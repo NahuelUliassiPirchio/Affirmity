@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Timer
@@ -30,6 +31,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -42,6 +44,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.data.Affirmation
 import com.pirxhio.affirmity.data.WeeklyStreak
@@ -218,6 +222,18 @@ fun WeeklyStreakTracker(
 
 private enum class BackgroundMode { COLOR, IMAGE_URL, GALLERY, JSON_IMPORT }
 
+/** Shape reference for [onImportAffirmationsJson] — handy to paste into an LLM prompt. */
+private const val AFFIRMATIONS_JSON_EXAMPLE = """[
+  {
+    "title": "I am capable of change",
+    "subtitle": "Growth starts with a single choice",
+    "background": {
+      "type": "color",
+      "value": "#2A9D8F"
+    }
+  }
+]"""
+
 @Composable
 private fun AddAffirmationCard(
     downloadError: String?,
@@ -235,6 +251,7 @@ private fun AddAffirmationCard(
     var galleryUri by remember { mutableStateOf<Uri?>(null) }
     var importJson by remember { mutableStateOf("") }
     var replaceExisting by remember { mutableStateOf(false) }
+    val clipboardManager = LocalClipboardManager.current
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
@@ -332,6 +349,15 @@ private fun AddAffirmationCard(
                 }
 
                 BackgroundMode.JSON_IMPORT -> {
+                    OutlinedButton(
+                        onClick = {
+                            clipboardManager.setText(AnnotatedString(AFFIRMATIONS_JSON_EXAMPLE))
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.ContentCopy, contentDescription = null)
+                        Text(" Copiar ejemplo de JSON")
+                    }
                     OutlinedTextField(
                         value = importJson,
                         onValueChange = { importJson = it },
