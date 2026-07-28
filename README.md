@@ -1,6 +1,22 @@
 # Affirmity
 
-Native Android app (Kotlin + Jetpack Compose) for daily affirmations and meditation practice.
+A native Android app (Kotlin + Jetpack Compose) for tracking a personal daily practice:
+reading affirmations and meditating, with streaks that keep you honest about it.
+
+This is a personal practice project — built to work through a real, self-contained Android
+architecture (Compose UI, Room, DataStore, WorkManager) rather than to ship on the Play Store.
+It isn't published, but it's built the way a real app would be.
+
+## Why this exists
+
+Habit apps usually outsource the hard part to a backend. The goal here was the opposite:
+a fully local, offline-first app that still behaves like a "real" product —
+persistent state, background-scheduled notifications that fire even when the app isn't running,
+and streak tracking that survives app restarts and day boundaries correctly.
+
+Secondary goal: use the project as a sandbox for modern Android patterns — Compose Material 3,
+Room + DataStore for persistence, and WorkManager-based scheduling — without the overhead of
+auth, sync, or a server.
 
 ## Features
 
@@ -10,21 +26,23 @@ vertical swipe (swipe down to go to the next card, looping back to the start of 
 deck when exhausted). Each card renders a background (solid color or image) behind its text.
 
 ### 2. Add / manage affirmations
-Users can create their own affirmations. Each affirmation is persisted using the JSON shape
-described in [Affirmation data format](#affirmation-data-format) below.
+Users can create their own affirmations, one at a time or via bulk JSON paste. Each affirmation
+is persisted using the JSON shape described in [Affirmation data format](#affirmation-data-format)
+below.
 
-Background images are supplied as a URL. On save, the app downloads the image once and stores it
-in local app storage (`filesDir`); the persisted record references the local file path so cards
-render correctly offline. The original URL is kept only as provenance, not as the render source.
+Background images are supplied as a URL (or picked from the device gallery). On save, the app
+downloads/copies the image once and stores it in local app storage (`filesDir`); the persisted
+record references the local file path so cards render correctly offline. The original URL is
+kept only as provenance, not as the render source.
 
 ### 3. Meditation timer
 A dedicated tab with a circular dial timer: the user sets a duration by dragging around a clock
-face, starts a countdown, and a sound plays when the timer reaches zero.
+face, starts a countdown, and a gong sound plays when the timer reaches zero.
 
 ### 4. Daily tracker
 Tracks, per calendar day, two independent streaks:
-- Affirmations: complete once the user has viewed at least 2 affirmations that day.
-- Meditation: complete once the user has completed a meditation session that day.
+- **Affirmations**: complete once the user has viewed at least 2 affirmations that day.
+- **Meditation**: complete once the user has completed a meditation session that day.
 
 Each streak resets to zero the first day its own condition is missed; they don't depend on
 each other.
@@ -39,12 +57,9 @@ The affirmation reminder notification can include the text of an affirmation dir
 
 ### 7. Reflection prompts
 A separate notification channel sends prompts at random times within a configured window, with
-open-ended, introspective ("uncomfortable") questions, independent of the reminder notifications
-in point 5.
+open-ended, introspective questions, independent of the reminder notifications in point 5.
 
 ## Affirmation data format
-
-Draft JSON shape for a single affirmation (subject to the open questions below):
 
 ```json
 {
@@ -58,21 +73,32 @@ Draft JSON shape for a single affirmation (subject to the open questions below):
 ```
 
 `background.type` is either `"color"` (hex value) or `"image"` (a URI/resource reference).
+Affirmations can also be bulk-imported by pasting a JSON array of objects in this shape.
 
-## Decisions
+## Architecture decisions
 
 - **Persistence**: local-only (Room + DataStore), no backend/auth/sync.
-- **Background images**: submitted as a URL, downloaded once and cached to local storage; the
-  persisted reference is the local file path, not the remote URL.
+- **Background images**: submitted as a URL or picked from the gallery, cached once to local
+  storage; the persisted reference is the local file path, not the remote source.
 - **Streaks**: affirmations and meditation each track their own independent streak, resetting on
-  the first day their own condition is missed.
+  the first day their own condition is missed. Persisted as a compact `(streakDays,
+  lastCompletedEpochDay)` window rather than a raw day-by-day array.
 - **Initial content**: the affirmations feed starts empty; there is no bundled starter set — the
   user must add their own before the feed has anything to show.
 - **Meditation sound**: a single sound bundled as an app resource, no per-user choice.
-- **Background reliability**: streak/tracker resets and reminder/prompt notifications must fire
-  correctly even when the app process isn't running, implying `WorkManager`/`AlarmManager`-backed
-  scheduling rather than in-memory state tied to an open Activity.
+- **Background reliability**: streak/tracker resets and reminder/prompt notifications fire
+  correctly even when the app process isn't running, via `WorkManager`-backed self-rescheduling
+  work chains rather than in-memory state tied to an open Activity.
+
+## Tech stack
+
+- Kotlin 2.2.10, Jetpack Compose (Material 3), Compose BOM 2025.12.00
+- Room (structured data) + DataStore Preferences (streaks, settings)
+- WorkManager for background scheduling
+- minSdk 24, targetSdk / compileSdk 36
+- Single Gradle module: `:app`
 
 ## Status
 
-Early scaffold stage — requirements above are being refined before implementation begins.
+Actively developed as a personal practice project. Core features (feed, meditation timer, daily
+tracker, notifications, bulk import) are implemented and working.
