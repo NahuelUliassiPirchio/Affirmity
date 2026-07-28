@@ -83,4 +83,28 @@ class NotificationScheduleTest {
 
         assertEquals(startMinute, minuteOfDay(result))
     }
+
+    @Test
+    fun `subWindow splits the window into three equal contiguous thirds`() {
+        val startMinute = 9 * 60 // 09:00
+        val endMinute = 21 * 60 // 21:00 -> 720 minute span
+
+        val first = NotificationSchedule.subWindow(startMinute, endMinute, 0, 3)
+        val second = NotificationSchedule.subWindow(startMinute, endMinute, 1, 3)
+        val third = NotificationSchedule.subWindow(startMinute, endMinute, 2, 3)
+
+        assertEquals(startMinute to startMinute + 240, first)
+        assertEquals(startMinute + 240 to startMinute + 480, second)
+        assertEquals(startMinute + 480 to endMinute, third)
+    }
+
+    @Test
+    fun `subWindow last slot absorbs the remainder minute`() {
+        val startMinute = 0
+        val endMinute = 10 // span of 10 does not divide evenly by 3
+
+        val last = NotificationSchedule.subWindow(startMinute, endMinute, 2, 3)
+
+        assertEquals(endMinute, last.second)
+    }
 }

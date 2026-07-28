@@ -13,8 +13,8 @@ import org.junit.runner.RunWith
 
 /**
  * Covers task 4.4: calling [NotificationScheduler.ensureScheduled] twice in a row must enqueue
- * exactly one pending occurrence — the idempotent-reseed guarantee relied on for app relaunch and
- * reboot recovery.
+ * exactly one pending occurrence per daily slot — the idempotent-reseed guarantee relied on for
+ * app relaunch and reboot recovery.
  */
 @RunWith(AndroidJUnit4::class)
 class NotificationSchedulerInstrumentedTest {
@@ -33,15 +33,17 @@ class NotificationSchedulerInstrumentedTest {
     }
 
     @Test
-    fun ensureScheduledTwice_enqueuesExactlyOnePendingOccurrence() = runBlocking {
+    fun ensureScheduledTwice_enqueuesExactlyOnePendingOccurrencePerSlot() = runBlocking {
         scheduler.ensureScheduled(NotificationChannelSpec.REMINDER)
         scheduler.ensureScheduled(NotificationChannelSpec.REMINDER)
 
-        val infos = androidx.work.WorkManager.getInstance(context)
-            .getWorkInfosForUniqueWork(NotificationChannelSpec.REMINDER.uniqueWorkName)
-            .get()
-        val pending = infos.filter { !it.state.isFinished }
+        for (slot in 0 until NotificationScheduler.SLOTS_PER_DAY) {
+            val infos = androidx.work.WorkManager.getInstance(context)
+                .getWorkInfosForUniqueWork("${NotificationChannelSpec.REMINDER.uniqueWorkName}_slot$slot")
+                .get()
+            val pending = infos.filter { !it.state.isFinished }
 
-        assertEquals(1, pending.size)
+            assertEquals("slot=$slot", 1, pending.size)
+        }
     }
 }

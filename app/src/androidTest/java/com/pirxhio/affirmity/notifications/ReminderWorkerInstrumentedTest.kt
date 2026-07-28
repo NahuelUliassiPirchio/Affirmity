@@ -93,7 +93,7 @@ class ReminderWorkerInstrumentedTest {
         assertEquals(ListenableWorker.Result.success(), result)
 
         val infos = WorkManager.getInstance(context)
-            .getWorkInfosForUniqueWork(NotificationChannelSpec.REMINDER.uniqueWorkName)
+            .getWorkInfosForUniqueWork("${NotificationChannelSpec.REMINDER.uniqueWorkName}_slot0")
             .get()
         assertEquals(true, infos.isNotEmpty())
     }

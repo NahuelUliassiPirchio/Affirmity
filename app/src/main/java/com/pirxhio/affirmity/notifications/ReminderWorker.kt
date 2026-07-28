@@ -34,7 +34,8 @@ class ReminderWorker(
                 title = applicationContext.getString(R.string.notification_reminder_title),
                 body = body,
             )
-            scheduler.scheduleNext(channel)
+            val slot = inputData.getInt(NotificationScheduler.KEY_SLOT_INDEX, 0)
+            scheduler.scheduleNext(channel, slot)
             Result.success()
         }.getOrElse { Result.retry() }
     }
