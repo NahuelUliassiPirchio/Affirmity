@@ -1,7 +1,6 @@
 package com.pirxhio.affirmity.ui.meditation
 
-import android.media.AudioManager
-import android.media.ToneGenerator
+import android.media.MediaPlayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,8 +35,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.pirxhio.affirmity.R
 import kotlinx.coroutines.delay
 
 private const val MIN_DURATION_SECONDS = 30
@@ -60,9 +61,10 @@ fun MeditationScreen(
     var isRunning by remember { mutableStateOf(false) }
     var selectedPreset by remember { mutableStateOf<String?>(null) }
 
-    val toneGenerator = remember { ToneGenerator(AudioManager.STREAM_MUSIC, 80) }
+    val context = LocalContext.current
+    val gongPlayer = remember { MediaPlayer.create(context, R.raw.meditation_gong) }
     DisposableEffect(Unit) {
-        onDispose { toneGenerator.release() }
+        onDispose { gongPlayer.release() }
     }
 
     // Real countdown driven by a coroutine delay loop (not a fake animation).
@@ -73,7 +75,8 @@ fun MeditationScreen(
         }
         if (isRunning && secondsRemaining <= 0) {
             isRunning = false
-            toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP, 600)
+            gongPlayer.seekTo(0)
+            gongPlayer.start()
             secondsRemaining = durationSeconds
             onSessionCompleted()
         }
