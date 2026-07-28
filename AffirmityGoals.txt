@@ -1,0 +1,10 @@
+Affirmity
+
+Estoy diseñando una aplicación y quiero que tenga las siguientes features:
+1. Una parte de afirmaciones donde se puedan seleccionar distintos fondos y que sea random el orden. Que sea un formato de tarjetas donde se hace un swipe down para pasar entre ellas e ir rotando.
+2. Una parte para agregar estas afirmaciones en un formato JSON específico elegido por vos, que contenga un título, un color o imagen de fondo y un subtítulo.
+3. Una tab que sea para meditar, que sea un timer donde uno pone el tiempo como un reloj circular y suena un sonido, valga la redundancia, cuando termina.
+4. Un tracker tanto de haber presenciado las afirmaciones, al menos dos, y haber meditado cada día.
+5. Reminders de cada aspecto, ya sea de que hay que meditar, hay que hacer afirmaciones.
+6. De esto último podría tener una afirmación en la misma notificación.
+7. Y otro tipo de notificaciones, media random, haciendo preguntas incómodas.
