@@ -120,6 +120,10 @@ class AffirmityAppState(
     var addImageError = mutableStateOf<String?>(null)
         private set
 
+    /** Set by [importAffirmationsFromJson]; cleared on the next import attempt. */
+    var importAffirmationsError = mutableStateOf<String?>(null)
+        private set
+
     var affirmationsStreak = mutableStateOf(WeeklyStreak(completedDays = List(7) { false }, streakDays = 0))
         private set
 
@@ -250,6 +254,47 @@ class AffirmityAppState(
                 background = AffirmationBackground.Image(localPath),
             ).toEntity()
         )
+    }
+
+    fun importAffirmationsFromJson(json: String, replaceExisting: Boolean) {
+        importAffirmationsError.value = null
+        val parsed = try {
+            parseAffirmationsJson(json)
+        } catch (e: IllegalArgumentException) {
+            importAffirmationsError.value = e.message
+            return
+        }
+
+        scope.launch {
+            if (replaceExisting) {
+                affirmationDao.deleteAll()
+            }
+
+            var failedCount = 0
+            parsed.forEach { item ->
+                val background = if (item.backgroundType == "image") {
+                    val localPath = runCatching { imageStore.download(item.backgroundValue) }
+                        .onFailure { failedCount++ }
+                        .getOrNull() ?: return@forEach
+                    AffirmationBackground.Image(localPath)
+                } else {
+                    AffirmationBackground.Color(item.backgroundValue)
+                }
+
+                affirmationDao.insert(
+                    Affirmation(
+                        title = item.title,
+                        subtitle = item.subtitle,
+                        background = background,
+                    ).toEntity()
+                )
+            }
+
+            if (failedCount > 0) {
+                importAffirmationsError.value =
+                    "$failedCount afirmación(es) no se pudieron importar: falló la descarga de la imagen."
+            }
+        }
     }
 
     fun removeAffirmation(id: String) {

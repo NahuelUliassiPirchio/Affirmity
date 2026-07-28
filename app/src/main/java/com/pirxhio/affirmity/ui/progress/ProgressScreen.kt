@@ -31,6 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -57,9 +58,11 @@ fun ProgressScreen(
     affirmationsStreak: WeeklyStreak,
     meditationStreak: WeeklyStreak,
     addImageError: String?,
+    importError: String?,
     onAddAffirmationWithColor: (title: String, subtitle: String, colorHex: String) -> Unit,
     onAddAffirmationWithImage: (title: String, subtitle: String, imageUrl: String) -> Unit,
     onAddAffirmationWithGalleryImage: (title: String, subtitle: String, imageUri: Uri) -> Unit,
+    onImportAffirmationsJson: (json: String, replaceExisting: Boolean) -> Unit,
     onDeleteAffirmation: (id: String) -> Unit,
     onOpenSettings: () -> Unit,
 ) {
@@ -124,9 +127,11 @@ fun ProgressScreen(
         item {
             AddAffirmationCard(
                 downloadError = addImageError,
+                importError = importError,
                 onAddAffirmationWithColor = onAddAffirmationWithColor,
                 onAddAffirmationWithImage = onAddAffirmationWithImage,
                 onAddAffirmationWithGalleryImage = onAddAffirmationWithGalleryImage,
+                onImportAffirmationsJson = onImportAffirmationsJson,
             )
         }
 
@@ -211,14 +216,16 @@ fun WeeklyStreakTracker(
     }
 }
 
-private enum class BackgroundMode { COLOR, IMAGE_URL, GALLERY }
+private enum class BackgroundMode { COLOR, IMAGE_URL, GALLERY, JSON_IMPORT }
 
 @Composable
 private fun AddAffirmationCard(
     downloadError: String?,
+    importError: String?,
     onAddAffirmationWithColor: (String, String, String) -> Unit,
     onAddAffirmationWithImage: (String, String, String) -> Unit,
     onAddAffirmationWithGalleryImage: (String, String, Uri) -> Unit,
+    onImportAffirmationsJson: (json: String, replaceExisting: Boolean) -> Unit,
 ) {
     var title by remember { mutableStateOf("") }
     var subtitle by remember { mutableStateOf("") }
@@ -226,6 +233,8 @@ private fun AddAffirmationCard(
     var backgroundMode by remember { mutableStateOf(BackgroundMode.COLOR) }
     var imageUrl by remember { mutableStateOf("") }
     var galleryUri by remember { mutableStateOf<Uri?>(null) }
+    var importJson by remember { mutableStateOf("") }
+    var replaceExisting by remember { mutableStateOf(false) }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
@@ -241,20 +250,22 @@ private fun AddAffirmationCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = { Text("Título") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-            OutlinedTextField(
-                value = subtitle,
-                onValueChange = { subtitle = it },
-                label = { Text("Subtítulo") },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 2
-            )
+            if (backgroundMode != BackgroundMode.JSON_IMPORT) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Título") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = subtitle,
+                    onValueChange = { subtitle = it },
+                    label = { Text("Subtítulo") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
                     selected = backgroundMode == BackgroundMode.COLOR,
@@ -270,6 +281,11 @@ private fun AddAffirmationCard(
                     selected = backgroundMode == BackgroundMode.GALLERY,
                     onClick = { backgroundMode = BackgroundMode.GALLERY },
                     label = { Text("Galería") }
+                )
+                FilterChip(
+                    selected = backgroundMode == BackgroundMode.JSON_IMPORT,
+                    onClick = { backgroundMode = BackgroundMode.JSON_IMPORT },
+                    label = { Text("JSON") }
                 )
             }
             when (backgroundMode) {
@@ -314,39 +330,78 @@ private fun AddAffirmationCard(
                         Text(if (galleryUri == null) "Elegir de la galería" else "Cambiar imagen elegida")
                     }
                 }
+
+                BackgroundMode.JSON_IMPORT -> {
+                    OutlinedTextField(
+                        value = importJson,
+                        onValueChange = { importJson = it },
+                        label = { Text("Pegar JSON de afirmaciones") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 6
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Reemplazar afirmaciones actuales",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Switch(checked = replaceExisting, onCheckedChange = { replaceExisting = it })
+                    }
+                }
             }
-            if (downloadError != null && backgroundMode != BackgroundMode.COLOR) {
+            if (downloadError != null && backgroundMode != BackgroundMode.COLOR && backgroundMode != BackgroundMode.JSON_IMPORT) {
                 Text(
                     text = downloadError,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.error
                 )
             }
+            if (importError != null && backgroundMode == BackgroundMode.JSON_IMPORT) {
+                Text(
+                    text = importError,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
             Button(
                 onClick = {
-                    if (title.isBlank() || subtitle.isBlank()) return@Button
                     when (backgroundMode) {
                         BackgroundMode.COLOR -> {
+                            if (title.isBlank() || subtitle.isBlank()) return@Button
                             onAddAffirmationWithColor(title.trim(), subtitle.trim(), selectedColor)
                             selectedColor = swatches.first()
+                            title = ""
+                            subtitle = ""
                         }
                         BackgroundMode.IMAGE_URL -> {
-                            if (imageUrl.isBlank()) return@Button
+                            if (title.isBlank() || subtitle.isBlank() || imageUrl.isBlank()) return@Button
                             onAddAffirmationWithImage(title.trim(), subtitle.trim(), imageUrl.trim())
                             imageUrl = ""
+                            title = ""
+                            subtitle = ""
                         }
                         BackgroundMode.GALLERY -> {
+                            if (title.isBlank() || subtitle.isBlank()) return@Button
                             val uri = galleryUri ?: return@Button
                             onAddAffirmationWithGalleryImage(title.trim(), subtitle.trim(), uri)
                             galleryUri = null
+                            title = ""
+                            subtitle = ""
+                        }
+                        BackgroundMode.JSON_IMPORT -> {
+                            if (importJson.isBlank()) return@Button
+                            onImportAffirmationsJson(importJson, replaceExisting)
+                            importJson = ""
                         }
                     }
-                    title = ""
-                    subtitle = ""
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Guardar")
+                Text(if (backgroundMode == BackgroundMode.JSON_IMPORT) "Importar" else "Guardar")
             }
         }
     }

@@ -56,6 +56,9 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.work.runtime.ktx)
     testImplementation(libs.junit)
+    // Real org.json impl for JVM unit tests only — Android provides org.json at runtime, but the
+    // stub android.jar used by testDebugUnitTest throws "not mocked" for its real methods.
+    testImplementation(libs.json)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
