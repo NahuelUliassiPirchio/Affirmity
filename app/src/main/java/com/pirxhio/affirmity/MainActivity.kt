@@ -79,8 +79,15 @@ fun AffirmityApp() {
                     affirmations = appState.affirmations,
                     affirmationsStreak = appState.affirmationsStreak.value,
                     meditationStreak = appState.meditationStreak.value,
-                    onAddAffirmation = { title, subtitle, colorHex ->
-                        appState.addAffirmation(title, subtitle, colorHex)
+                    addImageError = appState.addImageError.value,
+                    onAddAffirmationWithColor = { title, subtitle, colorHex ->
+                        appState.addAffirmationWithColor(title, subtitle, colorHex)
+                    },
+                    onAddAffirmationWithImage = { title, subtitle, imageUrl ->
+                        appState.addAffirmationWithImage(title, subtitle, imageUrl)
+                    },
+                    onAddAffirmationWithGalleryImage = { title, subtitle, imageUri ->
+                        appState.addAffirmationWithGalleryImage(title, subtitle, imageUri)
                     },
                     onDeleteAffirmation = { id -> appState.removeAffirmation(id) }
                 )

@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.data
 
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -9,6 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.pirxhio.affirmity.data.local.AffirmationDao
 import com.pirxhio.affirmity.data.local.AffirmationEntity
+import com.pirxhio.affirmity.data.local.AffirmationImageStore
 import com.pirxhio.affirmity.data.local.AffirmityDatabase
 import com.pirxhio.affirmity.data.local.DailyViewCount
 import com.pirxhio.affirmity.data.local.StreakSnapshot
@@ -18,11 +20,7 @@ import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
-/**
- * Background for an affirmation card. Only [Color] is exercised by the UI in this
- * pass; [Image] exists to match the README's documented JSON shape
- * (`background.type` == "color" | "image") for a future persistence/download pass.
- */
+/** Background for an affirmation card: a solid color, or a locally-cached downloaded image. */
 sealed class AffirmationBackground {
     data class Color(val value: String) : AffirmationBackground()
     data class Image(val localPath: String) : AffirmationBackground()
@@ -41,6 +39,7 @@ data class WeeklyStreak(
     val streakDays: Int,
 )
 
+/** Solid-color background, or the placeholder tint shown behind an image while it decodes. */
 fun Affirmation.backgroundColor(): Color =
     when (val bg = background) {
         is AffirmationBackground.Color -> runCatching {
@@ -107,8 +106,13 @@ class AffirmityAppState(
     private val scope: CoroutineScope,
     private val affirmationDao: AffirmationDao,
     private val trackerPreferences: TrackerPreferences,
+    private val imageStore: AffirmationImageStore,
 ) {
     val affirmations = mutableStateListOf<Affirmation>()
+
+    /** Set when [addAffirmationWithImage] fails to download; cleared on the next add attempt. */
+    var addImageError = mutableStateOf<String?>(null)
+        private set
 
     var affirmationsStreak = mutableStateOf(WeeklyStreak(completedDays = List(7) { false }, streakDays = 0))
         private set
@@ -155,7 +159,8 @@ class AffirmityAppState(
         }
     }
 
-    fun addAffirmation(title: String, subtitle: String, colorHex: String) {
+    fun addAffirmationWithColor(title: String, subtitle: String, colorHex: String) {
+        addImageError.value = null
         scope.launch {
             affirmationDao.insert(
                 Affirmation(
@@ -165,6 +170,36 @@ class AffirmityAppState(
                 ).toEntity()
             )
         }
+    }
+
+    fun addAffirmationWithImage(title: String, subtitle: String, imageUrl: String) {
+        addImageError.value = null
+        scope.launch {
+            val localPath = runCatching { imageStore.download(imageUrl) }
+                .onFailure { addImageError.value = "No se pudo descargar la imagen: ${it.message}" }
+                .getOrNull() ?: return@launch
+            insertImageAffirmation(title, subtitle, localPath)
+        }
+    }
+
+    fun addAffirmationWithGalleryImage(title: String, subtitle: String, imageUri: Uri) {
+        addImageError.value = null
+        scope.launch {
+            val localPath = runCatching { imageStore.importFromGallery(imageUri) }
+                .onFailure { addImageError.value = "No se pudo importar la imagen: ${it.message}" }
+                .getOrNull() ?: return@launch
+            insertImageAffirmation(title, subtitle, localPath)
+        }
+    }
+
+    private suspend fun insertImageAffirmation(title: String, subtitle: String, localPath: String) {
+        affirmationDao.insert(
+            Affirmation(
+                title = title,
+                subtitle = subtitle,
+                background = AffirmationBackground.Image(localPath),
+            ).toEntity()
+        )
     }
 
     fun removeAffirmation(id: String) {
@@ -234,6 +269,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             scope = scope,
             affirmationDao = database.affirmationDao(),
             trackerPreferences = TrackerPreferences(context),
+            imageStore = AffirmationImageStore(context.applicationContext),
         )
     }
 }

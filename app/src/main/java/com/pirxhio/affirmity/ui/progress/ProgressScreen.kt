@@ -1,5 +1,9 @@
 package com.pirxhio.affirmity.ui.progress
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,6 +25,7 @@ import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -50,7 +55,10 @@ fun ProgressScreen(
     affirmations: List<Affirmation>,
     affirmationsStreak: WeeklyStreak,
     meditationStreak: WeeklyStreak,
-    onAddAffirmation: (title: String, subtitle: String, colorHex: String) -> Unit,
+    addImageError: String?,
+    onAddAffirmationWithColor: (title: String, subtitle: String, colorHex: String) -> Unit,
+    onAddAffirmationWithImage: (title: String, subtitle: String, imageUrl: String) -> Unit,
+    onAddAffirmationWithGalleryImage: (title: String, subtitle: String, imageUri: Uri) -> Unit,
     onDeleteAffirmation: (id: String) -> Unit,
 ) {
     LazyColumn(
@@ -100,7 +108,12 @@ fun ProgressScreen(
         }
 
         item {
-            AddAffirmationCard(onAddAffirmation)
+            AddAffirmationCard(
+                downloadError = addImageError,
+                onAddAffirmationWithColor = onAddAffirmationWithColor,
+                onAddAffirmationWithImage = onAddAffirmationWithImage,
+                onAddAffirmationWithGalleryImage = onAddAffirmationWithGalleryImage,
+            )
         }
 
         items(affirmations, key = { it.id }) { affirmation ->
@@ -184,11 +197,26 @@ fun WeeklyStreakTracker(
     }
 }
 
+private enum class BackgroundMode { COLOR, IMAGE_URL, GALLERY }
+
 @Composable
-private fun AddAffirmationCard(onAddAffirmation: (String, String, String) -> Unit) {
+private fun AddAffirmationCard(
+    downloadError: String?,
+    onAddAffirmationWithColor: (String, String, String) -> Unit,
+    onAddAffirmationWithImage: (String, String, String) -> Unit,
+    onAddAffirmationWithGalleryImage: (String, String, Uri) -> Unit,
+) {
     var title by remember { mutableStateOf("") }
     var subtitle by remember { mutableStateOf("") }
     var selectedColor by remember { mutableStateOf(swatches.first()) }
+    var backgroundMode by remember { mutableStateOf(BackgroundMode.COLOR) }
+    var imageUrl by remember { mutableStateOf("") }
+    var galleryUri by remember { mutableStateOf<Uri?>(null) }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri -> galleryUri = uri }
+    )
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -214,29 +242,93 @@ private fun AddAffirmationCard(onAddAffirmation: (String, String, String) -> Uni
                 minLines = 2
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                swatches.forEach { hex ->
-                    val color = Color(android.graphics.Color.parseColor(hex))
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clickable { selectedColor = hex }
-                            .background(color, CircleShape)
-                            .border(
-                                width = if (selectedColor == hex) 2.dp else 0.dp,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                shape = CircleShape
+                FilterChip(
+                    selected = backgroundMode == BackgroundMode.COLOR,
+                    onClick = { backgroundMode = BackgroundMode.COLOR },
+                    label = { Text("Color") }
+                )
+                FilterChip(
+                    selected = backgroundMode == BackgroundMode.IMAGE_URL,
+                    onClick = { backgroundMode = BackgroundMode.IMAGE_URL },
+                    label = { Text("URL") }
+                )
+                FilterChip(
+                    selected = backgroundMode == BackgroundMode.GALLERY,
+                    onClick = { backgroundMode = BackgroundMode.GALLERY },
+                    label = { Text("Galería") }
+                )
+            }
+            when (backgroundMode) {
+                BackgroundMode.COLOR -> {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        swatches.forEach { hex ->
+                            val color = Color(android.graphics.Color.parseColor(hex))
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clickable { selectedColor = hex }
+                                    .background(color, CircleShape)
+                                    .border(
+                                        width = if (selectedColor == hex) 2.dp else 0.dp,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        shape = CircleShape
+                                    )
                             )
+                        }
+                    }
+                }
+
+                BackgroundMode.IMAGE_URL -> {
+                    OutlinedTextField(
+                        value = imageUrl,
+                        onValueChange = { imageUrl = it },
+                        label = { Text("URL de la imagen") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
                     )
                 }
+
+                BackgroundMode.GALLERY -> {
+                    Button(
+                        onClick = {
+                            galleryLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (galleryUri == null) "Elegir de la galería" else "Cambiar imagen elegida")
+                    }
+                }
+            }
+            if (downloadError != null && backgroundMode != BackgroundMode.COLOR) {
+                Text(
+                    text = downloadError,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error
+                )
             }
             Button(
                 onClick = {
-                    if (title.isNotBlank() && subtitle.isNotBlank()) {
-                        onAddAffirmation(title.trim(), subtitle.trim(), selectedColor)
-                        title = ""
-                        subtitle = ""
-                        selectedColor = swatches.first()
+                    if (title.isBlank() || subtitle.isBlank()) return@Button
+                    when (backgroundMode) {
+                        BackgroundMode.COLOR -> {
+                            onAddAffirmationWithColor(title.trim(), subtitle.trim(), selectedColor)
+                            selectedColor = swatches.first()
+                        }
+                        BackgroundMode.IMAGE_URL -> {
+                            if (imageUrl.isBlank()) return@Button
+                            onAddAffirmationWithImage(title.trim(), subtitle.trim(), imageUrl.trim())
+                            imageUrl = ""
+                        }
+                        BackgroundMode.GALLERY -> {
+                            val uri = galleryUri ?: return@Button
+                            onAddAffirmationWithGalleryImage(title.trim(), subtitle.trim(), uri)
+                            galleryUri = null
+                        }
                     }
+                    title = ""
+                    subtitle = ""
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {

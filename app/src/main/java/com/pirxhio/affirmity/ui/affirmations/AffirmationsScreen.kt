@@ -1,5 +1,7 @@
 package com.pirxhio.affirmity.ui.affirmations
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,18 +24,26 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.data.Affirmation
+import com.pirxhio.affirmity.data.AffirmationBackground
 import com.pirxhio.affirmity.data.backgroundColor
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.withContext
 
 /**
  * Full-screen, swipeable card feed matching afirmaciones.html: one card per page,
@@ -97,51 +107,77 @@ private fun AffirmationCard(affirmation: Affirmation) {
         modifier = Modifier
             .fillMaxSize()
             .background(affirmation.backgroundColor())
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Black.copy(alpha = 0.6f),
-                        Color.Black.copy(alpha = 0.2f),
-                        Color.Black.copy(alpha = 0.8f),
-                    )
-                )
-            ),
-        contentAlignment = Alignment.Center
     ) {
-        Column(
-            modifier = Modifier
-                .padding(24.dp)
-                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                imageVector = affirmation.icon(),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.height(32.dp)
-            )
-            Text(
-                text = affirmation.title,
-                style = MaterialTheme.typography.headlineLarge,
-                color = Color.White,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 8.dp)
-            )
-            Box(
-                modifier = Modifier
-                    .padding(vertical = 8.dp)
-                    .width(48.dp)
-                    .height(1.dp)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
-            )
-            Text(
-                text = affirmation.subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color(0xFFCCCCCC),
-                textAlign = TextAlign.Center
-            )
+        val background = affirmation.background
+        if (background is AffirmationBackground.Image) {
+            AffirmationImageBackground(background.localPath)
         }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.6f),
+                            Color.Black.copy(alpha = 0.2f),
+                            Color.Black.copy(alpha = 0.8f),
+                        )
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = affirmation.icon(),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.height(32.dp)
+                )
+                Text(
+                    text = affirmation.title,
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                Box(
+                    modifier = Modifier
+                        .padding(vertical = 8.dp)
+                        .width(48.dp)
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                )
+                Text(
+                    text = affirmation.subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color(0xFFCCCCCC),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AffirmationImageBackground(localPath: String) {
+    val bitmap by produceState<ImageBitmap?>(initialValue = null, localPath) {
+        value = withContext(Dispatchers.IO) {
+            runCatching { BitmapFactory.decodeFile(localPath)?.asImageBitmap() }.getOrNull()
+        }
+    }
+    bitmap?.let {
+        Image(
+            bitmap = it,
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
     }
 }
 
