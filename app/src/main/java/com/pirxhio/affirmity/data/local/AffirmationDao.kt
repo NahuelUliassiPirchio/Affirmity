@@ -15,4 +15,7 @@ interface AffirmationDao {
 
     @Query("DELETE FROM affirmations WHERE id = :id")
     suspend fun deleteById(id: String)
+
+    @Query("SELECT * FROM affirmations ORDER BY RANDOM() LIMIT 1")
+    suspend fun randomAffirmation(): AffirmationEntity?
 }

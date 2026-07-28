@@ -1,3 +1,20 @@
 <resources>
     <string name="app_name">Affirmity</string>
+
+    <string name="notification_channel_reminder_name">Recordatorios</string>
+    <string name="notification_channel_reminder_description">Avisos para meditar o ver afirmaciones</string>
+    <string name="notification_channel_reflection_name">Preguntas de reflexión</string>
+    <string name="notification_channel_reflection_description">Preguntas diarias para reflexionar</string>
+
+    <string name="notification_reminder_title">Un momento para ti</string>
+    <string name="notification_reminder_fallback_body">Tómate un momento para meditar o ver tus afirmaciones.</string>
+    <string name="notification_reflection_title">Reflexiona un momento</string>
+
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_reminders_label">Recordatorios</string>
+    <string name="settings_reflection_label">Preguntas de reflexión</string>
+    <string name="settings_window_start_label">Desde</string>
+    <string name="settings_window_end_label">Hasta</string>
+    <string name="settings_permission_banner_text">Las notificaciones están desactivadas en el sistema</string>
+    <string name="settings_permission_banner_action">Abrir ajustes</string>
 </resources>

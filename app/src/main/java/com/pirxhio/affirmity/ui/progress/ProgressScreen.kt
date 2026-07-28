@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -60,6 +61,7 @@ fun ProgressScreen(
     onAddAffirmationWithImage: (title: String, subtitle: String, imageUrl: String) -> Unit,
     onAddAffirmationWithGalleryImage: (title: String, subtitle: String, imageUri: Uri) -> Unit,
     onDeleteAffirmation: (id: String) -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -69,11 +71,23 @@ fun ProgressScreen(
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         item {
-            Text(
-                text = "Mi Progreso",
-                style = MaterialTheme.typography.headlineLarge,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Mi Progreso",
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                IconButton(onClick = onOpenSettings) {
+                    Icon(
+                        imageVector = Icons.Filled.Settings,
+                        contentDescription = "Ajustes"
+                    )
+                }
+            }
         }
 
         item {
