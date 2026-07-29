@@ -24,7 +24,6 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.fillMaxSize
-import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
@@ -132,7 +131,6 @@ private fun WeekGrid(rows: List<DailyCompletionEntity>, weekStart: Long, todayIn
     val showLetters = availableHeight >= LETTERS_ROW_THRESHOLD
 
     Row(
-        modifier = GlanceModifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(horizontalAlignment = Alignment.Start) {
@@ -166,12 +164,12 @@ private fun WeekGrid(rows: List<DailyCompletionEntity>, weekStart: Long, todayIn
         Column(horizontalAlignment = Alignment.Start) {
             Text(
                 text = "Afirmar",
-                style = TextStyle(fontSize = 13.sp, color = GlanceColorProvider(AFFIRMATION_COLOR)),
+                style = TextStyle(fontSize = 16.sp, color = GlanceColorProvider(AFFIRMATION_COLOR)),
             )
             Text(
                 text = "Meditar",
                 modifier = GlanceModifier.padding(top = 1.dp),
-                style = TextStyle(fontSize = 13.sp, color = GlanceColorProvider(MEDITATION_COLOR)),
+                style = TextStyle(fontSize = 16.sp, color = GlanceColorProvider(MEDITATION_COLOR)),
             )
         }
     }
