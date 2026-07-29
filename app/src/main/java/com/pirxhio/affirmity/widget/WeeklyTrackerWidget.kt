@@ -10,8 +10,10 @@ import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
+import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.provideContent
@@ -47,13 +49,22 @@ private val EMPTY_COLOR = Color(0x33FFFFFF)
 private val TODAY_RING_COLOR = Color(0xFFFFFFFF)
 private val CELL_SIZE = 26.dp
 
+/** Content-height thresholds below which a row no longer fits without clipping. */
+private val LEGEND_ROW_THRESHOLD = 90.dp
+private val LETTERS_ROW_THRESHOLD = 68.dp
+
 /**
  * Weekly tracker home-screen widget (spec: home-widget). Reads a snapshot from Room *before*
  * `provideContent` (D6) since Glance sessions are torn down when not visible — the widget is
  * refreshed by explicit `updateAll` calls from [com.pirxhio.affirmity.data.WidgetUpdater] and
  * [DayRolloverWorker], not by live composition.
+ *
+ * [SizeMode.Exact] recomposes with the real current size on every resize, so the content can drop
+ * the legend/letters rows instead of clipping when the user drags the widget below its full height.
  */
 class WeeklyTrackerWidget : GlanceAppWidget() {
+
+    override val sizeMode: SizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val dao = AffirmityDatabase.getInstance(context).dailyCompletionDao()
@@ -115,6 +126,9 @@ private fun EmptyState() {
 @androidx.compose.runtime.Composable
 private fun WeekGrid(rows: List<DailyCompletionEntity>, weekStart: Long, todayIndex: Int) {
     val byDay = rows.associateBy { it.epochDay }
+    val availableHeight = LocalSize.current.height
+    val showLetters = availableHeight >= LETTERS_ROW_THRESHOLD
+    val showLegend = availableHeight >= LEGEND_ROW_THRESHOLD
 
     Column(
         modifier = GlanceModifier.fillMaxWidth(),
@@ -133,38 +147,42 @@ private fun WeekGrid(rows: List<DailyCompletionEntity>, weekStart: Long, todayIn
                 )
             }
         }
-        Row(
-            modifier = GlanceModifier.fillMaxWidth().padding(top = 4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            for (letter in DAY_LETTERS) {
-                Text(
-                    text = letter,
-                    modifier = GlanceModifier.width(CELL_SIZE),
-                    style = TextStyle(
-                        fontSize = 10.sp,
-                        color = GlanceColorProvider(TODAY_RING_COLOR),
-                        textAlign = TextAlign.Center,
-                    ),
-                )
+        if (showLetters) {
+            Row(
+                modifier = GlanceModifier.fillMaxWidth().padding(top = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                for (letter in DAY_LETTERS) {
+                    Text(
+                        text = letter,
+                        modifier = GlanceModifier.width(CELL_SIZE),
+                        style = TextStyle(
+                            fontSize = 10.sp,
+                            color = GlanceColorProvider(TODAY_RING_COLOR),
+                            textAlign = TextAlign.Center,
+                        ),
+                    )
+                }
             }
         }
-        Row(
-            modifier = GlanceModifier.fillMaxWidth().padding(top = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = "Afirmar",
-                style = TextStyle(fontSize = 10.sp, color = GlanceColorProvider(AFFIRMATION_COLOR)),
-            )
-            Text(
-                text = "   ",
-                style = TextStyle(fontSize = 10.sp),
-            )
-            Text(
-                text = "Meditar",
-                style = TextStyle(fontSize = 10.sp, color = GlanceColorProvider(MEDITATION_COLOR)),
-            )
+        if (showLegend) {
+            Row(
+                modifier = GlanceModifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = "Afirmar",
+                    style = TextStyle(fontSize = 10.sp, color = GlanceColorProvider(AFFIRMATION_COLOR)),
+                )
+                Text(
+                    text = "   ",
+                    style = TextStyle(fontSize = 10.sp),
+                )
+                Text(
+                    text = "Meditar",
+                    style = TextStyle(fontSize = 10.sp, color = GlanceColorProvider(MEDITATION_COLOR)),
+                )
+            }
         }
     }
 }
