@@ -1,6 +1,7 @@
 package com.pirxhio.affirmity
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -45,23 +46,44 @@ import com.pirxhio.affirmity.ui.progress.ProgressScreen
 import com.pirxhio.affirmity.ui.settings.SettingsScreen
 import com.pirxhio.affirmity.ui.theme.AffirmityTheme
 
+/** Extra key a launcher (e.g. the home-screen widget) sets to pick the initial [AppDestinations]. */
+const val EXTRA_START_DESTINATION = "start_destination"
+
+/** Unknown or absent values fall back to [AppDestinations.AFIRMACIONES] (D10). */
+private fun resolveStartDestination(intent: Intent?): AppDestinations {
+    val raw = intent?.getStringExtra(EXTRA_START_DESTINATION)
+    return AppDestinations.entries.find { it.name == raw } ?: AppDestinations.AFIRMACIONES
+}
+
 class MainActivity : ComponentActivity() {
+    private val startDestination = mutableStateOf(AppDestinations.AFIRMACIONES)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        startDestination.value = resolveStartDestination(intent)
         setContent {
             AffirmityTheme {
-                AffirmityApp()
+                AffirmityApp(startDestination = startDestination.value)
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        startDestination.value = resolveStartDestination(intent)
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @PreviewScreenSizes
 @Composable
-fun AffirmityApp() {
-    var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.AFIRMACIONES) }
+fun AffirmityApp(startDestination: AppDestinations = AppDestinations.AFIRMACIONES) {
+    var currentDestination by rememberSaveable { mutableStateOf(startDestination) }
+    LaunchedEffect(startDestination) {
+        currentDestination = startDestination
+    }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     val appState = rememberAffirmityAppState()
     val context = LocalContext.current

@@ -19,6 +19,8 @@ import com.pirxhio.affirmity.data.local.NotificationPreferences
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.NotificationScheduler
+import com.pirxhio.affirmity.widget.WeeklyTrackerWidget
+import androidx.glance.appwidget.updateAll
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -344,8 +346,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
     }
 }
 
-/**
- * Default [WidgetUpdater] wiring, overridden in `widget/` once the Glance widget package exists
- * (D9). Until then this is a safe no-op so `AffirmityAppState` remains fully usable on its own.
- */
-private fun widgetUpdater(context: android.content.Context): WidgetUpdater = WidgetUpdater { }
+/** Pushes a Glance `updateAll` for [WeeklyTrackerWidget] (D9). */
+private fun widgetUpdater(context: android.content.Context): WidgetUpdater = WidgetUpdater {
+    WeeklyTrackerWidget().updateAll(context)
+}
