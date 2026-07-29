@@ -162,16 +162,16 @@ private fun WeekGrid(rows: List<DailyCompletionEntity>, weekStart: Long, todayIn
                 }
             }
         }
-        Spacer(modifier = GlanceModifier.defaultWeight())
-        Column(horizontalAlignment = Alignment.End) {
+        Spacer(modifier = GlanceModifier.width(10.dp))
+        Column(horizontalAlignment = Alignment.Start) {
             Text(
                 text = "Afirmar",
-                style = TextStyle(fontSize = 10.sp, color = GlanceColorProvider(AFFIRMATION_COLOR)),
+                style = TextStyle(fontSize = 13.sp, color = GlanceColorProvider(AFFIRMATION_COLOR)),
             )
             Text(
                 text = "Meditar",
-                modifier = GlanceModifier.padding(top = 2.dp),
-                style = TextStyle(fontSize = 10.sp, color = GlanceColorProvider(MEDITATION_COLOR)),
+                modifier = GlanceModifier.padding(top = 1.dp),
+                style = TextStyle(fontSize = 13.sp, color = GlanceColorProvider(MEDITATION_COLOR)),
             )
         }
     }
