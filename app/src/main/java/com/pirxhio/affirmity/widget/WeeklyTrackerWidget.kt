@@ -25,8 +25,10 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
+import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
+import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider as GlanceColorProvider
 import com.pirxhio.affirmity.MainActivity
@@ -38,10 +40,12 @@ private const val EXTRA_START_DESTINATION = "start_destination"
 private const val HOME_DESTINATION = "AFIRMACIONES"
 private val DAY_LETTERS = listOf("L", "M", "M", "J", "V", "S", "D")
 
-/** Filled color for a completed half; empty color for an incomplete one. */
-private val FILLED_COLOR = Color(0xFF00696F)
+/** Per-habit fill colors; empty color for an incomplete half. */
+private val MEDITATION_COLOR = Color(0xFF00696F)
+private val AFFIRMATION_COLOR = Color(0xFFC77B58)
 private val EMPTY_COLOR = Color(0x33FFFFFF)
 private val TODAY_RING_COLOR = Color(0xFFFFFFFF)
+private val CELL_SIZE = 26.dp
 
 /**
  * Weekly tracker home-screen widget (spec: home-widget). Reads a snapshot from Room *before*
@@ -112,8 +116,14 @@ private fun EmptyState() {
 private fun WeekGrid(rows: List<DailyCompletionEntity>, weekStart: Long, todayIndex: Int) {
     val byDay = rows.associateBy { it.epochDay }
 
-    Column(modifier = GlanceModifier.fillMaxWidth()) {
-        Row(modifier = GlanceModifier.fillMaxWidth()) {
+    Column(
+        modifier = GlanceModifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row(
+            modifier = GlanceModifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             for (offset in 0 until 7) {
                 val day = byDay[weekStart + offset]
                 DayCell(
@@ -123,31 +133,50 @@ private fun WeekGrid(rows: List<DailyCompletionEntity>, weekStart: Long, todayIn
                 )
             }
         }
-        Row(modifier = GlanceModifier.fillMaxWidth().padding(top = 4.dp)) {
+        Row(
+            modifier = GlanceModifier.fillMaxWidth().padding(top = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
             for (letter in DAY_LETTERS) {
                 Text(
                     text = letter,
-                    modifier = GlanceModifier.padding(horizontal = 6.dp),
-                    style = TextStyle(fontSize = 10.sp, color = GlanceColorProvider(TODAY_RING_COLOR)),
+                    modifier = GlanceModifier.width(CELL_SIZE),
+                    style = TextStyle(
+                        fontSize = 10.sp,
+                        color = GlanceColorProvider(TODAY_RING_COLOR),
+                        textAlign = TextAlign.Center,
+                    ),
                 )
             }
         }
-        Row(modifier = GlanceModifier.fillMaxWidth().padding(top = 6.dp)) {
-            Text(text = "Afirmar", style = TextStyle(fontSize = 10.sp, color = GlanceColorProvider(TODAY_RING_COLOR)))
-            Text(text = "  ", style = TextStyle(fontSize = 10.sp))
-            Text(text = "Meditar", style = TextStyle(fontSize = 10.sp, color = GlanceColorProvider(TODAY_RING_COLOR)))
+        Row(
+            modifier = GlanceModifier.fillMaxWidth().padding(top = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = "Afirmar",
+                style = TextStyle(fontSize = 10.sp, color = GlanceColorProvider(AFFIRMATION_COLOR)),
+            )
+            Text(
+                text = "   ",
+                style = TextStyle(fontSize = 10.sp),
+            )
+            Text(
+                text = "Meditar",
+                style = TextStyle(fontSize = 10.sp, color = GlanceColorProvider(MEDITATION_COLOR)),
+            )
         }
     }
 }
 
 @androidx.compose.runtime.Composable
 private fun DayCell(isToday: Boolean, affirmationDone: Boolean, meditationDone: Boolean) {
-    Box(modifier = GlanceModifier.size(26.dp).padding(1.dp), contentAlignment = Alignment.Center) {
+    Box(modifier = GlanceModifier.size(CELL_SIZE), contentAlignment = Alignment.Center) {
         if (isToday) {
             Image(
                 provider = ImageProvider(com.pirxhio.affirmity.R.drawable.widget_cell_ring),
                 contentDescription = null,
-                modifier = GlanceModifier.size(26.dp),
+                modifier = GlanceModifier.size(CELL_SIZE),
                 colorFilter = androidx.glance.ColorFilter.tint(GlanceColorProvider(TODAY_RING_COLOR)),
             )
         }
@@ -156,7 +185,7 @@ private fun DayCell(isToday: Boolean, affirmationDone: Boolean, meditationDone: 
             contentDescription = null,
             modifier = GlanceModifier.size(20.dp),
             colorFilter = androidx.glance.ColorFilter.tint(
-                GlanceColorProvider(if (affirmationDone) FILLED_COLOR else EMPTY_COLOR),
+                GlanceColorProvider(if (affirmationDone) AFFIRMATION_COLOR else EMPTY_COLOR),
             ),
         )
         Image(
@@ -164,7 +193,7 @@ private fun DayCell(isToday: Boolean, affirmationDone: Boolean, meditationDone: 
             contentDescription = null,
             modifier = GlanceModifier.size(20.dp),
             colorFilter = androidx.glance.ColorFilter.tint(
-                GlanceColorProvider(if (meditationDone) FILLED_COLOR else EMPTY_COLOR),
+                GlanceColorProvider(if (meditationDone) MEDITATION_COLOR else EMPTY_COLOR),
             ),
         )
     }
