@@ -50,8 +50,8 @@ private val TODAY_RING_COLOR = Color(0xFFFFFFFF)
 private val CELL_SIZE = 26.dp
 
 /** Content-height thresholds below which a row no longer fits without clipping. */
-private val LEGEND_ROW_THRESHOLD = 90.dp
-private val LETTERS_ROW_THRESHOLD = 68.dp
+private val LEGEND_ROW_THRESHOLD = 108.dp
+private val LETTERS_ROW_THRESHOLD = 74.dp
 
 /**
  * Weekly tracker home-screen widget (spec: home-widget). Reads a snapshot from Room *before*
@@ -103,7 +103,7 @@ internal fun WeeklyTrackerContent(
         modifier = GlanceModifier
             .fillMaxSize()
             .background(ImageProvider(com.pirxhio.affirmity.R.drawable.widget_card_bg))
-            .padding(12.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
             .clickable(actionStartActivity(tapIntent)),
         contentAlignment = Alignment.Center,
     ) {
@@ -149,7 +149,7 @@ private fun WeekGrid(rows: List<DailyCompletionEntity>, weekStart: Long, todayIn
         }
         if (showLetters) {
             Row(
-                modifier = GlanceModifier.fillMaxWidth().padding(top = 4.dp),
+                modifier = GlanceModifier.fillMaxWidth().padding(top = 2.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 for (letter in DAY_LETTERS) {
@@ -167,7 +167,7 @@ private fun WeekGrid(rows: List<DailyCompletionEntity>, weekStart: Long, todayIn
         }
         if (showLegend) {
             Row(
-                modifier = GlanceModifier.fillMaxWidth().padding(top = 8.dp),
+                modifier = GlanceModifier.fillMaxWidth().padding(top = 4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
