@@ -13,13 +13,12 @@ import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.AffirmationImageStore
 import com.pirxhio.affirmity.data.local.AffirmityDatabase
 import com.pirxhio.affirmity.data.local.ChannelSettings
+import com.pirxhio.affirmity.data.local.DailyCompletionDao
 import com.pirxhio.affirmity.data.local.DailyViewCount
 import com.pirxhio.affirmity.data.local.NotificationPreferences
-import com.pirxhio.affirmity.data.local.StreakSnapshot
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.NotificationScheduler
-import java.util.Calendar
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -78,29 +77,6 @@ private fun Affirmation.toEntity(): AffirmationEntity = AffirmationEntity(
     },
 )
 
-/** A device-local day count (arbitrary epoch, only used for day-difference math). */
-private fun epochDay(calendar: Calendar = Calendar.getInstance()): Long {
-    val midnight = (calendar.clone() as Calendar).apply {
-        set(Calendar.HOUR_OF_DAY, 0)
-        set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
-    }
-    return midnight.timeInMillis / (24 * 60 * 60 * 1000L)
-}
-
-/** Mon..Sun completion for the calendar week containing [today], derived from the streak window. */
-private fun StreakSnapshot.toWeeklyStreak(today: Calendar = Calendar.getInstance()): WeeklyStreak {
-    val daysSinceMonday = (today.get(Calendar.DAY_OF_WEEK) + 5) % 7
-    val monday = (today.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -daysSinceMonday) }
-    val windowStart = lastCompletedEpochDay - streakDays + 1
-    val completedDays = (0 until 7).map { offset ->
-        val dayEpoch = epochDay((monday.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, offset) })
-        streakDays > 0 && dayEpoch in windowStart..lastCompletedEpochDay
-    }
-    return WeeklyStreak(completedDays = completedDays, streakDays = streakDays)
-}
-
 /**
  * Shared in-memory state for the whole app, backed by Room (affirmations) and DataStore
  * (trackers) — see README "Decisions". Screens read plain [Affirmation]/[WeeklyStreak] state;
@@ -109,10 +85,12 @@ private fun StreakSnapshot.toWeeklyStreak(today: Calendar = Calendar.getInstance
 class AffirmityAppState(
     private val scope: CoroutineScope,
     private val affirmationDao: AffirmationDao,
+    private val dailyCompletionDao: DailyCompletionDao,
     private val trackerPreferences: TrackerPreferences,
     private val imageStore: AffirmationImageStore,
     private val notificationPreferences: NotificationPreferences,
     private val notificationScheduler: NotificationScheduler,
+    private val widgetUpdater: WidgetUpdater,
 ) {
     val affirmations = mutableStateListOf<Affirmation>()
 
@@ -140,8 +118,6 @@ class AffirmityAppState(
     var reflectionSettings = mutableStateOf(ChannelSettings(enabled = false, startMinute = 540, endMinute = 1260))
         private set
 
-    private var affirmationsLastCompletedEpochDay = -1L
-    private var meditationLastCompletedEpochDay = -1L
     private var affirmationsViewedToday = DailyViewCount(epochDay = -1L, count = 0)
 
     init {
@@ -152,15 +128,21 @@ class AffirmityAppState(
             }
         }
         scope.launch {
-            trackerPreferences.observeAffirmationsStreak().collect { snapshot ->
-                affirmationsLastCompletedEpochDay = snapshot.lastCompletedEpochDay
-                affirmationsStreak.value = snapshot.toWeeklyStreak()
-            }
-        }
-        scope.launch {
-            trackerPreferences.observeMeditationStreak().collect { snapshot ->
-                meditationLastCompletedEpochDay = snapshot.lastCompletedEpochDay
-                meditationStreak.value = snapshot.toWeeklyStreak()
+            val today = DayClock.epochDay()
+            val weekStart = DayClock.weekStartEpochDay()
+            dailyCompletionDao.observeRange(weekStart - STREAK_LOOKBACK_DAYS, weekStart + 6).collect { rows ->
+                affirmationsStreak.value = DailyCompletionStats.toWeeklyStreak(
+                    rows = rows,
+                    weekStartEpochDay = weekStart,
+                    todayEpochDay = today,
+                    isDone = { it.affirmationDone },
+                )
+                meditationStreak.value = DailyCompletionStats.toWeeklyStreak(
+                    rows = rows,
+                    weekStartEpochDay = weekStart,
+                    todayEpochDay = today,
+                    isDone = { it.meditationDone },
+                )
             }
         }
         scope.launch {
@@ -304,7 +286,7 @@ class AffirmityAppState(
     /** Call once per affirmation the user settles on while swiping the feed. */
     fun recordAffirmationViewed() {
         scope.launch {
-            val today = epochDay()
+            val today = DayClock.epochDay()
             val viewed = affirmationsViewedToday
             val updated = if (viewed.epochDay == today) {
                 viewed.copy(count = viewed.count + 1)
@@ -314,14 +296,18 @@ class AffirmityAppState(
             affirmationsViewedToday = updated
             trackerPreferences.saveAffirmationsViewedToday(updated)
             if (updated.count >= AFFIRMATIONS_GOAL_PER_DAY) {
-                markDayCompleted(today, isMeditation = false)
+                dailyCompletionDao.markAffirmation(today)
+                widgetUpdater.refresh()
             }
         }
     }
 
     /** Call when a meditation session finishes its full countdown. */
     fun recordMeditationCompleted() {
-        scope.launch { markDayCompleted(epochDay(), isMeditation = true) }
+        scope.launch {
+            dailyCompletionDao.markMeditation(DayClock.epochDay())
+            widgetUpdater.refresh()
+        }
     }
 
     /** Call whenever the user settles on a new duration (slider release, preset tap). */
@@ -330,27 +316,11 @@ class AffirmityAppState(
         scope.launch { trackerPreferences.saveMeditationDurationSeconds(seconds) }
     }
 
-    private suspend fun markDayCompleted(today: Long, isMeditation: Boolean) {
-        val lastEpoch = if (isMeditation) meditationLastCompletedEpochDay else affirmationsLastCompletedEpochDay
-        if (lastEpoch == today) return
-
-        val currentStreak = if (isMeditation) meditationStreak.value.streakDays else affirmationsStreak.value.streakDays
-        val newStreakDays = if (lastEpoch == today - 1) currentStreak + 1 else 1
-        val snapshot = StreakSnapshot(streakDays = newStreakDays, lastCompletedEpochDay = today)
-
-        if (isMeditation) {
-            meditationLastCompletedEpochDay = today
-            meditationStreak.value = snapshot.toWeeklyStreak()
-            trackerPreferences.saveMeditationStreak(snapshot)
-        } else {
-            affirmationsLastCompletedEpochDay = today
-            affirmationsStreak.value = snapshot.toWeeklyStreak()
-            trackerPreferences.saveAffirmationsStreak(snapshot)
-        }
-    }
-
     private companion object {
         const val AFFIRMATIONS_GOAL_PER_DAY = 2
+
+        /** How far back to look when deriving the running streak from `daily_completion`. */
+        const val STREAK_LOOKBACK_DAYS = 370L
     }
 }
 
@@ -364,10 +334,18 @@ fun rememberAffirmityAppState(): AffirmityAppState {
         AffirmityAppState(
             scope = scope,
             affirmationDao = database.affirmationDao(),
+            dailyCompletionDao = database.dailyCompletionDao(),
             trackerPreferences = TrackerPreferences(context),
             imageStore = AffirmationImageStore(context.applicationContext),
             notificationPreferences = notificationPreferences,
             notificationScheduler = NotificationScheduler(context.applicationContext, notificationPreferences),
+            widgetUpdater = widgetUpdater(context.applicationContext),
         )
     }
 }
+
+/**
+ * Default [WidgetUpdater] wiring, overridden in `widget/` once the Glance widget package exists
+ * (D9). Until then this is a safe no-op so `AffirmityAppState` remains fully usable on its own.
+ */
+private fun widgetUpdater(context: android.content.Context): WidgetUpdater = WidgetUpdater { }
