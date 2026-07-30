@@ -1,0 +1,40 @@
+package com.pirxhio.affirmity.data.repository
+
+import com.pirxhio.affirmity.data.local.AffirmationEntity
+import com.pirxhio.affirmity.data.local.ChannelSettings
+import com.pirxhio.affirmity.data.local.DailyCompletionEntity
+import com.pirxhio.affirmity.notifications.NotificationChannelSpec
+import kotlinx.coroutines.flow.Flow
+
+/**
+ * Store-agnostic contract for affirmation persistence. Implementations exist for Room
+ * (signed-out users, `RoomAffirmationRepository`) and Firestore (signed-in users,
+ * `FirestoreAffirmationRepository`) — see `data-sync` spec for the single-writer cutover rule.
+ */
+interface AffirmationRepository {
+    fun observeAll(): Flow<List<AffirmationEntity>>
+    suspend fun insert(entity: AffirmationEntity)
+    suspend fun deleteById(id: String)
+    suspend fun deleteAll()
+}
+
+/** Store-agnostic contract for the daily habit-completion tracker (streak source of truth). */
+interface DailyCompletionRepository {
+    fun observeRange(from: Long, to: Long): Flow<List<DailyCompletionEntity>>
+    suspend fun getRange(from: Long, to: Long): List<DailyCompletionEntity>
+    suspend fun markMeditation(epochDay: Long)
+    suspend fun markAffirmation(epochDay: Long)
+}
+
+/** Store-agnostic contract for the meditation-duration preference. */
+interface MeditationPreferencesRepository {
+    fun observeMeditationDurationSeconds(): Flow<Int?>
+    suspend fun saveMeditationDurationSeconds(seconds: Int)
+}
+
+/** Store-agnostic contract for both notification-channel preferences. */
+interface NotificationSettingsRepository {
+    fun observe(channel: NotificationChannelSpec): Flow<ChannelSettings>
+    suspend fun setEnabled(channel: NotificationChannelSpec, enabled: Boolean)
+    suspend fun setWindow(channel: NotificationChannelSpec, startMinute: Int, endMinute: Int)
+}
