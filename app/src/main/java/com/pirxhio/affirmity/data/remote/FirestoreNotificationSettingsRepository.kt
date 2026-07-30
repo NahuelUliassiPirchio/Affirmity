@@ -1,0 +1,50 @@
+package com.pirxhio.affirmity.data.remote
+
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
+import com.pirxhio.affirmity.data.local.ChannelSettings
+import com.pirxhio.affirmity.data.repository.NotificationSettingsRepository
+import com.pirxhio.affirmity.notifications.NotificationChannelSpec
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.tasks.await
+
+/**
+ * [NotificationSettingsRepository] backed by the single shared `users/{uid}/settings/preferences`
+ * document, both channels prefixed per [NotificationChannelSpec.prefsPrefix] (mirrors
+ * `NotificationPreferences`' DataStore key convention). Thin Firebase SDK glue, untested by design.
+ */
+class FirestoreNotificationSettingsRepository(
+    private val firestore: FirebaseFirestore,
+    private val uid: String,
+) : NotificationSettingsRepository {
+
+    private fun document() = firestore.document(FirestorePaths.settingsPreferencesDoc(uid))
+
+    override fun observe(channel: NotificationChannelSpec): Flow<ChannelSettings> = callbackFlow {
+        val registration = document().addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                close(error)
+                return@addSnapshotListener
+            }
+            trySend(channelSettingsFromMap(channel, snapshot?.data.orEmpty()))
+        }
+        awaitClose { registration.remove() }
+    }
+
+    override suspend fun setEnabled(channel: NotificationChannelSpec, enabled: Boolean) {
+        document().set(mapOf("${channel.prefsPrefix}_enabled" to enabled), SetOptions.merge()).await()
+    }
+
+    override suspend fun setWindow(channel: NotificationChannelSpec, startMinute: Int, endMinute: Int) {
+        require(endMinute >= startMinute) { "endMinute ($endMinute) must be >= startMinute ($startMinute)" }
+        document().set(
+            mapOf(
+                "${channel.prefsPrefix}_startMinute" to startMinute,
+                "${channel.prefsPrefix}_endMinute" to endMinute,
+            ),
+            SetOptions.merge(),
+        ).await()
+    }
+}
