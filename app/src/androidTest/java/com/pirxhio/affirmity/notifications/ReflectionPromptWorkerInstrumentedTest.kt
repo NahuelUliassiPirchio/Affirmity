@@ -7,6 +7,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.ListenableWorker
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
+import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.NotificationPreferences
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -21,11 +22,13 @@ class ReflectionPromptWorkerInstrumentedTest {
 
     private lateinit var context: Context
     private lateinit var preferences: NotificationPreferences
+    private lateinit var debugLog: NotificationDebugLog
 
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         preferences = NotificationPreferences(context)
+        debugLog = NotificationDebugLog(context)
         WorkManagerTestInitHelper.initializeTestWorkManager(context)
         runBlocking { preferences.setEnabled(NotificationChannelSpec.REFLECTION, true) }
     }
@@ -42,8 +45,9 @@ class ReflectionPromptWorkerInstrumentedTest {
                     appContext,
                     workerParameters,
                     preferences,
-                    NotificationScheduler(appContext, preferences),
-                    Notifier(appContext),
+                    NotificationScheduler(appContext, preferences, debugLog),
+                    Notifier(appContext, debugLog),
+                    debugLog,
                 )
             })
             .build()

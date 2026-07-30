@@ -5,7 +5,12 @@ import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import com.pirxhio.affirmity.data.local.NotificationDebugLog
+import com.pirxhio.affirmity.data.local.NotificationLogEvent
 import com.pirxhio.affirmity.data.local.NotificationPreferences
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -20,6 +25,7 @@ import kotlinx.coroutines.withContext
 class NotificationScheduler(
     private val context: Context,
     private val preferences: NotificationPreferences,
+    private val debugLog: NotificationDebugLog,
 ) {
     private val workManager get() = WorkManager.getInstance(context)
 
@@ -78,6 +84,11 @@ class NotificationScheduler(
         }
 
         workManager.enqueueUniqueWork(uniqueWorkName(channel, slot), ExistingWorkPolicy.REPLACE, request)
+        debugLog.record(
+            channel,
+            NotificationLogEvent.SCHEDULED,
+            "slot $slot @ ${TIME_FORMAT.format(Date(triggerAt))}",
+        )
     }
 
     /** Cancels all of [channel]'s slot chains; the other channel's pending work is untouched. */
@@ -93,5 +104,6 @@ class NotificationScheduler(
     companion object {
         const val SLOTS_PER_DAY = 3
         const val KEY_SLOT_INDEX = "slot_index"
+        private val TIME_FORMAT = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault())
     }
 }

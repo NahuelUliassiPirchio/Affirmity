@@ -5,6 +5,7 @@ import androidx.work.ListenableWorker
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import com.pirxhio.affirmity.data.local.AffirmationDao
+import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.NotificationPreferences
 
 /**
@@ -23,8 +24,9 @@ class AffirmityWorkerFactory(
         workerClassName: String,
         workerParameters: WorkerParameters,
     ): ListenableWorker? {
-        val scheduler = NotificationScheduler(appContext, preferences)
-        val notifier = Notifier(appContext)
+        val debugLog = NotificationDebugLog(appContext)
+        val scheduler = NotificationScheduler(appContext, preferences, debugLog)
+        val notifier = Notifier(appContext, debugLog)
         return when (workerClassName) {
             ReminderWorker::class.java.name -> ReminderWorker(
                 appContext,
@@ -33,6 +35,7 @@ class AffirmityWorkerFactory(
                 preferences,
                 scheduler,
                 notifier,
+                debugLog,
             )
 
             ReflectionPromptWorker::class.java.name -> ReflectionPromptWorker(
@@ -41,6 +44,7 @@ class AffirmityWorkerFactory(
                 preferences,
                 scheduler,
                 notifier,
+                debugLog,
             )
 
             else -> null

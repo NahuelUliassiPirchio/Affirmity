@@ -13,6 +13,7 @@ import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.local.AffirmationDao
 import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.AffirmityDatabase
+import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.NotificationPreferences
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -30,12 +31,14 @@ class ReminderWorkerInstrumentedTest {
     private lateinit var context: Context
     private lateinit var database: AffirmityDatabase
     private lateinit var preferences: NotificationPreferences
+    private lateinit var debugLog: NotificationDebugLog
 
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         database = Room.inMemoryDatabaseBuilder(context, AffirmityDatabase::class.java).build()
         preferences = NotificationPreferences(context)
+        debugLog = NotificationDebugLog(context)
         WorkManagerTestInitHelper.initializeTestWorkManager(context)
         runBlocking { preferences.setEnabled(NotificationChannelSpec.REMINDER, true) }
     }
@@ -52,8 +55,9 @@ class ReminderWorkerInstrumentedTest {
                     workerParameters,
                     database.affirmationDao(),
                     preferences,
-                    NotificationScheduler(appContext, preferences),
-                    Notifier(appContext),
+                    NotificationScheduler(appContext, preferences, debugLog),
+                    Notifier(appContext, debugLog),
+                    debugLog,
                 )
             })
             .build()

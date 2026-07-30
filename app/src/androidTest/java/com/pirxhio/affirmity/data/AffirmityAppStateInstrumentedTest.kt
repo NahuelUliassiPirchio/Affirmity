@@ -7,9 +7,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.testing.WorkManagerTestInitHelper
 import com.pirxhio.affirmity.data.local.AffirmationImageStore
 import com.pirxhio.affirmity.data.local.AffirmityDatabase
+import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.NotificationPreferences
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.notifications.NotificationScheduler
+import com.pirxhio.affirmity.notifications.Notifier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -39,6 +41,7 @@ class AffirmityAppStateInstrumentedTest {
             .allowMainThreadQueries()
             .build()
         val notificationPreferences = NotificationPreferences(context)
+        val notificationDebugLog = NotificationDebugLog(context.applicationContext)
         state = AffirmityAppState(
             scope = CoroutineScope(Dispatchers.Unconfined),
             affirmationDao = db.affirmationDao(),
@@ -46,7 +49,13 @@ class AffirmityAppStateInstrumentedTest {
             trackerPreferences = TrackerPreferences(context),
             imageStore = AffirmationImageStore(context.applicationContext),
             notificationPreferences = notificationPreferences,
-            notificationScheduler = NotificationScheduler(context.applicationContext, notificationPreferences),
+            notificationScheduler = NotificationScheduler(
+                context.applicationContext,
+                notificationPreferences,
+                notificationDebugLog,
+            ),
+            notificationDebugLog = notificationDebugLog,
+            notifier = Notifier(context.applicationContext, notificationDebugLog),
             widgetUpdater = WidgetUpdater { },
         )
     }

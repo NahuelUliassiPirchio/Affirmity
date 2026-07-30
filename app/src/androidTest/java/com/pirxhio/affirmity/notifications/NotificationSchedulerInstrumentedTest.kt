@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.testing.WorkManagerTestInitHelper
+import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.NotificationPreferences
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -28,7 +29,7 @@ class NotificationSchedulerInstrumentedTest {
         context = ApplicationProvider.getApplicationContext()
         WorkManagerTestInitHelper.initializeTestWorkManager(context)
         preferences = NotificationPreferences(context)
-        scheduler = NotificationScheduler(context, preferences)
+        scheduler = NotificationScheduler(context, preferences, NotificationDebugLog(context))
         runBlocking { preferences.setEnabled(NotificationChannelSpec.REMINDER, true) }
     }
 

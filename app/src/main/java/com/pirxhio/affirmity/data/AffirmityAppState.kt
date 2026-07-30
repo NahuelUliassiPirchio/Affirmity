@@ -26,10 +26,13 @@ import com.pirxhio.affirmity.data.local.AffirmityDatabase
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionDao
 import com.pirxhio.affirmity.data.local.DailyViewCount
+import com.pirxhio.affirmity.data.local.NotificationDebugLog
+import com.pirxhio.affirmity.data.local.NotificationLogEntry
 import com.pirxhio.affirmity.data.local.NotificationPreferences
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.NotificationScheduler
+import com.pirxhio.affirmity.notifications.Notifier
 import com.pirxhio.affirmity.widget.WeeklyTrackerWidget
 import androidx.glance.appwidget.updateAll
 import java.util.UUID
@@ -103,6 +106,8 @@ class AffirmityAppState(
     private val imageStore: AffirmationImageStore,
     private val notificationPreferences: NotificationPreferences,
     private val notificationScheduler: NotificationScheduler,
+    private val notificationDebugLog: NotificationDebugLog,
+    private val notifier: Notifier,
     private val widgetUpdater: WidgetUpdater,
     private val authRepository: AuthRepository,
 ) {
@@ -138,6 +143,9 @@ class AffirmityAppState(
         private set
 
     var reflectionSettings = mutableStateOf(ChannelSettings(enabled = false, startMinute = 540, endMinute = 1260))
+        private set
+
+    var notificationDebugEntries = mutableStateListOf<NotificationLogEntry>()
         private set
 
     private var affirmationsViewedToday = DailyViewCount(epochDay = -1L, count = 0)
@@ -192,6 +200,12 @@ class AffirmityAppState(
             notificationScheduler.ensureScheduled(NotificationChannelSpec.REFLECTION)
         }
         scope.launch {
+            notificationDebugLog.entries.collect { entries ->
+                notificationDebugEntries.clear()
+                notificationDebugEntries.addAll(entries)
+            }
+        }
+        scope.launch {
             authRepository.authState.collect { authState.value = it }
         }
     }
@@ -214,6 +228,22 @@ class AffirmityAppState(
 
     fun signOut() {
         scope.launch { authRepository.signOut() }
+    }
+
+    fun clearNotificationDebugLog() {
+        scope.launch { notificationDebugLog.clear() }
+    }
+
+    /** Posts a real notification right now, bypassing the scheduler/worker chain entirely — lets
+     * the user confirm what a delivered notification looks like without waiting for a scheduled slot. */
+    fun sendTestNotification() {
+        scope.launch {
+            notifier.notify(
+                channel = NotificationChannelSpec.REMINDER,
+                title = "Notificación de prueba",
+                body = "Si ves esto, el sistema de notificaciones funciona en este teléfono.",
+            )
+        }
     }
 
     fun setChannelEnabled(channel: NotificationChannelSpec, enabled: Boolean) {
@@ -376,6 +406,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
     return remember {
         val database = AffirmityDatabase.getInstance(context)
         val notificationPreferences = NotificationPreferences(context)
+        val notificationDebugLog = NotificationDebugLog(context.applicationContext)
         val googleIdAuthProvider = GoogleIdAuthProvider(CredentialManager.create(context.applicationContext))
         AffirmityAppState(
             scope = scope,
@@ -384,7 +415,13 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             trackerPreferences = TrackerPreferences(context),
             imageStore = AffirmationImageStore(context.applicationContext),
             notificationPreferences = notificationPreferences,
-            notificationScheduler = NotificationScheduler(context.applicationContext, notificationPreferences),
+            notificationScheduler = NotificationScheduler(
+                context.applicationContext,
+                notificationPreferences,
+                notificationDebugLog,
+            ),
+            notificationDebugLog = notificationDebugLog,
+            notifier = Notifier(context.applicationContext, notificationDebugLog),
             widgetUpdater = widgetUpdater(context.applicationContext),
             authRepository = FirebaseAuthRepository(
                 auth = FirebaseAuth.getInstance(),

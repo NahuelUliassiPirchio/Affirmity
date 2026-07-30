@@ -43,6 +43,7 @@ import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
 import com.pirxhio.affirmity.ui.meditation.MeditationScreen
 import com.pirxhio.affirmity.ui.progress.ProgressScreen
+import com.pirxhio.affirmity.ui.settings.NotificationDebugScreen
 import com.pirxhio.affirmity.ui.settings.SettingsScreen
 import com.pirxhio.affirmity.ui.theme.AffirmityTheme
 
@@ -85,6 +86,7 @@ fun AffirmityApp(startDestination: AppDestinations = AppDestinations.AFIRMACIONE
         currentDestination = startDestination
     }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showNotificationDebug by rememberSaveable { mutableStateOf(false) }
     val appState = rememberAffirmityAppState()
     val context = LocalContext.current
 
@@ -105,6 +107,34 @@ fun AffirmityApp(startDestination: AppDestinations = AppDestinations.AFIRMACIONE
         if (needsRuntimePrompt) {
             permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+    }
+
+    if (showNotificationDebug) {
+        BackHandler { showNotificationDebug = false }
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            topBar = {
+                TopAppBar(
+                    title = { Text("Debug de notificaciones") },
+                    navigationIcon = {
+                        IconButton(onClick = { showNotificationDebug = false }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Volver"
+                            )
+                        }
+                    }
+                )
+            }
+        ) { innerPadding ->
+            NotificationDebugScreen(
+                modifier = Modifier.padding(innerPadding),
+                entries = appState.notificationDebugEntries,
+                onClear = { appState.clearNotificationDebugLog() },
+                onSendTestNotification = { appState.sendTestNotification() },
+            )
+        }
+        return
     }
 
     if (showSettings) {
@@ -160,6 +190,7 @@ fun AffirmityApp(startDestination: AppDestinations = AppDestinations.AFIRMACIONE
                         end
                     )
                 },
+                onOpenNotificationDebug = { showNotificationDebug = true },
             )
         }
         return

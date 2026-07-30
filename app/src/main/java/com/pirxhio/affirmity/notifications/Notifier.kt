@@ -7,6 +7,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.pirxhio.affirmity.MainActivity
 import com.pirxhio.affirmity.R
+import com.pirxhio.affirmity.data.local.NotificationDebugLog
+import com.pirxhio.affirmity.data.local.NotificationLogEvent
 
 /**
  * Builds and posts a single channel's notification. Centralizes the
@@ -14,10 +16,13 @@ import com.pirxhio.affirmity.R
  * if the user (or the system) has disabled notifications, `notify()` is silently skipped and the
  * chain keeps rescheduling for whenever permission/preference is restored.
  */
-class Notifier(private val context: Context) {
+class Notifier(private val context: Context, private val debugLog: NotificationDebugLog) {
 
-    fun notify(channel: NotificationChannelSpec, title: String, body: String) {
-        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
+    suspend fun notify(channel: NotificationChannelSpec, title: String, body: String) {
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+            debugLog.record(channel, NotificationLogEvent.NOTIFY_SKIPPED_PERMISSION)
+            return
+        }
 
         val contentIntent = PendingIntent.getActivity(
             context,
@@ -27,7 +32,7 @@ class Notifier(private val context: Context) {
         )
 
         val notification = NotificationCompat.Builder(context, channel.channelId)
-            .setSmallIcon(R.drawable.ic_notification)
+            .setSmallIcon(R.drawable.notification_icon_24dp)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
@@ -36,5 +41,6 @@ class Notifier(private val context: Context) {
             .build()
 
         NotificationManagerCompat.from(context).notify(channel.notificationId, notification)
+        debugLog.record(channel, NotificationLogEvent.NOTIFY_POSTED)
     }
 }

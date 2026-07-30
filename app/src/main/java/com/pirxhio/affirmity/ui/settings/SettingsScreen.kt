@@ -47,6 +47,7 @@ fun SettingsScreen(
     onReminderWindowChanged: (startMinute: Int, endMinute: Int) -> Unit,
     onReflectionEnabledChanged: (Boolean) -> Unit,
     onReflectionWindowChanged: (startMinute: Int, endMinute: Int) -> Unit,
+    onOpenNotificationDebug: () -> Unit,
     onSignInClicked: () -> Unit,
     onSignOutClicked: () -> Unit,
     modifier: Modifier = Modifier,
@@ -87,6 +88,21 @@ fun SettingsScreen(
                 onEnabledChanged = onReflectionEnabledChanged,
                 onWindowChanged = onReflectionWindowChanged,
             )
+        }
+
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(text = "Debug de notificaciones", style = MaterialTheme.typography.titleMedium)
+                    TextButton(onClick = onOpenNotificationDebug) { Text("Ver historial") }
+                }
+            }
         }
     }
 }
