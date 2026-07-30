@@ -1,0 +1,68 @@
+schema: spec-driven
+
+context: |
+  Native Android app, Kotlin 2.2.10 + Jetpack Compose (BOM 2025.12.00), single
+  Gradle module :app, package com.pirxhio.affirmity. minSdk 24 / targetSdk 36 /
+  compileSdk 36, AGP 9.3.1. Persistence today: Room 2.8.4 + DataStore
+  Preferences 1.2.1, notifications via WorkManager 2.11.2
+  (NotificationScheduler/ReminderWorker/ReflectionPromptWorker), home-screen
+  widget via Glance 1.1.1. Upcoming change: migrate persistence/notifications
+  to Firebase (Auth, Firestore, FCM via Cloud Functions + Cloud Scheduler),
+  replacing WorkManager scheduling failing under Doze/battery optimization.
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes (especially Firebase migration
+      touching Room/DataStore/WorkManager persistence)
+    - Call out minSdk 24 compatibility for any new dependency
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows (e.g. FCM push -> local
+      notification, Firestore sync)
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    guidelines:
+      - Follow existing code patterns (single-activity Compose, libs.versions.toml
+        catalog, no inline dependency coordinates)
+    tdd: true
+    test_command: "gradlew.bat testDebugUnitTest"
+  verify:
+    test_command: "gradlew.bat testDebugUnitTest"
+    build_command: "gradlew.bat assembleDebug"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
+
+testing:
+  strict_tdd: true
+  test_runner:
+    command: "gradlew.bat testDebugUnitTest"
+    framework: "JUnit 4 (4.13.2), Android Gradle Plugin unit test task"
+  test_layers:
+    unit:
+      available: true
+      tool: "JUnit 4 (app/src/test)"
+    integration:
+      available: false
+      tool: null
+    e2e:
+      available: true
+      tool: "Espresso 3.5.1 + Compose UI Test (androidx-compose-ui-test-junit4), app/src/androidTest, run via gradlew.bat connectedDebugAndroidTest (needs device/emulator)"
+  coverage:
+    available: false
+    command: null
+  quality_tools:
+    linter:
+      available: true
+      command: "gradlew.bat lint"
+    type_checker:
+      available: true
+      command: "part of gradlew.bat assembleDebug (Kotlin compiler)"
+    formatter:
+      available: false
+      command: null

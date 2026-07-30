@@ -32,6 +32,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.pirxhio.affirmity.R
+import com.pirxhio.affirmity.auth.AuthError
+import com.pirxhio.affirmity.auth.AuthState
 import com.pirxhio.affirmity.data.local.ChannelSettings
 
 @Composable
@@ -39,10 +41,14 @@ fun SettingsScreen(
     reminderSettings: ChannelSettings,
     reflectionSettings: ChannelSettings,
     notificationsPermissionGranted: Boolean,
+    authState: AuthState,
+    authError: AuthError?,
     onReminderEnabledChanged: (Boolean) -> Unit,
     onReminderWindowChanged: (startMinute: Int, endMinute: Int) -> Unit,
     onReflectionEnabledChanged: (Boolean) -> Unit,
     onReflectionWindowChanged: (startMinute: Int, endMinute: Int) -> Unit,
+    onSignInClicked: () -> Unit,
+    onSignOutClicked: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -54,6 +60,15 @@ fun SettingsScreen(
     ) {
         if (!notificationsPermissionGranted) {
             item { PermissionBanner() }
+        }
+
+        item {
+            AccountSettingsCard(
+                authState = authState,
+                authError = authError,
+                onSignInClicked = onSignInClicked,
+                onSignOutClicked = onSignOutClicked,
+            )
         }
 
         item {

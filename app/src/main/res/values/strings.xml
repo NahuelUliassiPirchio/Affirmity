@@ -17,4 +17,14 @@
     <string name="settings_window_end_label">Hasta</string>
     <string name="settings_permission_banner_text">Las notificaciones están desactivadas en el sistema</string>
     <string name="settings_permission_banner_action">Abrir ajustes</string>
+
+    <string name="settings_account_label">Cuenta</string>
+    <string name="settings_account_signed_out_text">No has iniciado sesión</string>
+    <string name="settings_account_sign_in_button">Iniciar sesión con Google</string>
+    <string name="settings_account_signed_in_prefix">Sesión iniciada como</string>
+    <string name="settings_account_sign_out_button">Cerrar sesión</string>
+    <string name="settings_account_error_no_credential">No se encontró ninguna cuenta de Google en este dispositivo.</string>
+    <string name="settings_account_error_provider_unavailable">Google Play Services no está disponible o está desactualizado.</string>
+    <string name="settings_account_error_config_missing">El inicio de sesión todavía no está disponible.</string>
+    <string name="settings_account_error_unknown">No se pudo iniciar sesión. Intenta de nuevo.</string>
 </resources>

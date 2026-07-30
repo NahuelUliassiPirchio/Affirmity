@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "1005740395113",
+    "project_id": "affirmity-7ace6",
+    "storage_bucket": "affirmity-7ace6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1005740395113:android:8fbcd2e19b609039bc70f8",
+        "android_client_info": {
+          "package_name": "com.pirxhio.affirmity"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1005740395113-5avf59pgeprdd57k6v01mnl19mthtaeo.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.pirxhio.affirmity",
+            "certificate_hash": "800a37f391ffbc3d2b64e0b0240a5f108bcf72da"
+          }
+        },
+        {
+          "client_id": "1005740395113-dtm6v46a672efq5hcirc4b0kedn8cas8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC9fU25dwT-36LP1tde4YceScVHW1opFp0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1005740395113-dtm6v46a672efq5hcirc4b0kedn8cas8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

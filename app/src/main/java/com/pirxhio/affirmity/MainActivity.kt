@@ -130,6 +130,10 @@ fun AffirmityApp(startDestination: AppDestinations = AppDestinations.AFIRMACIONE
                 reminderSettings = appState.reminderSettings.value,
                 reflectionSettings = appState.reflectionSettings.value,
                 notificationsPermissionGranted = notificationsPermissionGranted,
+                authState = appState.authState.value,
+                authError = appState.authError.value,
+                onSignInClicked = { appState.signIn(context) },
+                onSignOutClicked = { appState.signOut() },
                 onReminderEnabledChanged = { enabled ->
                     appState.setChannelEnabled(
                         NotificationChannelSpec.REMINDER,

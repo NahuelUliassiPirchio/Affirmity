@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.data
 
+import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
@@ -8,6 +9,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.credentials.CredentialManager
+import com.google.firebase.auth.FirebaseAuth
+import com.pirxhio.affirmity.auth.AuthError
+import com.pirxhio.affirmity.auth.AuthException
+import com.pirxhio.affirmity.auth.AuthProviderId
+import com.pirxhio.affirmity.auth.AuthRepository
+import com.pirxhio.affirmity.auth.AuthState
+import com.pirxhio.affirmity.auth.FirebaseAuthRepository
+import com.pirxhio.affirmity.auth.GoogleIdAuthProvider
+import com.pirxhio.affirmity.auth.SignInCancelledException
 import com.pirxhio.affirmity.data.local.AffirmationDao
 import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.AffirmationImageStore
@@ -93,8 +104,17 @@ class AffirmityAppState(
     private val notificationPreferences: NotificationPreferences,
     private val notificationScheduler: NotificationScheduler,
     private val widgetUpdater: WidgetUpdater,
+    private val authRepository: AuthRepository,
 ) {
     val affirmations = mutableStateListOf<Affirmation>()
+
+    /** Provider-neutral sign-in state; see `auth/AuthState.kt`. Settings-only, never gates a screen. */
+    var authState = mutableStateOf<AuthState>(AuthState.SignedOut)
+        private set
+
+    /** Set on a recoverable sign-in failure; `null` on cancellation (not an error) or success. */
+    var authError = mutableStateOf<AuthError?>(null)
+        private set
 
     /** Set when [addAffirmationWithImage] fails to download; cleared on the next add attempt. */
     var addImageError = mutableStateOf<String?>(null)
@@ -171,6 +191,29 @@ class AffirmityAppState(
             notificationScheduler.ensureScheduled(NotificationChannelSpec.REMINDER)
             notificationScheduler.ensureScheduled(NotificationChannelSpec.REFLECTION)
         }
+        scope.launch {
+            authRepository.authState.collect { authState.value = it }
+        }
+    }
+
+    /** Starts Google sign-in from the Settings account section. Never crashes: recoverable
+     * failures land in [authError]; cancellation clears it and leaves the user signed out. */
+    fun signIn(activityContext: Context) {
+        authError.value = null
+        scope.launch {
+            authRepository.signIn(AuthProviderId.GOOGLE, activityContext)
+                .onFailure { throwable ->
+                    authError.value = when (throwable) {
+                        is SignInCancelledException -> null
+                        is AuthException -> throwable.error
+                        else -> AuthError.Unknown(throwable.message)
+                    }
+                }
+        }
+    }
+
+    fun signOut() {
+        scope.launch { authRepository.signOut() }
     }
 
     fun setChannelEnabled(channel: NotificationChannelSpec, enabled: Boolean) {
@@ -333,6 +376,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
     return remember {
         val database = AffirmityDatabase.getInstance(context)
         val notificationPreferences = NotificationPreferences(context)
+        val googleIdAuthProvider = GoogleIdAuthProvider(CredentialManager.create(context.applicationContext))
         AffirmityAppState(
             scope = scope,
             affirmationDao = database.affirmationDao(),
@@ -342,6 +386,10 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             notificationPreferences = notificationPreferences,
             notificationScheduler = NotificationScheduler(context.applicationContext, notificationPreferences),
             widgetUpdater = widgetUpdater(context.applicationContext),
+            authRepository = FirebaseAuthRepository(
+                auth = FirebaseAuth.getInstance(),
+                providers = mapOf(AuthProviderId.GOOGLE to googleIdAuthProvider),
+            ),
         )
     }
 }
