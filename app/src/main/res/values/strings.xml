@@ -27,4 +27,5 @@
     <string name="settings_account_error_provider_unavailable">Google Play Services no está disponible o está desactualizado.</string>
     <string name="settings_account_error_config_missing">El inicio de sesión todavía no está disponible.</string>
     <string name="settings_account_error_unknown">No se pudo iniciar sesión. Intenta de nuevo.</string>
+    <string name="settings_account_sync_error">No se pudo sincronizar tus datos con la nube. Seguimos usando tus datos guardados en este teléfono; lo intentaremos de nuevo la próxima vez que inicies sesión.</string>
 </resources>

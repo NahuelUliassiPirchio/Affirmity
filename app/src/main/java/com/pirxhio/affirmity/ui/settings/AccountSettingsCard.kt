@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +30,7 @@ fun AccountSettingsCard(
     authError: AuthError?,
     onSignInClicked: () -> Unit,
     onSignOutClicked: () -> Unit,
+    syncError: String? = null,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -55,7 +57,12 @@ fun AccountSettingsCard(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         val label = authState.email ?: authState.displayName ?: authState.uid
-                        Text(text = "${stringResource(id = R.string.settings_account_signed_in_prefix)} $label")
+                        Text(
+                            text = "${stringResource(id = R.string.settings_account_signed_in_prefix)} $label",
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                         TextButton(onClick = onSignOutClicked) {
                             Text(stringResource(id = R.string.settings_account_sign_out_button))
                         }
@@ -66,6 +73,13 @@ fun AccountSettingsCard(
             if (authError != null) {
                 Text(
                     text = authError.toDisplayMessage(),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+
+            if (syncError != null) {
+                Text(
+                    text = stringResource(id = R.string.settings_account_sync_error),
                     color = MaterialTheme.colorScheme.error,
                 )
             }

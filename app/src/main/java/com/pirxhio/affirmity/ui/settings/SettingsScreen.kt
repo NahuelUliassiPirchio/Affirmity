@@ -43,6 +43,7 @@ fun SettingsScreen(
     notificationsPermissionGranted: Boolean,
     authState: AuthState,
     authError: AuthError?,
+    syncError: String? = null,
     onReminderEnabledChanged: (Boolean) -> Unit,
     onReminderWindowChanged: (startMinute: Int, endMinute: Int) -> Unit,
     onReflectionEnabledChanged: (Boolean) -> Unit,
@@ -69,6 +70,7 @@ fun SettingsScreen(
                 authError = authError,
                 onSignInClicked = onSignInClicked,
                 onSignOutClicked = onSignOutClicked,
+                syncError = syncError,
             )
         }
 

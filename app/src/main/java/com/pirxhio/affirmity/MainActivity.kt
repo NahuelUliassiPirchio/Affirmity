@@ -162,6 +162,7 @@ fun AffirmityApp(startDestination: AppDestinations = AppDestinations.AFIRMACIONE
                 notificationsPermissionGranted = notificationsPermissionGranted,
                 authState = appState.authState.value,
                 authError = appState.authError.value,
+                syncError = appState.syncError.value,
                 onSignInClicked = { appState.signIn(context) },
                 onSignOutClicked = { appState.signOut() },
                 onReminderEnabledChanged = { enabled ->

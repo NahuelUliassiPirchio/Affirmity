@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.credentials.CredentialManager
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.pirxhio.affirmity.auth.AuthError
 import com.pirxhio.affirmity.auth.AuthException
 import com.pirxhio.affirmity.auth.AuthProviderId
@@ -19,24 +20,42 @@ import com.pirxhio.affirmity.auth.AuthState
 import com.pirxhio.affirmity.auth.FirebaseAuthRepository
 import com.pirxhio.affirmity.auth.GoogleIdAuthProvider
 import com.pirxhio.affirmity.auth.SignInCancelledException
-import com.pirxhio.affirmity.data.local.AffirmationDao
 import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.AffirmationImageStore
 import com.pirxhio.affirmity.data.local.AffirmityDatabase
 import com.pirxhio.affirmity.data.local.ChannelSettings
-import com.pirxhio.affirmity.data.local.DailyCompletionDao
 import com.pirxhio.affirmity.data.local.DailyViewCount
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.NotificationLogEntry
 import com.pirxhio.affirmity.data.local.NotificationPreferences
 import com.pirxhio.affirmity.data.local.TrackerPreferences
+import com.pirxhio.affirmity.data.remote.FirestoreAffirmationRepository
+import com.pirxhio.affirmity.data.remote.FirestoreDailyCompletionRepository
+import com.pirxhio.affirmity.data.remote.FirestoreMeditationPreferencesRepository
+import com.pirxhio.affirmity.data.remote.FirestoreMigrator
+import com.pirxhio.affirmity.data.remote.FirestoreNotificationSettingsRepository
+import com.pirxhio.affirmity.data.remote.MigrationSnapshot
+import com.pirxhio.affirmity.data.repository.DataSession
+import com.pirxhio.affirmity.data.repository.RoomAffirmationRepository
+import com.pirxhio.affirmity.data.repository.RoomDailyCompletionRepository
+import com.pirxhio.affirmity.data.repository.RoomMeditationPreferencesRepository
+import com.pirxhio.affirmity.data.repository.RoomNotificationSettingsRepository
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.NotificationScheduler
 import com.pirxhio.affirmity.notifications.Notifier
 import com.pirxhio.affirmity.widget.WeeklyTrackerWidget
 import androidx.glance.appwidget.updateAll
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.transformLatest
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
 
 /** Background for an affirmation card: a solid color, or a locally-cached downloaded image. */
@@ -100,16 +119,17 @@ private fun Affirmation.toEntity(): AffirmationEntity = AffirmationEntity(
  */
 class AffirmityAppState(
     private val scope: CoroutineScope,
-    private val affirmationDao: AffirmationDao,
-    private val dailyCompletionDao: DailyCompletionDao,
+    private val local: DataSession.Local,
+    private val remoteSessionFactory: (uid: String) -> DataSession.Remote,
+    private val migrator: FirestoreMigrator,
     private val trackerPreferences: TrackerPreferences,
     private val imageStore: AffirmationImageStore,
-    private val notificationPreferences: NotificationPreferences,
     private val notificationScheduler: NotificationScheduler,
     private val notificationDebugLog: NotificationDebugLog,
     private val notifier: Notifier,
     private val widgetUpdater: WidgetUpdater,
     private val authRepository: AuthRepository,
+    private val useRemoteSession: Boolean = true,
 ) {
     val affirmations = mutableStateListOf<Affirmation>()
 
@@ -148,11 +168,67 @@ class AffirmityAppState(
     var notificationDebugEntries = mutableStateListOf<NotificationLogEntry>()
         private set
 
+    /** Set when a migration attempt fails on sign-in; the session stays [DataSession.Local] and
+     * the user keeps a fully working offline app. Cleared on the next successful swap attempt. */
+    var syncError = mutableStateOf<String?>(null)
+        private set
+
     private var affirmationsViewedToday = DailyViewCount(epochDay = -1L, count = 0)
+
+    /**
+     * The single source of truth for which store is active. See design.md's "The swap moment":
+     * `transformLatest` cancels its own previous body, and every `flatMapLatest` collector below
+     * cancels its in-flight Room subscription the instant a new [DataSession] is emitted — no
+     * stale Room collector survives a sign-in/sign-out swap. Writers suspend in [ready] instead of
+     * racing the swap (single-writer is a type-level property, not a convention).
+     */
+    private val session: StateFlow<DataSession> = authRepository.authState
+        .map { (it as? AuthState.SignedIn)?.uid }
+        .distinctUntilChanged()
+        .transformLatest { uid ->
+            if (uid == null || !useRemoteSession) {
+                emit(local)
+                return@transformLatest
+            }
+            emit(DataSession.Migrating(uid, local))
+            try {
+                migrator.ensureMigrated(migrationSnapshotFor(uid))
+                syncError.value = null
+                emit(remoteSessionFactory(uid))
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (failure: Exception) {
+                syncError.value = failure.message
+                emit(local)
+            }
+        }
+        .stateIn(scope, SharingStarted.Eagerly, local)
+
+    /** Suspends until the session leaves [DataSession.Migrating] (design.md's `ready()`), so no
+     * write can land in the wrong store while a migration is in flight. */
+    private suspend fun ready(): DataSession = session.first { it !is DataSession.Migrating }
+
+    /** One-time snapshot of the Room/DataStore state for [uid], taken right before migration
+     * (design.md's "The swap moment" step 4). Always reads through [local] — never [session] —
+     * since this runs while the session is still [DataSession.Migrating]. */
+    private suspend fun migrationSnapshotFor(uid: String): MigrationSnapshot {
+        val today = DayClock.epochDay()
+        return MigrationSnapshot(
+            uid = uid,
+            affirmations = local.affirmations.observeAll().first(),
+            completions = local.completions.getRange(today - STREAK_LOOKBACK_DAYS, today + 6),
+            meditationDurationSeconds = local.meditation.observeMeditationDurationSeconds().first(),
+            notificationSettings = mapOf(
+                NotificationChannelSpec.REMINDER to local.notifications.observe(NotificationChannelSpec.REMINDER).first(),
+                NotificationChannelSpec.REFLECTION to local.notifications.observe(NotificationChannelSpec.REFLECTION).first(),
+            ),
+            migratedAt = System.currentTimeMillis(),
+        )
+    }
 
     init {
         scope.launch {
-            affirmationDao.observeAll().collect { entities ->
+            session.flatMapLatest { it.affirmations.observeAll() }.collect { entities ->
                 affirmations.clear()
                 affirmations.addAll(entities.map { it.toAffirmation() })
             }
@@ -160,20 +236,21 @@ class AffirmityAppState(
         scope.launch {
             val today = DayClock.epochDay()
             val weekStart = DayClock.weekStartEpochDay()
-            dailyCompletionDao.observeRange(weekStart - STREAK_LOOKBACK_DAYS, weekStart + 6).collect { rows ->
-                affirmationsStreak.value = DailyCompletionStats.toWeeklyStreak(
-                    rows = rows,
-                    weekStartEpochDay = weekStart,
-                    todayEpochDay = today,
-                    isDone = { it.affirmationDone },
-                )
-                meditationStreak.value = DailyCompletionStats.toWeeklyStreak(
-                    rows = rows,
-                    weekStartEpochDay = weekStart,
-                    todayEpochDay = today,
-                    isDone = { it.meditationDone },
-                )
-            }
+            session.flatMapLatest { it.completions.observeRange(weekStart - STREAK_LOOKBACK_DAYS, weekStart + 6) }
+                .collect { rows ->
+                    affirmationsStreak.value = DailyCompletionStats.toWeeklyStreak(
+                        rows = rows,
+                        weekStartEpochDay = weekStart,
+                        todayEpochDay = today,
+                        isDone = { it.affirmationDone },
+                    )
+                    meditationStreak.value = DailyCompletionStats.toWeeklyStreak(
+                        rows = rows,
+                        weekStartEpochDay = weekStart,
+                        todayEpochDay = today,
+                        isDone = { it.meditationDone },
+                    )
+                }
         }
         scope.launch {
             trackerPreferences.observeAffirmationsViewedToday().collect { viewed ->
@@ -181,17 +258,17 @@ class AffirmityAppState(
             }
         }
         scope.launch {
-            trackerPreferences.observeMeditationDurationSeconds().collect { seconds ->
+            session.flatMapLatest { it.meditation.observeMeditationDurationSeconds() }.collect { seconds ->
                 meditationDurationSeconds.value = seconds
             }
         }
         scope.launch {
-            notificationPreferences.observe(NotificationChannelSpec.REMINDER).collect {
+            session.flatMapLatest { it.notifications.observe(NotificationChannelSpec.REMINDER) }.collect {
                 reminderSettings.value = it
             }
         }
         scope.launch {
-            notificationPreferences.observe(NotificationChannelSpec.REFLECTION).collect {
+            session.flatMapLatest { it.notifications.observe(NotificationChannelSpec.REFLECTION) }.collect {
                 reflectionSettings.value = it
             }
         }
@@ -248,7 +325,7 @@ class AffirmityAppState(
 
     fun setChannelEnabled(channel: NotificationChannelSpec, enabled: Boolean) {
         scope.launch {
-            notificationPreferences.setEnabled(channel, enabled)
+            ready().notifications.setEnabled(channel, enabled)
             if (enabled) {
                 notificationScheduler.scheduleNext(channel)
             } else {
@@ -259,7 +336,7 @@ class AffirmityAppState(
 
     fun setChannelWindow(channel: NotificationChannelSpec, startMinute: Int, endMinute: Int) {
         scope.launch {
-            notificationPreferences.setWindow(channel, startMinute, endMinute)
+            ready().notifications.setWindow(channel, startMinute, endMinute)
             val enabled = when (channel) {
                 NotificationChannelSpec.REMINDER -> reminderSettings.value.enabled
                 NotificationChannelSpec.REFLECTION -> reflectionSettings.value.enabled
@@ -273,7 +350,7 @@ class AffirmityAppState(
     fun addAffirmationWithColor(title: String, subtitle: String, colorHex: String) {
         addImageError.value = null
         scope.launch {
-            affirmationDao.insert(
+            ready().affirmations.insert(
                 Affirmation(
                     title = title,
                     subtitle = subtitle,
@@ -304,7 +381,7 @@ class AffirmityAppState(
     }
 
     private suspend fun insertImageAffirmation(title: String, subtitle: String, localPath: String) {
-        affirmationDao.insert(
+        ready().affirmations.insert(
             Affirmation(
                 title = title,
                 subtitle = subtitle,
@@ -323,8 +400,9 @@ class AffirmityAppState(
         }
 
         scope.launch {
+            val affirmationsRepo = ready().affirmations
             if (replaceExisting) {
-                affirmationDao.deleteAll()
+                affirmationsRepo.deleteAll()
             }
 
             var failedCount = 0
@@ -338,7 +416,7 @@ class AffirmityAppState(
                     AffirmationBackground.Color(item.backgroundValue)
                 }
 
-                affirmationDao.insert(
+                affirmationsRepo.insert(
                     Affirmation(
                         title = item.title,
                         subtitle = item.subtitle,
@@ -355,7 +433,7 @@ class AffirmityAppState(
     }
 
     fun removeAffirmation(id: String) {
-        scope.launch { affirmationDao.deleteById(id) }
+        scope.launch { ready().affirmations.deleteById(id) }
     }
 
     /** Call once per affirmation the user settles on while swiping the feed. */
@@ -371,7 +449,7 @@ class AffirmityAppState(
             affirmationsViewedToday = updated
             trackerPreferences.saveAffirmationsViewedToday(updated)
             if (updated.count >= AFFIRMATIONS_GOAL_PER_DAY) {
-                dailyCompletionDao.markAffirmation(today)
+                ready().completions.markAffirmation(today)
                 widgetUpdater.refresh()
             }
         }
@@ -380,7 +458,7 @@ class AffirmityAppState(
     /** Call when a meditation session finishes its full countdown. */
     fun recordMeditationCompleted() {
         scope.launch {
-            dailyCompletionDao.markMeditation(DayClock.epochDay())
+            ready().completions.markMeditation(DayClock.epochDay())
             widgetUpdater.refresh()
         }
     }
@@ -388,7 +466,7 @@ class AffirmityAppState(
     /** Call whenever the user settles on a new duration (slider release, preset tap). */
     fun recordMeditationDurationSelected(seconds: Int) {
         meditationDurationSeconds.value = seconds
-        scope.launch { trackerPreferences.saveMeditationDurationSeconds(seconds) }
+        scope.launch { ready().meditation.saveMeditationDurationSeconds(seconds) }
     }
 
     private companion object {
@@ -399,6 +477,12 @@ class AffirmityAppState(
     }
 }
 
+/**
+ * Kill switch (design.md's "Migration/Rollout"): flip to `false` to force every session back to
+ * [DataSession.Local] without reverting any code, e.g. if Firestore rules/rollout need a pause.
+ */
+private const val USE_REMOTE_SESSION = true
+
 @Composable
 fun rememberAffirmityAppState(): AffirmityAppState {
     val context = LocalContext.current
@@ -408,13 +492,29 @@ fun rememberAffirmityAppState(): AffirmityAppState {
         val notificationPreferences = NotificationPreferences(context)
         val notificationDebugLog = NotificationDebugLog(context.applicationContext)
         val googleIdAuthProvider = GoogleIdAuthProvider(CredentialManager.create(context.applicationContext))
+        val trackerPreferences = TrackerPreferences(context)
+        val firestore = FirebaseFirestore.getInstance()
+        val local = DataSession.Local(
+            affirmations = RoomAffirmationRepository(database.affirmationDao()),
+            completions = RoomDailyCompletionRepository(database.dailyCompletionDao()),
+            meditation = RoomMeditationPreferencesRepository(trackerPreferences),
+            notifications = RoomNotificationSettingsRepository(notificationPreferences),
+        )
         AffirmityAppState(
             scope = scope,
-            affirmationDao = database.affirmationDao(),
-            dailyCompletionDao = database.dailyCompletionDao(),
-            trackerPreferences = TrackerPreferences(context),
+            local = local,
+            remoteSessionFactory = { uid ->
+                DataSession.Remote(
+                    uid = uid,
+                    affirmations = FirestoreAffirmationRepository(firestore, uid),
+                    completions = FirestoreDailyCompletionRepository(firestore, uid),
+                    meditation = FirestoreMeditationPreferencesRepository(firestore, uid),
+                    notifications = FirestoreNotificationSettingsRepository(firestore, uid),
+                )
+            },
+            migrator = FirestoreMigrator(firestore),
+            trackerPreferences = trackerPreferences,
             imageStore = AffirmationImageStore(context.applicationContext),
-            notificationPreferences = notificationPreferences,
             notificationScheduler = NotificationScheduler(
                 context.applicationContext,
                 notificationPreferences,
@@ -427,6 +527,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
                 auth = FirebaseAuth.getInstance(),
                 providers = mapOf(AuthProviderId.GOOGLE to googleIdAuthProvider),
             ),
+            useRemoteSession = USE_REMOTE_SESSION,
         )
     }
 }
