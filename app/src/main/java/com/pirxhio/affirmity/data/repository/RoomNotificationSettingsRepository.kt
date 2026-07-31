@@ -20,4 +20,10 @@ class RoomNotificationSettingsRepository(
 
     override suspend fun setWindow(channel: NotificationChannelSpec, startMinute: Int, endMinute: Int) =
         notificationPreferences.setWindow(channel, startMinute, endMinute)
+
+    /**
+     * No-op: signed-out users have no server-driven scheduling to feed, so there is nothing to
+     * persist the device timezone into locally.
+     */
+    override suspend fun setTimeZone(zoneId: String) = Unit
 }

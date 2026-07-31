@@ -17,4 +17,8 @@ object FirestorePaths {
     fun settingsPreferencesDoc(uid: String): String = "users/$uid/settings/preferences"
 
     fun migratedMarkerDoc(uid: String): String = "users/$uid/meta/migrated"
+
+    fun fcmTokensCollection(uid: String): String = "users/$uid/fcmTokens"
+
+    fun fcmTokenDoc(uid: String, token: String): String = "${fcmTokensCollection(uid)}/$token"
 }

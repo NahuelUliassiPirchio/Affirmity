@@ -37,4 +37,11 @@ interface NotificationSettingsRepository {
     fun observe(channel: NotificationChannelSpec): Flow<ChannelSettings>
     suspend fun setEnabled(channel: NotificationChannelSpec, enabled: Boolean)
     suspend fun setWindow(channel: NotificationChannelSpec, startMinute: Int, endMinute: Int)
+
+    /**
+     * Persists the device's IANA timezone id so the server planner can compute this user's
+     * local-day trigger instants. No-op for the Room-backed (signed-out) implementation, since
+     * signed-out users have no server-driven scheduling to feed.
+     */
+    suspend fun setTimeZone(zoneId: String)
 }

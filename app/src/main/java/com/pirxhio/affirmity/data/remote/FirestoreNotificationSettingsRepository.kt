@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.data.remote
 
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.pirxhio.affirmity.data.local.ChannelSettings
@@ -43,6 +44,16 @@ class FirestoreNotificationSettingsRepository(
             mapOf(
                 "${channel.prefsPrefix}_startMinute" to startMinute,
                 "${channel.prefsPrefix}_endMinute" to endMinute,
+            ),
+            SetOptions.merge(),
+        ).await()
+    }
+
+    override suspend fun setTimeZone(zoneId: String) {
+        document().set(
+            mapOf(
+                "timeZone" to zoneId,
+                "timeZoneUpdatedAt" to FieldValue.serverTimestamp(),
             ),
             SetOptions.merge(),
         ).await()

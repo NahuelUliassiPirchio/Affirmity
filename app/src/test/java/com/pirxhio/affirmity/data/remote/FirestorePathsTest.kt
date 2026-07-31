@@ -24,4 +24,14 @@ class FirestorePathsTest {
     fun `migrated marker doc path`() {
         assertEquals("users/uid-1/meta/migrated", FirestorePaths.migratedMarkerDoc("uid-1"))
     }
+
+    @Test
+    fun `fcm tokens collection path is scoped under the user`() {
+        assertEquals("users/uid-1/fcmTokens", FirestorePaths.fcmTokensCollection("uid-1"))
+    }
+
+    @Test
+    fun `fcm token doc path uses the token as the doc id`() {
+        assertEquals("users/uid-1/fcmTokens/token-abc", FirestorePaths.fcmTokenDoc("uid-1", "token-abc"))
+    }
 }

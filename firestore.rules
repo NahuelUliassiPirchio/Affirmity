@@ -1,8 +1,38 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{uid}/{document=**} {
+    // Generic per-user documents (affirmations, dailyCompletions, settings, meta). Deliberately
+    // does NOT use a recursive {document=**} wildcard: Firestore rule evaluation is OR'd across
+    // every matching block, so a blanket wildcard here would silently grant unrestricted access
+    // to fcmTokens/notificationPlans too, making their shape validation below unenforceable.
+    match /users/{uid}/affirmations/{id} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /users/{uid}/dailyCompletions/{epochDay} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /users/{uid}/settings/{doc} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /users/{uid}/meta/{doc} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Owner-only, shape-validated: token id must match the doc id and platform must be "android".
+    match /users/{uid}/fcmTokens/{token} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.token == token
+        && request.resource.data.platform == 'android';
+    }
+
+    // Server-written only (Admin SDK bypasses rules); owner may read their own plan.
+    match /users/{uid}/notificationPlans/{day} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
     }
   }
 }
