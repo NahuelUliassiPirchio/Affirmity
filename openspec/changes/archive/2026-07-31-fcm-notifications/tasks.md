@@ -66,7 +66,7 @@ Chain strategy: stacked-to-main
 
 ## Phase 5: Verification (gates PR4 merge)
 
-- [ ] 5.1 `gradlew.bat testDebugUnitTest` green; no WorkManager notification worker left in diff
-- [ ] 5.2 `gradlew.bat assembleDebug` builds
-- [ ] 5.3 `cd functions && npm test` green (manual report)
+- [x] 5.1 `gradlew.bat testDebugUnitTest` green; no WorkManager notification worker left in diff
+- [x] 5.2 `gradlew.bat assembleDebug` builds
+- [x] 5.3 `cd functions && npm test` green (manual report)
 - [ ] 5.4 Manual E2E (needs console prerequisites): 3 daily slots/user-timezone; settings-edit reflected next plan; overnight force-stop delivery; streak fire/no-fire; token refresh on 2nd device; widget rollover at local midnight
