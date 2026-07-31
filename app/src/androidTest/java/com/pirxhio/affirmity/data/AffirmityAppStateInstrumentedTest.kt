@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.work.testing.WorkManagerTestInitHelper
 import com.pirxhio.affirmity.auth.AuthProviderId
 import com.pirxhio.affirmity.auth.AuthRepository
 import com.pirxhio.affirmity.auth.AuthState
@@ -14,6 +13,7 @@ import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.NotificationPreferences
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.DocWrite
+import com.pirxhio.affirmity.data.remote.FcmTokenRepository
 import com.pirxhio.affirmity.data.remote.FirestoreMigrationSource
 import com.pirxhio.affirmity.data.remote.FirestoreMigrator
 import com.pirxhio.affirmity.data.repository.DataSession
@@ -21,8 +21,8 @@ import com.pirxhio.affirmity.data.repository.RoomAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomDailyCompletionRepository
 import com.pirxhio.affirmity.data.repository.RoomMeditationPreferencesRepository
 import com.pirxhio.affirmity.data.repository.RoomNotificationSettingsRepository
-import com.pirxhio.affirmity.notifications.NotificationScheduler
 import com.pirxhio.affirmity.notifications.Notifier
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -63,7 +63,6 @@ class AffirmityAppStateInstrumentedTest {
     @Before
     fun setUp() {
         val context: Context = ApplicationProvider.getApplicationContext()
-        WorkManagerTestInitHelper.initializeTestWorkManager(context)
         db = Room.inMemoryDatabaseBuilder(context, AffirmityDatabase::class.java)
             .allowMainThreadQueries()
             .build()
@@ -83,15 +82,11 @@ class AffirmityAppStateInstrumentedTest {
             migrator = FirestoreMigrator(UnreachableFirestoreMigrationSource()),
             trackerPreferences = trackerPreferences,
             imageStore = AffirmationImageStore(context.applicationContext),
-            notificationScheduler = NotificationScheduler(
-                context.applicationContext,
-                notificationPreferences,
-                notificationDebugLog,
-            ),
             notificationDebugLog = notificationDebugLog,
             notifier = Notifier(context.applicationContext, notificationDebugLog),
             widgetUpdater = WidgetUpdater { },
             authRepository = FakeSignedOutAuthRepository(),
+            fcmTokenRepository = FcmTokenRepository(FirebaseFirestore.getInstance()),
         )
     }
 

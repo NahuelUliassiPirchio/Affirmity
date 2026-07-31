@@ -15,8 +15,7 @@ data class ParsedAffirmation(
 /**
  * Parses a pasted JSON array of affirmations (see README "Affirmation data format").
  *
- * Pure/JVM-testable: no Android Context or DAO dependency, mirrors the
- * [com.pirxhio.affirmity.notifications.NotificationSchedule] pattern. Throws
+ * Pure/JVM-testable: no Android Context or DAO dependency. Throws
  * [IllegalArgumentException] with a user-presentable message on any structural problem; an empty
  * array is valid and yields an empty list.
  */

@@ -11,9 +11,10 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Self-rescheduling one-shot worker that fires ~60s after each local midnight so the widget's
- * "today" outline advances even while the app is closed (D11). Needs no custom `WorkerFactory`
- * entry — [com.pirxhio.affirmity.notifications.AffirmityWorkerFactory] returns null for it and
- * WorkManager falls back to its default factory.
+ * "today" outline advances even while the app is closed (D11). Signed-in users also get a silent
+ * `day_rollover` FCM ping (see `notifications/AffirmityMessagingService.kt`); this worker is the
+ * offline/signed-out fallback (fcm-notifications design.md's "Day rollover" decision) and needs no
+ * custom `WorkerFactory` — WorkManager uses its default factory for it.
  */
 class DayRolloverWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 

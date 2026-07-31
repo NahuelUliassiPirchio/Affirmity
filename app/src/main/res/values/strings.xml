@@ -5,10 +5,14 @@
     <string name="notification_channel_reminder_description">Avisos para meditar o ver afirmaciones</string>
     <string name="notification_channel_reflection_name">Preguntas de reflexión</string>
     <string name="notification_channel_reflection_description">Preguntas diarias para reflexionar</string>
+    <string name="notification_channel_streak_name">Racha en riesgo</string>
+    <string name="notification_channel_streak_description">Avisos cuando tu racha está por terminar</string>
 
     <string name="notification_reminder_title">Un momento para ti</string>
     <string name="notification_reminder_fallback_body">Tómate un momento para meditar o ver tus afirmaciones.</string>
     <string name="notification_reflection_title">Reflexiona un momento</string>
+    <string name="notification_streak_title">Tu racha está por terminar</string>
+    <string name="notification_streak_fallback_body">Todavía puedes completar hoy y mantener tu racha.</string>
 
     <string name="settings_title">Ajustes</string>
     <string name="settings_reminders_label">Recordatorios</string>
