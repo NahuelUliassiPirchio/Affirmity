@@ -1,0 +1,112 @@
+import { describe, expect, it, vi } from 'vitest';
+
+import {
+  planAllUsers,
+  planAndEnqueueUser,
+  type PlanResult,
+  type PlanStore,
+  type TaskEnqueuer,
+  type UserPlanInput,
+} from '../src/planner';
+
+function makeStore(): PlanStore & { plans: Map<string, PlanResult> } {
+  const plans = new Map<string, PlanResult>();
+  return {
+    plans,
+    hasPlan: vi.fn(async (uid: string, localDay: number) => plans.has(`${uid}-${localDay}`)),
+    markPlanned: vi.fn(async (uid: string, localDay: number, result: PlanResult) => {
+      plans.set(`${uid}-${localDay}`, result);
+    }),
+    markFailed: vi.fn(async () => undefined),
+  };
+}
+
+function makeEnqueuer(): TaskEnqueuer & { calls: unknown[] } {
+  const calls: unknown[] = [];
+  return {
+    calls,
+    enqueue: vi.fn(async (task) => {
+      calls.push(task);
+      return { created: true };
+    }),
+  };
+}
+
+const baseInput: UserPlanInput = {
+  uid: 'user-1',
+  localDay: 19000,
+  settings: {
+    remindersEnabled: true,
+    reflectionEnabled: false,
+    reminderStartMinute: 9 * 60,
+    reminderEndMinute: 21 * 60,
+    reflectionStartMinute: 0,
+    reflectionEndMinute: 0,
+    timeZone: 'UTC',
+  },
+  completions: [],
+};
+
+describe('planAndEnqueueUser', () => {
+  it('enqueues 3 reminder tasks and marks the plan as planned', async () => {
+    const store = makeStore();
+    const enqueuer = makeEnqueuer();
+
+    const result = await planAndEnqueueUser(baseInput, store, enqueuer);
+
+    expect(result.status).toBe('planned');
+    expect(enqueuer.calls).toHaveLength(3);
+    expect(store.plans.has('user-1-19000')).toBe(true);
+  });
+
+  // Design.md: "Planner idempotency ... a second run for the same localDay enqueues nothing".
+  it('a second run for the same localDay enqueues nothing (idempotent)', async () => {
+    const store = makeStore();
+    const enqueuer = makeEnqueuer();
+
+    await planAndEnqueueUser(baseInput, store, enqueuer);
+    const second = await planAndEnqueueUser(baseInput, store, enqueuer);
+
+    expect(second.status).toBe('skipped');
+    expect(enqueuer.calls).toHaveLength(3); // unchanged from the first run
+  });
+});
+
+describe('planAllUsers', () => {
+  // Spec: "One user's planning failure does not block others".
+  it("isolates one user's planning failure and keeps planning the rest", async () => {
+    const store = makeStore();
+    const failingEnqueuer: TaskEnqueuer = {
+      enqueue: vi.fn(async (task) => {
+        if (task.uid === 'bad-user') throw new Error('boom');
+        return { created: true };
+      }),
+    };
+
+    const inputs: UserPlanInput[] = [
+      { ...baseInput, uid: 'bad-user' },
+      { ...baseInput, uid: 'good-user' },
+    ];
+
+    const results = await planAllUsers(inputs, store, failingEnqueuer);
+
+    expect(results.find((r) => r.uid === 'bad-user')?.status).toBe('failed');
+    expect(results.find((r) => r.uid === 'good-user')?.status).toBe('planned');
+    expect(store.markFailed).toHaveBeenCalledWith('bad-user', 19000, expect.any(String));
+  });
+
+  it('plans nothing for a user missing a timezone', async () => {
+    const store = makeStore();
+    const enqueuer = makeEnqueuer();
+
+    const results = await planAllUsers(
+      [{ ...baseInput, settings: { ...baseInput.settings, timeZone: null } }],
+      store,
+      enqueuer,
+    );
+
+    expect(results[0].status).toBe('planned');
+    expect(results[0].tasks).toHaveLength(0);
+    expect(enqueuer.calls).toHaveLength(0);
+  });
+});

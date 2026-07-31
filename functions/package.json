@@ -1,0 +1,26 @@
+{
+  "name": "affirmity-functions",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Affirmity Cloud Functions -- server-driven notification planner, Cloud Tasks dispatch, FCM send/prune, and streak evaluation (fcm-notifications stage 3).",
+  "main": "lib/index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@google-cloud/tasks": "^5.5.0",
+    "firebase-admin": "^14.2.0",
+    "firebase-functions": "^7.3.2",
+    "google-auth-library": "^9.14.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}
