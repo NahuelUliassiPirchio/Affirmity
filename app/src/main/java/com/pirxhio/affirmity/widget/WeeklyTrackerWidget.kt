@@ -33,10 +33,15 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider as GlanceColorProvider
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import com.pirxhio.affirmity.MainActivity
 import com.pirxhio.affirmity.data.DayClock
 import com.pirxhio.affirmity.data.local.AffirmityDatabase
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
+import com.pirxhio.affirmity.data.remote.FirestoreDailyCompletionRepository
+import com.pirxhio.affirmity.data.remote.FirestorePaths
+import kotlinx.coroutines.tasks.await
 
 private const val EXTRA_START_DESTINATION = "start_destination"
 private const val HOME_DESTINATION = "AFIRMACIONES"
@@ -68,11 +73,24 @@ class WeeklyTrackerWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val dao = AffirmityDatabase.getInstance(context).dailyCompletionDao()
         val today = DayClock.epochDay()
         val weekStart = DayClock.weekStartEpochDay()
-        val hasAny = dao.hasAny()
-        val rows = dao.getRange(weekStart, weekStart + 6)
+        // Signed-in completions live in Firestore only (fcm-notifications bugfix): reading Room
+        // here for a signed-in user showed a permanently stale week, frozen at the migration
+        // snapshot, since AffirmityAppState no longer writes completions to Room post-migration.
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+        val hasAny: Boolean
+        val rows: List<DailyCompletionEntity>
+        if (uid != null) {
+            val firestore = FirebaseFirestore.getInstance()
+            hasAny = firestore.collection(FirestorePaths.dailyCompletionsCollection(uid))
+                .limit(1).get().await().documents.isNotEmpty()
+            rows = FirestoreDailyCompletionRepository(firestore, uid).getRange(weekStart, weekStart + 6)
+        } else {
+            val dao = AffirmityDatabase.getInstance(context).dailyCompletionDao()
+            hasAny = dao.hasAny()
+            rows = dao.getRange(weekStart, weekStart + 6)
+        }
         val todayIndex = (today - weekStart).toInt().coerceIn(0, 6)
 
         provideContent {
