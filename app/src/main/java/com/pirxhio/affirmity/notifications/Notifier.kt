@@ -16,9 +16,12 @@ import com.pirxhio.affirmity.data.local.NotificationLogEvent
  * if the user (or the system) has disabled notifications, `notify()` is silently skipped and the
  * chain keeps rescheduling for whenever permission/preference is restored.
  */
-class Notifier(private val context: Context, private val debugLog: NotificationDebugLog) {
+class Notifier(
+    private val context: Context,
+    private val debugLog: NotificationDebugLog,
+) : NotificationPoster {
 
-    suspend fun notify(channel: NotificationChannelSpec, title: String, body: String) {
+    override suspend fun notify(channel: NotificationChannelSpec, title: String, body: String) {
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
             debugLog.record(channel, NotificationLogEvent.NOTIFY_SKIPPED_PERMISSION)
             return
