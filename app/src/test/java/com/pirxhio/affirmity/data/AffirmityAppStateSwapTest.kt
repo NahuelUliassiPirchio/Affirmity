@@ -11,6 +11,7 @@ import com.pirxhio.affirmity.data.local.DailyViewCount
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.DocWrite
+import com.pirxhio.affirmity.data.remote.FcmTokenRepository
 import com.pirxhio.affirmity.data.remote.FirestoreMigrationSource
 import com.pirxhio.affirmity.data.remote.FirestoreMigrator
 import com.pirxhio.affirmity.data.repository.AffirmationRepository
@@ -19,7 +20,6 @@ import com.pirxhio.affirmity.data.repository.DataSession
 import com.pirxhio.affirmity.data.repository.MeditationPreferencesRepository
 import com.pirxhio.affirmity.data.repository.NotificationSettingsRepository
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
-import com.pirxhio.affirmity.notifications.NotificationScheduler
 import com.pirxhio.affirmity.notifications.Notifier
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CompletableDeferred
@@ -96,6 +96,7 @@ private class FakeNotificationSettingsRepository(
     override fun observe(channel: NotificationChannelSpec): Flow<ChannelSettings> = flow
     override suspend fun setEnabled(channel: NotificationChannelSpec, enabled: Boolean) = Unit
     override suspend fun setWindow(channel: NotificationChannelSpec, startMinute: Int, endMinute: Int) = Unit
+    override suspend fun setTimeZone(zoneId: String) = Unit
 }
 
 private class FakeAuthRepository(
@@ -175,9 +176,9 @@ private fun buildState(
     val notificationDebugLog = mock(NotificationDebugLog::class.java)
     whenever(notificationDebugLog.entries)
         .thenReturn(EventedFlow("debug-log", mutableListOf(), listOf(emptyList())))
-    val notificationScheduler = mock(NotificationScheduler::class.java)
     val notifier = mock(Notifier::class.java)
     val imageStore = mock(AffirmationImageStore::class.java)
+    val fcmTokenRepository = mock(FcmTokenRepository::class.java)
 
     return AffirmityAppState(
         scope = scope,
@@ -186,11 +187,12 @@ private fun buildState(
         migrator = migrator,
         trackerPreferences = trackerPreferences,
         imageStore = imageStore,
-        notificationScheduler = notificationScheduler,
         notificationDebugLog = notificationDebugLog,
         notifier = notifier,
         widgetUpdater = WidgetUpdater { },
         authRepository = authRepository,
+        fcmTokenRepository = fcmTokenRepository,
+        deviceTimeZoneId = { "UTC" },
     )
 }
 

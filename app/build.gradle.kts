@@ -40,6 +40,9 @@ android {
     sourceSets {
         getByName("androidTest").assets.srcDirs("$projectDir/schemas")
     }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 ksp {

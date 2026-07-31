@@ -2,6 +2,7 @@ package com.pirxhio.affirmity.data
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -12,6 +13,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.credentials.CredentialManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.messaging.FirebaseMessaging
 import com.pirxhio.affirmity.auth.AuthError
 import com.pirxhio.affirmity.auth.AuthException
 import com.pirxhio.affirmity.auth.AuthProviderId
@@ -29,6 +31,7 @@ import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.NotificationLogEntry
 import com.pirxhio.affirmity.data.local.NotificationPreferences
 import com.pirxhio.affirmity.data.local.TrackerPreferences
+import com.pirxhio.affirmity.data.remote.FcmTokenRepository
 import com.pirxhio.affirmity.data.remote.FirestoreAffirmationRepository
 import com.pirxhio.affirmity.data.remote.FirestoreDailyCompletionRepository
 import com.pirxhio.affirmity.data.remote.FirestoreMeditationPreferencesRepository
@@ -41,15 +44,17 @@ import com.pirxhio.affirmity.data.repository.RoomDailyCompletionRepository
 import com.pirxhio.affirmity.data.repository.RoomMeditationPreferencesRepository
 import com.pirxhio.affirmity.data.repository.RoomNotificationSettingsRepository
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
-import com.pirxhio.affirmity.notifications.NotificationScheduler
 import com.pirxhio.affirmity.notifications.Notifier
 import com.pirxhio.affirmity.widget.WeeklyTrackerWidget
 import androidx.glance.appwidget.updateAll
+import java.util.TimeZone
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
@@ -57,6 +62,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 /** Background for an affirmation card: a solid color, or a locally-cached downloaded image. */
 sealed class AffirmationBackground {
@@ -124,11 +130,12 @@ class AffirmityAppState(
     private val migrator: FirestoreMigrator,
     private val trackerPreferences: TrackerPreferences,
     private val imageStore: AffirmationImageStore,
-    private val notificationScheduler: NotificationScheduler,
     private val notificationDebugLog: NotificationDebugLog,
     private val notifier: Notifier,
     private val widgetUpdater: WidgetUpdater,
     private val authRepository: AuthRepository,
+    private val fcmTokenRepository: FcmTokenRepository,
+    private val deviceTimeZoneId: () -> String = { TimeZone.getDefault().id },
     private val useRemoteSession: Boolean = true,
 ) {
     val affirmations = mutableStateListOf<Affirmation>()
@@ -273,8 +280,33 @@ class AffirmityAppState(
             }
         }
         scope.launch {
-            notificationScheduler.ensureScheduled(NotificationChannelSpec.REMINDER)
-            notificationScheduler.ensureScheduled(NotificationChannelSpec.REFLECTION)
+            // Signed-in FCM token registration + IANA timezone sync (design.md's "Timezone"
+            // decision + spec's "Token refresh is synced"): the server planner needs both to
+            // compute this user's local-day trigger instants and to know where to send.
+            //
+            // Deliberately observes [session] itself rather than independently deriving uid from
+            // [authRepository.authState] and snapshotting session state after the fact: the latter
+            // raced [session]'s own transformLatest pipeline (both react to the same authState
+            // emission concurrently), so a `ready()` call could return a stale pre-sign-in `Local`
+            // value read from the StateFlow's current value before migration had even started.
+            session.filterIsInstance<DataSession.Remote>()
+                .distinctUntilChangedBy { it.uid }
+                .collect { remoteSession ->
+                    val uid = remoteSession.uid
+                    Log.d(TAG, "fcm/timezone sync: session is Remote for uid=$uid")
+                    runCatching {
+                        val zoneId = deviceTimeZoneId()
+                        Log.d(TAG, "fcm/timezone sync: writing timeZone=$zoneId for uid=$uid")
+                        remoteSession.notifications.setTimeZone(zoneId)
+                        Log.d(TAG, "fcm/timezone sync: timeZone write succeeded")
+                        val token = FirebaseMessaging.getInstance().token.await()
+                        Log.d(TAG, "fcm/timezone sync: got FCM token, registering for uid=$uid")
+                        fcmTokenRepository.registerToken(uid, token)
+                        Log.d(TAG, "fcm/timezone sync: token registration succeeded")
+                    }.onFailure { error ->
+                        Log.e(TAG, "fcm/timezone sync: FAILED for uid=$uid", error)
+                    }
+                }
         }
         scope.launch {
             notificationDebugLog.entries.collect { entries ->
@@ -326,24 +358,18 @@ class AffirmityAppState(
     fun setChannelEnabled(channel: NotificationChannelSpec, enabled: Boolean) {
         scope.launch {
             ready().notifications.setEnabled(channel, enabled)
-            if (enabled) {
-                notificationScheduler.scheduleNext(channel)
-            } else {
-                notificationScheduler.cancel(channel)
-            }
         }
     }
 
+    /**
+     * [NotificationChannelSpec.STREAK] has no configurable time window (spec: it fires once at a
+     * fixed 20:00 user-local instant, evaluated server-side) — calling this for it is a no-op
+     * rather than an exhaustive `when` branch, since there is nothing to persist.
+     */
     fun setChannelWindow(channel: NotificationChannelSpec, startMinute: Int, endMinute: Int) {
+        if (channel == NotificationChannelSpec.STREAK) return
         scope.launch {
             ready().notifications.setWindow(channel, startMinute, endMinute)
-            val enabled = when (channel) {
-                NotificationChannelSpec.REMINDER -> reminderSettings.value.enabled
-                NotificationChannelSpec.REFLECTION -> reflectionSettings.value.enabled
-            }
-            if (enabled) {
-                notificationScheduler.scheduleNext(channel)
-            }
         }
     }
 
@@ -470,6 +496,7 @@ class AffirmityAppState(
     }
 
     private companion object {
+        const val TAG = "AffirmityAppState"
         const val AFFIRMATIONS_GOAL_PER_DAY = 2
 
         /** How far back to look when deriving the running streak from `daily_completion`. */
@@ -515,14 +542,10 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             migrator = FirestoreMigrator(firestore),
             trackerPreferences = trackerPreferences,
             imageStore = AffirmationImageStore(context.applicationContext),
-            notificationScheduler = NotificationScheduler(
-                context.applicationContext,
-                notificationPreferences,
-                notificationDebugLog,
-            ),
             notificationDebugLog = notificationDebugLog,
             notifier = Notifier(context.applicationContext, notificationDebugLog),
             widgetUpdater = widgetUpdater(context.applicationContext),
+            fcmTokenRepository = FcmTokenRepository(firestore),
             authRepository = FirebaseAuthRepository(
                 auth = FirebaseAuth.getInstance(),
                 providers = mapOf(AuthProviderId.GOOGLE to googleIdAuthProvider),
