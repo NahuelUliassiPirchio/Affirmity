@@ -161,6 +161,10 @@ export async function planAllUsers(
       results.push(await planAndEnqueueUser(input, store, enqueuer, rng));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      // Visible in Cloud Functions logs, not just the Firestore marker doc -- a silent catch here
+      // is exactly what made an IAM permission gap undiagnosable from `firebase functions:log`
+      // during this stage's rollout.
+      console.error(`planAllUsers: failed for uid=${input.uid} localDay=${input.localDay}: ${message}`);
       try {
         await store.markFailed(input.uid, input.localDay, message);
       } catch {

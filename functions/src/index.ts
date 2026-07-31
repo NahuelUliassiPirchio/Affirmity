@@ -15,7 +15,7 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { CloudTasksClient as GoogleCloudTasksClient } from '@google-cloud/tasks';
 import { OAuth2Client } from 'google-auth-library';
 
-import { localHourInZone } from './localDay';
+import { localHourInZone, utcMillisToLocalEpochDay } from './localDay';
 import { planAllUsers, type PlanStore, type PlanResult, type TaskEnqueuer, type UserPlanInput } from './planner';
 import { taskName } from './tasks';
 import { sendAndPrune, type FcmClient, type TokenStore } from './fcm';
@@ -99,7 +99,7 @@ function cloudTasksEnqueuer(): TaskEnqueuer {
   };
 }
 
-async function loadActiveUserInputs(localDay: number): Promise<UserPlanInput[]> {
+async function loadActiveUserInputs(): Promise<UserPlanInput[]> {
   const db = getFirestore();
   // Every document under users/{uid}/settings/ is the single `preferences` doc (per
   // FirestorePaths.kt), so no per-doc-id filter is needed -- and collectionGroup queries can't
@@ -117,18 +117,26 @@ async function loadActiveUserInputs(localDay: number): Promise<UserPlanInput[]> 
     if (!zone) continue; // no timezone captured yet -- cannot plan a local-day schedule
     if (localHourInZone(Date.now(), zone) !== PLANNING_LOCAL_HOUR) continue;
 
+    // Each user's calendar day is computed in their own zone, not a single shared UTC day: for
+    // negative-offset zones like Argentina, the UTC calendar can roll to day N up to ~3h before
+    // that user's local calendar does, which would misplan the day this tick is meant to cover.
+    const localDay = utcMillisToLocalEpochDay(Date.now(), zone);
+
     const completionsSnap = await db.collection(`users/${uid}/dailyCompletions`).get();
 
     inputs.push({
       uid,
       localDay,
+      // Field names mirror FirestoreNotificationSettingsRepository.kt's
+      // "${channel.prefsPrefix}_..." convention (prefsPrefix "reminder"/"reflection"), not the
+      // interface's own camelCase property names.
       settings: {
-        remindersEnabled: Boolean(data.remindersEnabled),
-        reflectionEnabled: Boolean(data.reflectionEnabled),
-        reminderStartMinute: Number(data.reminderStartMinute ?? 0),
-        reminderEndMinute: Number(data.reminderEndMinute ?? 0),
-        reflectionStartMinute: Number(data.reflectionStartMinute ?? 0),
-        reflectionEndMinute: Number(data.reflectionEndMinute ?? 0),
+        remindersEnabled: Boolean(data.reminder_enabled),
+        reflectionEnabled: Boolean(data.reflection_enabled),
+        reminderStartMinute: Number(data.reminder_startMinute ?? 0),
+        reminderEndMinute: Number(data.reminder_endMinute ?? 0),
+        reflectionStartMinute: Number(data.reflection_startMinute ?? 0),
+        reflectionEndMinute: Number(data.reflection_endMinute ?? 0),
         timeZone: zone,
       },
       completions: completionsSnap.docs.map((d: QueryDocumentSnapshot) => ({
@@ -143,8 +151,7 @@ async function loadActiveUserInputs(localDay: number): Promise<UserPlanInput[]> 
 
 /** Hourly tick; plans users whose local hour has just reached `PLANNING_LOCAL_HOUR`. */
 export const planNotifications = onSchedule('every 60 minutes', async () => {
-  const localDay = Math.floor(Date.now() / 86_400_000);
-  const inputs = await loadActiveUserInputs(localDay);
+  const inputs = await loadActiveUserInputs();
   await planAllUsers(inputs, firestoreStore(), cloudTasksEnqueuer());
 });
 
