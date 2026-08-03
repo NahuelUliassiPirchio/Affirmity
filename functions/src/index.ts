@@ -31,8 +31,12 @@ if (getApps().length === 0) {
   initializeApp();
 }
 
-/** Local hour at which the planner considers a user "due" for tomorrow's/today's plan. */
-const PLANNING_LOCAL_HOUR = 3;
+/** Local hour at which the planner considers a user "due" for tomorrow's/today's plan.
+ * Overridable via PLANNING_LOCAL_HOUR_OVERRIDE for manual end-to-end testing outside the real
+ * window -- remove the env var (or leave it unset) to fall back to the real production hour. */
+const PLANNING_LOCAL_HOUR = process.env.PLANNING_LOCAL_HOUR_OVERRIDE
+  ? Number(process.env.PLANNING_LOCAL_HOUR_OVERRIDE)
+  : 3;
 
 // Deploy-time configuration -- set via `firebase functions:config:set` / environment config, not
 // hardcoded, since queue path/invoker identity differ per environment (dev/staging/prod).
