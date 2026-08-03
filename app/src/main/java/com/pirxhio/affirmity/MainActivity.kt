@@ -42,6 +42,7 @@ import com.pirxhio.affirmity.data.rememberAffirmityAppState
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
 import com.pirxhio.affirmity.ui.meditation.MeditationScreen
+import com.pirxhio.affirmity.ui.onboarding.OnboardingScreen
 import com.pirxhio.affirmity.ui.progress.ProgressScreen
 import com.pirxhio.affirmity.ui.settings.NotificationDebugScreen
 import com.pirxhio.affirmity.ui.settings.SettingsScreen
@@ -107,6 +108,23 @@ fun AffirmityApp(startDestination: AppDestinations = AppDestinations.AFIRMACIONE
         if (needsRuntimePrompt) {
             permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+    }
+
+    if (appState.hasCompletedOnboarding.value == false) {
+        OnboardingScreen(
+            modifier = Modifier.fillMaxSize(),
+            authState = appState.authState.value,
+            authError = appState.authError.value,
+            onSignInClicked = { appState.signIn(context) },
+            onFinished = { appState.completeOnboarding() },
+        )
+        return
+    }
+
+    if (appState.hasCompletedOnboarding.value == null) {
+        // DataStore hasn't resolved yet — avoid a false "main app" flash before we know whether
+        // onboarding is needed.
+        return
     }
 
     if (showNotificationDebug) {

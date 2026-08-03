@@ -32,4 +32,11 @@
     <string name="settings_account_error_config_missing">El inicio de sesión todavía no está disponible.</string>
     <string name="settings_account_error_unknown">No se pudo iniciar sesión. Intenta de nuevo.</string>
     <string name="settings_account_sync_error">No se pudo sincronizar tus datos con la nube. Seguimos usando tus datos guardados en este teléfono; lo intentaremos de nuevo la próxima vez que inicies sesión.</string>
+
+    <string name="onboarding_back_button">Atrás</string>
+    <string name="onboarding_next_button">Siguiente</string>
+    <string name="onboarding_continue_without_account_button">Continuar sin cuenta</string>
+    <string name="onboarding_auth_title">Ya casi terminamos</string>
+    <string name="onboarding_auth_subtitle">Iniciá sesión para guardar tu progreso en la nube, o continuá sin cuenta.</string>
+    <string name="onboarding_auth_signed_in">¡Listo! Sesión iniciada.</string>
 </resources>

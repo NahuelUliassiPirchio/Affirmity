@@ -30,6 +30,7 @@ import com.pirxhio.affirmity.data.local.DailyViewCount
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.NotificationLogEntry
 import com.pirxhio.affirmity.data.local.NotificationPreferences
+import com.pirxhio.affirmity.data.local.OnboardingPreferences
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.FcmTokenRepository
 import com.pirxhio.affirmity.data.remote.FirestoreAffirmationRepository
@@ -129,6 +130,7 @@ class AffirmityAppState(
     private val remoteSessionFactory: (uid: String) -> DataSession.Remote,
     private val migrator: FirestoreMigrator,
     private val trackerPreferences: TrackerPreferences,
+    private val onboardingPreferences: OnboardingPreferences,
     private val imageStore: AffirmationImageStore,
     private val notificationDebugLog: NotificationDebugLog,
     private val notifier: Notifier,
@@ -178,6 +180,11 @@ class AffirmityAppState(
     /** Set when a migration attempt fails on sign-in; the session stays [DataSession.Local] and
      * the user keeps a fully working offline app. Cleared on the next successful swap attempt. */
     var syncError = mutableStateOf<String?>(null)
+        private set
+
+    /** Null until DataStore finishes its first read; [MainActivity] holds off showing onboarding
+     * or the main app until this resolves. */
+    var hasCompletedOnboarding = mutableStateOf<Boolean?>(null)
         private set
 
     private var affirmationsViewedToday = DailyViewCount(epochDay = -1L, count = 0)
@@ -317,6 +324,14 @@ class AffirmityAppState(
         scope.launch {
             authRepository.authState.collect { authState.value = it }
         }
+        scope.launch {
+            onboardingPreferences.observeHasCompletedOnboarding().collect { hasCompletedOnboarding.value = it }
+        }
+    }
+
+    fun completeOnboarding() {
+        hasCompletedOnboarding.value = true
+        scope.launch { onboardingPreferences.setCompleted() }
     }
 
     /** Starts Google sign-in from the Settings account section. Never crashes: recoverable
@@ -520,6 +535,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
         val notificationDebugLog = NotificationDebugLog(context.applicationContext)
         val googleIdAuthProvider = GoogleIdAuthProvider(CredentialManager.create(context.applicationContext))
         val trackerPreferences = TrackerPreferences(context)
+        val onboardingPreferences = OnboardingPreferences(context)
         val firestore = FirebaseFirestore.getInstance()
         val local = DataSession.Local(
             affirmations = RoomAffirmationRepository(database.affirmationDao()),
@@ -541,6 +557,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             },
             migrator = FirestoreMigrator(firestore),
             trackerPreferences = trackerPreferences,
+            onboardingPreferences = onboardingPreferences,
             imageStore = AffirmationImageStore(context.applicationContext),
             notificationDebugLog = notificationDebugLog,
             notifier = Notifier(context.applicationContext, notificationDebugLog),

@@ -17,3 +17,6 @@
 /.atl/
 /.gga
 local.properties
+
+# Local dev notes, not part of the shipped project
+/docs/
