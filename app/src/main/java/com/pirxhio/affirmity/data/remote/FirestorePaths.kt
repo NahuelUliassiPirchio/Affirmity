@@ -18,6 +18,8 @@ object FirestorePaths {
 
     fun migratedMarkerDoc(uid: String): String = "users/$uid/meta/migrated"
 
+    fun onboardingMarkerDoc(uid: String): String = "users/$uid/meta/onboarded"
+
     fun fcmTokensCollection(uid: String): String = "users/$uid/fcmTokens"
 
     fun fcmTokenDoc(uid: String, token: String): String = "${fcmTokensCollection(uid)}/$token"

@@ -26,6 +26,7 @@ class WeeklyTrackerWidgetContentTest {
                     ),
                     weekStart = monday,
                     todayIndex = 2,
+                    dayLetters = listOf("L", "M", "M", "J", "V", "S", "D"),
                 )
             }
 
@@ -42,6 +43,7 @@ class WeeklyTrackerWidgetContentTest {
                     rows = emptyList(),
                     weekStart = monday,
                     todayIndex = 0,
+                    dayLetters = listOf("L", "M", "M", "J", "V", "S", "D"),
                 )
             }
 

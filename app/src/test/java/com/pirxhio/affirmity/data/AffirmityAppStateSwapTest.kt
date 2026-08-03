@@ -9,11 +9,13 @@ import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyViewCount
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
+import com.pirxhio.affirmity.data.local.OnboardingPreferences
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.DocWrite
 import com.pirxhio.affirmity.data.remote.FcmTokenRepository
 import com.pirxhio.affirmity.data.remote.FirestoreMigrationSource
 import com.pirxhio.affirmity.data.remote.FirestoreMigrator
+import com.pirxhio.affirmity.data.remote.FirestoreOnboardingRepository
 import com.pirxhio.affirmity.data.repository.AffirmationRepository
 import com.pirxhio.affirmity.data.repository.DailyCompletionRepository
 import com.pirxhio.affirmity.data.repository.DataSession
@@ -179,6 +181,9 @@ private fun buildState(
     val notifier = mock(Notifier::class.java)
     val imageStore = mock(AffirmationImageStore::class.java)
     val fcmTokenRepository = mock(FcmTokenRepository::class.java)
+    val onboardingPreferences = mock(OnboardingPreferences::class.java)
+    whenever(onboardingPreferences.observeHasCompletedOnboarding())
+        .thenReturn(EventedFlow("onboarding-completed", mutableListOf(), listOf(true)))
 
     return AffirmityAppState(
         scope = scope,
@@ -192,6 +197,8 @@ private fun buildState(
         widgetUpdater = WidgetUpdater { },
         authRepository = authRepository,
         fcmTokenRepository = fcmTokenRepository,
+        onboardingRepository = mock(FirestoreOnboardingRepository::class.java),
+        onboardingPreferences = onboardingPreferences,
         deviceTimeZoneId = { "UTC" },
     )
 }

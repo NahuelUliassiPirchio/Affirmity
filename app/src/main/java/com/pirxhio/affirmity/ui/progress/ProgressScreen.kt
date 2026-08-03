@@ -50,8 +50,6 @@ import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.data.Affirmation
 import com.pirxhio.affirmity.data.WeeklyStreak
 
-private val dayLabels = listOf("L", "M", "M", "J", "V", "S", "D")
-
 private val swatches = listOf(
     "#2A9D8F", "#00696F", "#5BBCC3", "#5E5E5E", "#8F4D22", "#BA1A1A"
 )
@@ -188,7 +186,7 @@ fun WeeklyStreakTracker(
                     .padding(top = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                dayLabels.forEachIndexed { index, label ->
+                streak.dayLabels.forEachIndexed { index, label ->
                     val completed = streak.completedDays.getOrElse(index) { false }
                     Box(
                         modifier = Modifier

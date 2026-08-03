@@ -11,11 +11,13 @@ import com.pirxhio.affirmity.data.local.AffirmationImageStore
 import com.pirxhio.affirmity.data.local.AffirmityDatabase
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.NotificationPreferences
+import com.pirxhio.affirmity.data.local.OnboardingPreferences
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.DocWrite
 import com.pirxhio.affirmity.data.remote.FcmTokenRepository
 import com.pirxhio.affirmity.data.remote.FirestoreMigrationSource
 import com.pirxhio.affirmity.data.remote.FirestoreMigrator
+import com.pirxhio.affirmity.data.remote.FirestoreOnboardingRepository
 import com.pirxhio.affirmity.data.repository.DataSession
 import com.pirxhio.affirmity.data.repository.RoomAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomDailyCompletionRepository
@@ -51,8 +53,9 @@ private class UnreachableFirestoreMigrationSource : FirestoreMigrationSource {
 
 /**
  * Approval test for task 2.4 / spec scenario "Broken streak still shows earlier completions":
- * completing Monday, missing Tuesday, and completing Wednesday again must leave Monday and
- * Wednesday both marked completed in the derived [WeeklyStreak] — the bug this change fixes.
+ * completing the window's first day, missing the second, and completing the third again must
+ * leave the first and third days both marked completed in the derived [WeeklyStreak] — the bug
+ * this change fixes.
  */
 @RunWith(AndroidJUnit4::class)
 class AffirmityAppStateInstrumentedTest {
@@ -81,12 +84,14 @@ class AffirmityAppStateInstrumentedTest {
             remoteSessionFactory = { error("unreachable: session never leaves Local") },
             migrator = FirestoreMigrator(UnreachableFirestoreMigrationSource()),
             trackerPreferences = trackerPreferences,
+            onboardingPreferences = OnboardingPreferences(context.applicationContext),
             imageStore = AffirmationImageStore(context.applicationContext),
             notificationDebugLog = notificationDebugLog,
             notifier = Notifier(context.applicationContext, notificationDebugLog),
             widgetUpdater = WidgetUpdater { },
             authRepository = FakeSignedOutAuthRepository(),
             fcmTokenRepository = FcmTokenRepository(FirebaseFirestore.getInstance()),
+            onboardingRepository = FirestoreOnboardingRepository(FirebaseFirestore.getInstance()),
         )
     }
 
@@ -96,19 +101,19 @@ class AffirmityAppStateInstrumentedTest {
     }
 
     @Test
-    fun brokenMeditationStreak_stillShowsMondayAndWednesdayCompleted() = runBlocking {
-        val monday = DayClock.weekStartEpochDay()
-        val wednesday = monday + 2
+    fun brokenMeditationStreak_stillShowsFirstAndThirdDayCompleted() = runBlocking {
+        val windowStart = DayClock.rollingWindowStartEpochDay()
+        val thirdDay = windowStart + 2
 
-        db.dailyCompletionDao().markMeditation(monday)
-        // Tuesday intentionally left unmarked.
-        db.dailyCompletionDao().markMeditation(wednesday)
+        db.dailyCompletionDao().markMeditation(windowStart)
+        // Second day of the window intentionally left unmarked.
+        db.dailyCompletionDao().markMeditation(thirdDay)
 
         // Let the state's observeRange collector process the DAO writes.
         delay(200)
 
-        assertEquals(true, state.meditationStreak.value.completedDays[0]) // Monday
-        assertEquals(false, state.meditationStreak.value.completedDays[1]) // Tuesday
-        assertEquals(true, state.meditationStreak.value.completedDays[2]) // Wednesday
+        assertEquals(true, state.meditationStreak.value.completedDays[0]) // first day of window
+        assertEquals(false, state.meditationStreak.value.completedDays[1]) // second day
+        assertEquals(true, state.meditationStreak.value.completedDays[2]) // third day
     }
 }

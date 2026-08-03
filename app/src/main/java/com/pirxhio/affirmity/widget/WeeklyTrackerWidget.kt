@@ -45,7 +45,6 @@ import kotlinx.coroutines.tasks.await
 
 private const val EXTRA_START_DESTINATION = "start_destination"
 private const val HOME_DESTINATION = "AFIRMACIONES"
-private val DAY_LETTERS = listOf("L", "M", "M", "J", "V", "S", "D")
 
 /** Per-habit fill colors; empty color for an incomplete half. */
 private val MEDITATION_COLOR = Color(0xFF00696F)
@@ -74,7 +73,8 @@ class WeeklyTrackerWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val today = DayClock.epochDay()
-        val weekStart = DayClock.weekStartEpochDay()
+        val weekStart = DayClock.rollingWindowStartEpochDay()
+        val dayLetters = DayClock.rollingWindowDayLetters()
         // Signed-in completions live in Firestore only (fcm-notifications bugfix): reading Room
         // here for a signed-in user showed a permanently stale week, frozen at the migration
         // snapshot, since AffirmityAppState no longer writes completions to Room post-migration.
@@ -99,6 +99,7 @@ class WeeklyTrackerWidget : GlanceAppWidget() {
                 rows = rows,
                 weekStart = weekStart,
                 todayIndex = todayIndex,
+                dayLetters = dayLetters,
             )
         }
     }
@@ -111,6 +112,7 @@ internal fun WeeklyTrackerContent(
     rows: List<DailyCompletionEntity>,
     weekStart: Long,
     todayIndex: Int,
+    dayLetters: List<String>,
 ) {
     val context = LocalContext.current
     val tapIntent = Intent(context, MainActivity::class.java).apply {
@@ -129,7 +131,7 @@ internal fun WeeklyTrackerContent(
         if (!hasAny) {
             EmptyState()
         } else {
-            WeekGrid(rows = rows, weekStart = weekStart, todayIndex = todayIndex)
+            WeekGrid(rows = rows, weekStart = weekStart, todayIndex = todayIndex, dayLetters = dayLetters)
         }
     }
 }
@@ -143,7 +145,7 @@ private fun EmptyState() {
 }
 
 @androidx.compose.runtime.Composable
-private fun WeekGrid(rows: List<DailyCompletionEntity>, weekStart: Long, todayIndex: Int) {
+private fun WeekGrid(rows: List<DailyCompletionEntity>, weekStart: Long, todayIndex: Int, dayLetters: List<String>) {
     val byDay = rows.associateBy { it.epochDay }
     val availableHeight = LocalSize.current.height
     val showLetters = availableHeight >= LETTERS_ROW_THRESHOLD
@@ -164,7 +166,7 @@ private fun WeekGrid(rows: List<DailyCompletionEntity>, weekStart: Long, todayIn
             }
             if (showLetters) {
                 Row(modifier = GlanceModifier.padding(top = 2.dp)) {
-                    for (letter in DAY_LETTERS) {
+                    for (letter in dayLetters) {
                         Text(
                             text = letter,
                             modifier = GlanceModifier.width(CELL_SIZE),

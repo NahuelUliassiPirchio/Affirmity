@@ -38,6 +38,7 @@ import com.pirxhio.affirmity.data.remote.FirestoreDailyCompletionRepository
 import com.pirxhio.affirmity.data.remote.FirestoreMeditationPreferencesRepository
 import com.pirxhio.affirmity.data.remote.FirestoreMigrator
 import com.pirxhio.affirmity.data.remote.FirestoreNotificationSettingsRepository
+import com.pirxhio.affirmity.data.remote.FirestoreOnboardingRepository
 import com.pirxhio.affirmity.data.remote.MigrationSnapshot
 import com.pirxhio.affirmity.data.repository.DataSession
 import com.pirxhio.affirmity.data.repository.RoomAffirmationRepository
@@ -78,10 +79,11 @@ data class Affirmation(
     val background: AffirmationBackground,
 )
 
-/** Mon..Sun completion flags for a weekly habit tracker. */
+/** Rolling last-7-days completion flags (oldest first, today last) for a habit tracker. */
 data class WeeklyStreak(
     val completedDays: List<Boolean>,
     val streakDays: Int,
+    val dayLabels: List<String> = List(7) { "" },
 )
 
 /** Solid-color background, or the placeholder tint shown behind an image while it decodes. */
@@ -137,6 +139,7 @@ class AffirmityAppState(
     private val widgetUpdater: WidgetUpdater,
     private val authRepository: AuthRepository,
     private val fcmTokenRepository: FcmTokenRepository,
+    private val onboardingRepository: FirestoreOnboardingRepository,
     private val deviceTimeZoneId: () -> String = { TimeZone.getDefault().id },
     private val useRemoteSession: Boolean = true,
 ) {
@@ -249,21 +252,22 @@ class AffirmityAppState(
         }
         scope.launch {
             val today = DayClock.epochDay()
-            val weekStart = DayClock.weekStartEpochDay()
-            session.flatMapLatest { it.completions.observeRange(weekStart - STREAK_LOOKBACK_DAYS, weekStart + 6) }
+            val windowStart = DayClock.rollingWindowStartEpochDay()
+            val dayLabels = DayClock.rollingWindowDayLetters()
+            session.flatMapLatest { it.completions.observeRange(windowStart - STREAK_LOOKBACK_DAYS, windowStart + 6) }
                 .collect { rows ->
                     affirmationsStreak.value = DailyCompletionStats.toWeeklyStreak(
                         rows = rows,
-                        weekStartEpochDay = weekStart,
+                        weekStartEpochDay = windowStart,
                         todayEpochDay = today,
                         isDone = { it.affirmationDone },
-                    )
+                    ).copy(dayLabels = dayLabels)
                     meditationStreak.value = DailyCompletionStats.toWeeklyStreak(
                         rows = rows,
-                        weekStartEpochDay = weekStart,
+                        weekStartEpochDay = windowStart,
                         todayEpochDay = today,
                         isDone = { it.meditationDone },
-                    )
+                    ).copy(dayLabels = dayLabels)
                 }
         }
         scope.launch {
@@ -331,8 +335,20 @@ class AffirmityAppState(
 
     fun completeOnboarding() {
         hasCompletedOnboarding.value = true
-        scope.launch { onboardingPreferences.setCompleted() }
+        val uid = (authState.value as? AuthState.SignedIn)?.uid
+        scope.launch {
+            onboardingPreferences.setCompleted()
+            if (uid != null) {
+                runCatching { onboardingRepository.markCompleted(uid) }
+            }
+        }
     }
+
+    /** Used by the onboarding flow's "I already have an account" shortcut, right after sign-in,
+     * to recognize a returning account and skip the question steps. `false` on any read failure
+     * (e.g. offline) — falls back to the normal question flow rather than blocking onboarding. */
+    suspend fun hasRemoteOnboardingCompleted(uid: String): Boolean =
+        runCatching { onboardingRepository.hasCompleted(uid) }.getOrDefault(false)
 
     /** Starts Google sign-in from the Settings account section. Never crashes: recoverable
      * failures land in [authError]; cancellation clears it and leaves the user signed out. */
@@ -563,6 +579,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             notifier = Notifier(context.applicationContext, notificationDebugLog),
             widgetUpdater = widgetUpdater(context.applicationContext),
             fcmTokenRepository = FcmTokenRepository(firestore),
+            onboardingRepository = FirestoreOnboardingRepository(firestore),
             authRepository = FirebaseAuthRepository(
                 auth = FirebaseAuth.getInstance(),
                 providers = mapOf(AuthProviderId.GOOGLE to googleIdAuthProvider),

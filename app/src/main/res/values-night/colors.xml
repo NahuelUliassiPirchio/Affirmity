@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches TealPrimaryDark in ui/theme/Color.kt (dark color scheme's primary). -->
+    <color name="splash_background">#FF5BBCC3</color>
+</resources>

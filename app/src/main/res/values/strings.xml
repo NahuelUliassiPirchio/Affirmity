@@ -39,4 +39,9 @@
     <string name="onboarding_auth_title">Ya casi terminamos</string>
     <string name="onboarding_auth_subtitle">Iniciá sesión para guardar tu progreso en la nube, o continuá sin cuenta.</string>
     <string name="onboarding_auth_signed_in">¡Listo! Sesión iniciada.</string>
+    <string name="onboarding_intro_title">Bienvenido a Affirmity</string>
+    <string name="onboarding_intro_subtitle">¿Ya usaste la app antes? Iniciá sesión para omitir las preguntas.</string>
+    <string name="onboarding_intro_sign_in_button">Ya tengo una cuenta</string>
+    <string name="onboarding_intro_start_button">Empezar</string>
+    <string name="onboarding_intro_checking">Verificando tu cuenta…</string>
 </resources>

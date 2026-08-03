@@ -19,10 +19,16 @@ object DayClock {
         return midnight.timeInMillis / (24 * 60 * 60 * 1000L)
     }
 
-    /** [epochDay] of the Monday starting the calendar week containing [calendar]. */
-    fun weekStartEpochDay(calendar: Calendar = Calendar.getInstance()): Long {
-        val daysSinceMonday = (calendar.get(Calendar.DAY_OF_WEEK) + 5) % 7
-        val monday = (calendar.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -daysSinceMonday) }
-        return epochDay(monday)
+    /** [epochDay] of the day 6 days before [calendar] — start of the rolling last-7-days window. */
+    fun rollingWindowStartEpochDay(calendar: Calendar = Calendar.getInstance()): Long =
+        epochDay(calendar) - 6
+
+    /** Single-letter weekday labels for the rolling 7-day window ending on [calendar], oldest first. */
+    fun rollingWindowDayLetters(calendar: Calendar = Calendar.getInstance()): List<String> {
+        val letters = arrayOf("D", "L", "M", "M", "J", "V", "S") // Calendar.DAY_OF_WEEK: Sun=1..Sat=7
+        return (6 downTo 0).map { offset ->
+            val day = (calendar.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -offset) }
+            letters[day.get(Calendar.DAY_OF_WEEK) - 1]
+        }
     }
 }

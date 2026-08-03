@@ -36,39 +36,35 @@ class DayClockTest {
     }
 
     @Test
-    fun `weekStartEpochDay of a mid-week Wednesday is that week's Monday`() {
-        val wednesday = calendarAt(2026, Calendar.JANUARY, 14) // Wed
-        val monday = calendarAt(2026, Calendar.JANUARY, 12)
+    fun `rollingWindowStartEpochDay is 6 days before the given calendar day`() {
+        val today = calendarAt(2026, Calendar.JANUARY, 14)
+        val sixDaysAgo = calendarAt(2026, Calendar.JANUARY, 8)
 
-        assertEquals(DayClock.epochDay(monday), DayClock.weekStartEpochDay(wednesday))
+        assertEquals(DayClock.epochDay(sixDaysAgo), DayClock.rollingWindowStartEpochDay(today))
     }
 
     @Test
-    fun `weekStartEpochDay of Monday itself is its own day`() {
-        val monday = calendarAt(2026, Calendar.JANUARY, 12)
-
-        assertEquals(DayClock.epochDay(monday), DayClock.weekStartEpochDay(monday))
-    }
-
-    @Test
-    fun `weekStartEpochDay of Sunday rolls back to the preceding Monday`() {
-        val sunday = calendarAt(2026, Calendar.JANUARY, 18)
-        val monday = calendarAt(2026, Calendar.JANUARY, 12)
-
-        assertEquals(DayClock.epochDay(monday), DayClock.weekStartEpochDay(sunday))
-    }
-
-    @Test
-    fun `epochDay and weekStartEpochDay stay consistent across a DST spring-forward boundary`() {
+    fun `epochDay and rollingWindowStartEpochDay stay consistent across a DST spring-forward boundary`() {
         val nyZone = TimeZone.getTimeZone("America/New_York")
-        // 2026-03-08 is a DST spring-forward Sunday in America/New_York; same calendar week as March 7.
+        // 2026-03-08 is a DST spring-forward Sunday in America/New_York.
         val beforeDst = calendarAt(2026, Calendar.MARCH, 7, hour = 23, minute = 0, zone = nyZone)
         val afterDst = calendarAt(2026, Calendar.MARCH, 8, hour = 3, minute = 0, zone = nyZone)
 
         assertEquals(DayClock.epochDay(beforeDst) + 1, DayClock.epochDay(afterDst))
         assertEquals(
-            DayClock.weekStartEpochDay(beforeDst),
-            DayClock.weekStartEpochDay(afterDst),
+            DayClock.rollingWindowStartEpochDay(beforeDst) + 1,
+            DayClock.rollingWindowStartEpochDay(afterDst),
         )
+    }
+
+    @Test
+    fun `rollingWindowDayLetters ends on the given calendar day's weekday, oldest first`() {
+        val wednesday = calendarAt(2026, Calendar.JANUARY, 14) // Wed
+
+        val letters = DayClock.rollingWindowDayLetters(wednesday)
+
+        assertEquals(7, letters.size)
+        assertEquals("M", letters.last()) // today = Wednesday
+        assertEquals("J", letters.first()) // 6 days before Wednesday = last Thursday
     }
 }

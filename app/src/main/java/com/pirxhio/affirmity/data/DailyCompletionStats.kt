@@ -5,14 +5,14 @@ import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 /**
  * Pure derivation of [WeeklyStreak] shapes from raw [DailyCompletionEntity] rows — no I/O, no
  * `Calendar` reads. Each day is independent: a missed day never erases an earlier completed day
- * in the same week (this is the fix for the old contiguous-streak-window bug).
+ * in the same window (this is the fix for the old contiguous-streak-window bug).
  */
 object DailyCompletionStats {
 
     /**
-     * Mon..Sun completion flags for the week starting at [weekStartEpochDay], plus the current
-     * contiguous streak of [isDone] days ending on [todayEpochDay]. A day with no matching row in
-     * [rows] counts as not done.
+     * Completion flags for the rolling 7-day window starting at [weekStartEpochDay] (oldest day
+     * first, today last), plus the current contiguous streak of [isDone] days ending on
+     * [todayEpochDay]. A day with no matching row in [rows] counts as not done.
      */
     fun toWeeklyStreak(
         rows: List<DailyCompletionEntity>,

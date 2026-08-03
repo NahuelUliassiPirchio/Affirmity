@@ -38,6 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.pirxhio.affirmity.data.rememberAffirmityAppState
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
@@ -60,13 +61,22 @@ private fun resolveStartDestination(intent: Intent?): AppDestinations {
 class MainActivity : ComponentActivity() {
     private val startDestination = mutableStateOf(AppDestinations.AFIRMACIONES)
 
+    /** Keeps the native cold-start splash (Theme.Affirmity.Starting) on screen until onboarding
+     * state resolves, so there's no blank gap between the splash and the first real screen. */
+    private var keepSplashOnScreen = true
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
+        splashScreen.setKeepOnScreenCondition { keepSplashOnScreen }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         startDestination.value = resolveStartDestination(intent)
         setContent {
             AffirmityTheme {
-                AffirmityApp(startDestination = startDestination.value)
+                AffirmityApp(
+                    startDestination = startDestination.value,
+                    onOnboardingStateResolved = { keepSplashOnScreen = false },
+                )
             }
         }
     }
@@ -81,7 +91,10 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @PreviewScreenSizes
 @Composable
-fun AffirmityApp(startDestination: AppDestinations = AppDestinations.AFIRMACIONES) {
+fun AffirmityApp(
+    startDestination: AppDestinations = AppDestinations.AFIRMACIONES,
+    onOnboardingStateResolved: () -> Unit = {},
+) {
     var currentDestination by rememberSaveable { mutableStateOf(startDestination) }
     LaunchedEffect(startDestination) {
         currentDestination = startDestination
@@ -110,6 +123,10 @@ fun AffirmityApp(startDestination: AppDestinations = AppDestinations.AFIRMACIONE
         }
     }
 
+    LaunchedEffect(appState.hasCompletedOnboarding.value) {
+        if (appState.hasCompletedOnboarding.value != null) onOnboardingStateResolved()
+    }
+
     if (appState.hasCompletedOnboarding.value == false) {
         OnboardingScreen(
             modifier = Modifier.fillMaxSize(),
@@ -117,13 +134,14 @@ fun AffirmityApp(startDestination: AppDestinations = AppDestinations.AFIRMACIONE
             authError = appState.authError.value,
             onSignInClicked = { appState.signIn(context) },
             onFinished = { appState.completeOnboarding() },
+            onCheckReturningAccount = { uid -> appState.hasRemoteOnboardingCompleted(uid) },
         )
         return
     }
 
     if (appState.hasCompletedOnboarding.value == null) {
-        // DataStore hasn't resolved yet — avoid a false "main app" flash before we know whether
-        // onboarding is needed.
+        // DataStore hasn't resolved yet — the native splash (Theme.Affirmity.Starting) stays on
+        // screen via keepSplashOnScreen until this resolves, so nothing needs to render here.
         return
     }
 

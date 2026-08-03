@@ -7,4 +7,9 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Matches TealPrimaryLight/TealPrimaryDark in ui/theme/Color.kt, so the native cold-start
+         splash background (themes.xml's Theme.Affirmity.Starting) matches AffirmityTheme's primary
+         color as soon as Compose takes over. -->
+    <color name="splash_background">#FF00696F</color>
 </resources>
