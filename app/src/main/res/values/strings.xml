@@ -14,6 +14,42 @@
     <string name="notification_streak_title">Tu racha está por terminar</string>
     <string name="notification_streak_fallback_body">Todavía puedes completar hoy y mantener tu racha.</string>
 
+    <string-array name="reflection_prompts_monday">
+        <item>Hoy, lunes, ¿cómo te sentiste?</item>
+        <item>Arrancamos la semana. ¿Cómo veniste hoy, lunes?</item>
+        <item>Lunes de nuevo. ¿Cómo estuvo tu ánimo hoy?</item>
+    </string-array>
+    <string-array name="reflection_prompts_tuesday">
+        <item>Hoy, martes, ¿cómo te sentiste?</item>
+        <item>¿Cómo va este martes? Contanos cómo te sentiste.</item>
+        <item>Martes al día. ¿Cómo estuvo tu ánimo hoy?</item>
+    </string-array>
+    <string-array name="reflection_prompts_wednesday">
+        <item>Hoy, miércoles, ¿cómo te sentiste?</item>
+        <item>Mitad de semana. ¿Cómo veniste hoy, miércoles?</item>
+        <item>¿Cómo estuvo tu ánimo este miércoles?</item>
+    </string-array>
+    <string-array name="reflection_prompts_thursday">
+        <item>Hoy, jueves, ¿cómo te sentiste?</item>
+        <item>Ya casi. ¿Cómo estuvo tu ánimo hoy, jueves?</item>
+        <item>Jueves al día. Contanos cómo te sentiste.</item>
+    </string-array>
+    <string-array name="reflection_prompts_friday">
+        <item>Hoy, viernes, ¿cómo te sentiste?</item>
+        <item>Llegaste al viernes. ¿Cómo veniste hoy?</item>
+        <item>¿Cómo estuvo tu ánimo en este viernes?</item>
+    </string-array>
+    <string-array name="reflection_prompts_saturday">
+        <item>Hoy, sábado, ¿cómo te sentiste?</item>
+        <item>Fin de semana. ¿Cómo veniste hoy, sábado?</item>
+        <item>¿Cómo estuvo tu ánimo este sábado?</item>
+    </string-array>
+    <string-array name="reflection_prompts_sunday">
+        <item>Hoy, domingo, ¿cómo te sentiste?</item>
+        <item>Último día del finde. ¿Cómo veniste hoy, domingo?</item>
+        <item>¿Cómo estuvo tu ánimo este domingo?</item>
+    </string-array>
+
     <string name="settings_title">Ajustes</string>
     <string name="settings_reminders_label">Recordatorios</string>
     <string name="settings_reflection_label">Preguntas de reflexión</string>
