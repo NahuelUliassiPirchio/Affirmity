@@ -26,6 +26,7 @@ import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.AffirmationImageStore
 import com.pirxhio.affirmity.data.local.AffirmityDatabase
 import com.pirxhio.affirmity.data.local.ChannelSettings
+import com.pirxhio.affirmity.data.local.DailyMoodEntity
 import com.pirxhio.affirmity.data.local.DailyViewCount
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.NotificationLogEntry
@@ -35,6 +36,7 @@ import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.FcmTokenRepository
 import com.pirxhio.affirmity.data.remote.FirestoreAffirmationRepository
 import com.pirxhio.affirmity.data.remote.FirestoreDailyCompletionRepository
+import com.pirxhio.affirmity.data.remote.FirestoreDailyMoodRepository
 import com.pirxhio.affirmity.data.remote.FirestoreMeditationPreferencesRepository
 import com.pirxhio.affirmity.data.remote.FirestoreMigrator
 import com.pirxhio.affirmity.data.remote.FirestoreNotificationSettingsRepository
@@ -43,6 +45,7 @@ import com.pirxhio.affirmity.data.remote.MigrationSnapshot
 import com.pirxhio.affirmity.data.repository.DataSession
 import com.pirxhio.affirmity.data.repository.RoomAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomDailyCompletionRepository
+import com.pirxhio.affirmity.data.repository.RoomDailyMoodRepository
 import com.pirxhio.affirmity.data.repository.RoomMeditationPreferencesRepository
 import com.pirxhio.affirmity.data.repository.RoomNotificationSettingsRepository
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
@@ -167,6 +170,11 @@ class AffirmityAppState(
     var meditationStreak = mutableStateOf(WeeklyStreak(completedDays = List(7) { false }, streakDays = 0))
         private set
 
+    /** Rolling [STREAK_LOOKBACK_DAYS]-day window of mood check-ins, oldest first — the calendar
+     * and "Resumen" stats derive everything else (average/distribution/trend) from this list. */
+    var moodEntries = mutableStateListOf<DailyMoodEntity>()
+        private set
+
     /** Null until DataStore finishes its first read; the screen falls back to its own default. */
     var meditationDurationSeconds = mutableStateOf<Int?>(null)
         private set
@@ -234,6 +242,7 @@ class AffirmityAppState(
             uid = uid,
             affirmations = local.affirmations.observeAll().first(),
             completions = local.completions.getRange(today - STREAK_LOOKBACK_DAYS, today + 6),
+            moods = local.moods.getRange(today - STREAK_LOOKBACK_DAYS, today),
             meditationDurationSeconds = local.meditation.observeMeditationDurationSeconds().first(),
             notificationSettings = mapOf(
                 NotificationChannelSpec.REMINDER to local.notifications.observe(NotificationChannelSpec.REMINDER).first(),
@@ -268,6 +277,14 @@ class AffirmityAppState(
                         todayEpochDay = today,
                         isDone = { it.meditationDone },
                     ).copy(dayLabels = dayLabels)
+                }
+        }
+        scope.launch {
+            val today = DayClock.epochDay()
+            session.flatMapLatest { it.moods.observeRange(today - STREAK_LOOKBACK_DAYS, today) }
+                .collect { rows ->
+                    moodEntries.clear()
+                    moodEntries.addAll(rows)
                 }
         }
         scope.launch {
@@ -520,6 +537,11 @@ class AffirmityAppState(
         }
     }
 
+    /** Call from the day-detail sheet, for today or any past day the user is backfilling. */
+    fun recordMood(epochDay: Long, moodValue: Int, note: String?) {
+        scope.launch { ready().moods.upsert(epochDay, moodValue, note?.trim()?.ifBlank { null }) }
+    }
+
     /** Call whenever the user settles on a new duration (slider release, preset tap). */
     fun recordMeditationDurationSelected(seconds: Int) {
         meditationDurationSeconds.value = seconds
@@ -556,6 +578,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
         val local = DataSession.Local(
             affirmations = RoomAffirmationRepository(database.affirmationDao()),
             completions = RoomDailyCompletionRepository(database.dailyCompletionDao()),
+            moods = RoomDailyMoodRepository(database.dailyMoodDao()),
             meditation = RoomMeditationPreferencesRepository(trackerPreferences),
             notifications = RoomNotificationSettingsRepository(notificationPreferences),
         )
@@ -567,6 +590,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
                     uid = uid,
                     affirmations = FirestoreAffirmationRepository(firestore, uid),
                     completions = FirestoreDailyCompletionRepository(firestore, uid),
+                    moods = FirestoreDailyMoodRepository(firestore, uid),
                     meditation = FirestoreMeditationPreferencesRepository(firestore, uid),
                     notifications = FirestoreNotificationSettingsRepository(firestore, uid),
                 )

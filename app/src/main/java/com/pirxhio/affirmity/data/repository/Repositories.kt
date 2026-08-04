@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.data.repository
 import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
+import com.pirxhio.affirmity.data.local.DailyMoodEntity
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import kotlinx.coroutines.flow.Flow
 
@@ -24,6 +25,13 @@ interface DailyCompletionRepository {
     suspend fun getRange(from: Long, to: Long): List<DailyCompletionEntity>
     suspend fun markMeditation(epochDay: Long)
     suspend fun markAffirmation(epochDay: Long)
+}
+
+/** Store-agnostic contract for the daily mood check-in (1-5 scale + optional note). */
+interface DailyMoodRepository {
+    fun observeRange(from: Long, to: Long): Flow<List<DailyMoodEntity>>
+    suspend fun getRange(from: Long, to: Long): List<DailyMoodEntity>
+    suspend fun upsert(epochDay: Long, moodValue: Int, note: String?)
 }
 
 /** Store-agnostic contract for the meditation-duration preference. */

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Mood
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,6 +44,7 @@ import com.pirxhio.affirmity.data.rememberAffirmityAppState
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
 import com.pirxhio.affirmity.ui.meditation.MeditationScreen
+import com.pirxhio.affirmity.ui.mood.MoodScreen
 import com.pirxhio.affirmity.ui.onboarding.OnboardingScreen
 import com.pirxhio.affirmity.ui.progress.ProgressScreen
 import com.pirxhio.affirmity.ui.settings.NotificationDebugScreen
@@ -284,6 +286,11 @@ fun AffirmityApp(
                     onDeleteAffirmation = { id -> appState.removeAffirmation(id) },
                     onOpenSettings = { showSettings = true }
                 )
+
+                AppDestinations.ANIMO -> MoodScreen(
+                    moodEntries = appState.moodEntries,
+                    onSaveMood = { epochDay, moodValue, note -> appState.recordMood(epochDay, moodValue, note) },
+                )
             }
         }
     }
@@ -295,5 +302,6 @@ enum class AppDestinations(
 ) {
     AFIRMACIONES("Afirmaciones", Icons.Filled.AutoAwesome),
     MEDITAR("Meditar", Icons.Filled.Timer),
+    ANIMO("Ánimo", Icons.Filled.Mood),
     PROGRESO("Progreso", Icons.Filled.Person),
 }

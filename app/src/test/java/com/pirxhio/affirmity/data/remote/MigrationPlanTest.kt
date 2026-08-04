@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.data.remote
 import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
+import com.pirxhio.affirmity.data.local.DailyMoodEntity
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -11,10 +12,12 @@ import org.junit.Test
 private fun snapshotWith(
     affirmations: List<AffirmationEntity> = emptyList(),
     completions: List<DailyCompletionEntity> = emptyList(),
+    moods: List<DailyMoodEntity> = emptyList(),
 ): MigrationSnapshot = MigrationSnapshot(
     uid = "uid-1",
     affirmations = affirmations,
     completions = completions,
+    moods = moods,
     meditationDurationSeconds = 300,
     notificationSettings = mapOf(
         NotificationChannelSpec.REMINDER to ChannelSettings(true, 540, 1260),

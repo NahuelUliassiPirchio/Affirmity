@@ -14,6 +14,11 @@ object FirestorePaths {
     fun dailyCompletionDoc(uid: String, epochDay: Long): String =
         "${dailyCompletionsCollection(uid)}/$epochDay"
 
+    fun dailyMoodsCollection(uid: String): String = "users/$uid/dailyMoods"
+
+    fun dailyMoodDoc(uid: String, epochDay: Long): String =
+        "${dailyMoodsCollection(uid)}/$epochDay"
+
     fun settingsPreferencesDoc(uid: String): String = "users/$uid/settings/preferences"
 
     fun migratedMarkerDoc(uid: String): String = "users/$uid/meta/migrated"

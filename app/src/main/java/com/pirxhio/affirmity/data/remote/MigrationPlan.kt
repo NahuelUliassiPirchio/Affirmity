@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.data.remote
 import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
+import com.pirxhio.affirmity.data.local.DailyMoodEntity
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 
 /** One idempotent document write: a full Firestore doc path and the fields to `set(..., merge)`. */
@@ -16,6 +17,7 @@ data class MigrationSnapshot(
     val uid: String,
     val affirmations: List<AffirmationEntity>,
     val completions: List<DailyCompletionEntity>,
+    val moods: List<DailyMoodEntity>,
     val meditationDurationSeconds: Int?,
     val notificationSettings: Map<NotificationChannelSpec, ChannelSettings>,
     val migratedAt: Long,
@@ -37,6 +39,9 @@ object MigrationPlan {
         }
         snapshot.completions.forEach { entity ->
             writes += DocWrite(FirestorePaths.dailyCompletionDoc(snapshot.uid, entity.epochDay), dailyCompletionToMap(entity))
+        }
+        snapshot.moods.forEach { entity ->
+            writes += DocWrite(FirestorePaths.dailyMoodDoc(snapshot.uid, entity.epochDay), dailyMoodToMap(entity))
         }
         writes += DocWrite(FirestorePaths.settingsPreferencesDoc(snapshot.uid), preferencesMap(snapshot))
 

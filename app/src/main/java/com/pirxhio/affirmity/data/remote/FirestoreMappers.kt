@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.data.remote
 import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
+import com.pirxhio.affirmity.data.local.DailyMoodEntity
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 
 /**
@@ -47,6 +48,21 @@ fun dailyCompletionFromMap(map: Map<String, Any?>): DailyCompletionEntity = Dail
     epochDay = (map[FIELD_EPOCH_DAY] as Number).toLong(),
     meditationDone = map[FIELD_MEDITATION_DONE] as? Boolean ?: false,
     affirmationDone = map[FIELD_AFFIRMATION_DONE] as? Boolean ?: false,
+)
+
+private const val FIELD_MOOD_VALUE = "moodValue"
+private const val FIELD_NOTE = "note"
+
+fun dailyMoodToMap(entity: DailyMoodEntity): Map<String, Any> = buildMap {
+    put(FIELD_EPOCH_DAY, entity.epochDay)
+    put(FIELD_MOOD_VALUE, entity.moodValue)
+    entity.note?.let { put(FIELD_NOTE, it) }
+}
+
+fun dailyMoodFromMap(map: Map<String, Any?>): DailyMoodEntity = DailyMoodEntity(
+    epochDay = (map[FIELD_EPOCH_DAY] as Number).toLong(),
+    moodValue = (map[FIELD_MOOD_VALUE] as Number).toInt(),
+    note = map[FIELD_NOTE] as? String,
 )
 
 private const val DEFAULT_START_MINUTE = 540 // 09:00 — mirrors NotificationPreferences' default.

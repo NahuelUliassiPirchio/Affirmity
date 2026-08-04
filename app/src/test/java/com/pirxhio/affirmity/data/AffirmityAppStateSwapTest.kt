@@ -7,6 +7,7 @@ import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.AffirmationImageStore
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
+import com.pirxhio.affirmity.data.local.DailyMoodEntity
 import com.pirxhio.affirmity.data.local.DailyViewCount
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
@@ -18,6 +19,7 @@ import com.pirxhio.affirmity.data.remote.FirestoreMigrator
 import com.pirxhio.affirmity.data.remote.FirestoreOnboardingRepository
 import com.pirxhio.affirmity.data.repository.AffirmationRepository
 import com.pirxhio.affirmity.data.repository.DailyCompletionRepository
+import com.pirxhio.affirmity.data.repository.DailyMoodRepository
 import com.pirxhio.affirmity.data.repository.DataSession
 import com.pirxhio.affirmity.data.repository.MeditationPreferencesRepository
 import com.pirxhio.affirmity.data.repository.NotificationSettingsRepository
@@ -85,6 +87,14 @@ private class FakeDailyCompletionRepository(
     override suspend fun markAffirmation(epochDay: Long) = Unit
 }
 
+private class FakeDailyMoodRepository(
+    private val flow: Flow<List<DailyMoodEntity>> = EventedFlow("moods", mutableListOf(), listOf(emptyList())),
+) : DailyMoodRepository {
+    override fun observeRange(from: Long, to: Long): Flow<List<DailyMoodEntity>> = flow
+    override suspend fun getRange(from: Long, to: Long): List<DailyMoodEntity> = emptyList()
+    override suspend fun upsert(epochDay: Long, moodValue: Int, note: String?) = Unit
+}
+
 private class FakeMeditationPreferencesRepository(
     private val flow: Flow<Int?>,
 ) : MeditationPreferencesRepository {
@@ -137,6 +147,7 @@ private fun fakeLocal(events: MutableList<String>, id: String = "local-1"): Data
         EventedFlow("local-affirmations", events, listOf(listOf(affirmation(id)))),
     ),
     completions = FakeDailyCompletionRepository(EventedFlow("local-completions", events, listOf(emptyList()))),
+    moods = FakeDailyMoodRepository(EventedFlow("local-moods", events, listOf(emptyList()))),
     meditation = FakeMeditationPreferencesRepository(EventedFlow("local-meditation", events, listOf(600))),
     notifications = FakeNotificationSettingsRepository(
         EventedFlow("local-notifications", events, listOf(ChannelSettings(enabled = false, startMinute = 540, endMinute = 1260))),
@@ -149,6 +160,7 @@ private fun fakeRemote(uid: String, events: MutableList<String>, id: String = "r
         EventedFlow("remote-affirmations", events, listOf(listOf(affirmation(id)))),
     ),
     completions = FakeDailyCompletionRepository(EventedFlow("remote-completions", events, listOf(emptyList()))),
+    moods = FakeDailyMoodRepository(EventedFlow("remote-moods", events, listOf(emptyList()))),
     meditation = FakeMeditationPreferencesRepository(EventedFlow("remote-meditation", events, listOf(600))),
     notifications = FakeNotificationSettingsRepository(
         EventedFlow("remote-notifications", events, listOf(ChannelSettings(enabled = false, startMinute = 540, endMinute = 1260))),

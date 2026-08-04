@@ -22,6 +22,7 @@ private fun emptySnapshot(uid: String) = MigrationSnapshot(
     uid = uid,
     affirmations = emptyList(),
     completions = emptyList(),
+    moods = emptyList(),
     meditationDurationSeconds = null,
     notificationSettings = emptyMap(),
     migratedAt = 1_700_000_000_000L,

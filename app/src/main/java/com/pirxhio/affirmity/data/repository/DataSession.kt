@@ -14,12 +14,14 @@ package com.pirxhio.affirmity.data.repository
 sealed interface DataSession {
     val affirmations: AffirmationRepository
     val completions: DailyCompletionRepository
+    val moods: DailyMoodRepository
     val meditation: MeditationPreferencesRepository
     val notifications: NotificationSettingsRepository
 
     class Local(
         override val affirmations: AffirmationRepository,
         override val completions: DailyCompletionRepository,
+        override val moods: DailyMoodRepository,
         override val meditation: MeditationPreferencesRepository,
         override val notifications: NotificationSettingsRepository,
     ) : DataSession
@@ -30,6 +32,7 @@ sealed interface DataSession {
     ) : DataSession {
         override val affirmations: AffirmationRepository get() = local.affirmations
         override val completions: DailyCompletionRepository get() = local.completions
+        override val moods: DailyMoodRepository get() = local.moods
         override val meditation: MeditationPreferencesRepository get() = local.meditation
         override val notifications: NotificationSettingsRepository get() = local.notifications
     }
@@ -38,6 +41,7 @@ sealed interface DataSession {
         val uid: String,
         override val affirmations: AffirmationRepository,
         override val completions: DailyCompletionRepository,
+        override val moods: DailyMoodRepository,
         override val meditation: MeditationPreferencesRepository,
         override val notifications: NotificationSettingsRepository,
     ) : DataSession
