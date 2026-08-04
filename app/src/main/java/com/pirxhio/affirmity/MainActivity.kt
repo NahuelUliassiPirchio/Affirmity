@@ -40,6 +40,7 @@ import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.pirxhio.affirmity.auth.AuthState
 import com.pirxhio.affirmity.data.rememberAffirmityAppState
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
@@ -199,9 +200,7 @@ fun AffirmityApp(
                 reflectionSettings = appState.reflectionSettings.value,
                 notificationsPermissionGranted = notificationsPermissionGranted,
                 authState = appState.authState.value,
-                authError = appState.authError.value,
                 syncError = appState.syncError.value,
-                onSignInClicked = { appState.signIn(context) },
                 onSignOutClicked = { appState.signOut() },
                 onReminderEnabledChanged = { enabled ->
                     appState.setChannelEnabled(
@@ -284,7 +283,8 @@ fun AffirmityApp(
                         appState.importAffirmationsFromJson(json, replace)
                     },
                     onDeleteAffirmation = { id -> appState.removeAffirmation(id) },
-                    onOpenSettings = { showSettings = true }
+                    onOpenSettings = { showSettings = true },
+                    profilePhotoUrl = (appState.authState.value as? AuthState.SignedIn)?.photoUrl,
                 )
 
                 AppDestinations.ANIMO -> MoodScreen(

@@ -58,8 +58,6 @@
     <string name="settings_permission_banner_text">Las notificaciones están desactivadas en el sistema</string>
     <string name="settings_permission_banner_action">Abrir ajustes</string>
 
-    <string name="settings_account_label">Cuenta</string>
-    <string name="settings_account_signed_out_text">No has iniciado sesión</string>
     <string name="settings_account_sign_in_button">Iniciar sesión con Google</string>
     <string name="settings_account_signed_in_prefix">Sesión iniciada como</string>
     <string name="settings_account_sign_out_button">Cerrar sesión</string>

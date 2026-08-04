@@ -32,7 +32,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.pirxhio.affirmity.R
-import com.pirxhio.affirmity.auth.AuthError
 import com.pirxhio.affirmity.auth.AuthState
 import com.pirxhio.affirmity.data.local.ChannelSettings
 
@@ -42,14 +41,12 @@ fun SettingsScreen(
     reflectionSettings: ChannelSettings,
     notificationsPermissionGranted: Boolean,
     authState: AuthState,
-    authError: AuthError?,
     syncError: String? = null,
     onReminderEnabledChanged: (Boolean) -> Unit,
     onReminderWindowChanged: (startMinute: Int, endMinute: Int) -> Unit,
     onReflectionEnabledChanged: (Boolean) -> Unit,
     onReflectionWindowChanged: (startMinute: Int, endMinute: Int) -> Unit,
     onOpenNotificationDebug: () -> Unit,
-    onSignInClicked: () -> Unit,
     onSignOutClicked: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -62,16 +59,6 @@ fun SettingsScreen(
     ) {
         if (!notificationsPermissionGranted) {
             item { PermissionBanner() }
-        }
-
-        item {
-            AccountSettingsCard(
-                authState = authState,
-                authError = authError,
-                onSignInClicked = onSignInClicked,
-                onSignOutClicked = onSignOutClicked,
-                syncError = syncError,
-            )
         }
 
         item {
@@ -104,6 +91,16 @@ fun SettingsScreen(
                     Text(text = "Debug de notificaciones", style = MaterialTheme.typography.titleMedium)
                     TextButton(onClick = onOpenNotificationDebug) { Text("Ver historial") }
                 }
+            }
+        }
+
+        if (authState is AuthState.SignedIn) {
+            item {
+                SignOutSection(
+                    authState = authState,
+                    onSignOutClicked = onSignOutClicked,
+                    syncError = syncError,
+                )
             }
         }
     }
