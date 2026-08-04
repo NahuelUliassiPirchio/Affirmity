@@ -38,15 +38,37 @@ val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
     }
 }
 
+/** Additive: creates `streak_healer_use` empty. No backfill — the healer log starts from this
+ * version (design.md's "Migration / Rollout": `HEALER_EPOCH_START_DAY` blocks retroactive healing). */
+val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `streak_healer_use` (
+                `healedEpochDay` INTEGER NOT NULL,
+                `activatedAtMillis` INTEGER NOT NULL,
+                PRIMARY KEY(`healedEpochDay`)
+            )
+            """.trimIndent(),
+        )
+    }
+}
+
 @Database(
-    entities = [AffirmationEntity::class, DailyCompletionEntity::class, DailyMoodEntity::class],
-    version = 3,
+    entities = [
+        AffirmationEntity::class,
+        DailyCompletionEntity::class,
+        DailyMoodEntity::class,
+        StreakHealerUseEntity::class,
+    ],
+    version = 4,
     exportSchema = true,
 )
 abstract class AffirmityDatabase : RoomDatabase() {
     abstract fun affirmationDao(): AffirmationDao
     abstract fun dailyCompletionDao(): DailyCompletionDao
     abstract fun dailyMoodDao(): DailyMoodDao
+    abstract fun streakHealerUseDao(): StreakHealerUseDao
 
     companion object {
         @Volatile
@@ -58,7 +80,7 @@ abstract class AffirmityDatabase : RoomDatabase() {
                     context.applicationContext,
                     AffirmityDatabase::class.java,
                     "affirmity.db",
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
             }
     }
 }
