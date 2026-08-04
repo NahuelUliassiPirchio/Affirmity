@@ -6,7 +6,12 @@ enum class AuthProviderId { GOOGLE }
 /** Provider-neutral observable auth state — no provider-specific identifiers or terminology. */
 sealed interface AuthState {
     data object SignedOut : AuthState
-    data class SignedIn(val uid: String, val displayName: String?, val email: String?) : AuthState
+    data class SignedIn(
+        val uid: String,
+        val displayName: String?,
+        val email: String?,
+        val photoUrl: String? = null,
+    ) : AuthState
 }
 
 /** Provider-neutral credential shapes; Apple later adds an OAuth web-flow branch. */

@@ -21,6 +21,7 @@ credentials = "1.5.0"
 googleid = "1.1.1"
 mockitoCore = "5.14.2"
 coreSplashscreen = "1.0.1"
+coilCompose = "3.3.0"
 
 [libraries]
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
@@ -60,6 +61,8 @@ json = { group = "org.json", name = "json", version.ref = "json" }
 androidx-glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
 androidx-glance-testing = { group = "androidx.glance", name = "glance-testing", version.ref = "glance" }
 androidx-glance-appwidget-testing = { group = "androidx.glance", name = "glance-appwidget-testing", version.ref = "glance" }
+coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coilCompose" }
+coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coilCompose" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

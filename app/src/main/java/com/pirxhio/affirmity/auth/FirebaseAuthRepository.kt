@@ -10,7 +10,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.tasks.await
 
 /** Plain snapshot of the fields [FirebaseAuthRepository] needs from a Firebase user. */
-internal data class UserSnapshot(val uid: String, val displayName: String?, val email: String?)
+internal data class UserSnapshot(
+    val uid: String,
+    val displayName: String?,
+    val email: String?,
+    val photoUrl: String? = null,
+)
 
 /**
  * Narrow seam over [FirebaseAuth] so state-mapping and provider-lookup logic in
@@ -25,7 +30,7 @@ internal interface FirebaseAuthSource {
 }
 
 private fun FirebaseUser.toSnapshot(): UserSnapshot =
-    UserSnapshot(uid = uid, displayName = displayName, email = email)
+    UserSnapshot(uid = uid, displayName = displayName, email = email, photoUrl = photoUrl?.toString())
 
 private class RealFirebaseAuthSource(private val auth: FirebaseAuth) : FirebaseAuthSource {
     override fun currentUserSnapshot(): UserSnapshot? = auth.currentUser?.toSnapshot()
@@ -50,7 +55,12 @@ internal fun mapSnapshot(snapshot: UserSnapshot?): AuthState =
     if (snapshot == null) {
         AuthState.SignedOut
     } else {
-        AuthState.SignedIn(uid = snapshot.uid, displayName = snapshot.displayName, email = snapshot.email)
+        AuthState.SignedIn(
+            uid = snapshot.uid,
+            displayName = snapshot.displayName,
+            email = snapshot.email,
+            photoUrl = snapshot.photoUrl,
+        )
     }
 
 /**

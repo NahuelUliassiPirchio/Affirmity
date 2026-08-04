@@ -75,6 +75,8 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
     testImplementation(libs.junit)
     // Real org.json impl for JVM unit tests only — Android provides org.json at runtime, but the
     // stub android.jar used by testDebugUnitTest throws "not mocked" for its real methods.
