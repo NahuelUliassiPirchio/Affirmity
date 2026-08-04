@@ -29,22 +29,28 @@ export function streakOf(
 }
 
 /**
- * Streak-about-to-end trigger condition (proposal decision 3, spec's "Streak-About-to-End
- * Channel"): the user's current streak is >= 1 AND at least one of affirmation/meditation is
- * still unmarked for `todayEpochDay`. "Current streak" is the longer of the two independently
- * tracked (meditation, affirmation) contiguous streaks -- the app tracks and displays them
- * separately (see `AffirmityAppState.affirmationsStreak` / `.meditationStreak`), and the spec
- * scenarios describe a single undifferentiated "streak of N" without picking one track, so this
- * takes the max of both as the more conservative (fires more readily) interpretation.
+ * "Current streak" as shown to the user: the longer of the two independently tracked
+ * (meditation, affirmation) contiguous streaks ending at `todayEpochDay` -- the app tracks and
+ * displays them separately (see `AffirmityAppState.affirmationsStreak` / `.meditationStreak`),
+ * and the spec scenarios describe a single undifferentiated "streak of N" without picking one
+ * track, so this takes the max of both as the more conservative (fires more readily)
+ * interpretation.
  */
-export function shouldFireStreakAlert(rows: Completion[], todayEpochDay: number): boolean {
+export function currentStreak(rows: Completion[], todayEpochDay: number): number {
   const meditationStreak = streakOf(rows, todayEpochDay, (row) => row.meditationDone);
   const affirmationStreak = streakOf(rows, todayEpochDay, (row) => row.affirmationDone);
-  const streak = Math.max(meditationStreak, affirmationStreak);
+  return Math.max(meditationStreak, affirmationStreak);
+}
 
+/**
+ * Streak-about-to-end trigger condition (proposal decision 3, spec's "Streak-About-to-End
+ * Channel"): the user's current streak is >= 1 AND at least one of affirmation/meditation is
+ * still unmarked for `todayEpochDay`.
+ */
+export function shouldFireStreakAlert(rows: Completion[], todayEpochDay: number): boolean {
   const today = rows.find((row) => row.epochDay === todayEpochDay);
   const affirmationDone = today?.affirmationDone ?? false;
   const meditationDone = today?.meditationDone ?? false;
 
-  return streak >= 1 && (!affirmationDone || !meditationDone);
+  return currentStreak(rows, todayEpochDay) >= 1 && (!affirmationDone || !meditationDone);
 }

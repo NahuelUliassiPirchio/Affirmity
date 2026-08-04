@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { streakOf, shouldFireStreakAlert, type Completion } from '../src/streak';
+import { streakOf, shouldFireStreakAlert, currentStreak, type Completion } from '../src/streak';
 
 const MONDAY = 100;
 
@@ -67,5 +67,21 @@ describe('shouldFireStreakAlert', () => {
     const rows: Completion[] = [{ epochDay: MONDAY, meditationDone: false, affirmationDone: false }];
 
     expect(shouldFireStreakAlert(rows, MONDAY)).toBe(false);
+  });
+});
+
+describe('currentStreak', () => {
+  it('takes the longer of the meditation/affirmation streaks', () => {
+    const rows: Completion[] = [
+      { epochDay: MONDAY - 2, meditationDone: true, affirmationDone: false },
+      { epochDay: MONDAY - 1, meditationDone: true, affirmationDone: false },
+      { epochDay: MONDAY, meditationDone: true, affirmationDone: true },
+    ];
+
+    expect(currentStreak(rows, MONDAY)).toBe(3);
+  });
+
+  it('is 0 when neither track has an active streak', () => {
+    expect(currentStreak([], MONDAY)).toBe(0);
   });
 });

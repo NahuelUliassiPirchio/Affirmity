@@ -95,6 +95,27 @@ describe('planAllUsers', () => {
     expect(store.markFailed).toHaveBeenCalledWith('bad-user', 19000, expect.any(String));
   });
 
+  it('includes the current streak count in the streak task body', async () => {
+    const store = makeStore();
+    const enqueuer = makeEnqueuer();
+    const localDay = baseInput.localDay;
+
+    const input: UserPlanInput = {
+      ...baseInput,
+      completions: [
+        { epochDay: localDay - 1, meditationDone: true, affirmationDone: true },
+        { epochDay: localDay, meditationDone: true, affirmationDone: false },
+      ],
+    };
+
+    await planAndEnqueueUser(input, store, enqueuer);
+
+    const streakTask = enqueuer.calls.find((task) => (task as { channel: string }).channel === 'streak') as
+      | { body?: string }
+      | undefined;
+    expect(streakTask?.body).toBe('Llevás una racha de 2 días. Todavía puedes completar hoy y no perderla.');
+  });
+
   it('plans nothing for a user missing a timezone', async () => {
     const store = makeStore();
     const enqueuer = makeEnqueuer();

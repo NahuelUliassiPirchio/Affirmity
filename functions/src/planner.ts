@@ -6,7 +6,7 @@
  */
 
 import { subWindow, slotInstant } from './schedule';
-import { shouldFireStreakAlert, type Completion } from './streak';
+import { currentStreak, shouldFireStreakAlert, type Completion } from './streak';
 
 export const REMINDER_SLOT_COUNT = 3;
 export const REFLECTION_SLOT_COUNT = 3;
@@ -37,6 +37,9 @@ export interface PlannedTask {
   channel: NotificationChannel;
   slot: number;
   atMillis: number;
+  /** Overrides the client's default body for this task (e.g. the streak channel's day count) --
+   * forwarded verbatim through the Cloud Task to `sendNotification`'s FCM payload. */
+  body?: string;
 }
 
 export type PlanStatus = 'planned' | 'skipped' | 'failed';
@@ -114,12 +117,15 @@ export function planUserTasks(input: UserPlanInput, rng: () => number = Math.ran
   }
 
   if (shouldFireStreakAlert(completions, localDay)) {
+    const streak = currentStreak(completions, localDay);
+    const dayWord = streak === 1 ? 'día' : 'días';
     tasks.push({
       uid: '',
       localDay,
       channel: 'streak',
       slot: 0,
       atMillis: slotInstant(localDay, zone, STREAK_ALERT_MINUTE, STREAK_ALERT_MINUTE, rng).getTime(),
+      body: `Llevás una racha de ${streak} ${dayWord}. Todavía puedes completar hoy y no perderla.`,
     });
   }
 
