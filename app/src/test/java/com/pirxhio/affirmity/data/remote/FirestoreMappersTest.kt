@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.data.remote
 import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
+import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -60,5 +61,16 @@ class FirestoreMappersTest {
 
         assertEquals(reminder, channelSettingsFromMap(NotificationChannelSpec.REMINDER, combined))
         assertEquals(reflection, channelSettingsFromMap(NotificationChannelSpec.REFLECTION, combined))
+    }
+
+    @Test
+    fun `streak healer use entity round-trips and the map carries a numeric healedEpochDay field`() {
+        val entity = StreakHealerUseEntity(healedEpochDay = 19_876L, activatedAtMillis = 1_700_000_000_000L)
+
+        val map = streakHealerUseToMap(entity)
+        val roundTripped = streakHealerUseFromMap(map)
+
+        assertEquals(entity, roundTripped)
+        assertEquals(19_876L, (map["healedEpochDay"] as Number).toLong())
     }
 }

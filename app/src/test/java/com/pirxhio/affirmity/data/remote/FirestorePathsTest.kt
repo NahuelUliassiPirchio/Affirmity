@@ -34,4 +34,14 @@ class FirestorePathsTest {
     fun `fcm token doc path uses the token as the doc id`() {
         assertEquals("users/uid-1/fcmTokens/token-abc", FirestorePaths.fcmTokenDoc("uid-1", "token-abc"))
     }
+
+    @Test
+    fun `streak healer uses collection path is scoped under the user`() {
+        assertEquals("users/uid-1/streakHealerUses", FirestorePaths.streakHealerUsesCollection("uid-1"))
+    }
+
+    @Test
+    fun `streak healer use doc path uses the stringified healedEpochDay as the doc id`() {
+        assertEquals("users/uid-1/streakHealerUses/19876", FirestorePaths.streakHealerUseDoc("uid-1", 19_876L))
+    }
 }

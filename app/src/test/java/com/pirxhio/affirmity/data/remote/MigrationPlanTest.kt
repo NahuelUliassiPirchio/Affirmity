@@ -4,6 +4,7 @@ import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
+import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -13,11 +14,13 @@ private fun snapshotWith(
     affirmations: List<AffirmationEntity> = emptyList(),
     completions: List<DailyCompletionEntity> = emptyList(),
     moods: List<DailyMoodEntity> = emptyList(),
+    healerUses: List<StreakHealerUseEntity> = emptyList(),
 ): MigrationSnapshot = MigrationSnapshot(
     uid = "uid-1",
     affirmations = affirmations,
     completions = completions,
     moods = moods,
+    healerUses = healerUses,
     meditationDurationSeconds = 300,
     notificationSettings = mapOf(
         NotificationChannelSpec.REMINDER to ChannelSettings(true, 540, 1260),
@@ -86,5 +89,20 @@ class MigrationPlanTest {
         chunks.forEach { chunk -> assertTrue(chunk.size <= 450) }
         // 900 completions + 1 preferences doc + 1 marker doc = 902 ops total
         assertEquals(902, chunks.sumOf { it.size })
+    }
+
+    @Test
+    fun `plan covers every healer use exactly once, at the streak healer uses doc path`() {
+        val healerUses = listOf(
+            StreakHealerUseEntity(healedEpochDay = 10L, activatedAtMillis = 1_000L),
+            StreakHealerUseEntity(healedEpochDay = 20L, activatedAtMillis = 2_000L),
+        )
+        val snapshot = snapshotWith(healerUses = healerUses)
+
+        val allWrites = MigrationPlan.build(snapshot).flatten()
+
+        healerUses.forEach { use ->
+            assertTrue(allWrites.any { it.path == FirestorePaths.streakHealerUseDoc(snapshot.uid, use.healedEpochDay) })
+        }
     }
 }

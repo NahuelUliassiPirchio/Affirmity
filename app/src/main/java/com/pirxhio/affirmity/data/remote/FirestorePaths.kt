@@ -28,4 +28,9 @@ object FirestorePaths {
     fun fcmTokensCollection(uid: String): String = "users/$uid/fcmTokens"
 
     fun fcmTokenDoc(uid: String, token: String): String = "${fcmTokensCollection(uid)}/$token"
+
+    fun streakHealerUsesCollection(uid: String): String = "users/$uid/streakHealerUses"
+
+    fun streakHealerUseDoc(uid: String, healedEpochDay: Long): String =
+        "${streakHealerUsesCollection(uid)}/$healedEpochDay"
 }

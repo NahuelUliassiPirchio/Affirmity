@@ -4,6 +4,7 @@ import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
+import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import kotlinx.coroutines.flow.Flow
 
@@ -32,6 +33,17 @@ interface DailyMoodRepository {
     fun observeRange(from: Long, to: Long): Flow<List<DailyMoodEntity>>
     suspend fun getRange(from: Long, to: Long): List<DailyMoodEntity>
     suspend fun upsert(epochDay: Long, moodValue: Int, note: String?)
+}
+
+/**
+ * Store-agnostic contract for the streak-healer activation event log — an append-only log keyed
+ * by [StreakHealerUseEntity.healedEpochDay], never a mutable held/consumed flag (design.md's
+ * "Persist an event log, not mutable healer state" decision).
+ */
+interface StreakHealerRepository {
+    fun observeRange(from: Long, to: Long): Flow<List<StreakHealerUseEntity>>
+    suspend fun getRange(from: Long, to: Long): List<StreakHealerUseEntity>
+    suspend fun recordUse(healedEpochDay: Long)
 }
 
 /** Store-agnostic contract for the meditation-duration preference. */

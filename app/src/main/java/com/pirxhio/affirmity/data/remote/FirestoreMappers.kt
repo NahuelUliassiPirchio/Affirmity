@@ -4,6 +4,7 @@ import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
+import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 
 /**
@@ -63,6 +64,19 @@ fun dailyMoodFromMap(map: Map<String, Any?>): DailyMoodEntity = DailyMoodEntity(
     epochDay = (map[FIELD_EPOCH_DAY] as Number).toLong(),
     moodValue = (map[FIELD_MOOD_VALUE] as Number).toInt(),
     note = map[FIELD_NOTE] as? String,
+)
+
+private const val FIELD_HEALED_EPOCH_DAY = "healedEpochDay"
+private const val FIELD_ACTIVATED_AT_MILLIS = "activatedAtMillis"
+
+fun streakHealerUseToMap(entity: StreakHealerUseEntity): Map<String, Any> = mapOf(
+    FIELD_HEALED_EPOCH_DAY to entity.healedEpochDay,
+    FIELD_ACTIVATED_AT_MILLIS to entity.activatedAtMillis,
+)
+
+fun streakHealerUseFromMap(map: Map<String, Any?>): StreakHealerUseEntity = StreakHealerUseEntity(
+    healedEpochDay = (map[FIELD_HEALED_EPOCH_DAY] as Number).toLong(),
+    activatedAtMillis = (map[FIELD_ACTIVATED_AT_MILLIS] as Number).toLong(),
 )
 
 private const val DEFAULT_START_MINUTE = 540 // 09:00 — mirrors NotificationPreferences' default.
