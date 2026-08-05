@@ -268,6 +268,7 @@ fun AffirmityApp(
                     affirmations = appState.affirmations,
                     affirmationsStreak = appState.affirmationsStreak.value,
                     meditationStreak = appState.meditationStreak.value,
+                    streakHealer = appState.streakHealer.value,
                     addImageError = appState.addImageError.value,
                     importError = appState.importAffirmationsError.value,
                     onAddAffirmationWithColor = { title, subtitle, colorHex ->
@@ -284,6 +285,7 @@ fun AffirmityApp(
                     },
                     onDeleteAffirmation = { id -> appState.removeAffirmation(id) },
                     onOpenSettings = { showSettings = true },
+                    onActivateHealer = { appState.activateStreakHealer() },
                     profilePhotoUrl = (appState.authState.value as? AuthState.SignedIn)?.photoUrl,
                 )
 

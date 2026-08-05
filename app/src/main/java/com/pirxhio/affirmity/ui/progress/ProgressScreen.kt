@@ -22,6 +22,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.Button
@@ -51,6 +53,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.pirxhio.affirmity.data.Affirmation
+import com.pirxhio.affirmity.data.HealerActivation
+import com.pirxhio.affirmity.data.StreakHealerState
 import com.pirxhio.affirmity.data.WeeklyStreak
 
 private val swatches = listOf(
@@ -62,6 +66,7 @@ fun ProgressScreen(
     affirmations: List<Affirmation>,
     affirmationsStreak: WeeklyStreak,
     meditationStreak: WeeklyStreak,
+    streakHealer: StreakHealerState,
     addImageError: String?,
     importError: String?,
     onAddAffirmationWithColor: (title: String, subtitle: String, colorHex: String) -> Unit,
@@ -70,6 +75,7 @@ fun ProgressScreen(
     onImportAffirmationsJson: (json: String, replaceExisting: Boolean) -> Unit,
     onDeleteAffirmation: (id: String) -> Unit,
     onOpenSettings: () -> Unit,
+    onActivateHealer: () -> Unit,
     profilePhotoUrl: String? = null,
 ) {
     LazyColumn(
@@ -103,6 +109,11 @@ fun ProgressScreen(
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
+                // Always visible regardless of healer/activation state — distinct from the
+                // StreakHealerCard below (spec's `general-streak` domain: alive if either habit
+                // was done that day, independent of the per-habit trackers further down).
+                GeneralStreakCounter(generalStreakDays = streakHealer.generalStreakDays)
+                StreakHealerCard(streakHealer = streakHealer, onActivateHealer = onActivateHealer)
                 // Bug fix vs. the mockup: Meditación used to render a minutes-goal
                 // progress bar here. It now shares the exact same day-circle tracker
                 // component as Afirmaciones, just with its own icon/data.
@@ -169,6 +180,94 @@ private fun ProfileAvatar(photoUrl: String?, onClick: () -> Unit) {
                 contentDescription = "Perfil y ajustes",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+/** Always-visible general-streak day counter (spec's `general-streak` domain) — separate from the
+ * per-habit trackers and from [StreakHealerCard]'s own held/CTA state. */
+@Composable
+private fun GeneralStreakCounter(generalStreakDays: Int) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.LocalFireDepartment,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(
+            text = "Racha general: $generalStreakDays días",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(start = 8.dp),
+        )
+    }
+}
+
+/**
+ * The streak-healer CTA (design.md's "StreakHealerCard above the two WeeklyStreakTrackers"):
+ * a held badge when no window is open, an explicit activation button when [HealerActivation.Available],
+ * and a used-today confirmation when [HealerActivation.UsedToday]. Renders nothing when neither a
+ * healer is held nor a window is open, to avoid cluttering the screen for the common case.
+ */
+@Composable
+private fun StreakHealerCard(streakHealer: StreakHealerState, onActivateHealer: () -> Unit) {
+    val activation = streakHealer.activation
+    if (!streakHealer.healerHeld && activation == HealerActivation.Unavailable) return
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Favorite,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(
+                    text = "Sanador de racha",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+            when (activation) {
+                is HealerActivation.Available -> {
+                    Text(
+                        text = "Ayer no completaste ningún hábito. Activá el sanador para conservar tu racha " +
+                            "general — esto no reemplaza lo que hagas hoy.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Button(onClick = onActivateHealer, modifier = Modifier.fillMaxWidth()) {
+                        Text("Activar sanador")
+                    }
+                }
+
+                is HealerActivation.UsedToday -> {
+                    Text(
+                        text = "Sanador activado: tu racha general sigue intacta.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                HealerActivation.Unavailable -> {
+                    // streakHealer.healerHeld is true here (guarded above): show the held badge.
+                    Text(
+                        text = "Tenés 1 sanador guardado para el próximo día que falles.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }
