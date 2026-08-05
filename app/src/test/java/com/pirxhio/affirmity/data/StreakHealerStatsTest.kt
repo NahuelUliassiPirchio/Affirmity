@@ -126,13 +126,35 @@ class StreakHealerStatsTest {
     }
 
     @Test
-    fun `days before startEpochDay never count toward the streak or a grant`() {
-        // Full days 97..100, but startEpochDay floors evaluation at day 100 only.
+    fun `days before startEpochDay never grant a healer, even though they still count toward the streak`() {
+        // Full days 97..100, but startEpochDay floors *healer* evaluation at day 100 only.
         val rows = listOf(fullDay(start - 3), fullDay(start - 2), fullDay(start - 1), fullDay(start))
 
         val state = StreakHealerStats.evaluate(rows, emptyList(), todayEpochDay = start, startEpochDay = start)
 
+        // Default streakStartEpochDay == startEpochDay: with no wider streakStartEpochDay given,
+        // the count itself is floored too (same value the caller passed in).
         assertEquals(1, state.generalStreakDays)
         assertTrue("a single full day at the floor must not grant a healer", !state.healerHeld)
+    }
+
+    @Test
+    fun `streakStartEpochDay lets pre-rollout completions count toward the general streak`() {
+        // Same 4 straight full days, but the general-streak count is given a wider, unfloored
+        // window while the healer floor (startEpochDay) still sits at day 100 — the fix for the
+        // "racha general shows 1 despite a week of history" report: the rollout floor should only
+        // block retroactive healer grants/heals, not the visible day-count.
+        val rows = listOf(fullDay(start - 3), fullDay(start - 2), fullDay(start - 1), fullDay(start))
+
+        val state = StreakHealerStats.evaluate(
+            rows,
+            emptyList(),
+            todayEpochDay = start,
+            startEpochDay = start,
+            streakStartEpochDay = start - 3,
+        )
+
+        assertEquals(4, state.generalStreakDays)
+        assertTrue("a single full day at the healer floor must still not grant a healer", !state.healerHeld)
     }
 }

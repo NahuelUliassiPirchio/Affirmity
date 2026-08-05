@@ -54,7 +54,6 @@ import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
 import com.pirxhio.affirmity.widget.WeeklyTrackerWidget
 import androidx.glance.appwidget.updateAll
-import java.util.Calendar
 import java.util.TimeZone
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
@@ -312,6 +311,7 @@ class AffirmityAppState(
                     uses = healerRows,
                     todayEpochDay = today,
                     startEpochDay = healerStart,
+                    streakStartEpochDay = StreakHealerStats.rawStreakStartEpochDay(today),
                 )
             }
         }
@@ -606,23 +606,18 @@ class AffirmityAppState(
         scope.launch { ready().meditation.saveMeditationDurationSeconds(seconds) }
     }
 
-    /** Floors [StreakHealerStats] evaluation at [HEALER_EPOCH_START_DAY] so completion history
-     * from before this feature shipped can never retroactively grant/heal (design.md's
+    /** Floors [StreakHealerStats] evaluation at [StreakHealerStats.EPOCH_START_DAY] so completion
+     * history from before this feature shipped can never retroactively grant/heal (design.md's
      * "Migration / Rollout" decision), while still respecting the usual lookback window. */
     private fun healerStartEpochDay(todayEpochDay: Long): Long =
-        maxOf(todayEpochDay - STREAK_LOOKBACK_DAYS, HEALER_EPOCH_START_DAY)
+        StreakHealerStats.healerStartEpochDay(todayEpochDay)
 
     private companion object {
         const val TAG = "AffirmityAppState"
         const val AFFIRMATIONS_GOAL_PER_DAY = 2
 
         /** How far back to look when deriving the running streak from `daily_completion`. */
-        const val STREAK_LOOKBACK_DAYS = 370L
-
-        /** This feature's release day — see [healerStartEpochDay]. */
-        val HEALER_EPOCH_START_DAY: Long = DayClock.epochDay(
-            Calendar.getInstance().apply { set(2026, Calendar.AUGUST, 4, 0, 0, 0) }
-        )
+        const val STREAK_LOOKBACK_DAYS = StreakHealerStats.LOOKBACK_DAYS
     }
 }
 

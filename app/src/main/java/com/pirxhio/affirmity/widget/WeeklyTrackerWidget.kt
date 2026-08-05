@@ -37,10 +37,13 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.pirxhio.affirmity.MainActivity
 import com.pirxhio.affirmity.data.DayClock
+import com.pirxhio.affirmity.data.StreakHealerStats
 import com.pirxhio.affirmity.data.local.AffirmityDatabase
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.remote.FirestoreDailyCompletionRepository
 import com.pirxhio.affirmity.data.remote.FirestorePaths
+import com.pirxhio.affirmity.data.remote.FirestoreStreakHealerRepository
+import com.pirxhio.affirmity.data.repository.RoomStreakHealerRepository
 import kotlinx.coroutines.tasks.await
 
 private const val EXTRA_START_DESTINATION = "start_destination"
@@ -75,22 +78,38 @@ class WeeklyTrackerWidget : GlanceAppWidget() {
         val today = DayClock.epochDay()
         val weekStart = DayClock.rollingWindowStartEpochDay()
         val dayLetters = DayClock.rollingWindowDayLetters()
+        val healerStart = StreakHealerStats.healerStartEpochDay(today)
+        val rawStreakStart = StreakHealerStats.rawStreakStartEpochDay(today)
+        // Widened past the healer's rollout floor: the general-streak count itself is unfloored
+        // (only healer grant/heal eligibility uses healerStart), so this needs the full lookback.
+        val streakRangeStart = minOf(weekStart, rawStreakStart)
         // Signed-in completions live in Firestore only (fcm-notifications bugfix): reading Room
         // here for a signed-in user showed a permanently stale week, frozen at the migration
         // snapshot, since AffirmityAppState no longer writes completions to Room post-migration.
         val uid = FirebaseAuth.getInstance().currentUser?.uid
         val hasAny: Boolean
-        val rows: List<DailyCompletionEntity>
+        val allRows: List<DailyCompletionEntity>
+        val generalStreakDays: Int
         if (uid != null) {
             val firestore = FirebaseFirestore.getInstance()
             hasAny = firestore.collection(FirestorePaths.dailyCompletionsCollection(uid))
                 .limit(1).get().await().documents.isNotEmpty()
-            rows = FirestoreDailyCompletionRepository(firestore, uid).getRange(weekStart, weekStart + 6)
+            allRows = FirestoreDailyCompletionRepository(firestore, uid).getRange(streakRangeStart, today)
+            val healerUses = FirestoreStreakHealerRepository(firestore, uid).getRange(healerStart, today)
+            generalStreakDays = StreakHealerStats.evaluate(
+                allRows, healerUses, today, healerStart, streakStartEpochDay = rawStreakStart,
+            ).generalStreakDays
         } else {
-            val dao = AffirmityDatabase.getInstance(context).dailyCompletionDao()
+            val database = AffirmityDatabase.getInstance(context)
+            val dao = database.dailyCompletionDao()
             hasAny = dao.hasAny()
-            rows = dao.getRange(weekStart, weekStart + 6)
+            allRows = dao.getRange(streakRangeStart, today)
+            val healerUses = RoomStreakHealerRepository(database.streakHealerUseDao()).getRange(healerStart, today)
+            generalStreakDays = StreakHealerStats.evaluate(
+                allRows, healerUses, today, healerStart, streakStartEpochDay = rawStreakStart,
+            ).generalStreakDays
         }
+        val rows = allRows.filter { it.epochDay in weekStart..(weekStart + 6) }
         val todayIndex = (today - weekStart).toInt().coerceIn(0, 6)
 
         provideContent {
@@ -100,6 +119,7 @@ class WeeklyTrackerWidget : GlanceAppWidget() {
                 weekStart = weekStart,
                 todayIndex = todayIndex,
                 dayLetters = dayLetters,
+                generalStreakDays = generalStreakDays,
             )
         }
     }
@@ -113,6 +133,7 @@ internal fun WeeklyTrackerContent(
     weekStart: Long,
     todayIndex: Int,
     dayLetters: List<String>,
+    generalStreakDays: Int = 0,
 ) {
     val context = LocalContext.current
     val tapIntent = Intent(context, MainActivity::class.java).apply {
@@ -132,6 +153,16 @@ internal fun WeeklyTrackerContent(
             EmptyState()
         } else {
             WeekGrid(rows = rows, weekStart = weekStart, todayIndex = todayIndex, dayLetters = dayLetters)
+        }
+        // Overlaid rather than laid out inline, so it never grows the widget's content height —
+        // this full-size Box only positions its own child, independent of the centered content above.
+        if (generalStreakDays > 0) {
+            Box(modifier = GlanceModifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
+                Text(
+                    text = "🔥$generalStreakDays",
+                    style = TextStyle(fontSize = 10.sp, color = GlanceColorProvider(TODAY_RING_COLOR)),
+                )
+            }
         }
     }
 }

@@ -2,6 +2,7 @@ package com.pirxhio.affirmity.data
 
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
+import java.util.Calendar
 
 /**
  * Pure per-day accessors derived from raw [DailyCompletionEntity] rows only — "layer 1" of the
@@ -45,6 +46,25 @@ sealed interface HealerActivation {
  * - [evaluate]: applies the persisted activation-event log on top of [timeline].
  */
 object StreakHealerStats {
+
+    /** How far back to look when deriving the running streak from `daily_completion`. */
+    const val LOOKBACK_DAYS = 370L
+
+    /** This feature's release day — completion history from before it can never retroactively
+     * grant/heal (design.md's "Migration / Rollout" decision). */
+    val EPOCH_START_DAY: Long = DayClock.epochDay(
+        Calendar.getInstance().apply { set(2026, Calendar.AUGUST, 4, 0, 0, 0) }
+    )
+
+    /** Floors the usual [LOOKBACK_DAYS] window at [EPOCH_START_DAY] — bounds healer grant/heal/
+     * activation eligibility only. Use [rawStreakStartEpochDay] for the visible day-count. */
+    fun healerStartEpochDay(todayEpochDay: Long): Long =
+        maxOf(todayEpochDay - LOOKBACK_DAYS, EPOCH_START_DAY)
+
+    /** The unfloored [LOOKBACK_DAYS] window, for [evaluate]'s `streakStartEpochDay` — pre-rollout
+     * completions still count toward the visible general streak. */
+    fun rawStreakStartEpochDay(todayEpochDay: Long): Long =
+        todayEpochDay - LOOKBACK_DAYS
 
     /**
      * Completions-only view: [rawGeneralStreakDays] walks backward from [todayEpochDay], floored at
@@ -95,13 +115,19 @@ object StreakHealerStats {
      * Applies [uses] (the persisted activation-event log, keyed by `healedEpochDay`) on top of
      * [timeline]. A day counts toward the streak if it had activity OR was explicitly healed.
      * `held` is derived by simulating grant (two consecutive full days, capped at one) and
-     * consumption (any day present in [uses]) from [startEpochDay] through [todayEpochDay].
+     * consumption (any day present in [uses]) from [startEpochDay] through [todayEpochDay] —
+     * [startEpochDay] is the *healer* rollout floor and only bounds grant/heal/activation
+     * eligibility. [generalStreakDays] is a separate, unfloored day-count: it walks back from
+     * [todayEpochDay] to [streakStartEpochDay] (defaulting to [startEpochDay] for callers that
+     * don't distinguish the two), so pre-rollout completions still count toward the visible streak
+     * even though they can never retroactively grant or heal.
      */
     fun evaluate(
         rows: List<DailyCompletionEntity>,
         uses: List<StreakHealerUseEntity>,
         todayEpochDay: Long,
         startEpochDay: Long,
+        streakStartEpochDay: Long = startEpochDay,
     ): StreakHealerState {
         val timeline = timeline(rows, todayEpochDay, startEpochDay)
         val healedDays = uses.map { it.healedEpochDay }.toSet()
@@ -119,7 +145,7 @@ object StreakHealerStats {
 
         var generalStreakDays = 0
         var d = todayEpochDay
-        while (d >= startEpochDay && effectiveDone(d)) {
+        while (d >= streakStartEpochDay && effectiveDone(d)) {
             generalStreakDays++
             d--
         }
