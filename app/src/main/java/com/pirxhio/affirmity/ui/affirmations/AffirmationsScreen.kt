@@ -146,19 +146,21 @@ private fun AffirmationCard(affirmation: Affirmation) {
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 8.dp)
                 )
-                Box(
-                    modifier = Modifier
-                        .padding(vertical = 8.dp)
-                        .width(48.dp)
-                        .height(1.dp)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
-                )
-                Text(
-                    text = affirmation.subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFFCCCCCC),
-                    textAlign = TextAlign.Center
-                )
+                if (affirmation.subtitle.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .padding(vertical = 8.dp)
+                            .width(48.dp)
+                            .height(1.dp)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+                    )
+                    Text(
+                        text = affirmation.subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFFCCCCCC),
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }

@@ -408,6 +408,7 @@ private fun AddAffirmationCard(
     var galleryUri by remember { mutableStateOf<Uri?>(null) }
     var importJson by remember { mutableStateOf("") }
     var replaceExisting by remember { mutableStateOf(false) }
+    var showValidationError by remember { mutableStateOf(false) }
     val clipboardManager = LocalClipboardManager.current
 
     val galleryLauncher = rememberLauncherForActivityResult(
@@ -427,17 +428,21 @@ private fun AddAffirmationCard(
             if (backgroundMode != BackgroundMode.JSON_IMPORT) {
                 OutlinedTextField(
                     value = title,
-                    onValueChange = { title = it },
+                    onValueChange = { title = it; showValidationError = false },
                     label = { Text("Título") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
+                    isError = showValidationError && title.isBlank(),
+                    supportingText = if (showValidationError && title.isBlank()) {
+                        { Text("Falta el título") }
+                    } else null,
                 )
                 OutlinedTextField(
                     value = subtitle,
                     onValueChange = { subtitle = it },
-                    label = { Text("Subtítulo") },
+                    label = { Text("Subtítulo (opcional)") },
                     modifier = Modifier.fillMaxWidth(),
-                    minLines = 2
+                    minLines = 2,
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -485,16 +490,21 @@ private fun AddAffirmationCard(
                 BackgroundMode.IMAGE_URL -> {
                     OutlinedTextField(
                         value = imageUrl,
-                        onValueChange = { imageUrl = it },
+                        onValueChange = { imageUrl = it; showValidationError = false },
                         label = { Text("URL de la imagen") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        isError = showValidationError && imageUrl.isBlank(),
+                        supportingText = if (showValidationError && imageUrl.isBlank()) {
+                            { Text("Falta la URL de la imagen") }
+                        } else null,
                     )
                 }
 
                 BackgroundMode.GALLERY -> {
                     Button(
                         onClick = {
+                            showValidationError = false
                             galleryLauncher.launch(
                                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                             )
@@ -502,6 +512,13 @@ private fun AddAffirmationCard(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(if (galleryUri == null) "Elegir de la galería" else "Cambiar imagen elegida")
+                    }
+                    if (showValidationError && galleryUri == null) {
+                        Text(
+                            text = "Elegí una imagen de la galería",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
                     }
                 }
 
@@ -554,33 +571,46 @@ private fun AddAffirmationCard(
                 onClick = {
                     when (backgroundMode) {
                         BackgroundMode.COLOR -> {
-                            if (title.isBlank() || subtitle.isBlank()) return@Button
+                            if (title.isBlank()) {
+                                showValidationError = true
+                                return@Button
+                            }
                             onAddAffirmationWithColor(title.trim(), subtitle.trim(), selectedColor)
                             selectedColor = swatches.first()
                             title = ""
                             subtitle = ""
                         }
                         BackgroundMode.IMAGE_URL -> {
-                            if (title.isBlank() || subtitle.isBlank() || imageUrl.isBlank()) return@Button
+                            if (title.isBlank() || imageUrl.isBlank()) {
+                                showValidationError = true
+                                return@Button
+                            }
                             onAddAffirmationWithImage(title.trim(), subtitle.trim(), imageUrl.trim())
                             imageUrl = ""
                             title = ""
                             subtitle = ""
                         }
                         BackgroundMode.GALLERY -> {
-                            if (title.isBlank() || subtitle.isBlank()) return@Button
-                            val uri = galleryUri ?: return@Button
+                            val uri = galleryUri
+                            if (title.isBlank() || uri == null) {
+                                showValidationError = true
+                                return@Button
+                            }
                             onAddAffirmationWithGalleryImage(title.trim(), subtitle.trim(), uri)
                             galleryUri = null
                             title = ""
                             subtitle = ""
                         }
                         BackgroundMode.JSON_IMPORT -> {
-                            if (importJson.isBlank()) return@Button
+                            if (importJson.isBlank()) {
+                                showValidationError = true
+                                return@Button
+                            }
                             onImportAffirmationsJson(importJson, replaceExisting)
                             importJson = ""
                         }
                     }
+                    showValidationError = false
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
