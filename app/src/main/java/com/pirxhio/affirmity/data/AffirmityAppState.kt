@@ -60,6 +60,7 @@ import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
@@ -271,10 +272,12 @@ class AffirmityAppState(
 
     init {
         scope.launch {
-            session.flatMapLatest { it.affirmations.observeAll() }.collect { entities ->
-                affirmations.clear()
-                affirmations.addAll(entities.map { it.toAffirmation() })
-            }
+            session.flatMapLatest { it.affirmations.observeAll() }
+                .catch { error -> Log.e(TAG, "affirmations flow failed", error) }
+                .collect { entities ->
+                    affirmations.clear()
+                    affirmations.addAll(entities.map { it.toAffirmation() })
+                }
         }
         scope.launch {
             val today = DayClock.epochDay()
@@ -290,7 +293,8 @@ class AffirmityAppState(
                     s.completions.observeRange(windowStart - STREAK_LOOKBACK_DAYS, windowStart + 6),
                     s.healerUses.observeRange(healerStart, today),
                 ) { completionRows, healerRows -> completionRows to healerRows }
-            }.collect { (rows, healerRows) ->
+            }.catch { error -> Log.e(TAG, "completions/healer flow failed", error) }
+                .collect { (rows, healerRows) ->
                 affirmationsStreak.value = DailyCompletionStats.toWeeklyStreak(
                     rows = rows,
                     weekStartEpochDay = windowStart,
@@ -314,6 +318,7 @@ class AffirmityAppState(
         scope.launch {
             val today = DayClock.epochDay()
             session.flatMapLatest { it.moods.observeRange(today - STREAK_LOOKBACK_DAYS, today) }
+                .catch { error -> Log.e(TAG, "moods flow failed", error) }
                 .collect { rows ->
                     moodEntries.clear()
                     moodEntries.addAll(rows)
@@ -325,19 +330,19 @@ class AffirmityAppState(
             }
         }
         scope.launch {
-            session.flatMapLatest { it.meditation.observeMeditationDurationSeconds() }.collect { seconds ->
-                meditationDurationSeconds.value = seconds
-            }
+            session.flatMapLatest { it.meditation.observeMeditationDurationSeconds() }
+                .catch { error -> Log.e(TAG, "meditation duration flow failed", error) }
+                .collect { seconds -> meditationDurationSeconds.value = seconds }
         }
         scope.launch {
-            session.flatMapLatest { it.notifications.observe(NotificationChannelSpec.REMINDER) }.collect {
-                reminderSettings.value = it
-            }
+            session.flatMapLatest { it.notifications.observe(NotificationChannelSpec.REMINDER) }
+                .catch { error -> Log.e(TAG, "reminder settings flow failed", error) }
+                .collect { reminderSettings.value = it }
         }
         scope.launch {
-            session.flatMapLatest { it.notifications.observe(NotificationChannelSpec.REFLECTION) }.collect {
-                reflectionSettings.value = it
-            }
+            session.flatMapLatest { it.notifications.observe(NotificationChannelSpec.REFLECTION) }
+                .catch { error -> Log.e(TAG, "reflection settings flow failed", error) }
+                .collect { reflectionSettings.value = it }
         }
         scope.launch {
             // Signed-in FCM token registration + IANA timezone sync (design.md's "Timezone"
