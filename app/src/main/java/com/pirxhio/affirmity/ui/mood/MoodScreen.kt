@@ -55,7 +55,10 @@ fun MoodScreen(
     moodEntries: List<DailyMoodEntity>,
     onSaveMood: (epochDay: Long, moodValue: Int, note: String?) -> Unit,
 ) {
-    val moodByDay = remember(moodEntries) { moodEntries.associateBy { it.epochDay } }
+    // Not `remember`-keyed: `moodEntries` is a SnapshotStateList mutated in place (clear + addAll),
+    // so its reference never changes and a remember(moodEntries) key would never invalidate,
+    // freezing the calendar on whatever data existed at first composition.
+    val moodByDay = moodEntries.associateBy { it.epochDay }
     val todayEpochDay = remember { DayClock.epochDay() }
 
     var visibleMonth by remember {
@@ -91,7 +94,7 @@ fun MoodScreen(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background),
-        contentPadding = PaddingValues(24.dp),
+        contentPadding = PaddingValues(start = 24.dp, top = 40.dp, end = 24.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         item {
