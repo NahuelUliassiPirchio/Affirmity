@@ -11,6 +11,7 @@ import com.pirxhio.affirmity.data.local.DailyMoodEntity
 import com.pirxhio.affirmity.data.local.DailyViewCount
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
+import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.DocWrite
 import com.pirxhio.affirmity.data.remote.FcmTokenRepository
@@ -23,6 +24,7 @@ import com.pirxhio.affirmity.data.repository.DailyMoodRepository
 import com.pirxhio.affirmity.data.repository.DataSession
 import com.pirxhio.affirmity.data.repository.MeditationPreferencesRepository
 import com.pirxhio.affirmity.data.repository.NotificationSettingsRepository
+import com.pirxhio.affirmity.data.repository.StreakHealerRepository
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
 import java.util.concurrent.CopyOnWriteArrayList
@@ -95,6 +97,17 @@ private class FakeDailyMoodRepository(
     override suspend fun upsert(epochDay: Long, moodValue: Int, note: String?) = Unit
 }
 
+private class FakeStreakHealerRepository(
+    private val flow: Flow<List<StreakHealerUseEntity>> = EventedFlow("healerUses", mutableListOf(), listOf(emptyList())),
+) : StreakHealerRepository {
+    val recorded = CopyOnWriteArrayList<Long>()
+    override fun observeRange(from: Long, to: Long): Flow<List<StreakHealerUseEntity>> = flow
+    override suspend fun getRange(from: Long, to: Long): List<StreakHealerUseEntity> = emptyList()
+    override suspend fun recordUse(healedEpochDay: Long) {
+        recorded += healedEpochDay
+    }
+}
+
 private class FakeMeditationPreferencesRepository(
     private val flow: Flow<Int?>,
 ) : MeditationPreferencesRepository {
@@ -148,6 +161,7 @@ private fun fakeLocal(events: MutableList<String>, id: String = "local-1"): Data
     ),
     completions = FakeDailyCompletionRepository(EventedFlow("local-completions", events, listOf(emptyList()))),
     moods = FakeDailyMoodRepository(EventedFlow("local-moods", events, listOf(emptyList()))),
+    healerUses = FakeStreakHealerRepository(EventedFlow("local-healerUses", events, listOf(emptyList()))),
     meditation = FakeMeditationPreferencesRepository(EventedFlow("local-meditation", events, listOf(600))),
     notifications = FakeNotificationSettingsRepository(
         EventedFlow("local-notifications", events, listOf(ChannelSettings(enabled = false, startMinute = 540, endMinute = 1260))),
@@ -161,6 +175,7 @@ private fun fakeRemote(uid: String, events: MutableList<String>, id: String = "r
     ),
     completions = FakeDailyCompletionRepository(EventedFlow("remote-completions", events, listOf(emptyList()))),
     moods = FakeDailyMoodRepository(EventedFlow("remote-moods", events, listOf(emptyList()))),
+    healerUses = FakeStreakHealerRepository(EventedFlow("remote-healerUses", events, listOf(emptyList()))),
     meditation = FakeMeditationPreferencesRepository(EventedFlow("remote-meditation", events, listOf(600))),
     notifications = FakeNotificationSettingsRepository(
         EventedFlow("remote-notifications", events, listOf(ChannelSettings(enabled = false, startMinute = 540, endMinute = 1260))),

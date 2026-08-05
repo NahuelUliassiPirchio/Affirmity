@@ -41,6 +41,7 @@ import com.pirxhio.affirmity.data.remote.FirestoreMeditationPreferencesRepositor
 import com.pirxhio.affirmity.data.remote.FirestoreMigrator
 import com.pirxhio.affirmity.data.remote.FirestoreNotificationSettingsRepository
 import com.pirxhio.affirmity.data.remote.FirestoreOnboardingRepository
+import com.pirxhio.affirmity.data.remote.FirestoreStreakHealerRepository
 import com.pirxhio.affirmity.data.remote.MigrationSnapshot
 import com.pirxhio.affirmity.data.repository.DataSession
 import com.pirxhio.affirmity.data.repository.RoomAffirmationRepository
@@ -48,15 +49,18 @@ import com.pirxhio.affirmity.data.repository.RoomDailyCompletionRepository
 import com.pirxhio.affirmity.data.repository.RoomDailyMoodRepository
 import com.pirxhio.affirmity.data.repository.RoomMeditationPreferencesRepository
 import com.pirxhio.affirmity.data.repository.RoomNotificationSettingsRepository
+import com.pirxhio.affirmity.data.repository.RoomStreakHealerRepository
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
 import com.pirxhio.affirmity.widget.WeeklyTrackerWidget
 import androidx.glance.appwidget.updateAll
+import java.util.Calendar
 import java.util.TimeZone
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.filterIsInstance
@@ -170,6 +174,18 @@ class AffirmityAppState(
     var meditationStreak = mutableStateOf(WeeklyStreak(completedDays = List(7) { false }, streakDays = 0))
         private set
 
+    /** General-streak + healer state (spec's `general-streak`/`streak-healer` domains), derived by
+     * [StreakHealerStats.evaluate] from completions and the healer-use event log combined. */
+    var streakHealer = mutableStateOf(
+        StreakHealerState(
+            generalStreakDays = 0,
+            healerHeld = false,
+            healedDays = emptySet(),
+            activation = HealerActivation.Unavailable,
+        )
+    )
+        private set
+
     /** Rolling [STREAK_LOOKBACK_DAYS]-day window of mood check-ins, oldest first — the calendar
      * and "Resumen" stats derive everything else (average/distribution/trend) from this list. */
     var moodEntries = mutableStateListOf<DailyMoodEntity>()
@@ -243,6 +259,7 @@ class AffirmityAppState(
             affirmations = local.affirmations.observeAll().first(),
             completions = local.completions.getRange(today - STREAK_LOOKBACK_DAYS, today + 6),
             moods = local.moods.getRange(today - STREAK_LOOKBACK_DAYS, today),
+            healerUses = local.healerUses.getRange(healerStartEpochDay(today), today),
             meditationDurationSeconds = local.meditation.observeMeditationDurationSeconds().first(),
             notificationSettings = mapOf(
                 NotificationChannelSpec.REMINDER to local.notifications.observe(NotificationChannelSpec.REMINDER).first(),
@@ -263,21 +280,36 @@ class AffirmityAppState(
             val today = DayClock.epochDay()
             val windowStart = DayClock.rollingWindowStartEpochDay()
             val dayLabels = DayClock.rollingWindowDayLetters()
-            session.flatMapLatest { it.completions.observeRange(windowStart - STREAK_LOOKBACK_DAYS, windowStart + 6) }
-                .collect { rows ->
-                    affirmationsStreak.value = DailyCompletionStats.toWeeklyStreak(
-                        rows = rows,
-                        weekStartEpochDay = windowStart,
-                        todayEpochDay = today,
-                        isDone = { it.affirmationDone },
-                    ).copy(dayLabels = dayLabels)
-                    meditationStreak.value = DailyCompletionStats.toWeeklyStreak(
-                        rows = rows,
-                        weekStartEpochDay = windowStart,
-                        todayEpochDay = today,
-                        isDone = { it.meditationDone },
-                    ).copy(dayLabels = dayLabels)
-                }
+            val healerStart = healerStartEpochDay(today)
+            // The healer-use flow is combined *inside* this flatMapLatest (design.md's "Combine
+            // both flows inside the existing flatMapLatest" decision) rather than in a parallel
+            // collector, so both subscriptions share the same swap-cancellation lifecycle: no
+            // stale Room/Firestore collector for either flow can survive a sign-in/sign-out swap.
+            session.flatMapLatest { s ->
+                combine(
+                    s.completions.observeRange(windowStart - STREAK_LOOKBACK_DAYS, windowStart + 6),
+                    s.healerUses.observeRange(healerStart, today),
+                ) { completionRows, healerRows -> completionRows to healerRows }
+            }.collect { (rows, healerRows) ->
+                affirmationsStreak.value = DailyCompletionStats.toWeeklyStreak(
+                    rows = rows,
+                    weekStartEpochDay = windowStart,
+                    todayEpochDay = today,
+                    isDone = { it.affirmationDone },
+                ).copy(dayLabels = dayLabels)
+                meditationStreak.value = DailyCompletionStats.toWeeklyStreak(
+                    rows = rows,
+                    weekStartEpochDay = windowStart,
+                    todayEpochDay = today,
+                    isDone = { it.meditationDone },
+                ).copy(dayLabels = dayLabels)
+                streakHealer.value = StreakHealerStats.evaluate(
+                    rows = rows,
+                    uses = healerRows,
+                    todayEpochDay = today,
+                    startEpochDay = healerStart,
+                )
+            }
         }
         scope.launch {
             val today = DayClock.epochDay()
@@ -542,11 +574,38 @@ class AffirmityAppState(
         scope.launch { ready().moods.upsert(epochDay, moodValue, note?.trim()?.ifBlank { null }) }
     }
 
+    /**
+     * Explicit user action for the streak-healer CTA. Deliberately re-reads [DayClock.epochDay]
+     * and re-derives eligibility here rather than trusting the (possibly stale, e.g. a screen left
+     * open across midnight) [streakHealer] state already rendered — a failed check is a silent
+     * no-op (design.md's "Validate eligibility at click time, not from the rendered state" decision,
+     * the same class of bug as the previously recorded UTC-vs-zone one).
+     */
+    fun activateStreakHealer() {
+        scope.launch {
+            val today = DayClock.epochDay()
+            val start = healerStartEpochDay(today)
+            val activeSession = ready()
+            val rows = activeSession.completions.getRange(start, today)
+            val uses = activeSession.healerUses.getRange(start, today)
+            val activation = StreakHealerStats.evaluate(rows, uses, todayEpochDay = today, startEpochDay = start).activation
+            if (activation is HealerActivation.Available) {
+                activeSession.healerUses.recordUse(activation.breakEpochDay)
+            }
+        }
+    }
+
     /** Call whenever the user settles on a new duration (slider release, preset tap). */
     fun recordMeditationDurationSelected(seconds: Int) {
         meditationDurationSeconds.value = seconds
         scope.launch { ready().meditation.saveMeditationDurationSeconds(seconds) }
     }
+
+    /** Floors [StreakHealerStats] evaluation at [HEALER_EPOCH_START_DAY] so completion history
+     * from before this feature shipped can never retroactively grant/heal (design.md's
+     * "Migration / Rollout" decision), while still respecting the usual lookback window. */
+    private fun healerStartEpochDay(todayEpochDay: Long): Long =
+        maxOf(todayEpochDay - STREAK_LOOKBACK_DAYS, HEALER_EPOCH_START_DAY)
 
     private companion object {
         const val TAG = "AffirmityAppState"
@@ -554,6 +613,11 @@ class AffirmityAppState(
 
         /** How far back to look when deriving the running streak from `daily_completion`. */
         const val STREAK_LOOKBACK_DAYS = 370L
+
+        /** This feature's release day — see [healerStartEpochDay]. */
+        val HEALER_EPOCH_START_DAY: Long = DayClock.epochDay(
+            Calendar.getInstance().apply { set(2026, Calendar.AUGUST, 4, 0, 0, 0) }
+        )
     }
 }
 
@@ -579,6 +643,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             affirmations = RoomAffirmationRepository(database.affirmationDao()),
             completions = RoomDailyCompletionRepository(database.dailyCompletionDao()),
             moods = RoomDailyMoodRepository(database.dailyMoodDao()),
+            healerUses = RoomStreakHealerRepository(database.streakHealerUseDao()),
             meditation = RoomMeditationPreferencesRepository(trackerPreferences),
             notifications = RoomNotificationSettingsRepository(notificationPreferences),
         )
@@ -591,6 +656,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
                     affirmations = FirestoreAffirmationRepository(firestore, uid),
                     completions = FirestoreDailyCompletionRepository(firestore, uid),
                     moods = FirestoreDailyMoodRepository(firestore, uid),
+                    healerUses = FirestoreStreakHealerRepository(firestore, uid),
                     meditation = FirestoreMeditationPreferencesRepository(firestore, uid),
                     notifications = FirestoreNotificationSettingsRepository(firestore, uid),
                 )

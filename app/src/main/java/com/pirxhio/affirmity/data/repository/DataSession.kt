@@ -15,6 +15,7 @@ sealed interface DataSession {
     val affirmations: AffirmationRepository
     val completions: DailyCompletionRepository
     val moods: DailyMoodRepository
+    val healerUses: StreakHealerRepository
     val meditation: MeditationPreferencesRepository
     val notifications: NotificationSettingsRepository
 
@@ -22,6 +23,7 @@ sealed interface DataSession {
         override val affirmations: AffirmationRepository,
         override val completions: DailyCompletionRepository,
         override val moods: DailyMoodRepository,
+        override val healerUses: StreakHealerRepository,
         override val meditation: MeditationPreferencesRepository,
         override val notifications: NotificationSettingsRepository,
     ) : DataSession
@@ -33,6 +35,7 @@ sealed interface DataSession {
         override val affirmations: AffirmationRepository get() = local.affirmations
         override val completions: DailyCompletionRepository get() = local.completions
         override val moods: DailyMoodRepository get() = local.moods
+        override val healerUses: StreakHealerRepository get() = local.healerUses
         override val meditation: MeditationPreferencesRepository get() = local.meditation
         override val notifications: NotificationSettingsRepository get() = local.notifications
     }
@@ -42,6 +45,7 @@ sealed interface DataSession {
         override val affirmations: AffirmationRepository,
         override val completions: DailyCompletionRepository,
         override val moods: DailyMoodRepository,
+        override val healerUses: StreakHealerRepository,
         override val meditation: MeditationPreferencesRepository,
         override val notifications: NotificationSettingsRepository,
     ) : DataSession
