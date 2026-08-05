@@ -23,9 +23,11 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -37,6 +39,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -188,6 +191,8 @@ private fun ProfileAvatar(photoUrl: String?, onClick: () -> Unit) {
  * per-habit trackers and from [StreakHealerCard]'s own held/CTA state. */
 @Composable
 private fun GeneralStreakCounter(generalStreakDays: Int) {
+    var showExplanation by remember { mutableStateOf(false) }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -203,6 +208,31 @@ private fun GeneralStreakCounter(generalStreakDays: Int) {
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(start = 8.dp),
+        )
+        IconButton(onClick = { showExplanation = true }, modifier = Modifier.size(24.dp)) {
+            Icon(
+                imageVector = Icons.Filled.Info,
+                contentDescription = "Qué es la racha general",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+
+    if (showExplanation) {
+        AlertDialog(
+            onDismissRequest = { showExplanation = false },
+            confirmButton = {
+                TextButton(onClick = { showExplanation = false }) { Text("Entendido") }
+            },
+            title = { Text("Racha general") },
+            text = {
+                Text(
+                    "Se mantiene mientras completes al menos una de las dos actividades " +
+                        "(afirmación o meditación) cada día. Se rompe solo si pasa un día " +
+                        "entero sin completar ninguna.",
+                )
+            },
         )
     }
 }
