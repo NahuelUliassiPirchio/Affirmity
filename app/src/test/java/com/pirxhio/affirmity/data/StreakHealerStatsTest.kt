@@ -65,6 +65,14 @@ class StreakHealerStatsTest {
 
         assertEquals(HealerActivation.UsedToday(start + 2), healedState.activation)
         assertTrue("healer must be consumed by activation", !healedState.healerHeld)
+        // Activation covers ONLY the healed day (102). Day 103 has zero activity of its own, so the
+        // general streak breaks again at day 103 regardless of the activation ("se rompe igual" — see
+        // spec's "Explicit activation heals only day N; day N+1 follows normal rules").
+        assertEquals(
+            "activation must not cover day N+1 itself: zero activity on the window day still breaks the streak",
+            0,
+            healedState.generalStreakDays,
+        )
 
         // With day 103 ALSO completed, the healed day 102 keeps the streak continuous through today.
         val rowsWithActivityOnWindowDay = listOf(fullDay(start), fullDay(start + 1), fullDay(start + 3))
