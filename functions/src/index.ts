@@ -127,6 +127,7 @@ async function loadActiveUserInputs(): Promise<UserPlanInput[]> {
     const localDay = utcMillisToLocalEpochDay(Date.now(), zone);
 
     const completionsSnap = await db.collection(`users/${uid}/dailyCompletions`).get();
+    const healerUsesSnap = await db.collection(`users/${uid}/streakHealerUses`).get();
 
     inputs.push({
       uid,
@@ -147,6 +148,9 @@ async function loadActiveUserInputs(): Promise<UserPlanInput[]> {
         epochDay: Number(d.id),
         meditationDone: Boolean(d.data().meditationDone),
         affirmationDone: Boolean(d.data().affirmationDone),
+      })),
+      healerUses: healerUsesSnap.docs.map((d: QueryDocumentSnapshot) => ({
+        healedEpochDay: Number(d.data().healedEpochDay ?? d.id),
       })),
     });
   }

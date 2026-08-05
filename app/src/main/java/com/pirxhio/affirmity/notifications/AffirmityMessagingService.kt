@@ -39,6 +39,10 @@ class AffirmityMessagingService : FirebaseMessagingService() {
             NotificationChannelSpec.STREAK ->
                 getString(R.string.notification_streak_title) to
                     getString(R.string.notification_streak_fallback_body)
+
+            NotificationChannelSpec.HEALER ->
+                getString(R.string.notification_healer_title) to
+                    getString(R.string.notification_healer_fallback_body)
         }
     }
 

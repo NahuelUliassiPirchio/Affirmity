@@ -614,7 +614,7 @@ class AffirmityAppState(
 
     private companion object {
         const val TAG = "AffirmityAppState"
-        const val AFFIRMATIONS_GOAL_PER_DAY = 2
+        const val AFFIRMATIONS_GOAL_PER_DAY = 5
 
         /** How far back to look when deriving the running streak from `daily_completion`. */
         const val STREAK_LOOKBACK_DAYS = StreakHealerStats.LOOKBACK_DAYS

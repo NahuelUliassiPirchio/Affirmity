@@ -38,4 +38,11 @@ enum class NotificationChannelSpec(
         channelNameRes = R.string.notification_channel_streak_name,
         channelDescriptionRes = R.string.notification_channel_streak_description,
     ),
+    HEALER(
+        channelId = "affirmity_healer_alerts",
+        notificationId = 1004,
+        prefsPrefix = "healer",
+        channelNameRes = R.string.notification_channel_healer_name,
+        channelDescriptionRes = R.string.notification_channel_healer_description,
+    ),
 }

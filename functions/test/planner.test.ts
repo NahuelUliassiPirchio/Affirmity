@@ -45,6 +45,7 @@ const baseInput: UserPlanInput = {
     timeZone: 'UTC',
   },
   completions: [],
+  healerUses: [],
 };
 
 describe('planAndEnqueueUser', () => {
@@ -114,6 +115,50 @@ describe('planAllUsers', () => {
       | { body?: string }
       | undefined;
     expect(streakTask?.body).toBe('Llevás una racha de 2 días. Todavía puedes completar hoy y no perderla.');
+  });
+
+  it('fires the healer channel the day after a break when a healer is held', async () => {
+    const store = makeStore();
+    const enqueuer = makeEnqueuer();
+    // 2026-08-10 UTC-epoch-day, well after the healer's 2026-08-04 rollout floor.
+    const localDay = 20675;
+
+    const input: UserPlanInput = {
+      ...baseInput,
+      localDay,
+      completions: [
+        { epochDay: localDay - 3, meditationDone: true, affirmationDone: true },
+        { epochDay: localDay - 2, meditationDone: true, affirmationDone: true },
+        // localDay - 1 has no row at all: zero activity, the break day.
+      ],
+      healerUses: [],
+    };
+
+    await planAndEnqueueUser(input, store, enqueuer);
+
+    const healerTask = enqueuer.calls.find((task) => (task as { channel: string }).channel === 'healer');
+    expect(healerTask).toBeDefined();
+  });
+
+  it('does not fire the healer channel when the break day was already healed', async () => {
+    const store = makeStore();
+    const enqueuer = makeEnqueuer();
+    const localDay = 20675;
+
+    const input: UserPlanInput = {
+      ...baseInput,
+      localDay,
+      completions: [
+        { epochDay: localDay - 3, meditationDone: true, affirmationDone: true },
+        { epochDay: localDay - 2, meditationDone: true, affirmationDone: true },
+      ],
+      healerUses: [{ healedEpochDay: localDay - 1 }],
+    };
+
+    await planAndEnqueueUser(input, store, enqueuer);
+
+    const healerTask = enqueuer.calls.find((task) => (task as { channel: string }).channel === 'healer');
+    expect(healerTask).toBeUndefined();
   });
 
   it('plans nothing for a user missing a timezone', async () => {

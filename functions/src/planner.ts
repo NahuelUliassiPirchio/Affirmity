@@ -7,12 +7,14 @@
 
 import { subWindow, slotInstant } from './schedule';
 import { currentStreak, shouldFireStreakAlert, type Completion } from './streak';
+import { shouldFireHealerAlert, type HealerUse } from './healer';
 
 export const REMINDER_SLOT_COUNT = 3;
 export const REFLECTION_SLOT_COUNT = 3;
 export const STREAK_ALERT_MINUTE = 20 * 60; // 20:00 user-local time
+export const HEALER_ALERT_MINUTE = 20 * 60; // 20:00 user-local time
 
-export type NotificationChannel = 'reminder' | 'reflection' | 'streak';
+export type NotificationChannel = 'reminder' | 'reflection' | 'streak' | 'healer';
 
 export interface NotificationSettings {
   remindersEnabled: boolean;
@@ -29,6 +31,7 @@ export interface UserPlanInput {
   localDay: number;
   settings: NotificationSettings;
   completions: Completion[];
+  healerUses: HealerUse[];
 }
 
 export interface PlannedTask {
@@ -82,7 +85,7 @@ function windowSlots(
 
 /** Pure: computes this user's tasks for one local day. No I/O. */
 export function planUserTasks(input: UserPlanInput, rng: () => number = Math.random): PlannedTask[] {
-  const { settings, completions, localDay, uid } = input;
+  const { settings, completions, healerUses, localDay, uid } = input;
   const zone = settings.timeZone;
   if (!zone) return [];
 
@@ -126,6 +129,16 @@ export function planUserTasks(input: UserPlanInput, rng: () => number = Math.ran
       slot: 0,
       atMillis: slotInstant(localDay, zone, STREAK_ALERT_MINUTE, STREAK_ALERT_MINUTE, rng).getTime(),
       body: `Llevás una racha de ${streak} ${dayWord}. Todavía puedes completar hoy y no perderla.`,
+    });
+  }
+
+  if (shouldFireHealerAlert(completions, healerUses, localDay)) {
+    tasks.push({
+      uid: '',
+      localDay,
+      channel: 'healer',
+      slot: 0,
+      atMillis: slotInstant(localDay, zone, HEALER_ALERT_MINUTE, HEALER_ALERT_MINUTE, rng).getTime(),
     });
   }
 
