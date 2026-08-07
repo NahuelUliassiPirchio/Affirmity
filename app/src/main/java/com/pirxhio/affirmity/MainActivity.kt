@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -252,6 +253,7 @@ fun AffirmityApp(
         }
     ) {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+            Box(modifier = Modifier.padding(innerPadding)) {
             when (currentDestination) {
                 AppDestinations.AFIRMACIONES -> AffirmationsScreen(
                     affirmations = appState.affirmations,
@@ -293,6 +295,7 @@ fun AffirmityApp(
                     moodEntries = appState.moodEntries,
                     onSaveMood = { epochDay, moodValue, note -> appState.recordMood(epochDay, moodValue, note) },
                 )
+            }
             }
         }
     }

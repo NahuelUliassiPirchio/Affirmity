@@ -12,6 +12,7 @@ class FcmMessageHandlerTest {
             NotificationChannelSpec.REMINDER -> "Reminder title" to "Reminder body"
             NotificationChannelSpec.REFLECTION -> "Reflection title" to "Reflection body"
             NotificationChannelSpec.STREAK -> "Streak title" to "Streak body"
+            NotificationChannelSpec.HEALER -> "Healer title" to "Healer body"
         }
     }
 
