@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -47,14 +46,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import com.pirxhio.affirmity.data.Affirmation
 import com.pirxhio.affirmity.data.HealerActivation
 import com.pirxhio.affirmity.data.StreakHealerState
@@ -77,9 +73,7 @@ fun ProgressScreen(
     onAddAffirmationWithGalleryImage: (title: String, subtitle: String, imageUri: Uri) -> Unit,
     onImportAffirmationsJson: (json: String, replaceExisting: Boolean) -> Unit,
     onDeleteAffirmation: (id: String) -> Unit,
-    onOpenSettings: () -> Unit,
     onActivateHealer: () -> Unit,
-    profilePhotoUrl: String? = null,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -89,20 +83,12 @@ fun ProgressScreen(
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Mi Progreso",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                ProfileAvatar(photoUrl = profilePhotoUrl, onClick = onOpenSettings)
-            }
+            Text(
+                text = "Mi Progreso",
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(top = 16.dp),
+            )
         }
 
         item {
@@ -157,35 +143,6 @@ fun ProgressScreen(
 
         items(affirmations, key = { it.id }) { affirmation ->
             AffirmationRow(affirmation, onDeleteAffirmation)
-        }
-    }
-}
-
-@Composable
-private fun ProfileAvatar(photoUrl: String?, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (photoUrl != null) {
-            AsyncImage(
-                model = photoUrl,
-                contentDescription = "Perfil y ajustes",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape),
-            )
-        } else {
-            Icon(
-                imageVector = Icons.Filled.Person,
-                contentDescription = "Perfil y ajustes",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }
