@@ -43,6 +43,7 @@ import com.pirxhio.affirmity.data.AffirmationBackground
 import com.pirxhio.affirmity.data.backgroundColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.withContext
 
 /**
@@ -86,8 +87,12 @@ fun AffirmationsScreen(affirmations: List<Affirmation>, onAffirmationViewed: () 
 
     // Counts as "viewed" once the swipe settles on a new page, matching what a user
     // would perceive as having actually read that affirmation (vs. a mid-swipe frame).
+    // drop(1): snapshotFlow emits the current settledPage immediately on collection, before any
+    // swipe happens -- without dropping it, just mounting this screen (e.g. reopening the app)
+    // counts as a view.
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.settledPage }
+            .drop(1)
             .distinctUntilChanged()
             .collect { onAffirmationViewed() }
     }
