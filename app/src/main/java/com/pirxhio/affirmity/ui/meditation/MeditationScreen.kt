@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 private const val MIN_DURATION_SECONDS = 30
 private const val MAX_DURATION_SECONDS = 30 * 60
@@ -149,7 +150,10 @@ fun MeditationScreen(
             Slider(
                 value = durationSeconds.toFloat(),
                 onValueChange = {
-                    durationSeconds = (it / STEP_SECONDS).toInt() * STEP_SECONDS
+                    // Round to the nearest step, not floor: truncating toInt() always rounds
+                    // down, so a value like 6:00 could only ever be reached from below, never
+                    // from a finger landing anywhere in its upper half.
+                    durationSeconds = (it / STEP_SECONDS).roundToInt() * STEP_SECONDS
                     secondsRemaining = durationSeconds
                 },
                 onValueChangeFinished = { onDurationSelected(durationSeconds) },
