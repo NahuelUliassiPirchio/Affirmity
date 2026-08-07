@@ -115,7 +115,10 @@ fun ProgressScreen(
                 // Always visible regardless of healer/activation state — distinct from the
                 // StreakHealerCard below (spec's `general-streak` domain: alive if either habit
                 // was done that day, independent of the per-habit trackers further down).
-                GeneralStreakCounter(generalStreakDays = streakHealer.generalStreakDays)
+                GeneralStreakCounter(
+                    generalStreakDays = streakHealer.generalStreakDays,
+                    isTodayDone = streakHealer.isTodayDone,
+                )
                 StreakHealerCard(streakHealer = streakHealer, onActivateHealer = onActivateHealer)
                 // Bug fix vs. the mockup: Meditación used to render a minutes-goal
                 // progress bar here. It now shares the exact same day-circle tracker
@@ -190,7 +193,7 @@ private fun ProfileAvatar(photoUrl: String?, onClick: () -> Unit) {
 /** Always-visible general-streak day counter (spec's `general-streak` domain) — separate from the
  * per-habit trackers and from [StreakHealerCard]'s own held/CTA state. */
 @Composable
-private fun GeneralStreakCounter(generalStreakDays: Int) {
+private fun GeneralStreakCounter(generalStreakDays: Int, isTodayDone: Boolean) {
     var showExplanation by remember { mutableStateOf(false) }
 
     Row(
@@ -199,8 +202,8 @@ private fun GeneralStreakCounter(generalStreakDays: Int) {
     ) {
         Icon(
             imageVector = Icons.Filled.LocalFireDepartment,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
+            contentDescription = if (isTodayDone) "Racha activa hoy" else "Racha pendiente hoy",
+            tint = if (isTodayDone) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
             modifier = Modifier.size(20.dp),
         )
         Text(

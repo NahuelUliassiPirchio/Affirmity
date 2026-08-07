@@ -54,6 +54,7 @@ private val MEDITATION_COLOR = Color(0xFF00696F)
 private val AFFIRMATION_COLOR = Color(0xFFC77B58)
 private val EMPTY_COLOR = Color(0x33FFFFFF)
 private val TODAY_RING_COLOR = Color(0xFFFFFFFF)
+private val UNLIT_STREAK_COLOR = Color(0xFF8A8A8A)
 private val CELL_SIZE = 26.dp
 
 /** Content-height threshold below which the day-letters row no longer fits without clipping. */
@@ -90,24 +91,29 @@ class WeeklyTrackerWidget : GlanceAppWidget() {
         val hasAny: Boolean
         val allRows: List<DailyCompletionEntity>
         val generalStreakDays: Int
+        val isTodayDone: Boolean
         if (uid != null) {
             val firestore = FirebaseFirestore.getInstance()
             hasAny = firestore.collection(FirestorePaths.dailyCompletionsCollection(uid))
                 .limit(1).get().await().documents.isNotEmpty()
             allRows = FirestoreDailyCompletionRepository(firestore, uid).getRange(streakRangeStart, today)
             val healerUses = FirestoreStreakHealerRepository(firestore, uid).getRange(healerStart, today)
-            generalStreakDays = StreakHealerStats.evaluate(
+            val streakHealer = StreakHealerStats.evaluate(
                 allRows, healerUses, today, healerStart, streakStartEpochDay = rawStreakStart,
-            ).generalStreakDays
+            )
+            generalStreakDays = streakHealer.generalStreakDays
+            isTodayDone = streakHealer.isTodayDone
         } else {
             val database = AffirmityDatabase.getInstance(context)
             val dao = database.dailyCompletionDao()
             hasAny = dao.hasAny()
             allRows = dao.getRange(streakRangeStart, today)
             val healerUses = RoomStreakHealerRepository(database.streakHealerUseDao()).getRange(healerStart, today)
-            generalStreakDays = StreakHealerStats.evaluate(
+            val streakHealer = StreakHealerStats.evaluate(
                 allRows, healerUses, today, healerStart, streakStartEpochDay = rawStreakStart,
-            ).generalStreakDays
+            )
+            generalStreakDays = streakHealer.generalStreakDays
+            isTodayDone = streakHealer.isTodayDone
         }
         val rows = allRows.filter { it.epochDay in weekStart..(weekStart + 6) }
         val todayIndex = (today - weekStart).toInt().coerceIn(0, 6)
@@ -120,6 +126,7 @@ class WeeklyTrackerWidget : GlanceAppWidget() {
                 todayIndex = todayIndex,
                 dayLetters = dayLetters,
                 generalStreakDays = generalStreakDays,
+                isTodayDone = isTodayDone,
             )
         }
     }
@@ -134,6 +141,7 @@ internal fun WeeklyTrackerContent(
     todayIndex: Int,
     dayLetters: List<String>,
     generalStreakDays: Int = 0,
+    isTodayDone: Boolean = false,
 ) {
     val context = LocalContext.current
     val tapIntent = Intent(context, MainActivity::class.java).apply {
@@ -157,11 +165,22 @@ internal fun WeeklyTrackerContent(
         // Overlaid rather than laid out inline, so it never grows the widget's content height —
         // this full-size Box only positions its own child, independent of the centered content above.
         if (generalStreakDays > 0) {
+            // A tintable vector, not the 🔥 emoji: emoji are colored bitmap glyphs and ignore
+            // ColorFilter/text color, so they can't be dimmed for the "unlit" (today not done) state.
+            val streakColor = if (isTodayDone) TODAY_RING_COLOR else UNLIT_STREAK_COLOR
             Box(modifier = GlanceModifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
-                Text(
-                    text = "🔥$generalStreakDays",
-                    style = TextStyle(fontSize = 10.sp, color = GlanceColorProvider(TODAY_RING_COLOR)),
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        provider = ImageProvider(com.pirxhio.affirmity.R.drawable.ic_streak_flame),
+                        contentDescription = null,
+                        modifier = GlanceModifier.size(12.dp),
+                        colorFilter = androidx.glance.ColorFilter.tint(GlanceColorProvider(streakColor)),
+                    )
+                    Text(
+                        text = "$generalStreakDays",
+                        style = TextStyle(fontSize = 10.sp, color = GlanceColorProvider(streakColor)),
+                    )
+                }
             }
         }
     }

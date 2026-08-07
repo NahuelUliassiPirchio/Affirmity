@@ -179,6 +179,7 @@ class AffirmityAppState(
     var streakHealer = mutableStateOf(
         StreakHealerState(
             generalStreakDays = 0,
+            isTodayDone = false,
             healerHeld = false,
             healedDays = emptySet(),
             activation = HealerActivation.Unavailable,

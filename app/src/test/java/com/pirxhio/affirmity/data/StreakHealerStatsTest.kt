@@ -40,11 +40,22 @@ class StreakHealerStatsTest {
     }
 
     @Test
-    fun `a zero-activity day breaks the general streak`() {
+    fun `today not being done yet does not zero the streak, it just isn't counted`() {
         val rows = listOf(partialDay(start, meditationDone = true))
-        // day start + 1 has no row at all: zero activity
+        // day start + 1 has no row at all: zero activity, but not yet "broken" -- it's still today.
 
         val state = StreakHealerStats.evaluate(rows, emptyList(), todayEpochDay = start + 1, startEpochDay = start)
+
+        assertEquals(1, state.generalStreakDays)
+        assertTrue(!state.isTodayDone)
+    }
+
+    @Test
+    fun `a full zero-activity day that is no longer today breaks the general streak`() {
+        val rows = listOf(fullDay(start))
+        // day start + 1 had zero activity and is now in the past; day start + 2 is "today".
+
+        val state = StreakHealerStats.evaluate(rows, emptyList(), todayEpochDay = start + 2, startEpochDay = start)
 
         assertEquals(0, state.generalStreakDays)
     }
@@ -65,12 +76,14 @@ class StreakHealerStatsTest {
 
         assertEquals(HealerActivation.UsedToday(start + 2), healedState.activation)
         assertTrue("healer must be consumed by activation", !healedState.healerHeld)
-        // Activation covers ONLY the healed day (102). Day 103 has zero activity of its own, so the
-        // general streak breaks again at day 103 regardless of the activation ("se rompe igual" — see
-        // spec's "Explicit activation heals only day N; day N+1 follows normal rules").
+        // Activation covers ONLY the healed day (102). Day 103 (today) has zero activity of its own,
+        // so it isn't counted -- but that alone doesn't zero the streak: the healed day 102 and the
+        // two full days before it still count "through yesterday" (see spec's "Explicit activation
+        // heals only day N; day N+1 follows normal rules").
+        assertTrue("today's own zero activity must not count yet", !healedState.isTodayDone)
         assertEquals(
-            "activation must not cover day N+1 itself: zero activity on the window day still breaks the streak",
-            0,
+            "the streak through yesterday (the healed day) must still show, not reset to 0",
+            3,
             healedState.generalStreakDays,
         )
 

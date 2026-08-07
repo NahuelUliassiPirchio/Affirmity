@@ -22,6 +22,7 @@ data class StreakTimeline(
 /** The healer-aware derived state shown to the UI (see design.md's "Interfaces / Contracts"). */
 data class StreakHealerState(
     val generalStreakDays: Int,
+    val isTodayDone: Boolean,
     val healerHeld: Boolean,
     val healedDays: Set<Long>,
     val activation: HealerActivation,
@@ -143,8 +144,11 @@ object StreakHealerStats {
             day++
         }
 
+        // Today not being done yet doesn't zero the streak out — it just isn't counted until it's
+        // done. The count shown is "through yesterday" (or through today once it's completed).
+        val isTodayDone = effectiveDone(todayEpochDay)
         var generalStreakDays = 0
-        var d = todayEpochDay
+        var d = if (isTodayDone) todayEpochDay else todayEpochDay - 1
         while (d >= streakStartEpochDay && effectiveDone(d)) {
             generalStreakDays++
             d--
@@ -163,6 +167,7 @@ object StreakHealerStats {
 
         return StreakHealerState(
             generalStreakDays = generalStreakDays,
+            isTodayDone = isTodayDone,
             healerHeld = held,
             healedDays = healedDays,
             activation = activation,
