@@ -2,6 +2,8 @@ package com.pirxhio.affirmity.widget
 
 import androidx.glance.appwidget.testing.unit.runGlanceAppWidgetUnitTest
 import androidx.glance.testing.unit.hasText
+import androidx.test.platform.app.InstrumentationRegistry
+import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -13,6 +15,7 @@ import org.junit.Test
 class WeeklyTrackerWidgetContentTest {
 
     private val monday = 100L
+    private val context = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Test
     fun nonContiguousWeek_rendersGridNotEmptyState() = runTest {
@@ -30,7 +33,7 @@ class WeeklyTrackerWidgetContentTest {
                 )
             }
 
-            onNode(hasText("Afirmar")).assertExists()
+            onNode(hasText(context.getString(R.string.widget_action_affirm_label))).assertExists()
         }
     }
 
@@ -47,7 +50,7 @@ class WeeklyTrackerWidgetContentTest {
                 )
             }
 
-            onNode(hasText("Empezá hoy")).assertExists()
+            onNode(hasText(context.getString(R.string.widget_empty_state_label))).assertExists()
         }
     }
 }

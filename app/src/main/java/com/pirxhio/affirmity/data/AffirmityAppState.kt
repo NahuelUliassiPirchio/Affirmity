@@ -10,7 +10,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringArrayResource
 import androidx.credentials.CredentialManager
+import com.pirxhio.affirmity.R
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging
@@ -147,6 +149,11 @@ class AffirmityAppState(
     private val authRepository: AuthRepository,
     private val fcmTokenRepository: FcmTokenRepository,
     private val onboardingRepository: FirestoreOnboardingRepository,
+    /** 7-item Sun..Sat weekday-letter array, resolved from `R.array.weekday_letters` by the caller
+     * (composable-only `stringResource`s can't be called from this class's coroutines) — see
+     * [rememberAffirmityAppState] (D6). Defaults to the original Spanish glyphs so existing unit
+     * tests that build this class directly don't need to know about locale resolution. */
+    private val dayLetters: List<String> = listOf("D", "L", "M", "M", "J", "V", "S"),
     private val deviceTimeZoneId: () -> String = { TimeZone.getDefault().id },
     private val useRemoteSession: Boolean = true,
 ) {
@@ -282,7 +289,7 @@ class AffirmityAppState(
         scope.launch {
             val today = DayClock.epochDay()
             val windowStart = DayClock.rollingWindowStartEpochDay()
-            val dayLabels = DayClock.rollingWindowDayLetters()
+            val dayLabels = DayClock.rollingWindowDayLetters(dayLetters)
             val healerStart = healerStartEpochDay(today)
             // The healer-use flow is combined *inside* this flatMapLatest (design.md's "Combine
             // both flows inside the existing flatMapLatest" decision) rather than in a parallel
@@ -437,6 +444,19 @@ class AffirmityAppState(
                 channel = NotificationChannelSpec.REMINDER,
                 title = "Notificación de prueba",
                 body = "Si ves esto, el sistema de notificaciones funciona en este teléfono.",
+            )
+        }
+    }
+
+    /** Same as [sendTestNotification] but on the reflection channel, so the mood-value action
+     * buttons (and the tap-to-open-Ánimo behavior) can be tried without waiting for the nightly
+     * window. */
+    fun sendTestReflectionNotification() {
+        scope.launch {
+            notifier.notify(
+                channel = NotificationChannelSpec.REFLECTION,
+                title = "Hoy, ¿cómo te sentiste?",
+                body = "Notificación de prueba: tocá un emoji para abrir tu ánimo de hoy con esa opción elegida.",
             )
         }
     }
@@ -632,6 +652,10 @@ private const val USE_REMOTE_SESSION = true
 fun rememberAffirmityAppState(): AffirmityAppState {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    // Resolved here, in the composable body, not inside `remember` — a locale switch recreates
+    // the Activity and re-runs this whole composable in a fresh Composition, so this always
+    // reflects the current app locale (D6), unlike a value captured once inside `remember`.
+    val dayLetters = stringArrayResource(R.array.weekday_letters).toList()
     return remember {
         val database = AffirmityDatabase.getInstance(context)
         val notificationPreferences = NotificationPreferences(context)
@@ -671,6 +695,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             widgetUpdater = widgetUpdater(context.applicationContext),
             fcmTokenRepository = FcmTokenRepository(firestore),
             onboardingRepository = FirestoreOnboardingRepository(firestore),
+            dayLetters = dayLetters,
             authRepository = FirebaseAuthRepository(
                 auth = FirebaseAuth.getInstance(),
                 providers = mapOf(AuthProviderId.GOOGLE to googleIdAuthProvider),

@@ -57,14 +57,28 @@ class DayClockTest {
         )
     }
 
+    private val spanishLetters = listOf("D", "L", "M", "M", "J", "V", "S") // Sun..Sat
+    private val englishLetters = listOf("S", "M", "T", "W", "T", "F", "S") // Sun..Sat
+
     @Test
     fun `rollingWindowDayLetters ends on the given calendar day's weekday, oldest first`() {
         val wednesday = calendarAt(2026, Calendar.JANUARY, 14) // Wed
 
-        val letters = DayClock.rollingWindowDayLetters(wednesday)
+        val letters = DayClock.rollingWindowDayLetters(spanishLetters, wednesday)
 
         assertEquals(7, letters.size)
         assertEquals("M", letters.last()) // today = Wednesday
         assertEquals("J", letters.first()) // 6 days before Wednesday = last Thursday
+    }
+
+    @Test
+    fun `rollingWindowDayLetters follows the supplied letters array, not a hardcoded locale`() {
+        val wednesday = calendarAt(2026, Calendar.JANUARY, 14) // Wed
+
+        val letters = DayClock.rollingWindowDayLetters(englishLetters, wednesday)
+
+        assertEquals(7, letters.size)
+        assertEquals("W", letters.last()) // today = Wednesday
+        assertEquals("T", letters.first()) // 6 days before Wednesday = last Thursday
     }
 }

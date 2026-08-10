@@ -82,4 +82,114 @@
     <string name="onboarding_intro_sign_in_button">Ya tengo una cuenta</string>
     <string name="onboarding_intro_start_button">Empezar</string>
     <string name="onboarding_intro_checking">Verificando tu cuenta…</string>
+
+    <string-array name="weekday_letters">
+        <item>D</item>
+        <item>L</item>
+        <item>M</item>
+        <item>M</item>
+        <item>J</item>
+        <item>V</item>
+        <item>S</item>
+    </string-array>
+
+    <string name="nav_affirmations_label">Afirmaciones</string>
+    <string name="nav_meditate_label">Meditar</string>
+    <string name="nav_mood_label">Ánimo</string>
+    <string name="nav_progress_label">Progreso</string>
+    <string name="nav_back_content_description">Volver</string>
+    <string name="nav_notification_debug_title">Debug de notificaciones</string>
+
+    <string name="mood_title">Ánimo</string>
+    <string name="mood_subtitle">Refleja, observa y comprende tu ritmo interior.</string>
+    <string name="mood_resumen_title">Resumen</string>
+    <string name="mood_prev_month_content_description">Mes anterior</string>
+    <string name="mood_next_month_content_description">Mes siguiente</string>
+    <string name="mood_average_format">Promedio: %1$s</string>
+    <string name="mood_average_empty">–</string>
+    <string name="mood_streak_format">Racha: %1$d días</string>
+    <string name="mood_period_week">Semana</string>
+    <string name="mood_period_month">Mes</string>
+    <string name="mood_trend_title">TENDENCIA</string>
+    <string name="mood_distribution_title">DISTRIBUCIÓN</string>
+    <string name="mood_month_format">MMMM</string>
+    <string name="mood_day_label_format">EEEE d \'de\' MMMM</string>
+    <string name="mood_day_label_today">Hoy, %1$s</string>
+    <string-array name="mood_weekday_headers">
+        <item>LUN</item>
+        <item>MAR</item>
+        <item>MIÉ</item>
+        <item>JUE</item>
+        <item>VIE</item>
+        <item>SÁB</item>
+        <item>DOM</item>
+    </string-array>
+
+    <string name="mood_detail_notes_label">Notas (opcional)</string>
+    <string name="mood_detail_notes_placeholder">¿Cómo te sentiste hoy?</string>
+    <string name="mood_detail_save_button">Guardar</string>
+
+    <string name="notification_debug_send_test_button">Enviar notificación de prueba ahora</string>
+    <string name="notification_debug_send_test_reflection_button">Enviar notificación de reflexión de prueba</string>
+    <string name="notification_debug_clear_history_button">Borrar historial</string>
+    <string name="notification_debug_empty_message">Todavía no hay actividad registrada. Esperá al próximo horario programado, o cambiá la ventana en Ajustes para que dispare pronto.</string>
+
+    <string name="progress_title">Mi Progreso</string>
+    <string name="progress_habits_title">Hábitos</string>
+    <string name="progress_affirmations_label">Afirmaciones</string>
+    <string name="progress_meditation_label">Meditación</string>
+    <string name="progress_streak_active_content_description">Racha activa hoy</string>
+    <string name="progress_streak_pending_content_description">Racha pendiente hoy</string>
+    <string name="progress_general_streak_format">Racha general: %1$d días</string>
+    <string name="progress_general_streak_info_content_description">Qué es la racha general</string>
+    <string name="progress_general_streak_dialog_confirm">Entendido</string>
+    <string name="progress_general_streak_dialog_title">Racha general</string>
+    <string name="progress_general_streak_dialog_text">Se mantiene mientras completes al menos una de las dos actividades (afirmación o meditación) cada día. Se rompe solo si pasa un día entero sin completar ninguna.</string>
+    <string name="progress_streak_healer_title">Sanador de racha</string>
+    <string name="progress_streak_healer_available_body">Ayer no completaste ningún hábito. Activá el sanador para conservar tu racha general — esto no reemplaza lo que hagas hoy.</string>
+    <string name="progress_streak_healer_activate_button">Activar sanador</string>
+    <string name="progress_streak_healer_used_today_body">Sanador activado: tu racha general sigue intacta.</string>
+    <string name="progress_streak_healer_held_body">Tenés 1 sanador guardado para el próximo día que falles.</string>
+    <string name="progress_weekly_streak_format">Racha: %1$d días</string>
+    <string name="progress_affirmations_section_title">Mis Afirmaciones</string>
+    <string name="progress_title_field_label">Título</string>
+    <string name="progress_title_field_error">Falta el título</string>
+    <string name="progress_subtitle_field_label">Subtítulo (opcional)</string>
+    <string name="progress_mode_color_label">Color</string>
+    <string name="progress_mode_url_label">URL</string>
+    <string name="progress_mode_gallery_label">Galería</string>
+    <string name="progress_mode_json_label">JSON</string>
+    <string name="progress_image_url_label">URL de la imagen</string>
+    <string name="progress_image_url_error">Falta la URL de la imagen</string>
+    <string name="progress_gallery_pick_button">Elegir de la galería</string>
+    <string name="progress_gallery_change_button">Cambiar imagen elegida</string>
+    <string name="progress_gallery_error">Elegí una imagen de la galería</string>
+    <string name="progress_copy_json_example_button"> Copiar ejemplo de JSON</string>
+    <string name="progress_json_paste_label">Pegar JSON de afirmaciones</string>
+    <string name="progress_replace_existing_label">Reemplazar afirmaciones actuales</string>
+    <string name="progress_save_button">Guardar</string>
+    <string name="progress_import_button">Importar</string>
+    <string name="progress_delete_content_description">Eliminar</string>
+
+    <string name="settings_notification_debug_title">Debug de notificaciones</string>
+    <string name="settings_notification_debug_view_history_button">Ver historial</string>
+    <string name="settings_time_picker_cancel">Cancelar</string>
+    <string name="settings_time_picker_ok">OK</string>
+    <string name="settings_language_title">Idioma</string>
+    <string name="settings_language_system">Seguir idioma del sistema</string>
+    <string name="settings_language_spanish">Español</string>
+    <string name="settings_language_english">English</string>
+
+    <string name="meditation_title">Meditar</string>
+    <string name="meditation_subtitle">Encuentra tu centro.</string>
+    <string name="meditation_pause_content_description">Pausar</string>
+    <string name="meditation_start_content_description">Iniciar</string>
+    <string name="meditation_max_duration_label">30 min</string>
+    <string name="meditation_preset_relax">Relax</string>
+    <string name="meditation_preset_focus">Focus</string>
+    <string name="meditation_preset_sleep">Sleep</string>
+
+    <string name="widget_empty_state_label">Empezá hoy</string>
+    <string name="widget_action_affirm_label">Afirmar</string>
+    <string name="widget_action_meditate_label">Meditar</string>
 </resources>

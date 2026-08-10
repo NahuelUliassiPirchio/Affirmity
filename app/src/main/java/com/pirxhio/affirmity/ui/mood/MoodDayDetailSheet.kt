@@ -26,8 +26,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pirxhio.affirmity.R
 
 /**
  * Bottom sheet to log or edit a single day's mood: emoji + label preview, a 1-5 emoji picker, an
@@ -97,8 +99,8 @@ fun MoodDayDetailSheet(
             OutlinedTextField(
                 value = note,
                 onValueChange = { note = it },
-                label = { Text("Notas (opcional)") },
-                placeholder = { Text("¿Cómo te sentiste hoy?") },
+                label = { Text(stringResource(R.string.mood_detail_notes_label)) },
+                placeholder = { Text(stringResource(R.string.mood_detail_notes_placeholder)) },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
             )
@@ -106,7 +108,7 @@ fun MoodDayDetailSheet(
                 onClick = { onSave(selectedMood, note.trim()) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Guardar")
+                Text(stringResource(R.string.mood_detail_save_button))
             }
         }
     }

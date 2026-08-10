@@ -17,8 +17,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.local.NotificationLogEntry
 import com.pirxhio.affirmity.data.local.NotificationLogEvent
 import java.text.SimpleDateFormat
@@ -35,6 +37,7 @@ fun NotificationDebugScreen(
     entries: List<NotificationLogEntry>,
     onClear: () -> Unit,
     onSendTestNotification: () -> Unit,
+    onSendTestReflectionNotification: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -46,21 +49,26 @@ fun NotificationDebugScreen(
     ) {
         item {
             Button(onClick = onSendTestNotification, modifier = Modifier.fillMaxWidth()) {
-                Text("Enviar notificación de prueba ahora")
+                Text(stringResource(R.string.notification_debug_send_test_button))
+            }
+        }
+
+        item {
+            Button(onClick = onSendTestReflectionNotification, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.notification_debug_send_test_reflection_button))
             }
         }
 
         item {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onClear) { Text("Borrar historial") }
+                TextButton(onClick = onClear) { Text(stringResource(R.string.notification_debug_clear_history_button)) }
             }
         }
 
         if (entries.isEmpty()) {
             item {
                 Text(
-                    text = "Todavía no hay actividad registrada. Esperá al próximo horario programado, " +
-                        "o cambiá la ventana en Ajustes para que dispare pronto.",
+                    text = stringResource(R.string.notification_debug_empty_message),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }

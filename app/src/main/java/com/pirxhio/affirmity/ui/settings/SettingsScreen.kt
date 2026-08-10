@@ -10,11 +10,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,9 +34,34 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.auth.AuthState
 import com.pirxhio.affirmity.data.local.ChannelSettings
+
+/** Follow-system default plus the two supported explicit languages (spec: `In-App Language
+ * Selection`). Maps to/from a BCP-47 language tag rather than [LocaleListCompat] directly so the
+ * mapping itself stays a pure, JVM-testable function (D5). */
+enum class LanguageOption {
+    SYSTEM,
+    SPANISH,
+    ENGLISH;
+
+    fun toLanguageTag(): String? = when (this) {
+        SYSTEM -> null
+        SPANISH -> "es"
+        ENGLISH -> "en"
+    }
+
+    companion object {
+        fun fromLanguageTag(tag: String?): LanguageOption = when (tag) {
+            "es" -> SPANISH
+            "en" -> ENGLISH
+            else -> SYSTEM
+        }
+    }
+}
 
 @Composable
 fun SettingsScreen(
@@ -80,6 +108,10 @@ fun SettingsScreen(
         }
 
         item {
+            LanguageSettingsCard()
+        }
+
+        item {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier
@@ -88,8 +120,8 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(text = "Debug de notificaciones", style = MaterialTheme.typography.titleMedium)
-                    TextButton(onClick = onOpenNotificationDebug) { Text("Ver historial") }
+                    Text(text = stringResource(id = R.string.settings_notification_debug_title), style = MaterialTheme.typography.titleMedium)
+                    TextButton(onClick = onOpenNotificationDebug) { Text(stringResource(id = R.string.settings_notification_debug_view_history_button)) }
                 }
             }
         }
@@ -121,6 +153,54 @@ private fun PermissionBanner() {
                 context.startActivity(intent)
             }) {
                 Text(stringResource(id = R.string.settings_permission_banner_action))
+            }
+        }
+    }
+}
+
+/**
+ * System / Español / English toggle (spec: `In-App Language Selection`). Reads
+ * [AppCompatDelegate.getApplicationLocales] fresh on every composition (not `remember`-cached), so
+ * the selected option reflects reality again after a process restart. Writing calls
+ * [AppCompatDelegate.setApplicationLocales], which is the single source of truth — no parallel
+ * DataStore (D5) — and triggers the Activity recreate that re-resolves every `stringResource` in
+ * the app (D5's reactivity model).
+ */
+@Composable
+private fun LanguageSettingsCard() {
+    val currentTag = AppCompatDelegate.getApplicationLocales().let { locales ->
+        if (locales.isEmpty) null else locales[0]?.language
+    }
+    val selected = LanguageOption.fromLanguageTag(currentTag)
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(text = stringResource(id = R.string.settings_language_title), style = MaterialTheme.typography.titleMedium)
+            Column(modifier = Modifier.selectableGroup()) {
+                LanguageOption.entries.forEach { option ->
+                    val label = when (option) {
+                        LanguageOption.SYSTEM -> stringResource(id = R.string.settings_language_system)
+                        LanguageOption.SPANISH -> stringResource(id = R.string.settings_language_spanish)
+                        LanguageOption.ENGLISH -> stringResource(id = R.string.settings_language_english)
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = option == selected,
+                                onClick = {
+                                    val localeList = option.toLanguageTag()?.let { LocaleListCompat.forLanguageTags(it) }
+                                        ?: LocaleListCompat.getEmptyLocaleList()
+                                    AppCompatDelegate.setApplicationLocales(localeList)
+                                },
+                            )
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = option == selected, onClick = null)
+                        Text(text = label, modifier = Modifier.padding(start = 8.dp))
+                    }
+                }
             }
         }
     }
@@ -203,8 +283,8 @@ private fun TimePickerDialogHost(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                 ) {
-                    TextButton(onClick = onDismiss) { Text("Cancelar") }
-                    Button(onClick = { onConfirm(state.hour * 60 + state.minute) }) { Text("OK") }
+                    TextButton(onClick = onDismiss) { Text(stringResource(id = R.string.settings_time_picker_cancel)) }
+                    Button(onClick = { onConfirm(state.hour * 60 + state.minute) }) { Text(stringResource(id = R.string.settings_time_picker_ok)) }
                 }
             }
         }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.Affirmity" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.Affirmity" parent="Theme.AppCompat.DayNight.NoActionBar" />
 
     <!-- System-drawn cold-start splash (androidx.core.splashscreen): shown the instant the process
          starts, before Compose ever attaches, so the app never flashes the OS's default white

@@ -49,8 +49,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.Affirmation
 import com.pirxhio.affirmity.data.HealerActivation
 import com.pirxhio.affirmity.data.StreakHealerState
@@ -84,7 +86,7 @@ fun ProgressScreen(
     ) {
         item {
             Text(
-                text = "Mi Progreso",
+                text = stringResource(R.string.progress_title),
                 style = MaterialTheme.typography.headlineLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(top = 16.dp),
@@ -94,7 +96,7 @@ fun ProgressScreen(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = "Hábitos",
+                    text = stringResource(R.string.progress_habits_title),
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -110,12 +112,12 @@ fun ProgressScreen(
                 // progress bar here. It now shares the exact same day-circle tracker
                 // component as Afirmaciones, just with its own icon/data.
                 WeeklyStreakTracker(
-                    title = "Afirmaciones",
+                    title = stringResource(R.string.progress_affirmations_label),
                     icon = Icons.Filled.AutoAwesome,
                     streak = affirmationsStreak,
                 )
                 WeeklyStreakTracker(
-                    title = "Meditación",
+                    title = stringResource(R.string.progress_meditation_label),
                     icon = Icons.Filled.Timer,
                     streak = meditationStreak,
                 )
@@ -124,7 +126,7 @@ fun ProgressScreen(
 
         item {
             Text(
-                text = "Mis Afirmaciones",
+                text = stringResource(R.string.progress_affirmations_section_title),
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -159,12 +161,16 @@ private fun GeneralStreakCounter(generalStreakDays: Int, isTodayDone: Boolean) {
     ) {
         Icon(
             imageVector = Icons.Filled.LocalFireDepartment,
-            contentDescription = if (isTodayDone) "Racha activa hoy" else "Racha pendiente hoy",
+            contentDescription = if (isTodayDone) {
+                stringResource(R.string.progress_streak_active_content_description)
+            } else {
+                stringResource(R.string.progress_streak_pending_content_description)
+            },
             tint = if (isTodayDone) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
             modifier = Modifier.size(20.dp),
         )
         Text(
-            text = "Racha general: $generalStreakDays días",
+            text = stringResource(R.string.progress_general_streak_format, generalStreakDays),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(start = 8.dp),
@@ -172,7 +178,7 @@ private fun GeneralStreakCounter(generalStreakDays: Int, isTodayDone: Boolean) {
         IconButton(onClick = { showExplanation = true }, modifier = Modifier.size(24.dp)) {
             Icon(
                 imageVector = Icons.Filled.Info,
-                contentDescription = "Qué es la racha general",
+                contentDescription = stringResource(R.string.progress_general_streak_info_content_description),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
             )
@@ -183,15 +189,11 @@ private fun GeneralStreakCounter(generalStreakDays: Int, isTodayDone: Boolean) {
         AlertDialog(
             onDismissRequest = { showExplanation = false },
             confirmButton = {
-                TextButton(onClick = { showExplanation = false }) { Text("Entendido") }
+                TextButton(onClick = { showExplanation = false }) { Text(stringResource(R.string.progress_general_streak_dialog_confirm)) }
             },
-            title = { Text("Racha general") },
+            title = { Text(stringResource(R.string.progress_general_streak_dialog_title)) },
             text = {
-                Text(
-                    "Se mantiene mientras completes al menos una de las dos actividades " +
-                        "(afirmación o meditación) cada día. Se rompe solo si pasa un día " +
-                        "entero sin completar ninguna.",
-                )
+                Text(stringResource(R.string.progress_general_streak_dialog_text))
             },
         )
     }
@@ -222,7 +224,7 @@ private fun StreakHealerCard(streakHealer: StreakHealerState, onActivateHealer: 
                     modifier = Modifier.size(20.dp),
                 )
                 Text(
-                    text = "Sanador de racha",
+                    text = stringResource(R.string.progress_streak_healer_title),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(start = 8.dp),
@@ -231,19 +233,18 @@ private fun StreakHealerCard(streakHealer: StreakHealerState, onActivateHealer: 
             when (activation) {
                 is HealerActivation.Available -> {
                     Text(
-                        text = "Ayer no completaste ningún hábito. Activá el sanador para conservar tu racha " +
-                            "general — esto no reemplaza lo que hagas hoy.",
+                        text = stringResource(R.string.progress_streak_healer_available_body),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Button(onClick = onActivateHealer, modifier = Modifier.fillMaxWidth()) {
-                        Text("Activar sanador")
+                        Text(stringResource(R.string.progress_streak_healer_activate_button))
                     }
                 }
 
                 is HealerActivation.UsedToday -> {
                     Text(
-                        text = "Sanador activado: tu racha general sigue intacta.",
+                        text = stringResource(R.string.progress_streak_healer_used_today_body),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -252,7 +253,7 @@ private fun StreakHealerCard(streakHealer: StreakHealerState, onActivateHealer: 
                 HealerActivation.Unavailable -> {
                     // streakHealer.healerHeld is true here (guarded above): show the held badge.
                     Text(
-                        text = "Tenés 1 sanador guardado para el próximo día que falles.",
+                        text = stringResource(R.string.progress_streak_healer_held_body),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -294,7 +295,7 @@ fun WeeklyStreakTracker(
                     )
                 }
                 Text(
-                    text = "Racha: ${streak.streakDays} días",
+                    text = stringResource(R.string.progress_weekly_streak_format, streak.streakDays),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -389,18 +390,18 @@ private fun AddAffirmationCard(
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it; showValidationError = false },
-                    label = { Text("Título") },
+                    label = { Text(stringResource(R.string.progress_title_field_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     isError = showValidationError && title.isBlank(),
                     supportingText = if (showValidationError && title.isBlank()) {
-                        { Text("Falta el título") }
+                        { Text(stringResource(R.string.progress_title_field_error)) }
                     } else null,
                 )
                 OutlinedTextField(
                     value = subtitle,
                     onValueChange = { subtitle = it },
-                    label = { Text("Subtítulo (opcional)") },
+                    label = { Text(stringResource(R.string.progress_subtitle_field_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2,
                 )
@@ -409,22 +410,22 @@ private fun AddAffirmationCard(
                 FilterChip(
                     selected = backgroundMode == BackgroundMode.COLOR,
                     onClick = { backgroundMode = BackgroundMode.COLOR },
-                    label = { Text("Color") }
+                    label = { Text(stringResource(R.string.progress_mode_color_label)) }
                 )
                 FilterChip(
                     selected = backgroundMode == BackgroundMode.IMAGE_URL,
                     onClick = { backgroundMode = BackgroundMode.IMAGE_URL },
-                    label = { Text("URL") }
+                    label = { Text(stringResource(R.string.progress_mode_url_label)) }
                 )
                 FilterChip(
                     selected = backgroundMode == BackgroundMode.GALLERY,
                     onClick = { backgroundMode = BackgroundMode.GALLERY },
-                    label = { Text("Galería") }
+                    label = { Text(stringResource(R.string.progress_mode_gallery_label)) }
                 )
                 FilterChip(
                     selected = backgroundMode == BackgroundMode.JSON_IMPORT,
                     onClick = { backgroundMode = BackgroundMode.JSON_IMPORT },
-                    label = { Text("JSON") }
+                    label = { Text(stringResource(R.string.progress_mode_json_label)) }
                 )
             }
             when (backgroundMode) {
@@ -451,12 +452,12 @@ private fun AddAffirmationCard(
                     OutlinedTextField(
                         value = imageUrl,
                         onValueChange = { imageUrl = it; showValidationError = false },
-                        label = { Text("URL de la imagen") },
+                        label = { Text(stringResource(R.string.progress_image_url_label)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         isError = showValidationError && imageUrl.isBlank(),
                         supportingText = if (showValidationError && imageUrl.isBlank()) {
-                            { Text("Falta la URL de la imagen") }
+                            { Text(stringResource(R.string.progress_image_url_error)) }
                         } else null,
                     )
                 }
@@ -471,11 +472,17 @@ private fun AddAffirmationCard(
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(if (galleryUri == null) "Elegir de la galería" else "Cambiar imagen elegida")
+                        Text(
+                            if (galleryUri == null) {
+                                stringResource(R.string.progress_gallery_pick_button)
+                            } else {
+                                stringResource(R.string.progress_gallery_change_button)
+                            }
+                        )
                     }
                     if (showValidationError && galleryUri == null) {
                         Text(
-                            text = "Elegí una imagen de la galería",
+                            text = stringResource(R.string.progress_gallery_error),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -490,12 +497,12 @@ private fun AddAffirmationCard(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Filled.ContentCopy, contentDescription = null)
-                        Text(" Copiar ejemplo de JSON")
+                        Text(stringResource(R.string.progress_copy_json_example_button))
                     }
                     OutlinedTextField(
                         value = importJson,
                         onValueChange = { importJson = it },
-                        label = { Text("Pegar JSON de afirmaciones") },
+                        label = { Text(stringResource(R.string.progress_json_paste_label)) },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 6
                     )
@@ -505,7 +512,7 @@ private fun AddAffirmationCard(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = "Reemplazar afirmaciones actuales",
+                            text = stringResource(R.string.progress_replace_existing_label),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -574,7 +581,13 @@ private fun AddAffirmationCard(
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(if (backgroundMode == BackgroundMode.JSON_IMPORT) "Importar" else "Guardar")
+                Text(
+                    if (backgroundMode == BackgroundMode.JSON_IMPORT) {
+                        stringResource(R.string.progress_import_button)
+                    } else {
+                        stringResource(R.string.progress_save_button)
+                    }
+                )
             }
         }
     }
@@ -603,7 +616,7 @@ private fun AffirmationRow(affirmation: Affirmation, onDelete: (String) -> Unit)
             IconButton(onClick = { onDelete(affirmation.id) }) {
                 Icon(
                     imageVector = Icons.Filled.Delete,
-                    contentDescription = "Eliminar",
+                    contentDescription = stringResource(R.string.progress_delete_content_description),
                     tint = MaterialTheme.colorScheme.outline
                 )
             }

@@ -23,9 +23,14 @@ object DayClock {
     fun rollingWindowStartEpochDay(calendar: Calendar = Calendar.getInstance()): Long =
         epochDay(calendar) - 6
 
-    /** Single-letter weekday labels for the rolling 7-day window ending on [calendar], oldest first. */
-    fun rollingWindowDayLetters(calendar: Calendar = Calendar.getInstance()): List<String> {
-        val letters = arrayOf("D", "L", "M", "M", "J", "V", "S") // Calendar.DAY_OF_WEEK: Sun=1..Sat=7
+    /**
+     * Single-letter weekday labels for the rolling 7-day window ending on [calendar], oldest first.
+     * [letters] must be a 7-item array ordered `Calendar.DAY_OF_WEEK`: Sun=1..Sat=7 — callers
+     * resolve it from a locale-aware resource (e.g. `R.array.weekday_letters`) per call, never a
+     * cached/hardcoded value, so this stays a pure, Context-free JVM function.
+     */
+    fun rollingWindowDayLetters(letters: List<String>, calendar: Calendar = Calendar.getInstance()): List<String> {
+        require(letters.size == 7) { "letters must have exactly 7 items (Sun..Sat), got ${letters.size}" }
         return (6 downTo 0).map { offset ->
             val day = (calendar.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -offset) }
             letters[day.get(Calendar.DAY_OF_WEEK) - 1]

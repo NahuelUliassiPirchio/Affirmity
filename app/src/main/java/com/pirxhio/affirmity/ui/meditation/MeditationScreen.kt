@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
@@ -45,8 +46,6 @@ import kotlin.math.roundToInt
 private const val MIN_DURATION_SECONDS = 30
 private const val MAX_DURATION_SECONDS = 30 * 60
 private const val STEP_SECONDS = 30
-
-private val presets = listOf("Relax" to 5 * 60, "Focus" to 15 * 60, "Sleep" to 30 * 60)
 
 @Composable
 fun MeditationScreen(
@@ -61,6 +60,11 @@ fun MeditationScreen(
     var secondsRemaining by remember(initialDurationSeconds) { mutableIntStateOf(durationSeconds) }
     var isRunning by remember { mutableStateOf(false) }
     var selectedPreset by remember { mutableStateOf<String?>(null) }
+    val presets = listOf(
+        stringResource(R.string.meditation_preset_relax) to 5 * 60,
+        stringResource(R.string.meditation_preset_focus) to 15 * 60,
+        stringResource(R.string.meditation_preset_sleep) to 30 * 60,
+    )
 
     val context = LocalContext.current
     val gongPlayer = remember { MediaPlayer.create(context, R.raw.meditation_gong) }
@@ -95,12 +99,12 @@ fun MeditationScreen(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "Meditar",
+            text = stringResource(R.string.meditation_title),
             style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
-            text = "Encuentra tu centro.",
+            text = stringResource(R.string.meditation_subtitle),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.outline,
             modifier = Modifier.padding(top = 4.dp, bottom = 40.dp)
@@ -132,7 +136,11 @@ fun MeditationScreen(
                 ) {
                     Icon(
                         imageVector = if (isRunning) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (isRunning) "Pausar" else "Iniciar",
+                        contentDescription = if (isRunning) {
+                            stringResource(R.string.meditation_pause_content_description)
+                        } else {
+                            stringResource(R.string.meditation_start_content_description)
+                        },
                         tint = Color.Black
                     )
                 }
@@ -145,7 +153,7 @@ fun MeditationScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(formatTime(MIN_DURATION_SECONDS), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline)
-                Text("30 min", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline)
+                Text(stringResource(R.string.meditation_max_duration_label), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline)
             }
             Slider(
                 value = durationSeconds.toFloat(),

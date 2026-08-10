@@ -27,6 +27,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,8 +37,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.DailyMoodStats
 import com.pirxhio.affirmity.data.DayClock
 import com.pirxhio.affirmity.data.MOOD_MAX
@@ -54,12 +59,27 @@ private enum class ResumenPeriod { SEMANA, MES }
 fun MoodScreen(
     moodEntries: List<DailyMoodEntity>,
     onSaveMood: (epochDay: Long, moodValue: Int, note: String?) -> Unit,
+    initialMoodValue: Int? = null,
+    onInitialMoodConsumed: () -> Unit = {},
 ) {
     // Not `remember`-keyed: `moodEntries` is a SnapshotStateList mutated in place (clear + addAll),
     // so its reference never changes and a remember(moodEntries) key would never invalidate,
     // freezing the calendar on whatever data existed at first composition.
     val moodByDay = moodEntries.associateBy { it.epochDay }
     val todayEpochDay = remember { DayClock.epochDay() }
+
+    // Resolved per composition from LocalConfiguration, not a process-lifetime singleton — a
+    // locale switch recreates the Activity, which produces a new LocalConfiguration and therefore
+    // re-runs this composable with the new locale (D7).
+    val locale = LocalConfiguration.current.locales[0]
+    val monthFormatPattern = stringResource(R.string.mood_month_format)
+    val dayLabelFormatPattern = stringResource(R.string.mood_day_label_format)
+    val todayLabelTemplate = stringResource(R.string.mood_day_label_today)
+    val monthFormatter = remember(monthFormatPattern, locale) { SimpleDateFormat(monthFormatPattern, locale) }
+    val dayLabelFormatter = remember(dayLabelFormatPattern, locale) { SimpleDateFormat(dayLabelFormatPattern, locale) }
+
+    fun dayLabel(calendar: Calendar, epochDay: Long): String =
+        formatDayLabel(calendar, epochDay, todayEpochDay, dayLabelFormatter, todayLabelTemplate)
 
     var visibleMonth by remember {
         mutableStateOf(
@@ -74,6 +94,20 @@ fun MoodScreen(
     }
     var period by remember { mutableStateOf(ResumenPeriod.SEMANA) }
     var selectedDay by remember { mutableStateOf<SelectedDay?>(null) }
+
+    // Reflection notification's mood-value actions land here with a pre-picked value — open
+    // today's sheet with it selected instead of making the user find today's cell again.
+    LaunchedEffect(initialMoodValue) {
+        if (initialMoodValue != null) {
+            selectedDay = SelectedDay(
+                epochDay = todayEpochDay,
+                label = dayLabel(Calendar.getInstance(), todayEpochDay),
+                moodValue = initialMoodValue,
+                note = moodByDay[todayEpochDay]?.note,
+            )
+            onInitialMoodConsumed()
+        }
+    }
 
     val monthDays = remember(visibleMonth) { monthDaysWithEpoch(visibleMonth) }
     val monthEntries = monthDays.mapNotNull { moodByDay[it.epochDay] }
@@ -100,12 +134,12 @@ fun MoodScreen(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = "Ánimo",
+                    text = stringResource(R.string.mood_title),
                     style = MaterialTheme.typography.headlineLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "Refleja, observa y comprende tu ritmo interior.",
+                    text = stringResource(R.string.mood_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.outline,
                 )
@@ -117,6 +151,7 @@ fun MoodScreen(
                 visibleMonth = visibleMonth,
                 average = monthAverage,
                 streakDays = streakDays,
+                monthFormatter = monthFormatter,
                 onPrevMonth = { visibleMonth = shiftMonth(visibleMonth, -1) },
                 onNextMonth = { visibleMonth = shiftMonth(visibleMonth, 1) },
             )
@@ -131,7 +166,7 @@ fun MoodScreen(
                     val entry = moodByDay[day.epochDay]
                     selectedDay = SelectedDay(
                         epochDay = day.epochDay,
-                        label = formatDayLabel(day.calendar, day.epochDay, todayEpochDay),
+                        label = dayLabel(day.calendar, day.epochDay),
                         moodValue = entry?.moodValue,
                         note = entry?.note,
                     )
@@ -147,7 +182,7 @@ fun MoodScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Resumen",
+                        text = stringResource(R.string.mood_resumen_title),
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
@@ -198,12 +233,23 @@ private fun monthDaysWithEpoch(visibleMonth: Calendar): List<MonthDay> {
 private fun shiftMonth(visibleMonth: Calendar, delta: Int): Calendar =
     (visibleMonth.clone() as Calendar).apply { add(Calendar.MONTH, delta) }
 
-private val monthFormatter = SimpleDateFormat("MMMM", Locale("es", "ES"))
-private val dayLabelFormatter = SimpleDateFormat("EEEE d 'de' MMMM", Locale("es", "ES"))
-
-private fun formatDayLabel(calendar: Calendar, epochDay: Long, todayEpochDay: Long): String {
-    val formatted = dayLabelFormatter.format(calendar.time).replaceFirstChar { it.uppercase() }
-    return if (epochDay == todayEpochDay) "Hoy, $formatted" else formatted
+/**
+ * Builds the resolved-locale day label. Takes an already-constructed [dayFormatter] and
+ * [todayLabelTemplate] (a `%1$s` format string, e.g. "Hoy, %1$s") because this function is called
+ * from non-composable contexts (event-handler lambdas, `LaunchedEffect` bodies) — the caller
+ * resolves both from `stringResource`/`LocalConfiguration` inside the composable and passes them
+ * down (D7). `SimpleDateFormat` is not thread-safe, so a fresh instance per composition is also a
+ * correctness win, not just a localization one.
+ */
+private fun formatDayLabel(
+    calendar: Calendar,
+    epochDay: Long,
+    todayEpochDay: Long,
+    dayFormatter: SimpleDateFormat,
+    todayLabelTemplate: String,
+): String {
+    val formatted = dayFormatter.format(calendar.time).replaceFirstChar { it.uppercase() }
+    return if (epochDay == todayEpochDay) String.format(todayLabelTemplate, formatted) else formatted
 }
 
 @Composable
@@ -211,13 +257,14 @@ private fun MoodHeaderControls(
     visibleMonth: Calendar,
     average: Double?,
     streakDays: Int,
+    monthFormatter: SimpleDateFormat,
     onPrevMonth: () -> Unit,
     onNextMonth: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             IconButton(onClick = onPrevMonth) {
-                Icon(Icons.Filled.ChevronLeft, contentDescription = "Mes anterior")
+                Icon(Icons.Filled.ChevronLeft, contentDescription = stringResource(R.string.mood_prev_month_content_description))
             }
             Text(
                 text = monthFormatter.format(visibleMonth.time).replaceFirstChar { it.uppercase() },
@@ -225,12 +272,13 @@ private fun MoodHeaderControls(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             IconButton(onClick = onNextMonth) {
-                Icon(Icons.Filled.ChevronRight, contentDescription = "Mes siguiente")
+                Icon(Icons.Filled.ChevronRight, contentDescription = stringResource(R.string.mood_next_month_content_description))
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatChip(text = "Promedio: ${average?.let { "%.1f".format(it) } ?: "–"}")
-            StatChip(text = "Racha: $streakDays días")
+            val averageText = average?.let { "%.1f".format(it) } ?: stringResource(R.string.mood_average_empty)
+            StatChip(text = stringResource(R.string.mood_average_format, averageText))
+            StatChip(text = stringResource(R.string.mood_streak_format, streakDays))
         }
     }
 }
@@ -250,8 +298,6 @@ private fun StatChip(text: String) {
     }
 }
 
-private val weekdayHeaders = listOf("LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB", "DOM")
-
 @Composable
 private fun MoodCalendarGrid(
     monthDays: List<MonthDay>,
@@ -262,6 +308,7 @@ private fun MoodCalendarGrid(
     // Calendar.DAY_OF_WEEK: Sun=1..Sat=7; convert to a Monday-first leading-blank count.
     val leadingBlanks = ((monthDays.first().calendar.get(Calendar.DAY_OF_WEEK) + 5) % 7)
     val cells: List<MonthDay?> = List(leadingBlanks) { null } + monthDays
+    val weekdayHeaders = stringArrayResource(R.array.mood_weekday_headers)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -357,7 +404,11 @@ private fun ResumenToggle(period: ResumenPeriod, onPeriodChange: (ResumenPeriod)
                     .padding(horizontal = 12.dp, vertical = 6.dp),
             ) {
                 Text(
-                    text = if (candidate == ResumenPeriod.SEMANA) "Semana" else "Mes",
+                    text = if (candidate == ResumenPeriod.SEMANA) {
+                        stringResource(R.string.mood_period_week)
+                    } else {
+                        stringResource(R.string.mood_period_month)
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = if (selected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface,
                 )
@@ -375,7 +426,7 @@ private fun TrendChart(points: List<MoodTrendPoint>) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "TENDENCIA",
+                text = stringResource(R.string.mood_trend_title),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline,
             )
@@ -420,7 +471,7 @@ private fun MoodDistributionBars(distribution: MoodDistribution) {
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(
-                text = "DISTRIBUCIÓN",
+                text = stringResource(R.string.mood_distribution_title),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline,
             )

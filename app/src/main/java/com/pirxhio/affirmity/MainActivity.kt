@@ -5,7 +5,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -38,12 +37,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import androidx.compose.ui.unit.dp
+import androidx.annotation.StringRes
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.pirxhio.affirmity.auth.AuthState
+import com.pirxhio.affirmity.data.MOOD_MAX
 import com.pirxhio.affirmity.data.rememberAffirmityAppState
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
@@ -59,14 +62,24 @@ import com.pirxhio.affirmity.ui.theme.AffirmityTheme
 /** Extra key a launcher (e.g. the home-screen widget) sets to pick the initial [AppDestinations]. */
 const val EXTRA_START_DESTINATION = "start_destination"
 
+/** Extra key the reflection notification's mood-value actions set to pre-select a value in
+ * [com.pirxhio.affirmity.ui.mood.MoodScreen]'s today sheet. */
+const val EXTRA_MOOD_VALUE = "mood_value"
+
 /** Unknown or absent values fall back to [AppDestinations.AFIRMACIONES] (D10). */
 private fun resolveStartDestination(intent: Intent?): AppDestinations {
     val raw = intent?.getStringExtra(EXTRA_START_DESTINATION)
     return AppDestinations.entries.find { it.name == raw } ?: AppDestinations.AFIRMACIONES
 }
 
-class MainActivity : ComponentActivity() {
+private fun resolveMoodValue(intent: Intent?): Int? {
+    val value = intent?.getIntExtra(EXTRA_MOOD_VALUE, -1) ?: -1
+    return value.takeIf { it in 1..MOOD_MAX }
+}
+
+class MainActivity : AppCompatActivity() {
     private val startDestination = mutableStateOf(AppDestinations.AFIRMACIONES)
+    private val startMoodValue = mutableStateOf<Int?>(null)
 
     /** Keeps the native cold-start splash (Theme.Affirmity.Starting) on screen until onboarding
      * state resolves, so there's no blank gap between the splash and the first real screen. */
@@ -78,10 +91,17 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         startDestination.value = resolveStartDestination(intent)
+        startMoodValue.value = resolveMoodValue(intent)
+        // A per-app locale switch (Settings language toggle) triggers an Activity recreate that
+        // re-delivers this same held Intent to onCreate — without clearing the extra here, the
+        // mood-value sheet would re-open every time the user switches language after opening the
+        // app from a reflection notification action.
+        intent?.removeExtra(EXTRA_MOOD_VALUE)
         setContent {
             AffirmityTheme {
                 AffirmityApp(
                     startDestination = startDestination.value,
+                    startMoodValue = startMoodValue.value,
                     onOnboardingStateResolved = { keepSplashOnScreen = false },
                 )
             }
@@ -92,6 +112,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         startDestination.value = resolveStartDestination(intent)
+        startMoodValue.value = resolveMoodValue(intent)
     }
 }
 
@@ -100,11 +121,14 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AffirmityApp(
     startDestination: AppDestinations = AppDestinations.AFIRMACIONES,
+    startMoodValue: Int? = null,
     onOnboardingStateResolved: () -> Unit = {},
 ) {
     var currentDestination by rememberSaveable { mutableStateOf(startDestination) }
-    LaunchedEffect(startDestination) {
+    var pendingMoodValue by rememberSaveable { mutableStateOf<Int?>(null) }
+    LaunchedEffect(startDestination, startMoodValue) {
         currentDestination = startDestination
+        if (startMoodValue != null) pendingMoodValue = startMoodValue
     }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showNotificationDebug by rememberSaveable { mutableStateOf(false) }
@@ -158,12 +182,12 @@ fun AffirmityApp(
             modifier = Modifier.fillMaxSize(),
             topBar = {
                 TopAppBar(
-                    title = { Text("Debug de notificaciones") },
+                    title = { Text(stringResource(R.string.nav_notification_debug_title)) },
                     navigationIcon = {
                         IconButton(onClick = { showNotificationDebug = false }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Volver"
+                                contentDescription = stringResource(R.string.nav_back_content_description)
                             )
                         }
                     }
@@ -175,6 +199,7 @@ fun AffirmityApp(
                 entries = appState.notificationDebugEntries,
                 onClear = { appState.clearNotificationDebugLog() },
                 onSendTestNotification = { appState.sendTestNotification() },
+                onSendTestReflectionNotification = { appState.sendTestReflectionNotification() },
             )
         }
         return
@@ -186,12 +211,12 @@ fun AffirmityApp(
             modifier = Modifier.fillMaxSize(),
             topBar = {
                 TopAppBar(
-                    title = { Text("Ajustes") },
+                    title = { Text(stringResource(R.string.settings_title)) },
                     navigationIcon = {
                         IconButton(onClick = { showSettings = false }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Volver"
+                                contentDescription = stringResource(R.string.nav_back_content_description)
                             )
                         }
                     }
@@ -245,10 +270,10 @@ fun AffirmityApp(
                     icon = {
                         Icon(
                             imageVector = it.icon,
-                            contentDescription = it.label
+                            contentDescription = stringResource(it.labelRes)
                         )
                     },
-                    label = { Text(it.label) },
+                    label = { Text(stringResource(it.labelRes)) },
                     selected = it == currentDestination,
                     onClick = { currentDestination = it }
                 )
@@ -295,6 +320,8 @@ fun AffirmityApp(
                 AppDestinations.ANIMO -> MoodScreen(
                     moodEntries = appState.moodEntries,
                     onSaveMood = { epochDay, moodValue, note -> appState.recordMood(epochDay, moodValue, note) },
+                    initialMoodValue = pendingMoodValue,
+                    onInitialMoodConsumed = { pendingMoodValue = null },
                 )
             }
 
@@ -322,11 +349,11 @@ fun AffirmityApp(
 }
 
 enum class AppDestinations(
-    val label: String,
+    @StringRes val labelRes: Int,
     val icon: ImageVector,
 ) {
-    AFIRMACIONES("Afirmaciones", Icons.Filled.AutoAwesome),
-    MEDITAR("Meditar", Icons.Filled.Timer),
-    ANIMO("Ánimo", Icons.Filled.Mood),
-    PROGRESO("Progreso", Icons.Filled.Person),
+    AFIRMACIONES(R.string.nav_affirmations_label, Icons.Filled.AutoAwesome),
+    MEDITAR(R.string.nav_meditate_label, Icons.Filled.Timer),
+    ANIMO(R.string.nav_mood_label, Icons.Filled.Mood),
+    PROGRESO(R.string.nav_progress_label, Icons.Filled.Person),
 }

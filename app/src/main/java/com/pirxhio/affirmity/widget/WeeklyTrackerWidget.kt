@@ -78,7 +78,12 @@ class WeeklyTrackerWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val today = DayClock.epochDay()
         val weekStart = DayClock.rollingWindowStartEpochDay()
-        val dayLetters = DayClock.rollingWindowDayLetters()
+        // Resolved fresh from `context.resources` on every call, never cached at the top level or
+        // in a companion object (D6/D8): the widget's Context reflects the per-app locale on API
+        // 33+, and this stays correct since it's read at the same moment `provideGlance` runs.
+        val dayLetters = DayClock.rollingWindowDayLetters(
+            context.resources.getStringArray(com.pirxhio.affirmity.R.array.weekday_letters).toList(),
+        )
         val healerStart = StreakHealerStats.healerStartEpochDay(today)
         val rawStreakStart = StreakHealerStats.rawStreakStartEpochDay(today)
         // Widened past the healer's rollout floor: the general-streak count itself is unfloored
@@ -188,8 +193,12 @@ internal fun WeeklyTrackerContent(
 
 @androidx.compose.runtime.Composable
 private fun EmptyState() {
+    // `provideGlance` runs in the app process and hands Glance a real Context, so
+    // `context.getString(...)` resolves the same `values/`/`values-en/` catalogs as the rest of
+    // the app (D8). `stringResource` (Compose UI) is not usable inside a Glance composition.
+    val context = LocalContext.current
     Text(
-        text = "Empezá hoy",
+        text = context.getString(com.pirxhio.affirmity.R.string.widget_empty_state_label),
         style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 14.sp, color = GlanceColorProvider(TODAY_RING_COLOR)),
     )
 }
@@ -231,13 +240,14 @@ private fun WeekGrid(rows: List<DailyCompletionEntity>, weekStart: Long, todayIn
             }
         }
         Spacer(modifier = GlanceModifier.width(10.dp))
+        val context = LocalContext.current
         Column(horizontalAlignment = Alignment.Start) {
             Text(
-                text = "Afirmar",
+                text = context.getString(com.pirxhio.affirmity.R.string.widget_action_affirm_label),
                 style = TextStyle(fontSize = 16.sp, color = GlanceColorProvider(AFFIRMATION_COLOR)),
             )
             Text(
-                text = "Meditar",
+                text = context.getString(com.pirxhio.affirmity.R.string.widget_action_meditate_label),
                 modifier = GlanceModifier.padding(top = 1.dp),
                 style = TextStyle(fontSize = 16.sp, color = GlanceColorProvider(MEDITATION_COLOR)),
             )
