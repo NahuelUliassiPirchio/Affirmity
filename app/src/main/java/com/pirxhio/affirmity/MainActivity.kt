@@ -51,6 +51,7 @@ import com.pirxhio.affirmity.data.rememberAffirmityAppState
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
 import com.pirxhio.affirmity.ui.components.FloatingStatusOverlay
+import com.pirxhio.affirmity.ui.healer.StreakHealerGrantedScreen
 import com.pirxhio.affirmity.ui.meditation.MeditationScreen
 import com.pirxhio.affirmity.ui.mood.MoodScreen
 import com.pirxhio.affirmity.ui.onboarding.OnboardingScreen
@@ -260,6 +261,15 @@ fun AffirmityApp(
                 onOpenNotificationDebug = { showNotificationDebug = true },
             )
         }
+        return
+    }
+
+    if (appState.healerJustGranted.value) {
+        BackHandler { appState.acknowledgeHealerGrant() }
+        StreakHealerGrantedScreen(
+            modifier = Modifier.fillMaxSize(),
+            onConfirm = { appState.acknowledgeHealerGrant() },
+        )
         return
     }
 

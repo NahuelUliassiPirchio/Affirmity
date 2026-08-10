@@ -150,6 +150,11 @@
     <string name="progress_streak_healer_activate_button">Activar sanador</string>
     <string name="progress_streak_healer_used_today_body">Sanador activado: tu racha general sigue intacta.</string>
     <string name="progress_streak_healer_held_body">Tenés 1 sanador guardado para el próximo día que falles.</string>
+    <string name="healer_granted_title">¡Conseguiste un sanador de racha!</string>
+    <string name="healer_granted_subtitle">Dos días seguidos completando tus hábitos. Nada mal.</string>
+    <string name="healer_granted_explanation">Un sanador protege tu racha general si algún día te olvidás de completar tus hábitos: lo activás al día siguiente y ese día pasa a contar como si lo hubieras cumplido. Guardás hasta 1 sanador a la vez, y no reemplaza lo que hagas hoy — solo te da un margen para un tropiezo.</string>
+    <string name="healer_granted_confirm_button">Entendido</string>
+    <string name="healer_granted_icon_content_description">Ícono de sanador de racha</string>
     <string name="progress_weekly_streak_format">Racha: %1$d días</string>
     <string name="progress_affirmations_section_title">Mis Afirmaciones</string>
     <string name="progress_title_field_label">Título</string>

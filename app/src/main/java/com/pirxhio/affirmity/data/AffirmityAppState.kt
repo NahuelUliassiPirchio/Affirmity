@@ -194,6 +194,21 @@ class AffirmityAppState(
     )
         private set
 
+    /** True right after [streakHealer]'s `healerHeld` flips from false to true — drives the
+     * one-time [com.pirxhio.affirmity.ui.healer.StreakHealerGrantedScreen]. Never set on the first
+     * emission of a (re)started healer flow, so a cold start or sign-in/out session swap that
+     * happens to load an already-held healer doesn't replay the celebration. */
+    var healerJustGranted = mutableStateOf(false)
+        private set
+
+    /** Dismisses [healerJustGranted] once the user has seen the grant screen. */
+    fun acknowledgeHealerGrant() {
+        healerJustGranted.value = false
+    }
+
+    private var healerFlowInitialized = false
+        private set
+
     /** Rolling [STREAK_LOOKBACK_DAYS]-day window of mood check-ins, oldest first — the calendar
      * and "Resumen" stats derive everything else (average/distribution/trend) from this list. */
     var moodEntries = mutableStateListOf<DailyMoodEntity>()
@@ -296,6 +311,7 @@ class AffirmityAppState(
             // collector, so both subscriptions share the same swap-cancellation lifecycle: no
             // stale Room/Firestore collector for either flow can survive a sign-in/sign-out swap.
             session.flatMapLatest { s ->
+                healerFlowInitialized = false
                 combine(
                     s.completions.observeRange(windowStart - STREAK_LOOKBACK_DAYS, windowStart + 6),
                     s.healerUses.observeRange(healerStart, today),
@@ -314,13 +330,18 @@ class AffirmityAppState(
                     todayEpochDay = today,
                     isDone = { it.meditationDone },
                 ).copy(dayLabels = dayLabels)
-                streakHealer.value = StreakHealerStats.evaluate(
+                val newHealerState = StreakHealerStats.evaluate(
                     rows = rows,
                     uses = healerRows,
                     todayEpochDay = today,
                     startEpochDay = healerStart,
                     streakStartEpochDay = StreakHealerStats.rawStreakStartEpochDay(today),
                 )
+                if (healerFlowInitialized && newHealerState.healerHeld && !streakHealer.value.healerHeld) {
+                    healerJustGranted.value = true
+                }
+                healerFlowInitialized = true
+                streakHealer.value = newHealerState
             }
         }
         scope.launch {
