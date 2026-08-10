@@ -186,13 +186,30 @@ export const sendNotification = onRequest(async (req, res) => {
     return;
   }
 
-  const { uid, channel, title, body } = req.body as { uid: string; channel: string; title?: string; body?: string };
+  const { uid, channel, localDay, title, body } = req.body as {
+    uid: string;
+    channel: string;
+    localDay?: number;
+    title?: string;
+    body?: string;
+  };
   if (!uid || !channel) {
     res.status(400).send('Missing uid/channel');
     return;
   }
 
   const db = getFirestore();
+
+  // Reflection prompt is redundant once the user already logged today's mood between planning
+  // time (PLANNING_LOCAL_HOUR, early morning) and this task actually firing tonight.
+  if (channel === 'reflection' && typeof localDay === 'number') {
+    const moodDoc = await db.doc(`users/${uid}/dailyMoods/${localDay}`).get();
+    if (moodDoc.exists) {
+      res.status(200).send('Skipped: mood already logged');
+      return;
+    }
+  }
+
   const tokensSnap = await db.collection(`users/${uid}/fcmTokens`).get();
   const tokens = tokensSnap.docs.map((d: QueryDocumentSnapshot) => d.id);
 
