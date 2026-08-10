@@ -81,10 +81,18 @@ fun streakHealerUseFromMap(map: Map<String, Any?>): StreakHealerUseEntity = Stre
 
 private const val DEFAULT_START_MINUTE = 540 // 09:00 — mirrors NotificationPreferences' default.
 private const val DEFAULT_END_MINUTE = 1260 // 21:00
+private const val REFLECTION_DEFAULT_START_MINUTE = 1200 // 20:00 — mirrors NotificationPreferences' default.
+private const val REFLECTION_DEFAULT_END_MINUTE = 1380 // 23:00
 
 private fun enabledKey(channel: NotificationChannelSpec) = "${channel.prefsPrefix}_enabled"
 private fun startMinuteKey(channel: NotificationChannelSpec) = "${channel.prefsPrefix}_startMinute"
 private fun endMinuteKey(channel: NotificationChannelSpec) = "${channel.prefsPrefix}_endMinute"
+
+private fun defaultStartMinute(channel: NotificationChannelSpec) =
+    if (channel == NotificationChannelSpec.REFLECTION) REFLECTION_DEFAULT_START_MINUTE else DEFAULT_START_MINUTE
+
+private fun defaultEndMinute(channel: NotificationChannelSpec) =
+    if (channel == NotificationChannelSpec.REFLECTION) REFLECTION_DEFAULT_END_MINUTE else DEFAULT_END_MINUTE
 
 /**
  * Produces a partial map keyed by [channel]'s prefix so both channels can share one
@@ -98,6 +106,6 @@ fun channelSettingsToMap(channel: NotificationChannelSpec, settings: ChannelSett
 
 fun channelSettingsFromMap(channel: NotificationChannelSpec, map: Map<String, Any?>): ChannelSettings = ChannelSettings(
     enabled = map[enabledKey(channel)] as? Boolean ?: false,
-    startMinute = (map[startMinuteKey(channel)] as? Number)?.toInt() ?: DEFAULT_START_MINUTE,
-    endMinute = (map[endMinuteKey(channel)] as? Number)?.toInt() ?: DEFAULT_END_MINUTE,
+    startMinute = (map[startMinuteKey(channel)] as? Number)?.toInt() ?: defaultStartMinute(channel),
+    endMinute = (map[endMinuteKey(channel)] as? Number)?.toInt() ?: defaultEndMinute(channel),
 )

@@ -24,8 +24,8 @@ class NotificationPreferences(private val context: Context) {
         context.notificationDataStore.data.map {
             ChannelSettings(
                 enabled = it[enabledKey(channel)] ?: false,
-                startMinute = it[startMinuteKey(channel)] ?: DEFAULT_START_MINUTE,
-                endMinute = it[endMinuteKey(channel)] ?: DEFAULT_END_MINUTE,
+                startMinute = it[startMinuteKey(channel)] ?: defaultStartMinute(channel),
+                endMinute = it[endMinuteKey(channel)] ?: defaultEndMinute(channel),
             )
         }
 
@@ -53,8 +53,16 @@ class NotificationPreferences(private val context: Context) {
     private fun endMinuteKey(channel: NotificationChannelSpec) =
         intPreferencesKey("${channel.prefsPrefix}_end_minute")
 
+    private fun defaultStartMinute(channel: NotificationChannelSpec) =
+        if (channel == NotificationChannelSpec.REFLECTION) REFLECTION_DEFAULT_START_MINUTE else DEFAULT_START_MINUTE
+
+    private fun defaultEndMinute(channel: NotificationChannelSpec) =
+        if (channel == NotificationChannelSpec.REFLECTION) REFLECTION_DEFAULT_END_MINUTE else DEFAULT_END_MINUTE
+
     private companion object {
         const val DEFAULT_START_MINUTE = 540 // 09:00
         const val DEFAULT_END_MINUTE = 1260 // 21:00
+        const val REFLECTION_DEFAULT_START_MINUTE = 1200 // 20:00 — reflection reads better at night
+        const val REFLECTION_DEFAULT_END_MINUTE = 1380 // 23:00
     }
 }

@@ -27,6 +27,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,6 +55,8 @@ private enum class ResumenPeriod { SEMANA, MES }
 fun MoodScreen(
     moodEntries: List<DailyMoodEntity>,
     onSaveMood: (epochDay: Long, moodValue: Int, note: String?) -> Unit,
+    initialMoodValue: Int? = null,
+    onInitialMoodConsumed: () -> Unit = {},
 ) {
     // Not `remember`-keyed: `moodEntries` is a SnapshotStateList mutated in place (clear + addAll),
     // so its reference never changes and a remember(moodEntries) key would never invalidate,
@@ -74,6 +77,20 @@ fun MoodScreen(
     }
     var period by remember { mutableStateOf(ResumenPeriod.SEMANA) }
     var selectedDay by remember { mutableStateOf<SelectedDay?>(null) }
+
+    // Reflection notification's mood-value actions land here with a pre-picked value — open
+    // today's sheet with it selected instead of making the user find today's cell again.
+    LaunchedEffect(initialMoodValue) {
+        if (initialMoodValue != null) {
+            selectedDay = SelectedDay(
+                epochDay = todayEpochDay,
+                label = formatDayLabel(Calendar.getInstance(), todayEpochDay, todayEpochDay),
+                moodValue = initialMoodValue,
+                note = moodByDay[todayEpochDay]?.note,
+            )
+            onInitialMoodConsumed()
+        }
+    }
 
     val monthDays = remember(visibleMonth) { monthDaysWithEpoch(visibleMonth) }
     val monthEntries = monthDays.mapNotNull { moodByDay[it.epochDay] }

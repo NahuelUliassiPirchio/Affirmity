@@ -44,6 +44,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.pirxhio.affirmity.auth.AuthState
+import com.pirxhio.affirmity.data.MOOD_MAX
 import com.pirxhio.affirmity.data.rememberAffirmityAppState
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
@@ -59,14 +60,24 @@ import com.pirxhio.affirmity.ui.theme.AffirmityTheme
 /** Extra key a launcher (e.g. the home-screen widget) sets to pick the initial [AppDestinations]. */
 const val EXTRA_START_DESTINATION = "start_destination"
 
+/** Extra key the reflection notification's mood-value actions set to pre-select a value in
+ * [com.pirxhio.affirmity.ui.mood.MoodScreen]'s today sheet. */
+const val EXTRA_MOOD_VALUE = "mood_value"
+
 /** Unknown or absent values fall back to [AppDestinations.AFIRMACIONES] (D10). */
 private fun resolveStartDestination(intent: Intent?): AppDestinations {
     val raw = intent?.getStringExtra(EXTRA_START_DESTINATION)
     return AppDestinations.entries.find { it.name == raw } ?: AppDestinations.AFIRMACIONES
 }
 
+private fun resolveMoodValue(intent: Intent?): Int? {
+    val value = intent?.getIntExtra(EXTRA_MOOD_VALUE, -1) ?: -1
+    return value.takeIf { it in 1..MOOD_MAX }
+}
+
 class MainActivity : ComponentActivity() {
     private val startDestination = mutableStateOf(AppDestinations.AFIRMACIONES)
+    private val startMoodValue = mutableStateOf<Int?>(null)
 
     /** Keeps the native cold-start splash (Theme.Affirmity.Starting) on screen until onboarding
      * state resolves, so there's no blank gap between the splash and the first real screen. */
@@ -78,10 +89,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         startDestination.value = resolveStartDestination(intent)
+        startMoodValue.value = resolveMoodValue(intent)
         setContent {
             AffirmityTheme {
                 AffirmityApp(
                     startDestination = startDestination.value,
+                    startMoodValue = startMoodValue.value,
                     onOnboardingStateResolved = { keepSplashOnScreen = false },
                 )
             }
@@ -92,6 +105,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         startDestination.value = resolveStartDestination(intent)
+        startMoodValue.value = resolveMoodValue(intent)
     }
 }
 
@@ -100,11 +114,14 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AffirmityApp(
     startDestination: AppDestinations = AppDestinations.AFIRMACIONES,
+    startMoodValue: Int? = null,
     onOnboardingStateResolved: () -> Unit = {},
 ) {
     var currentDestination by rememberSaveable { mutableStateOf(startDestination) }
-    LaunchedEffect(startDestination) {
+    var pendingMoodValue by rememberSaveable { mutableStateOf<Int?>(null) }
+    LaunchedEffect(startDestination, startMoodValue) {
         currentDestination = startDestination
+        if (startMoodValue != null) pendingMoodValue = startMoodValue
     }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showNotificationDebug by rememberSaveable { mutableStateOf(false) }
@@ -175,6 +192,7 @@ fun AffirmityApp(
                 entries = appState.notificationDebugEntries,
                 onClear = { appState.clearNotificationDebugLog() },
                 onSendTestNotification = { appState.sendTestNotification() },
+                onSendTestReflectionNotification = { appState.sendTestReflectionNotification() },
             )
         }
         return
@@ -295,6 +313,8 @@ fun AffirmityApp(
                 AppDestinations.ANIMO -> MoodScreen(
                     moodEntries = appState.moodEntries,
                     onSaveMood = { epochDay, moodValue, note -> appState.recordMood(epochDay, moodValue, note) },
+                    initialMoodValue = pendingMoodValue,
+                    onInitialMoodConsumed = { pendingMoodValue = null },
                 )
             }
 

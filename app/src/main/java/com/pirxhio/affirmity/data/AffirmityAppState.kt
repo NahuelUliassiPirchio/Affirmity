@@ -441,6 +441,19 @@ class AffirmityAppState(
         }
     }
 
+    /** Same as [sendTestNotification] but on the reflection channel, so the mood-value action
+     * buttons (and the tap-to-open-Ánimo behavior) can be tried without waiting for the nightly
+     * window. */
+    fun sendTestReflectionNotification() {
+        scope.launch {
+            notifier.notify(
+                channel = NotificationChannelSpec.REFLECTION,
+                title = "Hoy, ¿cómo te sentiste?",
+                body = "Notificación de prueba: tocá un emoji para abrir tu ánimo de hoy con esa opción elegida.",
+            )
+        }
+    }
+
     fun setChannelEnabled(channel: NotificationChannelSpec, enabled: Boolean) {
         scope.launch {
             ready().notifications.setEnabled(channel, enabled)
