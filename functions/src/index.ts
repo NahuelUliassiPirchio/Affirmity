@@ -142,6 +142,9 @@ async function loadActiveUserInputs(): Promise<UserPlanInput[]> {
         reminderSegments: Array.isArray(data.reminder_segments) ? data.reminder_segments : [],
         reflectionSegments: Array.isArray(data.reflection_segments) ? data.reflection_segments : [],
         moodSegments: Array.isArray(data.mood_segments) ? data.mood_segments : [],
+        quietHoursEnabled: Boolean(data.quietHours_enabled),
+        quietHoursStartMinute: Number(data.quietHours_startMinute ?? 1380),
+        quietHoursEndMinute: Number(data.quietHours_endMinute ?? 420),
         timeZone: zone,
       },
       completions: completionsSnap.docs.map((d: QueryDocumentSnapshot) => ({

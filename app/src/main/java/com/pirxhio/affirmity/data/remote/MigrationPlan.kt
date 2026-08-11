@@ -4,6 +4,7 @@ import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
+import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 
@@ -22,6 +23,7 @@ data class MigrationSnapshot(
     val healerUses: List<StreakHealerUseEntity> = emptyList(),
     val meditationDurationSeconds: Int?,
     val notificationSettings: Map<NotificationChannelSpec, ChannelSettings>,
+    val quietHours: QuietHoursSettings,
     val migratedAt: Long,
 )
 
@@ -63,6 +65,7 @@ object MigrationPlan {
         snapshot.notificationSettings.forEach { (channel, settings) ->
             fields += channelSettingsToMap(channel, settings)
         }
+        fields += quietHoursSettingsToMap(snapshot.quietHours)
         return fields
     }
 

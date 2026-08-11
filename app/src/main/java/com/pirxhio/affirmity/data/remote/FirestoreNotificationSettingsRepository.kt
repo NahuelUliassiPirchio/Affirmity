@@ -5,6 +5,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DaySegment
+import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.repository.NotificationSettingsRepository
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import kotlinx.coroutines.channels.awaitClose
@@ -42,6 +43,31 @@ class FirestoreNotificationSettingsRepository(
     override suspend fun setSegments(channel: NotificationChannelSpec, segments: Set<DaySegment>) {
         document().set(
             mapOf(segmentsKey(channel) to segments.map { it.key }),
+            SetOptions.merge(),
+        ).await()
+    }
+
+    override fun observeQuietHours(): Flow<QuietHoursSettings> = callbackFlow {
+        val registration = document().addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                close(error)
+                return@addSnapshotListener
+            }
+            trySend(quietHoursSettingsFromMap(snapshot?.data.orEmpty()))
+        }
+        awaitClose { registration.remove() }
+    }
+
+    override suspend fun setQuietHoursEnabled(enabled: Boolean) {
+        document().set(mapOf("quietHours_enabled" to enabled), SetOptions.merge()).await()
+    }
+
+    override suspend fun setQuietHoursWindow(startMinute: Int, endMinute: Int) {
+        document().set(
+            mapOf(
+                "quietHours_startMinute" to startMinute,
+                "quietHours_endMinute" to endMinute,
+            ),
             SetOptions.merge(),
         ).await()
     }

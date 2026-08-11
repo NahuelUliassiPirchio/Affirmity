@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { DAY_SEGMENTS, segmentSlots, slotInstant } from '../src/schedule';
+import { DAY_SEGMENTS, isWithinQuietHours, segmentSlots, slotInstant } from '../src/schedule';
 
 // Deterministic LCG so `slotInstant`'s rng argument is reproducible in tests -- mirrors the
 // seeded `kotlin.random.Random(seed)` used in the retired NotificationScheduleTest.
@@ -53,6 +53,29 @@ describe('segmentSlots', () => {
     const tasks = segmentSlots(TEST_LOCAL_DAY, ZONE, ['not-a-segment'], 1, 'reminder', seededRng(4));
 
     expect(tasks).toEqual([]);
+  });
+});
+
+describe('isWithinQuietHours', () => {
+  it('matches a normal, non-wrapping range', () => {
+    expect(isWithinQuietHours(12 * 60, 9 * 60, 21 * 60)).toBe(true);
+    expect(isWithinQuietHours(8 * 60, 9 * 60, 21 * 60)).toBe(false);
+    expect(isWithinQuietHours(21 * 60, 9 * 60, 21 * 60)).toBe(false); // end exclusive
+  });
+
+  it('matches a wrapping range on both sides of midnight', () => {
+    expect(isWithinQuietHours(23 * 60 + 30, 23 * 60, 7 * 60)).toBe(true);
+    expect(isWithinQuietHours(3 * 60, 23 * 60, 7 * 60)).toBe(true);
+    expect(isWithinQuietHours(12 * 60, 23 * 60, 7 * 60)).toBe(false);
+  });
+
+  it('is inclusive of the start minute and exclusive of the end minute in a wrapping range', () => {
+    expect(isWithinQuietHours(23 * 60, 23 * 60, 7 * 60)).toBe(true);
+    expect(isWithinQuietHours(7 * 60, 23 * 60, 7 * 60)).toBe(false);
+  });
+
+  it('a zero-length window never mutes anything', () => {
+    expect(isWithinQuietHours(12 * 60, 9 * 60, 9 * 60)).toBe(false);
   });
 });
 

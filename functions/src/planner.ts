@@ -5,7 +5,8 @@
  * for one user never abort the pass (`planAllUsers`'s per-user try/catch).
  */
 
-import { segmentSlots, slotInstant } from './schedule';
+import { localMinuteOfDay } from './localDay';
+import { isWithinQuietHours, segmentSlots, slotInstant } from './schedule';
 import { currentStreak, shouldFireStreakAlert, type Completion } from './streak';
 import { shouldFireHealerAlert, type HealerUse } from './healer';
 
@@ -24,6 +25,9 @@ export interface NotificationSettings {
   reminderSegments: string[];
   reflectionSegments: string[];
   moodSegments: string[];
+  quietHoursEnabled: boolean;
+  quietHoursStartMinute: number;
+  quietHoursEndMinute: number;
   timeZone: string | null;
 }
 
@@ -113,7 +117,15 @@ export function planUserTasks(input: UserPlanInput, rng: () => number = Math.ran
     });
   }
 
-  return tasks.map((task) => ({ ...task, uid }));
+  const filtered = settings.quietHoursEnabled
+    ? tasks.filter((task) => !isWithinQuietHours(
+        localMinuteOfDay(task.atMillis, zone),
+        settings.quietHoursStartMinute,
+        settings.quietHoursEndMinute,
+      ))
+    : tasks;
+
+  return filtered.map((task) => ({ ...task, uid }));
 }
 
 /** Plans and enqueues one user's tasks for `input.localDay`; idempotent per `{uid, localDay}`. */

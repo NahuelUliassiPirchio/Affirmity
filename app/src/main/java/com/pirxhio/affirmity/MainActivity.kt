@@ -229,6 +229,7 @@ fun AffirmityApp(
                 reminderSettings = appState.reminderSettings.value,
                 reflectionSettings = appState.reflectionSettings.value,
                 moodSettings = appState.moodSettings.value,
+                quietHoursSettings = appState.quietHoursSettings.value,
                 notificationsPermissionGranted = notificationsPermissionGranted,
                 authState = appState.authState.value,
                 syncError = appState.syncError.value,
@@ -268,6 +269,12 @@ fun AffirmityApp(
                         NotificationChannelSpec.MOOD,
                         segments
                     )
+                },
+                onQuietHoursEnabledChanged = { enabled ->
+                    appState.setQuietHoursEnabled(enabled)
+                },
+                onQuietHoursWindowChanged = { start, end ->
+                    appState.setQuietHoursWindow(start, end)
                 },
                 onOpenNotificationDebug = { showNotificationDebug = true },
             )

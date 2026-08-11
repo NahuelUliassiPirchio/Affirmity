@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.data.local
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
@@ -15,6 +16,15 @@ private val Context.notificationDataStore by preferencesDataStore(name = "notifi
 data class ChannelSettings(
     val enabled: Boolean,
     val segments: Set<DaySegment>,
+)
+
+/** Global "mute everything" window (minutes since local midnight), independent of any channel.
+ * [endMinute] may be less than [startMinute] to express a range that wraps past midnight
+ * (e.g. 23:00-07:00). */
+data class QuietHoursSettings(
+    val enabled: Boolean,
+    val startMinute: Int,
+    val endMinute: Int,
 )
 
 class NotificationPreferences(private val context: Context) {
@@ -42,6 +52,26 @@ class NotificationPreferences(private val context: Context) {
         }
     }
 
+    fun observeQuietHours(): Flow<QuietHoursSettings> =
+        context.notificationDataStore.data.map {
+            QuietHoursSettings(
+                enabled = it[QUIET_HOURS_ENABLED_KEY] ?: false,
+                startMinute = it[QUIET_HOURS_START_KEY] ?: DEFAULT_QUIET_HOURS_START,
+                endMinute = it[QUIET_HOURS_END_KEY] ?: DEFAULT_QUIET_HOURS_END,
+            )
+        }
+
+    suspend fun setQuietHoursEnabled(enabled: Boolean) {
+        context.notificationDataStore.edit { it[QUIET_HOURS_ENABLED_KEY] = enabled }
+    }
+
+    suspend fun setQuietHoursWindow(startMinute: Int, endMinute: Int) {
+        context.notificationDataStore.edit {
+            it[QUIET_HOURS_START_KEY] = startMinute
+            it[QUIET_HOURS_END_KEY] = endMinute
+        }
+    }
+
     private fun enabledKey(channel: NotificationChannelSpec) =
         booleanPreferencesKey("${channel.prefsPrefix}_enabled")
 
@@ -59,5 +89,11 @@ class NotificationPreferences(private val context: Context) {
     private companion object {
         val DEFAULT_REMINDER_SEGMENTS = setOf(DaySegment.MANANA, DaySegment.TARDE)
         val DEFAULT_NIGHT_SEGMENTS = setOf(DaySegment.NOCHE)
+
+        val QUIET_HOURS_ENABLED_KEY = booleanPreferencesKey("quiet_hours_enabled")
+        val QUIET_HOURS_START_KEY = intPreferencesKey("quiet_hours_start_minute")
+        val QUIET_HOURS_END_KEY = intPreferencesKey("quiet_hours_end_minute")
+        const val DEFAULT_QUIET_HOURS_START = 1380 // 23:00
+        const val DEFAULT_QUIET_HOURS_END = 420 // 07:00
     }
 }

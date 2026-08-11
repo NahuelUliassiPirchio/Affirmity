@@ -42,6 +42,9 @@ const baseInput: UserPlanInput = {
     reminderSegments: ['manana', 'tarde'],
     reflectionSegments: [],
     moodSegments: [],
+    quietHoursEnabled: false,
+    quietHoursStartMinute: 0,
+    quietHoursEndMinute: 0,
     timeZone: 'UTC',
   },
   completions: [],
@@ -58,6 +61,26 @@ describe('planAndEnqueueUser', () => {
     expect(result.status).toBe('planned');
     expect(enqueuer.calls).toHaveLength(3);
     expect(store.plans.has('user-1-19000')).toBe(true);
+  });
+
+  it('enqueues nothing when quiet hours cover the whole selected segment span', async () => {
+    const store = makeStore();
+    const enqueuer = makeEnqueuer();
+
+    const input: UserPlanInput = {
+      ...baseInput,
+      settings: {
+        ...baseInput.settings,
+        quietHoursEnabled: true,
+        quietHoursStartMinute: 5 * 60,
+        quietHoursEndMinute: 19 * 60,
+      },
+    };
+
+    const result = await planAndEnqueueUser(input, store, enqueuer);
+
+    expect(result.status).toBe('planned');
+    expect(enqueuer.calls).toHaveLength(0);
   });
 
   // Design.md: "Planner idempotency ... a second run for the same localDay enqueues nothing".

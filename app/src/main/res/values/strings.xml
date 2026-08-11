@@ -94,6 +94,12 @@
     <string name="settings_segment_manana">Mañana (06–12)</string>
     <string name="settings_segment_tarde">Tarde (12–18)</string>
     <string name="settings_segment_noche">Noche (18–24)</string>
+    <string name="settings_quiet_hours_label">Modo silencio</string>
+    <string name="settings_quiet_hours_description">Silenciar todas las notificaciones durante este rango</string>
+    <string name="settings_quiet_hours_start_label">Desde</string>
+    <string name="settings_quiet_hours_end_label">Hasta</string>
+    <string name="settings_time_picker_cancel">Cancelar</string>
+    <string name="settings_time_picker_ok">OK</string>
     <string name="settings_permission_banner_text">Las notificaciones están desactivadas en el sistema</string>
     <string name="settings_permission_banner_action">Abrir ajustes</string>
 

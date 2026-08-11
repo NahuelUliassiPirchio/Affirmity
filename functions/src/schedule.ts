@@ -51,6 +51,18 @@ export function segmentSlots(
 }
 
 /**
+ * Whether `minuteOfDay` falls inside `[startMinute, endMinute)`, wrapping past midnight when
+ * `startMinute > endMinute` (e.g. 23:00-07:00 covers 23:00-23:59 and 00:00-06:59). A zero-length
+ * window (`startMinute === endMinute`) never mutes anything.
+ */
+export function isWithinQuietHours(minuteOfDay: number, startMinute: number, endMinute: number): boolean {
+  if (startMinute === endMinute) return false;
+  return startMinute < endMinute
+    ? minuteOfDay >= startMinute && minuteOfDay < endMinute
+    : minuteOfDay >= startMinute || minuteOfDay < endMinute;
+}
+
+/**
  * A random instant inside `[startMinute, endMinute]` (minutes since local midnight) on the given
  * `localDay`, in `zone`. `rng` must return a value in `[0, 1)` (defaults to `Math.random`); pass a
  * seeded generator for deterministic tests.

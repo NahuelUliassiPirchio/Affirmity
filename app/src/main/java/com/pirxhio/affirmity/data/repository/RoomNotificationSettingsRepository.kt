@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.data.repository
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DaySegment
 import com.pirxhio.affirmity.data.local.NotificationPreferences
+import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import kotlinx.coroutines.flow.Flow
 
@@ -21,6 +22,15 @@ class RoomNotificationSettingsRepository(
 
     override suspend fun setSegments(channel: NotificationChannelSpec, segments: Set<DaySegment>) =
         notificationPreferences.setSegments(channel, segments)
+
+    override fun observeQuietHours(): Flow<QuietHoursSettings> =
+        notificationPreferences.observeQuietHours()
+
+    override suspend fun setQuietHoursEnabled(enabled: Boolean) =
+        notificationPreferences.setQuietHoursEnabled(enabled)
+
+    override suspend fun setQuietHoursWindow(startMinute: Int, endMinute: Int) =
+        notificationPreferences.setQuietHoursWindow(startMinute, endMinute)
 
     /**
      * No-op: signed-out users have no server-driven scheduling to feed, so there is nothing to

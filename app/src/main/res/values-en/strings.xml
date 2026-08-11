@@ -94,6 +94,12 @@
     <string name="settings_segment_manana">Morning (6 AM–12 PM)</string>
     <string name="settings_segment_tarde">Afternoon (12–6 PM)</string>
     <string name="settings_segment_noche">Night (6 PM–12 AM)</string>
+    <string name="settings_quiet_hours_label">Quiet Hours</string>
+    <string name="settings_quiet_hours_description">Mute all notifications during this range</string>
+    <string name="settings_quiet_hours_start_label">From</string>
+    <string name="settings_quiet_hours_end_label">To</string>
+    <string name="settings_time_picker_cancel">Cancel</string>
+    <string name="settings_time_picker_ok">OK</string>
     <string name="settings_permission_banner_text">Notifications are turned off in system settings</string>
     <string name="settings_permission_banner_action">Open settings</string>
 

@@ -13,26 +13,36 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.auth.AuthState
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DaySegment
+import com.pirxhio.affirmity.data.local.QuietHoursSettings
 
 /** Follow-system default plus the two supported explicit languages (spec: `In-App Language
  * Selection`). Maps to/from a BCP-47 language tag rather than [LocaleListCompat] directly so the
@@ -62,6 +72,7 @@ fun SettingsScreen(
     reminderSettings: ChannelSettings,
     reflectionSettings: ChannelSettings,
     moodSettings: ChannelSettings,
+    quietHoursSettings: QuietHoursSettings,
     notificationsPermissionGranted: Boolean,
     authState: AuthState,
     syncError: String? = null,
@@ -71,6 +82,8 @@ fun SettingsScreen(
     onReflectionSegmentsChanged: (Set<DaySegment>) -> Unit,
     onMoodEnabledChanged: (Boolean) -> Unit,
     onMoodSegmentsChanged: (Set<DaySegment>) -> Unit,
+    onQuietHoursEnabledChanged: (Boolean) -> Unit,
+    onQuietHoursWindowChanged: (startMinute: Int, endMinute: Int) -> Unit,
     onOpenNotificationDebug: () -> Unit,
     onSignOutClicked: () -> Unit,
     modifier: Modifier = Modifier,
@@ -110,6 +123,14 @@ fun SettingsScreen(
                 settings = moodSettings,
                 onEnabledChanged = onMoodEnabledChanged,
                 onSegmentsChanged = onMoodSegmentsChanged,
+            )
+        }
+
+        item {
+            QuietHoursCard(
+                settings = quietHoursSettings,
+                onEnabledChanged = onQuietHoursEnabledChanged,
+                onWindowChanged = onQuietHoursWindowChanged,
             )
         }
 
@@ -254,3 +275,97 @@ private fun segmentLabelRes(segment: DaySegment): Int = when (segment) {
     DaySegment.TARDE -> R.string.settings_segment_tarde
     DaySegment.NOCHE -> R.string.settings_segment_noche
 }
+
+/**
+ * Global mute-everything window with a free-form start/end time range (unlike the fixed day-part
+ * chips above): [endMinute] may be less than [startMinute] to express a range that wraps past
+ * midnight (e.g. 23:00-07:00), so this deliberately does NOT clamp end >= start.
+ */
+@Composable
+private fun QuietHoursCard(
+    settings: QuietHoursSettings,
+    onEnabledChanged: (Boolean) -> Unit,
+    onWindowChanged: (startMinute: Int, endMinute: Int) -> Unit,
+) {
+    var editingStart by remember { mutableStateOf(false) }
+    var editingEnd by remember { mutableStateOf(false) }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(text = stringResource(id = R.string.settings_quiet_hours_label), style = MaterialTheme.typography.titleMedium)
+                Switch(checked = settings.enabled, onCheckedChange = onEnabledChanged)
+            }
+            Text(
+                text = stringResource(id = R.string.settings_quiet_hours_description),
+                style = MaterialTheme.typography.bodySmall,
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TextButton(onClick = { editingStart = true }) {
+                    Text("${stringResource(id = R.string.settings_quiet_hours_start_label)}: ${formatMinute(settings.startMinute)}")
+                }
+                TextButton(onClick = { editingEnd = true }) {
+                    Text("${stringResource(id = R.string.settings_quiet_hours_end_label)}: ${formatMinute(settings.endMinute)}")
+                }
+            }
+        }
+    }
+
+    if (editingStart) {
+        QuietHoursTimePickerDialog(
+            initialMinute = settings.startMinute,
+            onDismiss = { editingStart = false },
+            onConfirm = { newStart ->
+                editingStart = false
+                onWindowChanged(newStart, settings.endMinute)
+            },
+        )
+    }
+
+    if (editingEnd) {
+        QuietHoursTimePickerDialog(
+            initialMinute = settings.endMinute,
+            onDismiss = { editingEnd = false },
+            onConfirm = { newEnd ->
+                editingEnd = false
+                onWindowChanged(settings.startMinute, newEnd)
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun QuietHoursTimePickerDialog(
+    initialMinute: Int,
+    onDismiss: () -> Unit,
+    onConfirm: (Int) -> Unit,
+) {
+    val state = rememberTimePickerState(
+        initialHour = initialMinute / 60,
+        initialMinute = initialMinute % 60,
+        is24Hour = true,
+    )
+    Dialog(onDismissRequest = onDismiss) {
+        Card {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                TimePicker(state = state)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(onClick = onDismiss) { Text(stringResource(id = R.string.settings_time_picker_cancel)) }
+                    Button(onClick = { onConfirm(state.hour * 60 + state.minute) }) { Text(stringResource(id = R.string.settings_time_picker_ok)) }
+                }
+            }
+        }
+    }
+}
+
+private fun formatMinute(minute: Int): String =
+    "%02d:%02d".format(minute / 60, minute % 60)

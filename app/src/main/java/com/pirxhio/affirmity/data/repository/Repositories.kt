@@ -5,6 +5,7 @@ import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
 import com.pirxhio.affirmity.data.local.DaySegment
+import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import kotlinx.coroutines.flow.Flow
@@ -58,6 +59,11 @@ interface NotificationSettingsRepository {
     fun observe(channel: NotificationChannelSpec): Flow<ChannelSettings>
     suspend fun setEnabled(channel: NotificationChannelSpec, enabled: Boolean)
     suspend fun setSegments(channel: NotificationChannelSpec, segments: Set<DaySegment>)
+
+    /** Global "mute everything" window, independent of any channel. */
+    fun observeQuietHours(): Flow<QuietHoursSettings>
+    suspend fun setQuietHoursEnabled(enabled: Boolean)
+    suspend fun setQuietHoursWindow(startMinute: Int, endMinute: Int)
 
     /**
      * Persists the device's IANA timezone id so the server planner can compute this user's

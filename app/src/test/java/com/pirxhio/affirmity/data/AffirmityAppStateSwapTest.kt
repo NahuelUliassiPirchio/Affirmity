@@ -12,6 +12,7 @@ import com.pirxhio.affirmity.data.local.DailyViewCount
 import com.pirxhio.affirmity.data.local.DaySegment
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
+import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.DocWrite
@@ -38,6 +39,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -122,6 +124,10 @@ private class FakeNotificationSettingsRepository(
     override fun observe(channel: NotificationChannelSpec): Flow<ChannelSettings> = flow
     override suspend fun setEnabled(channel: NotificationChannelSpec, enabled: Boolean) = Unit
     override suspend fun setSegments(channel: NotificationChannelSpec, segments: Set<DaySegment>) = Unit
+    override fun observeQuietHours(): Flow<QuietHoursSettings> =
+        flowOf(QuietHoursSettings(enabled = false, startMinute = 1380, endMinute = 420))
+    override suspend fun setQuietHoursEnabled(enabled: Boolean) = Unit
+    override suspend fun setQuietHoursWindow(startMinute: Int, endMinute: Int) = Unit
     override suspend fun setTimeZone(zoneId: String) = Unit
 }
 

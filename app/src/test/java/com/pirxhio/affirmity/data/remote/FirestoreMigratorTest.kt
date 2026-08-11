@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.data.remote
 
+import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -25,6 +26,7 @@ private fun emptySnapshot(uid: String) = MigrationSnapshot(
     moods = emptyList(),
     meditationDurationSeconds = null,
     notificationSettings = emptyMap(),
+    quietHours = QuietHoursSettings(enabled = false, startMinute = 1380, endMinute = 420),
     migratedAt = 1_700_000_000_000L,
 )
 

@@ -35,6 +35,7 @@ import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.NotificationLogEntry
 import com.pirxhio.affirmity.data.local.NotificationPreferences
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
+import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.FcmTokenRepository
 import com.pirxhio.affirmity.data.remote.FirestoreAffirmationRepository
@@ -228,6 +229,9 @@ class AffirmityAppState(
     var moodSettings = mutableStateOf(ChannelSettings(enabled = false, segments = emptySet()))
         private set
 
+    var quietHoursSettings = mutableStateOf(QuietHoursSettings(enabled = false, startMinute = 1380, endMinute = 420))
+        private set
+
     var notificationDebugEntries = mutableStateListOf<NotificationLogEntry>()
         private set
 
@@ -293,6 +297,7 @@ class AffirmityAppState(
                 NotificationChannelSpec.REFLECTION to local.notifications.observe(NotificationChannelSpec.REFLECTION).first(),
                 NotificationChannelSpec.MOOD to local.notifications.observe(NotificationChannelSpec.MOOD).first(),
             ),
+            quietHours = local.notifications.observeQuietHours().first(),
             migratedAt = System.currentTimeMillis(),
         )
     }
@@ -382,6 +387,11 @@ class AffirmityAppState(
             session.flatMapLatest { it.notifications.observe(NotificationChannelSpec.MOOD) }
                 .catch { error -> Log.e(TAG, "mood settings flow failed", error) }
                 .collect { moodSettings.value = it }
+        }
+        scope.launch {
+            session.flatMapLatest { it.notifications.observeQuietHours() }
+                .catch { error -> Log.e(TAG, "quiet hours settings flow failed", error) }
+                .collect { quietHoursSettings.value = it }
         }
         scope.launch {
             // Signed-in FCM token registration + IANA timezone sync (design.md's "Timezone"
@@ -506,6 +516,18 @@ class AffirmityAppState(
         if (channel == NotificationChannelSpec.STREAK) return
         scope.launch {
             ready().notifications.setSegments(channel, segments)
+        }
+    }
+
+    fun setQuietHoursEnabled(enabled: Boolean) {
+        scope.launch {
+            ready().notifications.setQuietHoursEnabled(enabled)
+        }
+    }
+
+    fun setQuietHoursWindow(startMinute: Int, endMinute: Int) {
+        scope.launch {
+            ready().notifications.setQuietHoursWindow(startMinute, endMinute)
         }
     }
 

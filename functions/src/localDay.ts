@@ -99,3 +99,9 @@ export function utcMillisToLocalEpochDay(utcMillis: number, zone: string): numbe
 export function localHourInZone(utcMillis: number, zone: string): number {
   return getZonedParts(utcMillis, zone).hour;
 }
+
+/** The local minute-of-day (0-1439) that `utcMillis` falls on when viewed in `zone`. */
+export function localMinuteOfDay(utcMillis: number, zone: string): number {
+  const zoned = getZonedParts(utcMillis, zone);
+  return zoned.hour * 60 + zoned.minute;
+}

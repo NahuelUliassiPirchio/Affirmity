@@ -5,6 +5,7 @@ import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
 import com.pirxhio.affirmity.data.local.DaySegment
+import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 
@@ -106,4 +107,23 @@ fun channelSettingsFromMap(channel: NotificationChannelSpec, map: Map<String, An
         ?.mapNotNull { key -> DaySegment.entries.find { it.key == key } }
         ?.toSet()
         ?: defaultSegments(channel),
+)
+
+private const val QUIET_HOURS_ENABLED_FIELD = "quietHours_enabled"
+private const val QUIET_HOURS_START_FIELD = "quietHours_startMinute"
+private const val QUIET_HOURS_END_FIELD = "quietHours_endMinute"
+private const val DEFAULT_QUIET_HOURS_START = 1380 // 23:00 — mirrors NotificationPreferences' default.
+private const val DEFAULT_QUIET_HOURS_END = 420 // 07:00
+
+/** Bare (non-channel-prefixed) fields on the same `settings/preferences` document. */
+fun quietHoursSettingsToMap(settings: QuietHoursSettings): Map<String, Any> = mapOf(
+    QUIET_HOURS_ENABLED_FIELD to settings.enabled,
+    QUIET_HOURS_START_FIELD to settings.startMinute,
+    QUIET_HOURS_END_FIELD to settings.endMinute,
+)
+
+fun quietHoursSettingsFromMap(map: Map<String, Any?>): QuietHoursSettings = QuietHoursSettings(
+    enabled = map[QUIET_HOURS_ENABLED_FIELD] as? Boolean ?: false,
+    startMinute = (map[QUIET_HOURS_START_FIELD] as? Number)?.toInt() ?: DEFAULT_QUIET_HOURS_START,
+    endMinute = (map[QUIET_HOURS_END_FIELD] as? Number)?.toInt() ?: DEFAULT_QUIET_HOURS_END,
 )
