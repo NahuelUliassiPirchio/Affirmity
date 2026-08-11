@@ -19,18 +19,23 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Mood
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.material3.rememberBottomSheetScaffoldState
+import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,6 +56,9 @@ import com.pirxhio.affirmity.data.rememberAffirmityAppState
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
 import com.pirxhio.affirmity.ui.components.FloatingStatusOverlay
+import com.pirxhio.affirmity.ui.groups.AffirmationGroupAccess
+import com.pirxhio.affirmity.ui.groups.AffirmationGroupSelectorSheet
+import com.pirxhio.affirmity.ui.groups.selectableAffirmationGroups
 import com.pirxhio.affirmity.ui.healer.StreakHealerGrantedScreen
 import com.pirxhio.affirmity.ui.meditation.MeditationScreen
 import com.pirxhio.affirmity.ui.mood.MoodScreen
@@ -59,6 +67,7 @@ import com.pirxhio.affirmity.ui.progress.ProgressScreen
 import com.pirxhio.affirmity.ui.settings.NotificationDebugScreen
 import com.pirxhio.affirmity.ui.settings.SettingsScreen
 import com.pirxhio.affirmity.ui.theme.AffirmityTheme
+import kotlinx.coroutines.launch
 
 /** Extra key a launcher (e.g. the home-screen widget) sets to pick the initial [AppDestinations]. */
 const val EXTRA_START_DESTINATION = "start_destination"
@@ -311,10 +320,54 @@ fun AffirmityApp(
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
             Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
             when (currentDestination) {
-                AppDestinations.AFIRMACIONES -> AffirmationsScreen(
-                    affirmations = appState.affirmations,
-                    onAffirmationViewed = { appState.recordAffirmationViewed() }
-                )
+                AppDestinations.AFIRMACIONES -> {
+                    val sheetState = rememberStandardBottomSheetState(
+                        initialValue = SheetValue.Expanded,
+                        skipHiddenState = true,
+                        confirmValueChange = { target ->
+                            target != SheetValue.PartiallyExpanded || appState.isDraftSelectionValid
+                        },
+                    )
+                    val scaffoldState = rememberBottomSheetScaffoldState(bottomSheetState = sheetState)
+                    val sheetScope = rememberCoroutineScope()
+
+                    BottomSheetScaffold(
+                        scaffoldState = scaffoldState,
+                        sheetPeekHeight = 96.dp,
+                        sheetDragHandle = null,
+                        sheetContent = {
+                            AffirmationGroupSelectorSheet(
+                                groups = selectableAffirmationGroups(),
+                                selectedIds = appState.draftGroupIds.value,
+                                isValid = appState.isDraftSelectionValid,
+                                isExpanded = sheetState.currentValue == SheetValue.Expanded,
+                                onToggle = { group ->
+                                    appState.toggleGroup(
+                                        group.id,
+                                        toggleable = !group.alwaysSelected &&
+                                            group.access == AffirmationGroupAccess.FREE,
+                                    )
+                                },
+                                onApply = {
+                                    if (appState.applyGroupSelection()) {
+                                        sheetScope.launch { sheetState.partialExpand() }
+                                    }
+                                },
+                                onPeekClick = {
+                                    sheetScope.launch {
+                                        appState.resetDraftToCommitted()
+                                        sheetState.expand()
+                                    }
+                                },
+                            )
+                        },
+                    ) {
+                        AffirmationsScreen(
+                            affirmations = appState.filteredAffirmations,
+                            onAffirmationViewed = { appState.recordAffirmationViewed() }
+                        )
+                    }
+                }
 
                 AppDestinations.MEDITAR -> MeditationScreen(
                     initialDurationSeconds = appState.meditationDurationSeconds.value ?: (15 * 60),

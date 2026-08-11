@@ -5,6 +5,7 @@ import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
 import com.pirxhio.affirmity.data.local.DaySegment
+import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
@@ -20,6 +21,7 @@ private const val FIELD_TITLE = "title"
 private const val FIELD_SUBTITLE = "subtitle"
 private const val FIELD_BACKGROUND_TYPE = "backgroundType"
 private const val FIELD_BACKGROUND_VALUE = "backgroundValue"
+private const val FIELD_GROUP_ID = "groupId"
 
 fun affirmationToMap(entity: AffirmationEntity): Map<String, Any> = mapOf(
     FIELD_ID to entity.id,
@@ -27,6 +29,7 @@ fun affirmationToMap(entity: AffirmationEntity): Map<String, Any> = mapOf(
     FIELD_SUBTITLE to entity.subtitle,
     FIELD_BACKGROUND_TYPE to entity.backgroundType,
     FIELD_BACKGROUND_VALUE to entity.backgroundValue,
+    FIELD_GROUP_ID to entity.groupId,
 )
 
 fun affirmationFromMap(map: Map<String, Any?>): AffirmationEntity = AffirmationEntity(
@@ -35,6 +38,7 @@ fun affirmationFromMap(map: Map<String, Any?>): AffirmationEntity = AffirmationE
     subtitle = map[FIELD_SUBTITLE] as String,
     backgroundType = map[FIELD_BACKGROUND_TYPE] as String,
     backgroundValue = map[FIELD_BACKGROUND_VALUE] as String,
+    groupId = map[FIELD_GROUP_ID] as? String ?: PERSONALIZADAS_GROUP_ID,
 )
 
 private const val FIELD_EPOCH_DAY = "epochDay"

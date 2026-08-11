@@ -10,6 +10,7 @@ import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
 import com.pirxhio.affirmity.data.local.DailyViewCount
 import com.pirxhio.affirmity.data.local.DaySegment
+import com.pirxhio.affirmity.data.local.GroupSelectionPreferences
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
@@ -131,6 +132,20 @@ private class FakeNotificationSettingsRepository(
     override suspend fun setTimeZone(zoneId: String) = Unit
 }
 
+/** Fake [GroupSelectionPreferences] — the real class needs an Android [Context], so JVM tests
+ * that construct [AffirmityAppState] directly must fake this narrow interface (design risk #4). */
+private class FakeGroupSelectionPreferences(
+    initial: Set<String>? = null,
+) : GroupSelectionPreferences {
+    private val flow = MutableStateFlow(initial)
+    val saved = CopyOnWriteArrayList<Set<String>>()
+    override fun observeSelectedGroupIds(): Flow<Set<String>?> = flow
+    override suspend fun saveSelectedGroupIds(ids: Set<String>) {
+        saved += ids
+        flow.value = ids
+    }
+}
+
 private class FakeAuthRepository(
     initial: AuthState = AuthState.SignedOut,
 ) : AuthRepository {
@@ -205,6 +220,7 @@ private fun buildState(
     migrator: FirestoreMigrator,
     authRepository: AuthRepository,
     scope: CoroutineScope,
+    groupPreferences: GroupSelectionPreferences = FakeGroupSelectionPreferences(),
 ): AffirmityAppState {
     val trackerPreferences = mock(TrackerPreferences::class.java)
     whenever(trackerPreferences.observeAffirmationsViewedToday())
@@ -234,6 +250,9 @@ private fun buildState(
         onboardingRepository = mock(FirestoreOnboardingRepository::class.java),
         onboardingPreferences = onboardingPreferences,
         deviceTimeZoneId = { "UTC" },
+        groupPreferences = groupPreferences,
+        knownGroupIds = setOf("personalizadas", "bienestar"),
+        defaultThematicGroupIds = setOf("bienestar"),
     )
 }
 
@@ -356,6 +375,35 @@ class AffirmityAppStateSwapTest {
         val localRecollectIndex = events.lastIndexOf("local-affirmations:collect")
         assertTrue("Firestore listener must be cancelled on sign-out", remoteCancelIndex >= 0)
         assertTrue("Room must be resubscribed after sign-out", localRecollectIndex >= 0)
+
+        scope.cancel()
+    }
+
+    @Test
+    fun `a session swap preserves the committed group selection and filteredAffirmations reflects the new session`() = runBlocking {
+        val events = mutableListOf<String>()
+        val local = fakeLocal(events, id = "local-swap")
+        val authRepository = FakeAuthRepository()
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val groupPreferences = FakeGroupSelectionPreferences(initial = setOf("bienestar"))
+        val state = buildState(
+            local = local,
+            remote = { fakeRemote("uid-5", events, id = "remote-swap") },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = authRepository,
+            scope = scope,
+            groupPreferences = groupPreferences,
+        )
+        delay(50)
+        assertEquals(setOf("bienestar", "personalizadas"), state.selectedGroupIds.value)
+        assertTrue(state.filteredAffirmations.any { it.id == "local-swap" })
+
+        authRepository.emit(AuthState.SignedIn(uid = "uid-5", displayName = null, email = null))
+        delay(200)
+
+        assertEquals(setOf("bienestar", "personalizadas"), state.selectedGroupIds.value)
+        assertTrue(state.filteredAffirmations.any { it.id == "remote-swap" })
+        assertTrue(state.filteredAffirmations.none { it.id == "local-swap" })
 
         scope.cancel()
     }

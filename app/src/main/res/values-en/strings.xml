@@ -236,4 +236,23 @@
     <string name="widget_empty_state_label">Start today</string>
     <string name="widget_action_affirm_label">Affirm</string>
     <string name="widget_action_meditate_label">Meditate</string>
+
+    <string name="affirmation_group_badge_premium">Premium</string>
+    <string name="affirmation_group_badge_ad">Watch ad</string>
+    <string name="affirmation_group_bienestar_title">Wellbeing</string>
+    <string name="affirmation_group_bienestar_description">Daily affirmations to cultivate inner peace and physical and mental balance.</string>
+    <string name="affirmation_group_autocuidado_title">Self-Care</string>
+    <string name="affirmation_group_autocuidado_description">Nurture your self-esteem and learn to prioritize your needs with compassion.</string>
+    <string name="affirmation_group_fuerza_title">Willpower</string>
+    <string name="affirmation_group_fuerza_description">Strengthen your determination and overcome obstacles with a resilient mindset.</string>
+    <string name="affirmation_group_personalizadas_title">Personal</string>
+    <string name="affirmation_group_personalizadas_description">Your own affirmations, always included in the feed.</string>
+    <string name="affirmation_group_selector_title">Select your groups</string>
+    <string name="affirmation_group_selector_apply">Apply</string>
+    <string name="affirmation_group_selector_close">Close</string>
+    <string name="affirmation_group_selector_expand">Expand group selector</string>
+    <string name="affirmation_group_selector_collapse">Hide group selector</string>
+    <string name="affirmation_group_selector_min_selection_error">Select at least one thematic group.</string>
+    <string name="affirmation_group_locked_a11y">%1$s (locked)</string>
+    <string name="affirmation_group_always_on_a11y">Always selected</string>
 </resources>

@@ -25,16 +25,19 @@ import com.pirxhio.affirmity.auth.FirebaseAuthRepository
 import com.pirxhio.affirmity.auth.GoogleIdAuthProvider
 import com.pirxhio.affirmity.auth.SignInCancelledException
 import com.pirxhio.affirmity.data.local.AffirmationEntity
+import com.pirxhio.affirmity.data.local.AffirmationGroupPreferences
 import com.pirxhio.affirmity.data.local.AffirmationImageStore
 import com.pirxhio.affirmity.data.local.AffirmityDatabase
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
 import com.pirxhio.affirmity.data.local.DailyViewCount
 import com.pirxhio.affirmity.data.local.DaySegment
+import com.pirxhio.affirmity.data.local.GroupSelectionPreferences
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.NotificationLogEntry
 import com.pirxhio.affirmity.data.local.NotificationPreferences
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
+import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.FcmTokenRepository
@@ -56,6 +59,9 @@ import com.pirxhio.affirmity.data.repository.RoomNotificationSettingsRepository
 import com.pirxhio.affirmity.data.repository.RoomStreakHealerRepository
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
+import com.pirxhio.affirmity.ui.groups.AffirmationGroupAccess
+import com.pirxhio.affirmity.ui.groups.defaultAffirmationGroups
+import com.pirxhio.affirmity.ui.groups.selectableAffirmationGroups
 import com.pirxhio.affirmity.widget.WeeklyTrackerWidget
 import androidx.glance.appwidget.updateAll
 import java.util.TimeZone
@@ -88,6 +94,7 @@ data class Affirmation(
     val title: String,
     val subtitle: String,
     val background: AffirmationBackground,
+    val groupId: String = PERSONALIZADAS_GROUP_ID,
 )
 
 /** Rolling last-7-days completion flags (oldest first, today last) for a habit tracker. */
@@ -116,6 +123,7 @@ private fun AffirmationEntity.toAffirmation(): Affirmation = Affirmation(
     } else {
         AffirmationBackground.Color(backgroundValue)
     },
+    groupId = groupId,
 )
 
 private fun Affirmation.toEntity(): AffirmationEntity = AffirmationEntity(
@@ -130,7 +138,34 @@ private fun Affirmation.toEntity(): AffirmationEntity = AffirmationEntity(
         is AffirmationBackground.Image -> bg.localPath
         is AffirmationBackground.Color -> bg.value
     },
+    // User-created affirmations always land in `personalizadas`, regardless of the caller's
+    // [Affirmation.groupId] (spec: personalizadas Always-On; user-authored content is out of the
+    // thematic-group scope for this change).
+    groupId = PERSONALIZADAS_GROUP_ID,
 )
+
+/**
+ * Pure resolution of the committed group-id selection, extracted so it is testable without
+ * Android/DataStore (design §4, §6). [persisted] is `null` on the very first-ever launch (no
+ * selection ever saved). Unknown ids (e.g. a group removed in a later release) are dropped.
+ * `personalizadas` is always force-included.
+ */
+fun resolveSelectedGroupIds(
+    persisted: Set<String>?,
+    knownIds: Set<String>,
+    defaultThematicIds: Set<String>,
+): Set<String> {
+    val resolved = persisted?.filter { it in knownIds }?.toSet() ?: defaultThematicIds
+    return resolved + PERSONALIZADAS_GROUP_ID
+}
+
+/** Default for tests/previews that don't care about group selection: never emits a persisted
+ * value, so callers always resolve to the first-launch default. */
+private object NoOpGroupSelectionPreferences : GroupSelectionPreferences {
+    override fun observeSelectedGroupIds(): kotlinx.coroutines.flow.Flow<Set<String>?> =
+        kotlinx.coroutines.flow.flowOf(null)
+    override suspend fun saveSelectedGroupIds(ids: Set<String>) = Unit
+}
 
 /**
  * Shared in-memory state for the whole app, backed by Room (affirmations) and DataStore
@@ -158,8 +193,42 @@ class AffirmityAppState(
     private val dayLetters: List<String> = listOf("D", "L", "M", "M", "J", "V", "S"),
     private val deviceTimeZoneId: () -> String = { TimeZone.getDefault().id },
     private val useRemoteSession: Boolean = true,
+    private val groupPreferences: GroupSelectionPreferences = NoOpGroupSelectionPreferences,
+    /** Every known selectable group id, resolved in [rememberAffirmityAppState] from
+     * `selectableAffirmationGroups()` so this class never imports `ui.groups` (design D9). */
+    private val knownGroupIds: Set<String> = setOf(PERSONALIZADAS_GROUP_ID),
+    /** First-launch default thematic selection (unlocked thematic groups), also resolved by the
+     * caller for the same D9 reason. */
+    private val defaultThematicGroupIds: Set<String> = emptySet(),
 ) {
     val affirmations = mutableStateListOf<Affirmation>()
+
+    /** Group ids the user has committed. Null until DataStore's first read resolves; the UI shows
+     * nothing group-dependent until then. Always contains [PERSONALIZADAS_GROUP_ID] once resolved. */
+    var selectedGroupIds = mutableStateOf<Set<String>?>(null)
+        private set
+
+    /** Pending (uncommitted) selection the sheet mutates while open. Seeded from [selectedGroupIds]
+     * when it first resolves. */
+    var draftGroupIds = mutableStateOf(setOf(PERSONALIZADAS_GROUP_ID))
+        private set
+
+    private var draftInitialized = false
+
+    /** True when [draftGroupIds] contains at least one thematic group, OR `personalizadas` alone
+     * is selected but already has at least one affirmation of its own — an empty `personalizadas`
+     * can never satisfy the invariant by itself, since selecting it alone would otherwise commit
+     * to a guaranteed-empty feed. */
+    val isDraftSelectionValid: Boolean
+        get() = draftGroupIds.value.any { id -> id != PERSONALIZADAS_GROUP_ID } ||
+            affirmations.any { it.groupId == PERSONALIZADAS_GROUP_ID }
+
+    /** The feed's list: affirmations whose groupId is in the committed selection. NEVER used by
+     * ProgressScreen (that keeps reading [affirmations] unfiltered). Falls back to the full list
+     * while [selectedGroupIds] is still null. */
+    val filteredAffirmations: List<Affirmation>
+        get() = selectedGroupIds.value?.let { ids -> affirmations.filter { it.groupId in ids } }
+            ?: affirmations
 
     /** Provider-neutral sign-in state; see `auth/AuthState.kt`. Settings-only, never gates a screen. */
     var authState = mutableStateOf<AuthState>(AuthState.SignedOut)
@@ -434,6 +503,16 @@ class AffirmityAppState(
         scope.launch {
             onboardingPreferences.observeHasCompletedOnboarding().collect { hasCompletedOnboarding.value = it }
         }
+        scope.launch {
+            groupPreferences.observeSelectedGroupIds().collect { persisted ->
+                val resolved = resolveSelectedGroupIds(persisted, knownGroupIds, defaultThematicGroupIds)
+                selectedGroupIds.value = resolved
+                if (!draftInitialized) {
+                    draftGroupIds.value = resolved
+                    draftInitialized = true
+                }
+            }
+        }
     }
 
     fun completeOnboarding() {
@@ -679,6 +758,34 @@ class AffirmityAppState(
         scope.launch { ready().meditation.saveMeditationDurationSeconds(seconds) }
     }
 
+    /** Flips [groupId]'s membership in [draftGroupIds]. No-op for `alwaysSelected`/locked groups —
+     * the UI also disables them; this is defense in depth. */
+    fun toggleGroup(groupId: String, toggleable: Boolean) {
+        if (!toggleable) return
+        draftGroupIds.value = if (groupId in draftGroupIds.value) {
+            draftGroupIds.value - groupId
+        } else {
+            draftGroupIds.value + groupId
+        }
+    }
+
+    /** Commits [draftGroupIds] as [selectedGroupIds] and persists it, unless the draft violates
+     * the minimum-selection invariant — in which case nothing is committed or persisted. Returns
+     * whether the commit happened, so the caller can decide whether to collapse the sheet. */
+    fun applyGroupSelection(): Boolean {
+        if (!isDraftSelectionValid) return false
+        val committed = draftGroupIds.value
+        selectedGroupIds.value = committed
+        scope.launch { groupPreferences.saveSelectedGroupIds(committed) }
+        return true
+    }
+
+    /** Discards any uncommitted draft edits, restoring [draftGroupIds] to the last committed
+     * [selectedGroupIds] — used when the sheet re-expands. */
+    fun resetDraftToCommitted() {
+        selectedGroupIds.value?.let { draftGroupIds.value = it }
+    }
+
     /** Floors [StreakHealerStats] evaluation at [StreakHealerStats.EPOCH_START_DAY] so completion
      * history from before this feature shipped can never retroactively grant/heal (design.md's
      * "Migration / Rollout" decision), while still respecting the usual lookback window. */
@@ -708,6 +815,12 @@ fun rememberAffirmityAppState(): AffirmityAppState {
     // the Activity and re-runs this whole composable in a fresh Composition, so this always
     // reflects the current app locale (D6), unlike a value captured once inside `remember`.
     val dayLetters = stringArrayResource(R.array.weekday_letters).toList()
+    // Resolved here (not inside `remember`) so the `AffirmityAppState` class itself never imports
+    // `ui.groups` (design D9) — only this composable wiring function does, mirroring [dayLetters].
+    val knownGroupIds = selectableAffirmationGroups().map { it.id }.toSet()
+    val defaultThematicGroupIds = defaultAffirmationGroups()
+        .filter { it.access == AffirmationGroupAccess.FREE }
+        .map { it.id }.toSet()
     return remember {
         val database = AffirmityDatabase.getInstance(context)
         val notificationPreferences = NotificationPreferences(context)
@@ -753,6 +866,9 @@ fun rememberAffirmityAppState(): AffirmityAppState {
                 providers = mapOf(AuthProviderId.GOOGLE to googleIdAuthProvider),
             ),
             useRemoteSession = USE_REMOTE_SESSION,
+            groupPreferences = AffirmationGroupPreferences(context.applicationContext),
+            knownGroupIds = knownGroupIds,
+            defaultThematicGroupIds = defaultThematicGroupIds,
         )
     }
 }

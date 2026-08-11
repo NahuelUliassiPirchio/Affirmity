@@ -21,6 +21,7 @@ class FirestoreMappersTest {
             subtitle = "Breathe in, breathe out",
             backgroundType = "image",
             backgroundValue = "content://media/external/images/media/42",
+            groupId = "bienestar",
         )
 
         val map = affirmationToMap(entity)
@@ -28,6 +29,38 @@ class FirestoreMappersTest {
 
         assertEquals(entity, roundTripped)
         assertEquals("content://media/external/images/media/42", map["backgroundValue"])
+        assertEquals("bienestar", map["groupId"])
+    }
+
+    @Test
+    fun `affirmationFromMap falls back to personalizadas when groupId is missing`() {
+        val map = mapOf<String, Any?>(
+            "id" to "aff-legacy",
+            "title" to "Legacy",
+            "subtitle" to "Doc synced before groupId existed",
+            "backgroundType" to "color",
+            "backgroundValue" to "#000000",
+        )
+
+        val entity = affirmationFromMap(map)
+
+        assertEquals("personalizadas", entity.groupId)
+    }
+
+    @Test
+    fun `affirmationFromMap falls back to personalizadas when groupId is a non-String value`() {
+        val map = mapOf<String, Any?>(
+            "id" to "aff-corrupt",
+            "title" to "Corrupt",
+            "subtitle" to "groupId field has the wrong type",
+            "backgroundType" to "color",
+            "backgroundValue" to "#000000",
+            "groupId" to 42,
+        )
+
+        val entity = affirmationFromMap(map)
+
+        assertEquals("personalizadas", entity.groupId)
     }
 
     @Test

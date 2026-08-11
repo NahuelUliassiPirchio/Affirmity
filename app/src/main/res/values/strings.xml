@@ -236,4 +236,23 @@
     <string name="widget_empty_state_label">Empezá hoy</string>
     <string name="widget_action_affirm_label">Afirmar</string>
     <string name="widget_action_meditate_label">Meditar</string>
+
+    <string name="affirmation_group_badge_premium">Premium</string>
+    <string name="affirmation_group_badge_ad">Ver anuncio</string>
+    <string name="affirmation_group_bienestar_title">Bienestar</string>
+    <string name="affirmation_group_bienestar_description">Afirmaciones diarias para cultivar la paz interior y el equilibrio físico y mental.</string>
+    <string name="affirmation_group_autocuidado_title">Autocuidado</string>
+    <string name="affirmation_group_autocuidado_description">Nutre tu autoestima y aprende a priorizar tus necesidades con compasión.</string>
+    <string name="affirmation_group_fuerza_title">Fuerza de Voluntad</string>
+    <string name="affirmation_group_fuerza_description">Fortalece tu determinación y supera los obstáculos con una mentalidad resiliente.</string>
+    <string name="affirmation_group_personalizadas_title">Personalizadas</string>
+    <string name="affirmation_group_personalizadas_description">Tus propias afirmaciones, siempre incluidas en el feed.</string>
+    <string name="affirmation_group_selector_title">Seleccioná tus grupos</string>
+    <string name="affirmation_group_selector_apply">Aplicar</string>
+    <string name="affirmation_group_selector_close">Cerrar</string>
+    <string name="affirmation_group_selector_expand">Expandir selector de grupos</string>
+    <string name="affirmation_group_selector_collapse">Ocultar selector de grupos</string>
+    <string name="affirmation_group_selector_min_selection_error">Seleccioná al menos un grupo temático.</string>
+    <string name="affirmation_group_locked_a11y">%1$s (bloqueado)</string>
+    <string name="affirmation_group_always_on_a11y">Siempre seleccionado</string>
 </resources>

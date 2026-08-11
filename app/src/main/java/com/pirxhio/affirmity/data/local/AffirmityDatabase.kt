@@ -54,6 +54,18 @@ val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
     }
 }
 
+/** First ALTER-on-existing-table migration in this codebase. Structural only: the NOT NULL
+ * DEFAULT backfills every pre-existing row to `personalizadas` in one statement, so no user
+ * affirmation can become invisible under the new group filter. No content is inserted here or
+ * anywhere else in this change — the thematic groups ship as empty categories. */
+val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE `affirmations` ADD COLUMN `groupId` TEXT NOT NULL DEFAULT 'personalizadas'"
+        )
+    }
+}
+
 @Database(
     entities = [
         AffirmationEntity::class,
@@ -61,7 +73,7 @@ val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
         DailyMoodEntity::class,
         StreakHealerUseEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class AffirmityDatabase : RoomDatabase() {
@@ -80,7 +92,7 @@ abstract class AffirmityDatabase : RoomDatabase() {
                     context.applicationContext,
                     AffirmityDatabase::class.java,
                     "affirmity.db",
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { instance = it }
             }
     }
 }

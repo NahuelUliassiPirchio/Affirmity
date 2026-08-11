@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.data.local
 import androidx.room.testing.MigrationTestHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -21,6 +22,25 @@ class AffirmityDatabaseMigrationTest {
         emptyList(),
         FrameworkSQLiteOpenHelperFactory(),
     )
+
+    @Test
+    fun migrate4To5_addsGroupIdAndBackfillsExistingRowsToPersonalizadas() {
+        helper.createDatabase(TEST_DB, 4).apply {
+            execSQL(
+                "INSERT INTO affirmations (id, title, subtitle, backgroundType, backgroundValue) " +
+                    "VALUES ('id-1', 'Title', 'Subtitle', 'color', '#000000')",
+            )
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(TEST_DB, 5, true, MIGRATION_4_5)
+
+        val cursor = migrated.query("SELECT groupId FROM affirmations WHERE id = 'id-1'")
+        assertTrue(cursor.moveToFirst())
+        assertEquals("personalizadas", cursor.getString(0))
+        assertFalse(cursor.isNull(0))
+        cursor.close()
+    }
 
     @Test
     fun migrate1To2_preservesAffirmationsAndCreatesEmptyDailyCompletionTable() {
