@@ -62,6 +62,7 @@ import com.pirxhio.affirmity.ui.groups.selectableAffirmationGroups
 import com.pirxhio.affirmity.ui.healer.StreakHealerGrantedScreen
 import com.pirxhio.affirmity.ui.meditation.MeditationScreen
 import com.pirxhio.affirmity.ui.mood.MoodScreen
+import com.pirxhio.affirmity.ui.myaffirmations.MyAffirmationsScreen
 import com.pirxhio.affirmity.ui.onboarding.OnboardingScreen
 import com.pirxhio.affirmity.ui.progress.ProgressScreen
 import com.pirxhio.affirmity.ui.settings.NotificationDebugScreen
@@ -142,6 +143,7 @@ fun AffirmityApp(
     }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showNotificationDebug by rememberSaveable { mutableStateOf(false) }
+    var showMyAffirmations by rememberSaveable { mutableStateOf(false) }
     val appState = rememberAffirmityAppState()
     val context = LocalContext.current
 
@@ -210,6 +212,47 @@ fun AffirmityApp(
                 onClear = { appState.clearNotificationDebugLog() },
                 onSendTestNotification = { appState.sendTestNotification() },
                 onSendTestMoodNotification = { appState.sendTestMoodNotification() },
+            )
+        }
+        return
+    }
+
+    if (showMyAffirmations) {
+        BackHandler { showMyAffirmations = false }
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            topBar = {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.progress_affirmations_section_title)) },
+                    navigationIcon = {
+                        IconButton(onClick = { showMyAffirmations = false }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.nav_back_content_description)
+                            )
+                        }
+                    }
+                )
+            }
+        ) { innerPadding ->
+            MyAffirmationsScreen(
+                modifier = Modifier.padding(innerPadding),
+                affirmations = appState.affirmations,
+                addImageError = appState.addImageError.value,
+                importError = appState.importAffirmationsError.value,
+                onAddAffirmationWithColor = { title, subtitle, colorHex ->
+                    appState.addAffirmationWithColor(title, subtitle, colorHex)
+                },
+                onAddAffirmationWithImage = { title, subtitle, imageUrl ->
+                    appState.addAffirmationWithImage(title, subtitle, imageUrl)
+                },
+                onAddAffirmationWithGalleryImage = { title, subtitle, imageUri ->
+                    appState.addAffirmationWithGalleryImage(title, subtitle, imageUri)
+                },
+                onImportAffirmationsJson = { json, replace ->
+                    appState.importAffirmationsFromJson(json, replace)
+                },
+                onDeleteAffirmation = { id -> appState.removeAffirmation(id) },
             )
         }
         return
@@ -359,6 +402,7 @@ fun AffirmityApp(
                                         sheetState.expand()
                                     }
                                 },
+                                onAddCustomClick = { showMyAffirmations = true },
                             )
                         },
                     ) {
@@ -376,25 +420,9 @@ fun AffirmityApp(
                 )
 
                 AppDestinations.PROGRESO -> ProgressScreen(
-                    affirmations = appState.affirmations,
                     affirmationsStreak = appState.affirmationsStreak.value,
                     meditationStreak = appState.meditationStreak.value,
                     streakHealer = appState.streakHealer.value,
-                    addImageError = appState.addImageError.value,
-                    importError = appState.importAffirmationsError.value,
-                    onAddAffirmationWithColor = { title, subtitle, colorHex ->
-                        appState.addAffirmationWithColor(title, subtitle, colorHex)
-                    },
-                    onAddAffirmationWithImage = { title, subtitle, imageUrl ->
-                        appState.addAffirmationWithImage(title, subtitle, imageUrl)
-                    },
-                    onAddAffirmationWithGalleryImage = { title, subtitle, imageUri ->
-                        appState.addAffirmationWithGalleryImage(title, subtitle, imageUri)
-                    },
-                    onImportAffirmationsJson = { json, replace ->
-                        appState.importAffirmationsFromJson(json, replace)
-                    },
-                    onDeleteAffirmation = { id -> appState.removeAffirmation(id) },
                     onActivateHealer = { appState.activateStreakHealer() },
                 )
 

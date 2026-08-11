@@ -176,7 +176,6 @@
     <string name="notification_debug_empty_message">Todavía no hay actividad registrada. Esperá al próximo horario programado, o cambiá la ventana en Ajustes para que dispare pronto.</string>
 
     <string name="progress_title">Mi Progreso</string>
-    <string name="progress_habits_title">Hábitos</string>
     <string name="progress_affirmations_label">Afirmaciones</string>
     <string name="progress_meditation_label">Meditación</string>
     <string name="progress_streak_active_content_description">Racha activa hoy</string>
@@ -250,7 +249,7 @@
     <string name="affirmation_group_personalizadas_description">Tus propias afirmaciones, siempre incluidas en el feed.</string>
     <string name="affirmation_group_selector_title">Seleccioná tus grupos</string>
     <string name="affirmation_group_selector_apply">Aplicar</string>
-    <string name="affirmation_group_selector_close">Cerrar</string>
+    <string name="affirmation_group_add_custom">Agregar afirmaciones personalizadas</string>
     <string name="affirmation_group_selector_expand">Expandir selector de grupos</string>
     <string name="affirmation_group_selector_collapse">Ocultar selector de grupos</string>
     <string name="affirmation_group_selector_min_selection_error">Seleccioná al menos un grupo temático.</string>
