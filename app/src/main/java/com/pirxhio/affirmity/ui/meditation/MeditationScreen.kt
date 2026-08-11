@@ -24,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -52,6 +53,7 @@ fun MeditationScreen(
     initialDurationSeconds: Int = 15 * 60,
     onDurationSelected: (Int) -> Unit,
     onSessionCompleted: () -> Unit,
+    onOpenGuidedDemo: () -> Unit = {},
 ) {
     // Keyed on initialDurationSeconds so that when the persisted value arrives asynchronously
     // (DataStore's first read completes after this composable's initial composition), the
@@ -197,6 +199,10 @@ fun MeditationScreen(
                     )
                 }
             }
+        }
+
+        TextButton(onClick = onOpenGuidedDemo, modifier = Modifier.padding(top = 24.dp)) {
+            Text(stringResource(R.string.meditation_guided_demo_button))
         }
     }
 }

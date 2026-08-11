@@ -232,6 +232,21 @@
     <string name="meditation_preset_relax">Relax</string>
     <string name="meditation_preset_focus">Focus</string>
     <string name="meditation_preset_sleep">Sleep</string>
+    <string name="meditation_guided_demo_button">Meditación guiada (demo)</string>
+
+    <string name="guided_meditation_title">Respiración guiada</string>
+    <string name="guided_meditation_round_label">Ronda %1$d de %2$d</string>
+    <string name="guided_meditation_breath_label">Respiración %1$d de %2$d</string>
+    <string name="guided_meditation_inhale">Inhalá</string>
+    <string name="guided_meditation_exhale">Exhalá</string>
+    <string name="guided_meditation_retention">Sostené la respiración</string>
+    <string name="guided_meditation_retention_hint">Tocá cuando quieras soltar</string>
+    <string name="guided_meditation_recovery">Recuperación</string>
+    <string name="guided_meditation_completed">Sesión completa</string>
+    <string name="guided_meditation_start_content_description">Iniciar</string>
+    <string name="guided_meditation_pause_content_description">Pausar</string>
+    <string name="guided_meditation_resume_content_description">Reanudar</string>
+    <string name="guided_meditation_skip_content_description">Avanzar fase</string>
 
     <string name="widget_empty_state_label">Empezá hoy</string>
     <string name="widget_action_affirm_label">Afirmar</string>

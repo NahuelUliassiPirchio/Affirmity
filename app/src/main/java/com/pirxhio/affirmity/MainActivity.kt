@@ -60,6 +60,7 @@ import com.pirxhio.affirmity.ui.groups.AffirmationGroupAccess
 import com.pirxhio.affirmity.ui.groups.AffirmationGroupSelectorSheet
 import com.pirxhio.affirmity.ui.groups.selectableAffirmationGroups
 import com.pirxhio.affirmity.ui.healer.StreakHealerGrantedScreen
+import com.pirxhio.affirmity.ui.meditation.GuidedMeditationScreen
 import com.pirxhio.affirmity.ui.meditation.MeditationScreen
 import com.pirxhio.affirmity.ui.mood.MoodScreen
 import com.pirxhio.affirmity.ui.myaffirmations.MyAffirmationsScreen
@@ -144,6 +145,7 @@ fun AffirmityApp(
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showNotificationDebug by rememberSaveable { mutableStateOf(false) }
     var showMyAffirmations by rememberSaveable { mutableStateOf(false) }
+    var showGuidedMeditationDemo by rememberSaveable { mutableStateOf(false) }
     val appState = rememberAffirmityAppState()
     val context = LocalContext.current
 
@@ -254,6 +256,29 @@ fun AffirmityApp(
                 },
                 onDeleteAffirmation = { id -> appState.removeAffirmation(id) },
             )
+        }
+        return
+    }
+
+    if (showGuidedMeditationDemo) {
+        BackHandler { showGuidedMeditationDemo = false }
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            topBar = {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.guided_meditation_title)) },
+                    navigationIcon = {
+                        IconButton(onClick = { showGuidedMeditationDemo = false }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.nav_back_content_description)
+                            )
+                        }
+                    }
+                )
+            }
+        ) { innerPadding ->
+            GuidedMeditationScreen(modifier = Modifier.padding(innerPadding))
         }
         return
     }
@@ -416,7 +441,8 @@ fun AffirmityApp(
                 AppDestinations.MEDITAR -> MeditationScreen(
                     initialDurationSeconds = appState.meditationDurationSeconds.value ?: (15 * 60),
                     onDurationSelected = { seconds -> appState.recordMeditationDurationSelected(seconds) },
-                    onSessionCompleted = { appState.recordMeditationCompleted() }
+                    onSessionCompleted = { appState.recordMeditationCompleted() },
+                    onOpenGuidedDemo = { showGuidedMeditationDemo = true }
                 )
 
                 AppDestinations.PROGRESO -> ProgressScreen(
