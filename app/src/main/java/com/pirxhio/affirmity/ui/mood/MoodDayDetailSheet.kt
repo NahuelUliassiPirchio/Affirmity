@@ -23,13 +23,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pirxhio.affirmity.R
+import kotlinx.coroutines.launch
 
 /**
  * Bottom sheet to log or edit a single day's mood: emoji + label preview, a 1-5 emoji picker, an
@@ -46,6 +49,7 @@ fun MoodDayDetailSheet(
     onSave: (moodValue: Int, note: String?) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState()
+    val sheetScope = rememberCoroutineScope()
     var selectedMood by remember { mutableIntStateOf(initialMoodValue ?: 4) }
     var note by remember { mutableStateOf(initialNote.orEmpty()) }
 
@@ -101,7 +105,13 @@ fun MoodDayDetailSheet(
                 onValueChange = { note = it },
                 label = { Text(stringResource(R.string.mood_detail_notes_label)) },
                 placeholder = { Text(stringResource(R.string.mood_detail_notes_placeholder)) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { focusState ->
+                        if (focusState.isFocused) {
+                            sheetScope.launch { sheetState.expand() }
+                        }
+                    },
                 minLines = 3,
             )
             Button(
