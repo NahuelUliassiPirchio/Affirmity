@@ -3,16 +3,20 @@
 
     <string name="notification_channel_reminder_name">Recordatorios</string>
     <string name="notification_channel_reminder_description">Avisos para meditar o ver afirmaciones</string>
-    <string name="notification_channel_reflection_name">Preguntas de reflexión</string>
-    <string name="notification_channel_reflection_description">Preguntas diarias para reflexionar</string>
+    <string name="notification_channel_reflection_name">Preguntas Brújula</string>
+    <string name="notification_channel_reflection_description">Preguntas honestas para mirar hacia adentro</string>
     <string name="notification_channel_streak_name">Racha en riesgo</string>
     <string name="notification_channel_streak_description">Avisos cuando tu racha está por terminar</string>
     <string name="notification_channel_healer_name">Sanador de racha</string>
     <string name="notification_channel_healer_description">Avisos cuando tenés un sanador disponible para curar tu racha</string>
+    <string name="notification_channel_mood_name">Recordatorio de ánimo</string>
+    <string name="notification_channel_mood_description">Un aviso para loguear cómo te sentiste hoy</string>
 
     <string name="notification_reminder_title">Un momento para ti</string>
     <string name="notification_reminder_fallback_body">Tómate un momento para meditar o ver tus afirmaciones.</string>
-    <string name="notification_reflection_title">Reflexiona un momento</string>
+    <string name="notification_reflection_title">Un momento de honestidad</string>
+    <string name="notification_mood_title">¿Cómo te sentiste hoy?</string>
+    <string name="notification_mood_fallback_body">Tocá un emoji para loguear tu ánimo de hoy.</string>
     <string name="notification_streak_title">Tu racha está por terminar</string>
     <string name="notification_streak_fallback_body">Todavía puedes completar hoy y mantener tu racha.</string>
     <string name="notification_healer_title">Tu racha se rompió, pero tenés un sanador</string>
@@ -22,43 +26,74 @@
         <item>Hoy, lunes, ¿cómo te sentiste?</item>
         <item>Arrancamos la semana. ¿Cómo veniste hoy, lunes?</item>
         <item>Lunes de nuevo. ¿Cómo estuvo tu ánimo hoy?</item>
+        <item>¿Qué es lo más honesto que podrías decirte hoy?</item>
+        <item>¿Hay algo que estuviste evitando mirar esta semana?</item>
+        <item>¿Hacia dónde apunta tu brújula hoy: hacia adentro o hacia afuera?</item>
+        <item>¿Qué verdad incómoda podrías reconocerte hoy, lunes?</item>
     </string-array>
     <string-array name="reflection_prompts_tuesday">
         <item>Hoy, martes, ¿cómo te sentiste?</item>
         <item>¿Cómo va este martes? Contanos cómo te sentiste.</item>
         <item>Martes al día. ¿Cómo estuvo tu ánimo hoy?</item>
+        <item>¿Qué estás sintiendo que todavía no te animaste a nombrar?</item>
+        <item>¿A quién le debés una conversación honesta?</item>
+        <item>¿Qué parte de vos estuviste ignorando últimamente?</item>
+        <item>Si fueras totalmente honesto con vos, ¿qué cambiarías hoy?</item>
     </string-array>
     <string-array name="reflection_prompts_wednesday">
         <item>Hoy, miércoles, ¿cómo te sentiste?</item>
         <item>Mitad de semana. ¿Cómo veniste hoy, miércoles?</item>
         <item>¿Cómo estuvo tu ánimo este miércoles?</item>
+        <item>¿Qué te está costando aceptar de vos mismo?</item>
+        <item>¿Hay una excusa que te repetís seguido? ¿Es cierta?</item>
+        <item>¿Qué necesitás escuchar de vos mismo hoy?</item>
+        <item>¿En qué momento del día de hoy fuiste más vos?</item>
     </string-array>
     <string-array name="reflection_prompts_thursday">
         <item>Hoy, jueves, ¿cómo te sentiste?</item>
         <item>Ya casi. ¿Cómo estuvo tu ánimo hoy, jueves?</item>
         <item>Jueves al día. Contanos cómo te sentiste.</item>
+        <item>¿Qué verdad sobre vos mismo te cuesta aceptar?</item>
+        <item>¿Qué estás postergando por miedo, no por falta de tiempo?</item>
+        <item>¿Dónde sentís que no estás siendo del todo honesto con vos?</item>
+        <item>¿Qué te diría tu brújula interna si le hicieras caso hoy?</item>
     </string-array>
     <string-array name="reflection_prompts_friday">
         <item>Hoy, viernes, ¿cómo te sentiste?</item>
         <item>Llegaste al viernes. ¿Cómo veniste hoy?</item>
         <item>¿Cómo estuvo tu ánimo en este viernes?</item>
+        <item>Mirando la semana, ¿qué fuiste evitando sentir?</item>
+        <item>¿Qué decisión tomaste esta semana sin ser del todo honesto con vos?</item>
+        <item>¿Qué necesitás soltar antes de que arranque el finde?</item>
+        <item>¿Qué es lo más real que te pasó esta semana?</item>
     </string-array>
     <string-array name="reflection_prompts_saturday">
         <item>Hoy, sábado, ¿cómo te sentiste?</item>
         <item>Fin de semana. ¿Cómo veniste hoy, sábado?</item>
         <item>¿Cómo estuvo tu ánimo este sábado?</item>
+        <item>Sin nada que cumplir hoy, ¿qué sentís de verdad?</item>
+        <item>¿Qué parte de tu vida necesita más honestidad?</item>
+        <item>¿Qué te gustaría admitirte hoy que nunca dirías en voz alta?</item>
+        <item>¿Hacia dónde te está llevando tu brújula últimamente?</item>
     </string-array>
     <string-array name="reflection_prompts_sunday">
         <item>Hoy, domingo, ¿cómo te sentiste?</item>
         <item>Último día del finde. ¿Cómo veniste hoy, domingo?</item>
         <item>¿Cómo estuvo tu ánimo este domingo?</item>
+        <item>Antes de arrancar la semana que viene, ¿qué necesitás reconocerte?</item>
+        <item>¿Qué verdad querés llevarte de esta semana?</item>
+        <item>¿Con qué intención honesta te gustaría empezar la próxima semana?</item>
+        <item>¿Qué verdad incómoda podrías admitirte hoy?</item>
     </string-array>
 
     <string name="settings_title">Ajustes</string>
     <string name="settings_reminders_label">Recordatorios</string>
-    <string name="settings_reflection_label">Preguntas de reflexión</string>
-    <string name="settings_window_start_label">Desde</string>
-    <string name="settings_window_end_label">Hasta</string>
+    <string name="settings_reflection_label">Preguntas Brújula</string>
+    <string name="settings_mood_label">Recordatorio de ánimo</string>
+    <string name="settings_segment_madrugada">Madrugada (00–06)</string>
+    <string name="settings_segment_manana">Mañana (06–12)</string>
+    <string name="settings_segment_tarde">Tarde (12–18)</string>
+    <string name="settings_segment_noche">Noche (18–24)</string>
     <string name="settings_permission_banner_text">Las notificaciones están desactivadas en el sistema</string>
     <string name="settings_permission_banner_action">Abrir ajustes</string>
 
@@ -130,7 +165,7 @@
     <string name="mood_detail_save_button">Guardar</string>
 
     <string name="notification_debug_send_test_button">Enviar notificación de prueba ahora</string>
-    <string name="notification_debug_send_test_reflection_button">Enviar notificación de reflexión de prueba</string>
+    <string name="notification_debug_send_test_mood_button">Enviar notificación de ánimo de prueba</string>
     <string name="notification_debug_clear_history_button">Borrar historial</string>
     <string name="notification_debug_empty_message">Todavía no hay actividad registrada. Esperá al próximo horario programado, o cambiá la ventana en Ajustes para que dispare pronto.</string>
 
@@ -178,8 +213,6 @@
 
     <string name="settings_notification_debug_title">Debug de notificaciones</string>
     <string name="settings_notification_debug_view_history_button">Ver historial</string>
-    <string name="settings_time_picker_cancel">Cancelar</string>
-    <string name="settings_time_picker_ok">OK</string>
     <string name="settings_language_title">Idioma</string>
     <string name="settings_language_system">Seguir idioma del sistema</string>
     <string name="settings_language_spanish">Español</string>

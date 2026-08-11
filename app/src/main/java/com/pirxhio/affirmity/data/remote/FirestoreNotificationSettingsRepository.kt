@@ -4,6 +4,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.pirxhio.affirmity.data.local.ChannelSettings
+import com.pirxhio.affirmity.data.local.DaySegment
 import com.pirxhio.affirmity.data.repository.NotificationSettingsRepository
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import kotlinx.coroutines.channels.awaitClose
@@ -38,13 +39,9 @@ class FirestoreNotificationSettingsRepository(
         document().set(mapOf("${channel.prefsPrefix}_enabled" to enabled), SetOptions.merge()).await()
     }
 
-    override suspend fun setWindow(channel: NotificationChannelSpec, startMinute: Int, endMinute: Int) {
-        require(endMinute >= startMinute) { "endMinute ($endMinute) must be >= startMinute ($startMinute)" }
+    override suspend fun setSegments(channel: NotificationChannelSpec, segments: Set<DaySegment>) {
         document().set(
-            mapOf(
-                "${channel.prefsPrefix}_startMinute" to startMinute,
-                "${channel.prefsPrefix}_endMinute" to endMinute,
-            ),
+            mapOf(segmentsKey(channel) to segments.map { it.key }),
             SetOptions.merge(),
         ).await()
     }

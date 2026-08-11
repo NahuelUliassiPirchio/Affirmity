@@ -7,29 +7,47 @@
  */
 
 import { localInstantMillis } from './localDay';
+import type { NotificationChannel, PlannedTask } from './planner';
 
 /**
- * Splits `[startMinute, endMinute]` into `slotCount` equal-length sub-windows and returns the
- * `[start, end]` bounds of `slotIndex`'s share -- the last slot absorbs any remainder minute so
- * the slots always cover the full window with no gap or overlap.
+ * The four fixed, user-selectable day-part segments (minutes since local midnight). Mirrors the
+ * client's `DaySegment` enum (app/src/main/java/com/pirxhio/affirmity/data/local/DaySegment.kt) --
+ * the string keys here must match `DaySegment.key` exactly, since they round-trip through
+ * Firestore's `${prefsPrefix}_segments` array field.
  */
-export function subWindow(
-  startMinute: number,
-  endMinute: number,
-  slotIndex: number,
+export const DAY_SEGMENTS: Record<string, { startMinute: number; endMinute: number }> = {
+  madrugada: { startMinute: 0, endMinute: 360 },
+  manana: { startMinute: 360, endMinute: 720 },
+  tarde: { startMinute: 720, endMinute: 1080 },
+  noche: { startMinute: 1080, endMinute: 1440 },
+};
+
+/**
+ * Distributes `slotCount` instants across the selected `segments`, assigning slot `i` to
+ * `segments[i % segments.length]` (round-robin) so every selected segment gets at least one slot
+ * whenever `slotCount >= segments.length`, then picks one random instant inside that segment via
+ * `slotInstant`. No segments selected -> no tasks (a channel can be enabled with nothing picked;
+ * that's a valid silent no-op, not an error). An unrecognized segment key is skipped rather than
+ * thrown, since it should never happen from a trusted client but must not crash the planner pass
+ * if it somehow does.
+ */
+export function segmentSlots(
+  localDay: number,
+  zone: string,
+  segments: string[],
   slotCount: number,
-): [number, number] {
-  if (slotCount <= 0) {
-    throw new Error('slotCount must be positive');
+  channel: NotificationChannel,
+  rng: () => number = Math.random,
+): PlannedTask[] {
+  if (segments.length === 0) return [];
+  const tasks: PlannedTask[] = [];
+  for (let i = 0; i < slotCount; i++) {
+    const range = DAY_SEGMENTS[segments[i % segments.length]];
+    if (!range) continue;
+    const instant = slotInstant(localDay, zone, range.startMinute, range.endMinute, rng);
+    tasks.push({ uid: '', localDay, channel, slot: i, atMillis: instant.getTime() });
   }
-  if (slotIndex < 0 || slotIndex >= slotCount) {
-    throw new Error(`slotIndex (${slotIndex}) out of range for slotCount (${slotCount})`);
-  }
-  const span = Math.max(endMinute - startMinute, 0);
-  const slotSpan = Math.floor(span / slotCount);
-  const slotStart = startMinute + slotSpan * slotIndex;
-  const slotEnd = slotIndex === slotCount - 1 ? startMinute + span : slotStart + slotSpan;
-  return [slotStart, slotEnd];
+  return tasks;
 }
 
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { subWindow, slotInstant } from '../src/schedule';
+import { DAY_SEGMENTS, segmentSlots, slotInstant } from '../src/schedule';
 
 // Deterministic LCG so `slotInstant`'s rng argument is reproducible in tests -- mirrors the
 // seeded `kotlin.random.Random(seed)` used in the retired NotificationScheduleTest.
@@ -20,25 +20,39 @@ function minuteOfDayUtc(date: Date): number {
   return date.getUTCHours() * 60 + date.getUTCMinutes();
 }
 
-describe('subWindow', () => {
-  // Ported from `subWindow splits the window into three equal contiguous thirds`.
-  it('splits the window into three equal contiguous thirds', () => {
-    const startMinute = 9 * 60;
-    const endMinute = 21 * 60;
+describe('segmentSlots', () => {
+  it('puts every instant inside the single selected segment', () => {
+    const tasks = segmentSlots(TEST_LOCAL_DAY, ZONE, ['manana'], 3, 'reminder', seededRng(1));
 
-    expect(subWindow(startMinute, endMinute, 0, 3)).toEqual([startMinute, startMinute + 240]);
-    expect(subWindow(startMinute, endMinute, 1, 3)).toEqual([startMinute + 240, startMinute + 480]);
-    expect(subWindow(startMinute, endMinute, 2, 3)).toEqual([startMinute + 480, endMinute]);
+    expect(tasks).toHaveLength(3);
+    const { startMinute, endMinute } = DAY_SEGMENTS.manana;
+    for (const task of tasks) {
+      const minute = minuteOfDayUtc(new Date(task.atMillis));
+      expect(minute).toBeGreaterThanOrEqual(startMinute);
+      expect(minute).toBeLessThanOrEqual(endMinute);
+    }
   });
 
-  // Ported from `subWindow last slot absorbs the remainder minute`.
-  it('last slot absorbs the remainder minute', () => {
-    const startMinute = 0;
-    const endMinute = 10; // span of 10 does not divide evenly by 3
+  it('round-robins slots across multiple selected segments', () => {
+    const tasks = segmentSlots(TEST_LOCAL_DAY, ZONE, ['manana', 'noche'], 3, 'reminder', seededRng(2));
 
-    const last = subWindow(startMinute, endMinute, 2, 3);
+    expect(tasks).toHaveLength(3);
+    const bounds = [DAY_SEGMENTS.manana, DAY_SEGMENTS.noche, DAY_SEGMENTS.manana];
+    tasks.forEach((task, i) => {
+      const minute = minuteOfDayUtc(new Date(task.atMillis));
+      expect(minute).toBeGreaterThanOrEqual(bounds[i].startMinute);
+      expect(minute).toBeLessThanOrEqual(bounds[i].endMinute);
+    });
+  });
 
-    expect(last[1]).toBe(endMinute);
+  it('returns no tasks when no segment is selected', () => {
+    expect(segmentSlots(TEST_LOCAL_DAY, ZONE, [], 3, 'reminder', seededRng(3))).toEqual([]);
+  });
+
+  it('skips an unrecognized segment key instead of throwing', () => {
+    const tasks = segmentSlots(TEST_LOCAL_DAY, ZONE, ['not-a-segment'], 1, 'reminder', seededRng(4));
+
+    expect(tasks).toEqual([]);
   });
 });
 

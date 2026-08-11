@@ -31,6 +31,13 @@ enum class NotificationChannelSpec(
         channelNameRes = R.string.notification_channel_reflection_name,
         channelDescriptionRes = R.string.notification_channel_reflection_description,
     ),
+    MOOD(
+        channelId = "affirmity_mood_checkin",
+        notificationId = 1005,
+        prefsPrefix = "mood",
+        channelNameRes = R.string.notification_channel_mood_name,
+        channelDescriptionRes = R.string.notification_channel_mood_description,
+    ),
     STREAK(
         channelId = "affirmity_streak_alerts",
         notificationId = 1003,

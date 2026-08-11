@@ -4,6 +4,7 @@ import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
+import com.pirxhio.affirmity.data.local.DaySegment
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import org.junit.Assert.assertEquals
@@ -23,8 +24,8 @@ private fun snapshotWith(
     healerUses = healerUses,
     meditationDurationSeconds = 300,
     notificationSettings = mapOf(
-        NotificationChannelSpec.REMINDER to ChannelSettings(true, 540, 1260),
-        NotificationChannelSpec.REFLECTION to ChannelSettings(false, 600, 900),
+        NotificationChannelSpec.REMINDER to ChannelSettings(true, setOf(DaySegment.MANANA, DaySegment.TARDE)),
+        NotificationChannelSpec.REFLECTION to ChannelSettings(false, setOf(DaySegment.NOCHE)),
     ),
     migratedAt = 1_700_000_000_000L,
 )

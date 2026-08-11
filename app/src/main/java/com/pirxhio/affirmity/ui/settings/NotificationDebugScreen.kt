@@ -37,7 +37,7 @@ fun NotificationDebugScreen(
     entries: List<NotificationLogEntry>,
     onClear: () -> Unit,
     onSendTestNotification: () -> Unit,
-    onSendTestReflectionNotification: () -> Unit,
+    onSendTestMoodNotification: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -54,8 +54,8 @@ fun NotificationDebugScreen(
         }
 
         item {
-            Button(onClick = onSendTestReflectionNotification, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.notification_debug_send_test_reflection_button))
+            Button(onClick = onSendTestMoodNotification, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.notification_debug_send_test_mood_button))
             }
         }
 

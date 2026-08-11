@@ -4,6 +4,7 @@ import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
+import com.pirxhio.affirmity.data.local.DaySegment
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 
@@ -79,20 +80,16 @@ fun streakHealerUseFromMap(map: Map<String, Any?>): StreakHealerUseEntity = Stre
     activatedAtMillis = (map[FIELD_ACTIVATED_AT_MILLIS] as Number).toLong(),
 )
 
-private const val DEFAULT_START_MINUTE = 540 // 09:00 — mirrors NotificationPreferences' default.
-private const val DEFAULT_END_MINUTE = 1260 // 21:00
-private const val REFLECTION_DEFAULT_START_MINUTE = 1200 // 20:00 — mirrors NotificationPreferences' default.
-private const val REFLECTION_DEFAULT_END_MINUTE = 1380 // 23:00
+private val DEFAULT_REMINDER_SEGMENTS = setOf(DaySegment.MANANA, DaySegment.TARDE) // mirrors NotificationPreferences' default.
+private val DEFAULT_NIGHT_SEGMENTS = setOf(DaySegment.NOCHE) // mirrors NotificationPreferences' default.
 
-private fun enabledKey(channel: NotificationChannelSpec) = "${channel.prefsPrefix}_enabled"
-private fun startMinuteKey(channel: NotificationChannelSpec) = "${channel.prefsPrefix}_startMinute"
-private fun endMinuteKey(channel: NotificationChannelSpec) = "${channel.prefsPrefix}_endMinute"
+fun enabledKey(channel: NotificationChannelSpec) = "${channel.prefsPrefix}_enabled"
+fun segmentsKey(channel: NotificationChannelSpec) = "${channel.prefsPrefix}_segments"
 
-private fun defaultStartMinute(channel: NotificationChannelSpec) =
-    if (channel == NotificationChannelSpec.REFLECTION) REFLECTION_DEFAULT_START_MINUTE else DEFAULT_START_MINUTE
-
-private fun defaultEndMinute(channel: NotificationChannelSpec) =
-    if (channel == NotificationChannelSpec.REFLECTION) REFLECTION_DEFAULT_END_MINUTE else DEFAULT_END_MINUTE
+private fun defaultSegments(channel: NotificationChannelSpec) = when (channel) {
+    NotificationChannelSpec.REFLECTION, NotificationChannelSpec.MOOD -> DEFAULT_NIGHT_SEGMENTS
+    else -> DEFAULT_REMINDER_SEGMENTS
+}
 
 /**
  * Produces a partial map keyed by [channel]'s prefix so both channels can share one
@@ -100,12 +97,13 @@ private fun defaultEndMinute(channel: NotificationChannelSpec) =
  */
 fun channelSettingsToMap(channel: NotificationChannelSpec, settings: ChannelSettings): Map<String, Any> = mapOf(
     enabledKey(channel) to settings.enabled,
-    startMinuteKey(channel) to settings.startMinute,
-    endMinuteKey(channel) to settings.endMinute,
+    segmentsKey(channel) to settings.segments.map { it.key },
 )
 
 fun channelSettingsFromMap(channel: NotificationChannelSpec, map: Map<String, Any?>): ChannelSettings = ChannelSettings(
     enabled = map[enabledKey(channel)] as? Boolean ?: false,
-    startMinute = (map[startMinuteKey(channel)] as? Number)?.toInt() ?: defaultStartMinute(channel),
-    endMinute = (map[endMinuteKey(channel)] as? Number)?.toInt() ?: defaultEndMinute(channel),
+    segments = (map[segmentsKey(channel)] as? List<*>)
+        ?.mapNotNull { key -> DaySegment.entries.find { it.key == key } }
+        ?.toSet()
+        ?: defaultSegments(channel),
 )

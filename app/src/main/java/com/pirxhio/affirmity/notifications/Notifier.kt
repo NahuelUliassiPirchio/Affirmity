@@ -37,7 +37,7 @@ class Notifier(
             context,
             channel.notificationId,
             Intent(context, MainActivity::class.java).apply {
-                if (channel == NotificationChannelSpec.REFLECTION) {
+                if (channel == NotificationChannelSpec.MOOD) {
                     putExtra(EXTRA_START_DESTINATION, AppDestinations.ANIMO.name)
                 }
             },
@@ -55,7 +55,7 @@ class Notifier(
         // Quick-answer CTA: each button opens the app straight on the mood sheet for today with
         // that value pre-selected, so answering "how was your day" doesn't require navigating there.
         var actionsAdded = 0
-        if (channel == NotificationChannelSpec.REFLECTION) {
+        if (channel == NotificationChannelSpec.MOOD) {
             MOOD_VALUES.forEach { moodValue ->
                 val actionIntent = PendingIntent.getActivity(
                     context,
@@ -73,14 +73,14 @@ class Notifier(
             // Android caps at 3 inline actions; some OEM shades show fewer depending on width), so
             // logging what we *built* is how a "menos botones de los que esperaba" report gets told
             // apart from an actual bug here.
-            Log.d(TAG, "reflection notification built with $actionsAdded mood actions (channel=${channel.name})")
+            Log.d(TAG, "mood notification built with $actionsAdded mood actions (channel=${channel.name})")
         }
 
         NotificationManagerCompat.from(context).notify(channel.notificationId, builder.build())
         debugLog.record(
             channel,
             NotificationLogEvent.NOTIFY_POSTED,
-            detail = if (channel == NotificationChannelSpec.REFLECTION) "acciones agregadas: $actionsAdded" else "",
+            detail = if (channel == NotificationChannelSpec.MOOD) "acciones agregadas: $actionsAdded" else "",
         )
     }
 

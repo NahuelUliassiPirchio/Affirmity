@@ -36,6 +36,10 @@ class AffirmityMessagingService : FirebaseMessagingService() {
                 getString(R.string.notification_reflection_title) to
                     ReflectionPromptProvider.randomPrompt(applicationContext)
 
+            NotificationChannelSpec.MOOD ->
+                getString(R.string.notification_mood_title) to
+                    getString(R.string.notification_mood_fallback_body)
+
             NotificationChannelSpec.STREAK ->
                 getString(R.string.notification_streak_title) to
                     getString(R.string.notification_streak_fallback_body)

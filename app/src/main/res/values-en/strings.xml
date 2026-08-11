@@ -3,16 +3,20 @@
 
     <string name="notification_channel_reminder_name">Reminders</string>
     <string name="notification_channel_reminder_description">Nudges to meditate or view affirmations</string>
-    <string name="notification_channel_reflection_name">Reflection questions</string>
-    <string name="notification_channel_reflection_description">Daily questions to reflect on</string>
+    <string name="notification_channel_reflection_name">Compass Questions</string>
+    <string name="notification_channel_reflection_description">Honest prompts for a moment of self-inquiry</string>
     <string name="notification_channel_streak_name">Streak at risk</string>
     <string name="notification_channel_streak_description">Alerts when your streak is about to end</string>
     <string name="notification_channel_healer_name">Streak healer</string>
     <string name="notification_channel_healer_description">Alerts when you have a healer available to save your streak</string>
+    <string name="notification_channel_mood_name">Mood check-in</string>
+    <string name="notification_channel_mood_description">A nudge to log how you felt today</string>
 
     <string name="notification_reminder_title">A moment for you</string>
     <string name="notification_reminder_fallback_body">Take a moment to meditate or view your affirmations.</string>
-    <string name="notification_reflection_title">Take a moment to reflect</string>
+    <string name="notification_reflection_title">A moment of honesty</string>
+    <string name="notification_mood_title">How did you feel today?</string>
+    <string name="notification_mood_fallback_body">Tap an emoji to log today\'s mood.</string>
     <string name="notification_streak_title">Your streak is about to end</string>
     <string name="notification_streak_fallback_body">You can still complete today and keep your streak.</string>
     <string name="notification_healer_title">Your streak broke, but you have a healer</string>
@@ -22,43 +26,74 @@
         <item>Today\'s Monday — how did you feel?</item>
         <item>Starting the week off. How did you come into today?</item>
         <item>Monday again. How was your mood today?</item>
+        <item>What\'s the most honest thing you could tell yourself today?</item>
+        <item>Is there something you\'ve been avoiding looking at this week?</item>
+        <item>Where\'s your compass pointing today — inward or outward?</item>
+        <item>What uncomfortable truth could you admit to yourself today?</item>
     </string-array>
     <string-array name="reflection_prompts_tuesday">
         <item>Today\'s Tuesday — how did you feel?</item>
         <item>How\'s this Tuesday going? Tell us how you felt.</item>
         <item>Another Tuesday. How was your mood today?</item>
+        <item>What are you feeling that you haven\'t named yet?</item>
+        <item>Who do you owe an honest conversation to?</item>
+        <item>What part of yourself have you been ignoring lately?</item>
+        <item>If you were fully honest with yourself, what would you change today?</item>
     </string-array>
     <string-array name="reflection_prompts_wednesday">
         <item>Today\'s Wednesday — how did you feel?</item>
         <item>Midweek. How did you come into today?</item>
         <item>How was your mood this Wednesday?</item>
+        <item>What\'s hard for you to accept about yourself right now?</item>
+        <item>Is there an excuse you keep repeating to yourself? Is it even true?</item>
+        <item>What do you need to hear from yourself today?</item>
+        <item>When today did you feel most like yourself?</item>
     </string-array>
     <string-array name="reflection_prompts_thursday">
         <item>Today\'s Thursday — how did you feel?</item>
         <item>Almost there. How was your mood today?</item>
         <item>Another Thursday. Tell us how you felt.</item>
+        <item>What truth about yourself is hard to accept?</item>
+        <item>What are you putting off out of fear, not lack of time?</item>
+        <item>Where do you feel you\'re not being fully honest with yourself?</item>
+        <item>What would your inner compass tell you if you listened today?</item>
     </string-array>
     <string-array name="reflection_prompts_friday">
         <item>Today\'s Friday — how did you feel?</item>
         <item>You made it to Friday. How did you come into today?</item>
         <item>How was your mood this Friday?</item>
+        <item>Looking back at the week, what did you avoid feeling?</item>
+        <item>What decision did you make this week without being fully honest with yourself?</item>
+        <item>What do you need to let go of before the weekend starts?</item>
+        <item>What\'s the most real thing that happened to you this week?</item>
     </string-array>
     <string-array name="reflection_prompts_saturday">
         <item>Today\'s Saturday — how did you feel?</item>
         <item>Weekend\'s here. How did you come into today?</item>
         <item>How was your mood this Saturday?</item>
+        <item>With nothing to check off today, what are you really feeling?</item>
+        <item>What part of your life needs more honesty?</item>
+        <item>What would you like to admit to yourself today that you\'d never say out loud?</item>
+        <item>Where has your compass been pointing lately?</item>
     </string-array>
     <string-array name="reflection_prompts_sunday">
         <item>Today\'s Sunday — how did you feel?</item>
         <item>Last day of the weekend. How did you come into today?</item>
         <item>How was your mood this Sunday?</item>
+        <item>Before next week starts, what do you need to acknowledge?</item>
+        <item>What truth do you want to carry forward from this week?</item>
+        <item>What honest intention would you like to start next week with?</item>
+        <item>What uncomfortable truth could you admit to yourself today?</item>
     </string-array>
 
     <string name="settings_title">Settings</string>
     <string name="settings_reminders_label">Reminders</string>
-    <string name="settings_reflection_label">Reflection questions</string>
-    <string name="settings_window_start_label">From</string>
-    <string name="settings_window_end_label">To</string>
+    <string name="settings_reflection_label">Compass Questions</string>
+    <string name="settings_mood_label">Mood check-in</string>
+    <string name="settings_segment_madrugada">Late night (12–6 AM)</string>
+    <string name="settings_segment_manana">Morning (6 AM–12 PM)</string>
+    <string name="settings_segment_tarde">Afternoon (12–6 PM)</string>
+    <string name="settings_segment_noche">Night (6 PM–12 AM)</string>
     <string name="settings_permission_banner_text">Notifications are turned off in system settings</string>
     <string name="settings_permission_banner_action">Open settings</string>
 
@@ -130,7 +165,7 @@
     <string name="mood_detail_save_button">Save</string>
 
     <string name="notification_debug_send_test_button">Send a test notification now</string>
-    <string name="notification_debug_send_test_reflection_button">Send a test reflection notification</string>
+    <string name="notification_debug_send_test_mood_button">Send a test mood notification</string>
     <string name="notification_debug_clear_history_button">Clear history</string>
     <string name="notification_debug_empty_message">No activity logged yet. Wait for the next scheduled time, or change the window in Settings to trigger it sooner.</string>
 
@@ -178,8 +213,6 @@
 
     <string name="settings_notification_debug_title">Notification debug</string>
     <string name="settings_notification_debug_view_history_button">View history</string>
-    <string name="settings_time_picker_cancel">Cancel</string>
-    <string name="settings_time_picker_ok">OK</string>
     <string name="settings_language_title">Language</string>
     <string name="settings_language_system">Follow system language</string>
     <string name="settings_language_spanish">Español</string>

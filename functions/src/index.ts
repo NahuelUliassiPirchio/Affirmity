@@ -132,16 +132,16 @@ async function loadActiveUserInputs(): Promise<UserPlanInput[]> {
     inputs.push({
       uid,
       localDay,
-      // Field names mirror FirestoreNotificationSettingsRepository.kt's
-      // "${channel.prefsPrefix}_..." convention (prefsPrefix "reminder"/"reflection"), not the
-      // interface's own camelCase property names.
+      // Field names mirror FirestoreMappers.kt's "${channel.prefsPrefix}_..." convention
+      // (prefsPrefix "reminder"/"reflection"), not the interface's own camelCase property names.
+      // "_segments" holds an array of DaySegment.key strings (e.g. "manana", "noche").
       settings: {
         remindersEnabled: Boolean(data.reminder_enabled),
         reflectionEnabled: Boolean(data.reflection_enabled),
-        reminderStartMinute: Number(data.reminder_startMinute ?? 0),
-        reminderEndMinute: Number(data.reminder_endMinute ?? 0),
-        reflectionStartMinute: Number(data.reflection_startMinute ?? 0),
-        reflectionEndMinute: Number(data.reflection_endMinute ?? 0),
+        moodEnabled: Boolean(data.mood_enabled),
+        reminderSegments: Array.isArray(data.reminder_segments) ? data.reminder_segments : [],
+        reflectionSegments: Array.isArray(data.reflection_segments) ? data.reflection_segments : [],
+        moodSegments: Array.isArray(data.mood_segments) ? data.mood_segments : [],
         timeZone: zone,
       },
       completions: completionsSnap.docs.map((d: QueryDocumentSnapshot) => ({
@@ -200,9 +200,9 @@ export const sendNotification = onRequest(async (req, res) => {
 
   const db = getFirestore();
 
-  // Reflection prompt is redundant once the user already logged today's mood between planning
+  // The mood check-in is redundant once the user already logged today's mood between planning
   // time (PLANNING_LOCAL_HOUR, early morning) and this task actually firing tonight.
-  if (channel === 'reflection' && typeof localDay === 'number') {
+  if (channel === 'mood' && typeof localDay === 'number') {
     const moodDoc = await db.doc(`users/${uid}/dailyMoods/${localDay}`).get();
     if (moodDoc.exists) {
       res.status(200).send('Skipped: mood already logged');

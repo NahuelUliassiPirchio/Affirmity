@@ -30,6 +30,7 @@ import com.pirxhio.affirmity.data.local.AffirmityDatabase
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
 import com.pirxhio.affirmity.data.local.DailyViewCount
+import com.pirxhio.affirmity.data.local.DaySegment
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.NotificationLogEntry
 import com.pirxhio.affirmity.data.local.NotificationPreferences
@@ -218,10 +219,13 @@ class AffirmityAppState(
     var meditationDurationSeconds = mutableStateOf<Int?>(null)
         private set
 
-    var reminderSettings = mutableStateOf(ChannelSettings(enabled = false, startMinute = 540, endMinute = 1260))
+    var reminderSettings = mutableStateOf(ChannelSettings(enabled = false, segments = emptySet()))
         private set
 
-    var reflectionSettings = mutableStateOf(ChannelSettings(enabled = false, startMinute = 540, endMinute = 1260))
+    var reflectionSettings = mutableStateOf(ChannelSettings(enabled = false, segments = emptySet()))
+        private set
+
+    var moodSettings = mutableStateOf(ChannelSettings(enabled = false, segments = emptySet()))
         private set
 
     var notificationDebugEntries = mutableStateListOf<NotificationLogEntry>()
@@ -287,6 +291,7 @@ class AffirmityAppState(
             notificationSettings = mapOf(
                 NotificationChannelSpec.REMINDER to local.notifications.observe(NotificationChannelSpec.REMINDER).first(),
                 NotificationChannelSpec.REFLECTION to local.notifications.observe(NotificationChannelSpec.REFLECTION).first(),
+                NotificationChannelSpec.MOOD to local.notifications.observe(NotificationChannelSpec.MOOD).first(),
             ),
             migratedAt = System.currentTimeMillis(),
         )
@@ -372,6 +377,11 @@ class AffirmityAppState(
             session.flatMapLatest { it.notifications.observe(NotificationChannelSpec.REFLECTION) }
                 .catch { error -> Log.e(TAG, "reflection settings flow failed", error) }
                 .collect { reflectionSettings.value = it }
+        }
+        scope.launch {
+            session.flatMapLatest { it.notifications.observe(NotificationChannelSpec.MOOD) }
+                .catch { error -> Log.e(TAG, "mood settings flow failed", error) }
+                .collect { moodSettings.value = it }
         }
         scope.launch {
             // Signed-in FCM token registration + IANA timezone sync (design.md's "Timezone"
@@ -469,14 +479,13 @@ class AffirmityAppState(
         }
     }
 
-    /** Same as [sendTestNotification] but on the reflection channel, so the mood-value action
-     * buttons (and the tap-to-open-Ánimo behavior) can be tried without waiting for the nightly
-     * window. */
-    fun sendTestReflectionNotification() {
+    /** Same as [sendTestNotification] but on the mood channel, so the mood-value action buttons
+     * (and the tap-to-open-Ánimo behavior) can be tried without waiting for the nightly window. */
+    fun sendTestMoodNotification() {
         scope.launch {
             notifier.notify(
-                channel = NotificationChannelSpec.REFLECTION,
-                title = "Hoy, ¿cómo te sentiste?",
+                channel = NotificationChannelSpec.MOOD,
+                title = "¿Cómo te sentiste hoy?",
                 body = "Notificación de prueba: tocá un emoji para abrir tu ánimo de hoy con esa opción elegida.",
             )
         }
@@ -489,14 +498,14 @@ class AffirmityAppState(
     }
 
     /**
-     * [NotificationChannelSpec.STREAK] has no configurable time window (spec: it fires once at a
+     * [NotificationChannelSpec.STREAK] has no configurable segments (spec: it fires once at a
      * fixed 20:00 user-local instant, evaluated server-side) — calling this for it is a no-op
      * rather than an exhaustive `when` branch, since there is nothing to persist.
      */
-    fun setChannelWindow(channel: NotificationChannelSpec, startMinute: Int, endMinute: Int) {
+    fun setChannelSegments(channel: NotificationChannelSpec, segments: Set<DaySegment>) {
         if (channel == NotificationChannelSpec.STREAK) return
         scope.launch {
-            ready().notifications.setWindow(channel, startMinute, endMinute)
+            ready().notifications.setSegments(channel, segments)
         }
     }
 

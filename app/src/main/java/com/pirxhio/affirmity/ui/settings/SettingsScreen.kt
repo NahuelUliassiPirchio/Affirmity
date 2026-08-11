@@ -5,6 +5,7 @@ import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,33 +13,26 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.auth.AuthState
 import com.pirxhio.affirmity.data.local.ChannelSettings
+import com.pirxhio.affirmity.data.local.DaySegment
 
 /** Follow-system default plus the two supported explicit languages (spec: `In-App Language
  * Selection`). Maps to/from a BCP-47 language tag rather than [LocaleListCompat] directly so the
@@ -67,13 +61,16 @@ enum class LanguageOption {
 fun SettingsScreen(
     reminderSettings: ChannelSettings,
     reflectionSettings: ChannelSettings,
+    moodSettings: ChannelSettings,
     notificationsPermissionGranted: Boolean,
     authState: AuthState,
     syncError: String? = null,
     onReminderEnabledChanged: (Boolean) -> Unit,
-    onReminderWindowChanged: (startMinute: Int, endMinute: Int) -> Unit,
+    onReminderSegmentsChanged: (Set<DaySegment>) -> Unit,
     onReflectionEnabledChanged: (Boolean) -> Unit,
-    onReflectionWindowChanged: (startMinute: Int, endMinute: Int) -> Unit,
+    onReflectionSegmentsChanged: (Set<DaySegment>) -> Unit,
+    onMoodEnabledChanged: (Boolean) -> Unit,
+    onMoodSegmentsChanged: (Set<DaySegment>) -> Unit,
     onOpenNotificationDebug: () -> Unit,
     onSignOutClicked: () -> Unit,
     modifier: Modifier = Modifier,
@@ -94,7 +91,7 @@ fun SettingsScreen(
                 label = stringResource(id = R.string.settings_reminders_label),
                 settings = reminderSettings,
                 onEnabledChanged = onReminderEnabledChanged,
-                onWindowChanged = onReminderWindowChanged,
+                onSegmentsChanged = onReminderSegmentsChanged,
             )
         }
 
@@ -103,7 +100,16 @@ fun SettingsScreen(
                 label = stringResource(id = R.string.settings_reflection_label),
                 settings = reflectionSettings,
                 onEnabledChanged = onReflectionEnabledChanged,
-                onWindowChanged = onReflectionWindowChanged,
+                onSegmentsChanged = onReflectionSegmentsChanged,
+            )
+        }
+
+        item {
+            ChannelSettingsCard(
+                label = stringResource(id = R.string.settings_mood_label),
+                settings = moodSettings,
+                onEnabledChanged = onMoodEnabledChanged,
+                onSegmentsChanged = onMoodSegmentsChanged,
             )
         }
 
@@ -211,11 +217,8 @@ private fun ChannelSettingsCard(
     label: String,
     settings: ChannelSettings,
     onEnabledChanged: (Boolean) -> Unit,
-    onWindowChanged: (startMinute: Int, endMinute: Int) -> Unit,
+    onSegmentsChanged: (Set<DaySegment>) -> Unit,
 ) {
-    var editingStart by remember { mutableStateOf(false) }
-    var editingEnd by remember { mutableStateOf(false) }
-
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(
@@ -227,69 +230,27 @@ private fun ChannelSettingsCard(
                 Switch(checked = settings.enabled, onCheckedChange = onEnabledChanged)
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                TextButton(onClick = { editingStart = true }) {
-                    Text("${stringResource(id = R.string.settings_window_start_label)}: ${formatMinute(settings.startMinute)}")
-                }
-                TextButton(onClick = { editingEnd = true }) {
-                    Text("${stringResource(id = R.string.settings_window_end_label)}: ${formatMinute(settings.endMinute)}")
-                }
-            }
-        }
-    }
-
-    if (editingStart) {
-        TimePickerDialogHost(
-            initialMinute = settings.startMinute,
-            onDismiss = { editingStart = false },
-            onConfirm = { newStart ->
-                editingStart = false
-                val newEnd = maxOf(newStart, settings.endMinute)
-                onWindowChanged(newStart, newEnd)
-            },
-        )
-    }
-
-    if (editingEnd) {
-        TimePickerDialogHost(
-            initialMinute = settings.endMinute,
-            onDismiss = { editingEnd = false },
-            onConfirm = { newEnd ->
-                editingEnd = false
-                val newStart = minOf(settings.startMinute, newEnd)
-                onWindowChanged(newStart, newEnd)
-            },
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TimePickerDialogHost(
-    initialMinute: Int,
-    onDismiss: () -> Unit,
-    onConfirm: (Int) -> Unit,
-) {
-    val state = rememberTimePickerState(
-        initialHour = initialMinute / 60,
-        initialMinute = initialMinute % 60,
-        is24Hour = true,
-    )
-    Dialog(onDismissRequest = onDismiss) {
-        Card {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                TimePicker(state = state)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                ) {
-                    TextButton(onClick = onDismiss) { Text(stringResource(id = R.string.settings_time_picker_cancel)) }
-                    Button(onClick = { onConfirm(state.hour * 60 + state.minute) }) { Text(stringResource(id = R.string.settings_time_picker_ok)) }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                DaySegment.entries.forEach { segment ->
+                    val selected = segment in settings.segments
+                    FilterChip(
+                        selected = selected,
+                        onClick = {
+                            onSegmentsChanged(
+                                if (selected) settings.segments - segment else settings.segments + segment,
+                            )
+                        },
+                        label = { Text(stringResource(id = segmentLabelRes(segment))) },
+                    )
                 }
             }
         }
     }
 }
 
-private fun formatMinute(minute: Int): String =
-    "%02d:%02d".format(minute / 60, minute % 60)
+private fun segmentLabelRes(segment: DaySegment): Int = when (segment) {
+    DaySegment.MADRUGADA -> R.string.settings_segment_madrugada
+    DaySegment.MANANA -> R.string.settings_segment_manana
+    DaySegment.TARDE -> R.string.settings_segment_tarde
+    DaySegment.NOCHE -> R.string.settings_segment_noche
+}

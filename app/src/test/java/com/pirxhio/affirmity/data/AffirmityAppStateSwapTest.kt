@@ -9,6 +9,7 @@ import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
 import com.pirxhio.affirmity.data.local.DailyViewCount
+import com.pirxhio.affirmity.data.local.DaySegment
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
@@ -120,7 +121,7 @@ private class FakeNotificationSettingsRepository(
 ) : NotificationSettingsRepository {
     override fun observe(channel: NotificationChannelSpec): Flow<ChannelSettings> = flow
     override suspend fun setEnabled(channel: NotificationChannelSpec, enabled: Boolean) = Unit
-    override suspend fun setWindow(channel: NotificationChannelSpec, startMinute: Int, endMinute: Int) = Unit
+    override suspend fun setSegments(channel: NotificationChannelSpec, segments: Set<DaySegment>) = Unit
     override suspend fun setTimeZone(zoneId: String) = Unit
 }
 
@@ -164,7 +165,7 @@ private fun fakeLocal(events: MutableList<String>, id: String = "local-1"): Data
     healerUses = FakeStreakHealerRepository(EventedFlow("local-healerUses", events, listOf(emptyList()))),
     meditation = FakeMeditationPreferencesRepository(EventedFlow("local-meditation", events, listOf(600))),
     notifications = FakeNotificationSettingsRepository(
-        EventedFlow("local-notifications", events, listOf(ChannelSettings(enabled = false, startMinute = 540, endMinute = 1260))),
+        EventedFlow("local-notifications", events, listOf(ChannelSettings(enabled = false, segments = setOf(DaySegment.MANANA, DaySegment.TARDE)))),
     ),
 )
 
@@ -178,7 +179,7 @@ private fun fakeRemote(uid: String, events: MutableList<String>, id: String = "r
     healerUses = FakeStreakHealerRepository(EventedFlow("remote-healerUses", events, listOf(emptyList()))),
     meditation = FakeMeditationPreferencesRepository(EventedFlow("remote-meditation", events, listOf(600))),
     notifications = FakeNotificationSettingsRepository(
-        EventedFlow("remote-notifications", events, listOf(ChannelSettings(enabled = false, startMinute = 540, endMinute = 1260))),
+        EventedFlow("remote-notifications", events, listOf(ChannelSettings(enabled = false, segments = setOf(DaySegment.MANANA, DaySegment.TARDE)))),
     ),
 )
 

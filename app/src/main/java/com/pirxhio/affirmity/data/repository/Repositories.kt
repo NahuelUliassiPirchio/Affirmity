@@ -4,6 +4,7 @@ import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
+import com.pirxhio.affirmity.data.local.DaySegment
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import kotlinx.coroutines.flow.Flow
@@ -56,7 +57,7 @@ interface MeditationPreferencesRepository {
 interface NotificationSettingsRepository {
     fun observe(channel: NotificationChannelSpec): Flow<ChannelSettings>
     suspend fun setEnabled(channel: NotificationChannelSpec, enabled: Boolean)
-    suspend fun setWindow(channel: NotificationChannelSpec, startMinute: Int, endMinute: Int)
+    suspend fun setSegments(channel: NotificationChannelSpec, segments: Set<DaySegment>)
 
     /**
      * Persists the device's IANA timezone id so the server planner can compute this user's

@@ -200,7 +200,7 @@ fun AffirmityApp(
                 entries = appState.notificationDebugEntries,
                 onClear = { appState.clearNotificationDebugLog() },
                 onSendTestNotification = { appState.sendTestNotification() },
-                onSendTestReflectionNotification = { appState.sendTestReflectionNotification() },
+                onSendTestMoodNotification = { appState.sendTestMoodNotification() },
             )
         }
         return
@@ -228,6 +228,7 @@ fun AffirmityApp(
                 modifier = Modifier.padding(innerPadding),
                 reminderSettings = appState.reminderSettings.value,
                 reflectionSettings = appState.reflectionSettings.value,
+                moodSettings = appState.moodSettings.value,
                 notificationsPermissionGranted = notificationsPermissionGranted,
                 authState = appState.authState.value,
                 syncError = appState.syncError.value,
@@ -238,11 +239,10 @@ fun AffirmityApp(
                         enabled
                     )
                 },
-                onReminderWindowChanged = { start, end ->
-                    appState.setChannelWindow(
+                onReminderSegmentsChanged = { segments ->
+                    appState.setChannelSegments(
                         NotificationChannelSpec.REMINDER,
-                        start,
-                        end
+                        segments
                     )
                 },
                 onReflectionEnabledChanged = { enabled ->
@@ -251,11 +251,22 @@ fun AffirmityApp(
                         enabled
                     )
                 },
-                onReflectionWindowChanged = { start, end ->
-                    appState.setChannelWindow(
+                onReflectionSegmentsChanged = { segments ->
+                    appState.setChannelSegments(
                         NotificationChannelSpec.REFLECTION,
-                        start,
-                        end
+                        segments
+                    )
+                },
+                onMoodEnabledChanged = { enabled ->
+                    appState.setChannelEnabled(
+                        NotificationChannelSpec.MOOD,
+                        enabled
+                    )
+                },
+                onMoodSegmentsChanged = { segments ->
+                    appState.setChannelSegments(
+                        NotificationChannelSpec.MOOD,
+                        segments
                     )
                 },
                 onOpenNotificationDebug = { showNotificationDebug = true },

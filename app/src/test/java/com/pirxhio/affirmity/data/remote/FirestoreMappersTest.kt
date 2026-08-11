@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.data.remote
 import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
+import com.pirxhio.affirmity.data.local.DaySegment
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import org.junit.Assert.assertEquals
@@ -42,7 +43,7 @@ class FirestoreMappersTest {
 
     @Test
     fun `channel settings round-trip for the reminder channel and no streak field is ever produced`() {
-        val settings = ChannelSettings(enabled = true, startMinute = 480, endMinute = 1200)
+        val settings = ChannelSettings(enabled = true, segments = setOf(DaySegment.MANANA))
 
         val map = channelSettingsToMap(NotificationChannelSpec.REMINDER, settings)
         val roundTripped = channelSettingsFromMap(NotificationChannelSpec.REMINDER, map)
@@ -53,8 +54,8 @@ class FirestoreMappersTest {
 
     @Test
     fun `channel settings round-trip for the reflection channel independently of the reminder channel`() {
-        val reminder = ChannelSettings(enabled = false, startMinute = 540, endMinute = 1260)
-        val reflection = ChannelSettings(enabled = true, startMinute = 600, endMinute = 900)
+        val reminder = ChannelSettings(enabled = false, segments = setOf(DaySegment.MANANA, DaySegment.TARDE))
+        val reflection = ChannelSettings(enabled = true, segments = setOf(DaySegment.NOCHE))
 
         val combined = channelSettingsToMap(NotificationChannelSpec.REMINDER, reminder) +
             channelSettingsToMap(NotificationChannelSpec.REFLECTION, reflection)

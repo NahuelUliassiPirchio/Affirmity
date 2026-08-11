@@ -5,24 +5,25 @@
  * for one user never abort the pass (`planAllUsers`'s per-user try/catch).
  */
 
-import { subWindow, slotInstant } from './schedule';
+import { segmentSlots, slotInstant } from './schedule';
 import { currentStreak, shouldFireStreakAlert, type Completion } from './streak';
 import { shouldFireHealerAlert, type HealerUse } from './healer';
 
 export const REMINDER_SLOT_COUNT = 3;
 export const REFLECTION_SLOT_COUNT = 3;
+export const MOOD_SLOT_COUNT = 1;
 export const STREAK_ALERT_MINUTE = 20 * 60; // 20:00 user-local time
 export const HEALER_ALERT_MINUTE = 20 * 60; // 20:00 user-local time
 
-export type NotificationChannel = 'reminder' | 'reflection' | 'streak' | 'healer';
+export type NotificationChannel = 'reminder' | 'reflection' | 'mood' | 'streak' | 'healer';
 
 export interface NotificationSettings {
   remindersEnabled: boolean;
   reflectionEnabled: boolean;
-  reminderStartMinute: number;
-  reminderEndMinute: number;
-  reflectionStartMinute: number;
-  reflectionEndMinute: number;
+  moodEnabled: boolean;
+  reminderSegments: string[];
+  reflectionSegments: string[];
+  moodSegments: string[];
   timeZone: string | null;
 }
 
@@ -65,24 +66,6 @@ export interface TaskEnqueuer {
   enqueue(task: PlannedTask): Promise<{ created: boolean }>;
 }
 
-function windowSlots(
-  localDay: number,
-  zone: string,
-  startMinute: number,
-  endMinute: number,
-  slotCount: number,
-  channel: NotificationChannel,
-  rng: () => number,
-): PlannedTask[] {
-  const tasks: PlannedTask[] = [];
-  for (let i = 0; i < slotCount; i++) {
-    const [subStart, subEnd] = subWindow(startMinute, endMinute, i, slotCount);
-    const instant = slotInstant(localDay, zone, subStart, subEnd, rng);
-    tasks.push({ uid: '', localDay, channel, slot: i, atMillis: instant.getTime() });
-  }
-  return tasks;
-}
-
 /** Pure: computes this user's tasks for one local day. No I/O. */
 export function planUserTasks(input: UserPlanInput, rng: () => number = Math.random): PlannedTask[] {
   const { settings, completions, healerUses, localDay, uid } = input;
@@ -93,30 +76,18 @@ export function planUserTasks(input: UserPlanInput, rng: () => number = Math.ran
 
   if (settings.remindersEnabled) {
     tasks.push(
-      ...windowSlots(
-        localDay,
-        zone,
-        settings.reminderStartMinute,
-        settings.reminderEndMinute,
-        REMINDER_SLOT_COUNT,
-        'reminder',
-        rng,
-      ),
+      ...segmentSlots(localDay, zone, settings.reminderSegments, REMINDER_SLOT_COUNT, 'reminder', rng),
     );
   }
 
   if (settings.reflectionEnabled) {
     tasks.push(
-      ...windowSlots(
-        localDay,
-        zone,
-        settings.reflectionStartMinute,
-        settings.reflectionEndMinute,
-        REFLECTION_SLOT_COUNT,
-        'reflection',
-        rng,
-      ),
+      ...segmentSlots(localDay, zone, settings.reflectionSegments, REFLECTION_SLOT_COUNT, 'reflection', rng),
     );
+  }
+
+  if (settings.moodEnabled) {
+    tasks.push(...segmentSlots(localDay, zone, settings.moodSegments, MOOD_SLOT_COUNT, 'mood', rng));
   }
 
   if (shouldFireStreakAlert(completions, localDay)) {
