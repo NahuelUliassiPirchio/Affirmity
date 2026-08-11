@@ -97,11 +97,14 @@ data class Affirmation(
     val groupId: String = PERSONALIZADAS_GROUP_ID,
 )
 
-/** Rolling last-7-days completion flags (oldest first, today last) for a habit tracker. */
+/** Rolling last-7-days completion flags (oldest first, today last) for a habit tracker.
+ * [healedDays] holds the same-indexed offsets that were saved by the streak healer instead of
+ * actually completed — rendered as a mending heart instead of the usual dot/empty circle. */
 data class WeeklyStreak(
     val completedDays: List<Boolean>,
     val streakDays: Int,
     val dayLabels: List<String> = List(7) { "" },
+    val healedDays: Set<Int> = emptySet(),
 )
 
 /** Solid-color background, or the placeholder tint shown behind an image while it decodes. */
@@ -397,18 +400,6 @@ class AffirmityAppState(
                 ) { completionRows, healerRows -> completionRows to healerRows }
             }.catch { error -> Log.e(TAG, "completions/healer flow failed", error) }
                 .collect { (rows, healerRows) ->
-                affirmationsStreak.value = DailyCompletionStats.toWeeklyStreak(
-                    rows = rows,
-                    weekStartEpochDay = windowStart,
-                    todayEpochDay = today,
-                    isDone = { it.affirmationDone },
-                ).copy(dayLabels = dayLabels)
-                meditationStreak.value = DailyCompletionStats.toWeeklyStreak(
-                    rows = rows,
-                    weekStartEpochDay = windowStart,
-                    todayEpochDay = today,
-                    isDone = { it.meditationDone },
-                ).copy(dayLabels = dayLabels)
                 val newHealerState = StreakHealerStats.evaluate(
                     rows = rows,
                     uses = healerRows,
@@ -416,6 +407,21 @@ class AffirmityAppState(
                     startEpochDay = healerStart,
                     streakStartEpochDay = StreakHealerStats.rawStreakStartEpochDay(today),
                 )
+                val healedIndices = (0 until 7)
+                    .filter { offset -> (windowStart + offset) in newHealerState.healedDays }
+                    .toSet()
+                affirmationsStreak.value = DailyCompletionStats.toWeeklyStreak(
+                    rows = rows,
+                    weekStartEpochDay = windowStart,
+                    todayEpochDay = today,
+                    isDone = { it.affirmationDone },
+                ).copy(dayLabels = dayLabels, healedDays = healedIndices)
+                meditationStreak.value = DailyCompletionStats.toWeeklyStreak(
+                    rows = rows,
+                    weekStartEpochDay = windowStart,
+                    todayEpochDay = today,
+                    isDone = { it.meditationDone },
+                ).copy(dayLabels = dayLabels, healedDays = healedIndices)
                 if (healerFlowInitialized && newHealerState.healerHeld && !streakHealer.value.healerHeld) {
                     healerJustGranted.value = true
                 }

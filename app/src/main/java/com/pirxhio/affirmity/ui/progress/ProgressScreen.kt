@@ -49,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
@@ -308,16 +309,20 @@ fun WeeklyStreakTracker(
             ) {
                 streak.dayLabels.forEachIndexed { index, label ->
                     val completed = streak.completedDays.getOrElse(index) { false }
+                    val healed = index in streak.healedDays
                     Box(
                         modifier = Modifier
                             .size(32.dp)
                             .background(
-                                color = if (completed) MaterialTheme.colorScheme.onSurface
-                                else MaterialTheme.colorScheme.surfaceContainerHighest,
+                                color = when {
+                                    healed -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                    completed -> MaterialTheme.colorScheme.onSurface
+                                    else -> MaterialTheme.colorScheme.surfaceContainerHighest
+                                },
                                 shape = CircleShape
                             )
                             .then(
-                                if (!completed) Modifier.border(
+                                if (!completed && !healed) Modifier.border(
                                     1.dp,
                                     MaterialTheme.colorScheme.outlineVariant,
                                     CircleShape
@@ -325,12 +330,23 @@ fun WeeklyStreakTracker(
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (completed) MaterialTheme.colorScheme.surface
-                            else MaterialTheme.colorScheme.outline
-                        )
+                        if (healed) {
+                            // Multi-color mending-heart drawable — Unspecified keeps its own
+                            // colors instead of being flattened to a single tint.
+                            Icon(
+                                painter = painterResource(R.drawable.ic_heart_mended),
+                                contentDescription = stringResource(R.string.progress_healed_day_content_description),
+                                tint = Color.Unspecified,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        } else {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (completed) MaterialTheme.colorScheme.surface
+                                else MaterialTheme.colorScheme.outline
+                            )
+                        }
                     }
                 }
             }

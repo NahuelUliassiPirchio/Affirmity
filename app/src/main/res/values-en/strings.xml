@@ -191,6 +191,7 @@
     <string name="progress_streak_healer_activate_button">Activate healer</string>
     <string name="progress_streak_healer_used_today_body">Healer activated: your overall streak stays intact.</string>
     <string name="progress_streak_healer_held_body">You have 1 healer saved for the next day you miss.</string>
+    <string name="progress_healed_day_content_description">Day healed by the streak healer</string>
     <string name="healer_granted_title">You got a streak healer!</string>
     <string name="healer_granted_subtitle">Two days in a row completing your habits. Not bad.</string>
     <string name="healer_granted_explanation">A healer protects your overall streak if you ever forget to complete your habits: you activate it the next day, and that day counts as if you\'d done it. You can hold up to 1 healer at a time, and it doesn\'t replace what you do today — it just gives you room for one slip-up.</string>

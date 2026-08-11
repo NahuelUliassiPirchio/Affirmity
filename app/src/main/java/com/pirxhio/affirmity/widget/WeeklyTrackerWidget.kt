@@ -97,6 +97,7 @@ class WeeklyTrackerWidget : GlanceAppWidget() {
         val allRows: List<DailyCompletionEntity>
         val generalStreakDays: Int
         val isTodayDone: Boolean
+        val healedDays: Set<Long>
         if (uid != null) {
             val firestore = FirebaseFirestore.getInstance()
             hasAny = firestore.collection(FirestorePaths.dailyCompletionsCollection(uid))
@@ -108,6 +109,7 @@ class WeeklyTrackerWidget : GlanceAppWidget() {
             )
             generalStreakDays = streakHealer.generalStreakDays
             isTodayDone = streakHealer.isTodayDone
+            healedDays = streakHealer.healedDays
         } else {
             val database = AffirmityDatabase.getInstance(context)
             val dao = database.dailyCompletionDao()
@@ -119,6 +121,7 @@ class WeeklyTrackerWidget : GlanceAppWidget() {
             )
             generalStreakDays = streakHealer.generalStreakDays
             isTodayDone = streakHealer.isTodayDone
+            healedDays = streakHealer.healedDays
         }
         val rows = allRows.filter { it.epochDay in weekStart..(weekStart + 6) }
         val todayIndex = (today - weekStart).toInt().coerceIn(0, 6)
@@ -132,6 +135,7 @@ class WeeklyTrackerWidget : GlanceAppWidget() {
                 dayLetters = dayLetters,
                 generalStreakDays = generalStreakDays,
                 isTodayDone = isTodayDone,
+                healedDays = healedDays,
             )
         }
     }
@@ -147,6 +151,7 @@ internal fun WeeklyTrackerContent(
     dayLetters: List<String>,
     generalStreakDays: Int = 0,
     isTodayDone: Boolean = false,
+    healedDays: Set<Long> = emptySet(),
 ) {
     val context = LocalContext.current
     val tapIntent = Intent(context, MainActivity::class.java).apply {
@@ -165,7 +170,13 @@ internal fun WeeklyTrackerContent(
         if (!hasAny) {
             EmptyState()
         } else {
-            WeekGrid(rows = rows, weekStart = weekStart, todayIndex = todayIndex, dayLetters = dayLetters)
+            WeekGrid(
+                rows = rows,
+                weekStart = weekStart,
+                todayIndex = todayIndex,
+                dayLetters = dayLetters,
+                healedDays = healedDays,
+            )
         }
         // Overlaid rather than laid out inline, so it never grows the widget's content height —
         // this full-size Box only positions its own child, independent of the centered content above.
@@ -204,7 +215,13 @@ private fun EmptyState() {
 }
 
 @androidx.compose.runtime.Composable
-private fun WeekGrid(rows: List<DailyCompletionEntity>, weekStart: Long, todayIndex: Int, dayLetters: List<String>) {
+private fun WeekGrid(
+    rows: List<DailyCompletionEntity>,
+    weekStart: Long,
+    todayIndex: Int,
+    dayLetters: List<String>,
+    healedDays: Set<Long> = emptySet(),
+) {
     val byDay = rows.associateBy { it.epochDay }
     val availableHeight = LocalSize.current.height
     val showLetters = availableHeight >= LETTERS_ROW_THRESHOLD
@@ -220,6 +237,7 @@ private fun WeekGrid(rows: List<DailyCompletionEntity>, weekStart: Long, todayIn
                         isToday = offset == todayIndex,
                         affirmationDone = day?.affirmationDone ?: false,
                         meditationDone = day?.meditationDone ?: false,
+                        isHealed = (weekStart + offset) in healedDays,
                     )
                 }
             }
@@ -256,7 +274,7 @@ private fun WeekGrid(rows: List<DailyCompletionEntity>, weekStart: Long, todayIn
 }
 
 @androidx.compose.runtime.Composable
-private fun DayCell(isToday: Boolean, affirmationDone: Boolean, meditationDone: Boolean) {
+private fun DayCell(isToday: Boolean, affirmationDone: Boolean, meditationDone: Boolean, isHealed: Boolean = false) {
     Box(modifier = GlanceModifier.size(CELL_SIZE), contentAlignment = Alignment.Center) {
         if (isToday) {
             Image(
@@ -266,22 +284,33 @@ private fun DayCell(isToday: Boolean, affirmationDone: Boolean, meditationDone: 
                 colorFilter = androidx.glance.ColorFilter.tint(GlanceColorProvider(TODAY_RING_COLOR)),
             )
         }
-        Image(
-            provider = ImageProvider(com.pirxhio.affirmity.R.drawable.half_circle_left),
-            contentDescription = null,
-            modifier = GlanceModifier.size(20.dp),
-            colorFilter = androidx.glance.ColorFilter.tint(
-                GlanceColorProvider(if (affirmationDone) AFFIRMATION_COLOR else EMPTY_COLOR),
-            ),
-        )
-        Image(
-            provider = ImageProvider(com.pirxhio.affirmity.R.drawable.half_circle_right),
-            contentDescription = null,
-            modifier = GlanceModifier.size(20.dp),
-            colorFilter = androidx.glance.ColorFilter.tint(
-                GlanceColorProvider(if (meditationDone) MEDITATION_COLOR else EMPTY_COLOR),
-            ),
-        )
+        if (isHealed) {
+            // A healed day had zero real activity — the mending heart replaces both halves
+            // instead of showing two empty ones, to explain why the streak didn't break.
+            val context = LocalContext.current
+            Image(
+                provider = ImageProvider(com.pirxhio.affirmity.R.drawable.ic_heart_mended),
+                contentDescription = context.getString(com.pirxhio.affirmity.R.string.progress_healed_day_content_description),
+                modifier = GlanceModifier.size(20.dp),
+            )
+        } else {
+            Image(
+                provider = ImageProvider(com.pirxhio.affirmity.R.drawable.half_circle_left),
+                contentDescription = null,
+                modifier = GlanceModifier.size(20.dp),
+                colorFilter = androidx.glance.ColorFilter.tint(
+                    GlanceColorProvider(if (affirmationDone) AFFIRMATION_COLOR else EMPTY_COLOR),
+                ),
+            )
+            Image(
+                provider = ImageProvider(com.pirxhio.affirmity.R.drawable.half_circle_right),
+                contentDescription = null,
+                modifier = GlanceModifier.size(20.dp),
+                colorFilter = androidx.glance.ColorFilter.tint(
+                    GlanceColorProvider(if (meditationDone) MEDITATION_COLOR else EMPTY_COLOR),
+                ),
+            )
+        }
     }
 }
 
