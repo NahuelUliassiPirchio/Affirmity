@@ -401,7 +401,7 @@ fun AffirmityApp(
 
                     BottomSheetScaffold(
                         scaffoldState = scaffoldState,
-                        sheetPeekHeight = 96.dp,
+                        sheetPeekHeight = 64.dp,
                         sheetDragHandle = null,
                         sheetContent = {
                             AffirmationGroupSelectorSheet(

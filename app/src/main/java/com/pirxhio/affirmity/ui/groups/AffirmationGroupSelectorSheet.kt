@@ -129,7 +129,7 @@ private fun GroupSelectorPeekRow(isExpanded: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(96.dp)
+            .height(64.dp)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.Center,
@@ -155,7 +155,7 @@ private fun GroupSelectorPeekRow(isExpanded: Boolean, onClick: () -> Unit) {
                 ),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 12.dp),
+                modifier = Modifier.padding(top = 4.dp),
             )
         }
     }
