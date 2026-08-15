@@ -277,4 +277,14 @@
     <string name="affirmation_group_selector_min_selection_error">Seleccioná al menos un grupo temático.</string>
     <string name="affirmation_group_locked_a11y">%1$s (bloqueado)</string>
     <string name="affirmation_group_always_on_a11y">Siempre seleccionado</string>
+    <string name="affirmation_group_upgrade_cta">Mejorar a Pro</string>
+    <string name="paywall_title">Afirmity Pro</string>
+    <string name="paywall_description">Desbloqueá todos los grupos temáticos con una suscripción Pro.</string>
+    <string name="paywall_monthly_cta">Mensual — %1$s</string>
+    <string name="paywall_annual_cta">Anual — %1$s</string>
+    <string name="paywall_unavailable">No se pudieron cargar los planes. Intentá de nuevo más tarde.</string>
+    <string name="paywall_snackbar_lapse_message">Tu acceso Pro terminó.</string>
+    <string name="paywall_snackbar_lapse_action">Ver planes</string>
+    <string name="settings_subscription_title">Suscripción</string>
+    <string name="settings_subscription_manage_button">Gestionar suscripción</string>
 </resources>

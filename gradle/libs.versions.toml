@@ -23,6 +23,7 @@ mockitoCore = "5.14.2"
 coreSplashscreen = "1.0.1"
 coilCompose = "3.3.0"
 appcompat = "1.7.1"
+billing = "7.1.1"
 
 [libraries]
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
@@ -65,6 +66,7 @@ androidx-glance-testing = { group = "androidx.glance", name = "glance-testing", 
 androidx-glance-appwidget-testing = { group = "androidx.glance", name = "glance-appwidget-testing", version.ref = "glance" }
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coilCompose" }
 coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coilCompose" }
+billing-ktx = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "billing" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

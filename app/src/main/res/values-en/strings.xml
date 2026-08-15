@@ -277,4 +277,14 @@
     <string name="affirmation_group_selector_min_selection_error">Select at least one thematic group.</string>
     <string name="affirmation_group_locked_a11y">%1$s (locked)</string>
     <string name="affirmation_group_always_on_a11y">Always selected</string>
+    <string name="affirmation_group_upgrade_cta">Upgrade to Pro</string>
+    <string name="paywall_title">Affirmity Pro</string>
+    <string name="paywall_description">Unlock every thematic group with a Pro subscription.</string>
+    <string name="paywall_monthly_cta">Monthly — %1$s</string>
+    <string name="paywall_annual_cta">Annual — %1$s</string>
+    <string name="paywall_unavailable">Couldn\'t load plans. Try again later.</string>
+    <string name="paywall_snackbar_lapse_message">Your Pro access ended.</string>
+    <string name="paywall_snackbar_lapse_action">View plans</string>
+    <string name="settings_subscription_title">Subscription</string>
+    <string name="settings_subscription_manage_button">Manage subscription</string>
 </resources>

@@ -1,8 +1,10 @@
 package com.pirxhio.affirmity
 
 import android.Manifest
+import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
@@ -25,13 +27,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetValue
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,13 +57,14 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.pirxhio.affirmity.auth.AuthState
+import com.pirxhio.affirmity.billing.BillingService
 import com.pirxhio.affirmity.data.MOOD_MAX
 import com.pirxhio.affirmity.data.rememberAffirmityAppState
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
 import com.pirxhio.affirmity.ui.components.FloatingStatusOverlay
-import com.pirxhio.affirmity.ui.groups.AffirmationGroupAccess
 import com.pirxhio.affirmity.ui.groups.AffirmationGroupSelectorSheet
+import com.pirxhio.affirmity.ui.groups.isToggleable
 import com.pirxhio.affirmity.ui.groups.selectableAffirmationGroups
 import com.pirxhio.affirmity.ui.healer.StreakHealerGrantedScreen
 import com.pirxhio.affirmity.ui.meditation.GuidedMeditationScreen
@@ -65,6 +72,7 @@ import com.pirxhio.affirmity.ui.meditation.MeditationScreen
 import com.pirxhio.affirmity.ui.mood.MoodScreen
 import com.pirxhio.affirmity.ui.myaffirmations.MyAffirmationsScreen
 import com.pirxhio.affirmity.ui.onboarding.OnboardingScreen
+import com.pirxhio.affirmity.ui.paywall.PaywallSheet
 import com.pirxhio.affirmity.ui.progress.ProgressScreen
 import com.pirxhio.affirmity.ui.settings.NotificationDebugScreen
 import com.pirxhio.affirmity.ui.settings.SettingsScreen
@@ -146,8 +154,42 @@ fun AffirmityApp(
     var showNotificationDebug by rememberSaveable { mutableStateOf(false) }
     var showMyAffirmations by rememberSaveable { mutableStateOf(false) }
     var showGuidedMeditationDemo by rememberSaveable { mutableStateOf(false) }
+    var showPaywall by rememberSaveable { mutableStateOf(false) }
     val appState = rememberAffirmityAppState()
     val context = LocalContext.current
+
+    // Shared upgrade-CTA routing (design.md D7): signed-out taps route to sign-in, never straight
+    // to the paywall -- used by both the group selector sheet's per-row CTA and any other entry
+    // point (e.g. AccountSettingsCard) that opens the paywall.
+    val onUpgradeClick: () -> Unit = {
+        if (appState.authState.value is AuthState.SignedIn) {
+            showPaywall = true
+        } else {
+            appState.signIn(context)
+        }
+    }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val snackbarScope = rememberCoroutineScope()
+    // Explicit in-app lapse notice (design.md D8, spec's "Explicit in-app lapse notice"): a live
+    // Pro -> Free entitlement transition shows an indefinite snackbar with a "View plans" action
+    // that opens the paywall; dismissing it (either way) acknowledges the notice so it never
+    // re-fires for the same transition.
+    LaunchedEffect(appState.proLapseNotice.value) {
+        if (appState.proLapseNotice.value) {
+            snackbarScope.launch {
+                val result = snackbarHostState.showSnackbar(
+                    message = context.getString(R.string.paywall_snackbar_lapse_message),
+                    actionLabel = context.getString(R.string.paywall_snackbar_lapse_action),
+                    duration = androidx.compose.material3.SnackbarDuration.Long,
+                )
+                if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                    showPaywall = true
+                }
+                appState.acknowledgeProLapse()
+            }
+        }
+    }
 
     var notificationsPermissionGranted by remember {
         mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled())
@@ -354,6 +396,20 @@ fun AffirmityApp(
                     appState.setQuietHoursWindow(start, end)
                 },
                 onOpenNotificationDebug = { showNotificationDebug = true },
+                tier = appState.entitlementTier.value,
+                onUpgradeClick = onUpgradeClick,
+                onManageSubscriptionClick = {
+                    // Play has no in-app cancel/downgrade API -- routes to Play Store's own
+                    // subscription management surface (design.md Phase 7).
+                    val intent = Intent(
+                        Intent.ACTION_VIEW,
+                        Uri.parse(
+                            "https://play.google.com/store/account/subscriptions" +
+                                "?sku=$PRO_SUBSCRIPTION_PRODUCT_ID&package=${context.packageName}",
+                        ),
+                    )
+                    context.startActivity(intent)
+                },
             )
         }
         return
@@ -385,7 +441,10 @@ fun AffirmityApp(
             }
         }
     ) {
-        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+        ) { innerPadding ->
             Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
             when (currentDestination) {
                 AppDestinations.AFIRMACIONES -> {
@@ -409,11 +468,12 @@ fun AffirmityApp(
                                 selectedIds = appState.draftGroupIds.value,
                                 isValid = appState.isDraftSelectionValid,
                                 isExpanded = sheetState.currentValue == SheetValue.Expanded,
+                                tier = appState.entitlementTier.value,
+                                onUpgradeClick = onUpgradeClick,
                                 onToggle = { group ->
                                     appState.toggleGroup(
                                         group.id,
-                                        toggleable = !group.alwaysSelected &&
-                                            group.access == AffirmationGroupAccess.FREE,
+                                        toggleable = isToggleable(group, appState.entitlementTier.value),
                                     )
                                 },
                                 onApply = {
@@ -481,7 +541,47 @@ fun AffirmityApp(
             }
         }
     }
+
+    if (showPaywall) {
+        val activity = context as? Activity
+        val billingService = remember {
+            BillingService(
+                context = context.applicationContext,
+                proSubscriptionProductId = PRO_SUBSCRIPTION_PRODUCT_ID,
+                syncEntitlementUrl = SYNC_ENTITLEMENT_URL,
+                scope = snackbarScope,
+            )
+        }
+        DisposableEffect(billingService) {
+            billingService.connect()
+            onDispose { billingService.disconnect() }
+        }
+        val monthlyOffer by billingService.monthlyOffer.collectAsState()
+        val annualOffer by billingService.annualOffer.collectAsState()
+
+        PaywallSheet(
+            monthlyPriceLabel = monthlyOffer?.formattedPrice,
+            annualPriceLabel = annualOffer?.formattedPrice,
+            onSelectMonthly = {
+                val offer = monthlyOffer ?: return@PaywallSheet
+                activity?.let { billingService.launchPurchaseFlow(it, offer.offerToken) }
+            },
+            onSelectAnnual = {
+                val offer = annualOffer ?: return@PaywallSheet
+                activity?.let { billingService.launchPurchaseFlow(it, offer.offerToken) }
+            },
+            onDismiss = { showPaywall = false },
+        )
+    }
 }
+
+/** Play Console product/base-plan id -- part of the Phase 0 user-owned prerequisite (Play Console
+ * subscription setup); placeholder until that product exists. */
+private const val PRO_SUBSCRIPTION_PRODUCT_ID = "pro"
+
+/** Deployed `syncEntitlement` Cloud Function URL -- part of the Phase 0 user-owned prerequisite
+ * (service account + function deploy); placeholder until that deployment exists. */
+private const val SYNC_ENTITLEMENT_URL = ""
 
 enum class AppDestinations(
     @StringRes val labelRes: Int,

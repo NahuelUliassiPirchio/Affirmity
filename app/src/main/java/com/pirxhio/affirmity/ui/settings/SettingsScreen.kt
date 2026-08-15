@@ -43,6 +43,7 @@ import com.pirxhio.affirmity.auth.AuthState
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DaySegment
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
+import com.pirxhio.affirmity.data.repository.EntitlementTier
 
 /** Follow-system default plus the two supported explicit languages (spec: `In-App Language
  * Selection`). Maps to/from a BCP-47 language tag rather than [LocaleListCompat] directly so the
@@ -86,6 +87,9 @@ fun SettingsScreen(
     onQuietHoursWindowChanged: (startMinute: Int, endMinute: Int) -> Unit,
     onOpenNotificationDebug: () -> Unit,
     onSignOutClicked: () -> Unit,
+    tier: EntitlementTier,
+    onUpgradeClick: () -> Unit,
+    onManageSubscriptionClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -136,6 +140,14 @@ fun SettingsScreen(
 
         item {
             LanguageSettingsCard()
+        }
+
+        item {
+            SubscriptionSection(
+                tier = tier,
+                onUpgradeClick = onUpgradeClick,
+                onManageSubscriptionClick = onManageSubscriptionClick,
+            )
         }
 
         item {
