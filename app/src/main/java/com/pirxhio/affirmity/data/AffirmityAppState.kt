@@ -16,6 +16,7 @@ import com.pirxhio.affirmity.R
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging
+import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.auth.AuthError
 import com.pirxhio.affirmity.auth.AuthException
 import com.pirxhio.affirmity.auth.AuthProviderId
@@ -52,7 +53,6 @@ import com.pirxhio.affirmity.data.remote.FirestoreOnboardingRepository
 import com.pirxhio.affirmity.data.remote.FirestoreStreakHealerRepository
 import com.pirxhio.affirmity.data.remote.MigrationSnapshot
 import com.pirxhio.affirmity.data.repository.DataSession
-import com.pirxhio.affirmity.data.repository.EntitlementTier
 import com.pirxhio.affirmity.data.repository.RoomAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomDailyCompletionRepository
 import com.pirxhio.affirmity.data.repository.RoomDailyMoodRepository
@@ -291,7 +291,7 @@ class AffirmityAppState(
 
     /** Current Free/Pro gating tier, resolved from the live entitlement repository (design.md
      * D5/D8). Read by [rememberAffirmityAppState]'s callers to drive `GroupAccessPolicy`. */
-    var entitlementTier = mutableStateOf(EntitlementTier.FREE)
+    var entitlementTier = mutableStateOf(AccessTier.FREE)
         private set
 
     /** True right after a live entitlement transition from Pro to Free is observed (design.md D8,
@@ -558,8 +558,8 @@ class AffirmityAppState(
                     // optimistic purchase overlay (design.md D7/D8) -- an expiring optimistic
                     // window can never masquerade as a real lapse.
                     if (entitlementFlowInitialized &&
-                        entitlementTier.value == EntitlementTier.PRO &&
-                        entitlement.tier == EntitlementTier.FREE
+                        entitlementTier.value == AccessTier.PRO &&
+                        entitlement.tier == AccessTier.FREE
                     ) {
                         proLapseNotice.value = true
                         selectedGroupIds.value?.let { committed ->

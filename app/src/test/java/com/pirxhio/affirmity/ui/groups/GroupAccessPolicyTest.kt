@@ -1,6 +1,6 @@
 package com.pirxhio.affirmity.ui.groups
 
-import com.pirxhio.affirmity.data.repository.EntitlementTier
+import com.pirxhio.affirmity.access.AccessTier
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -18,75 +18,75 @@ class GroupAccessPolicyTest {
 
     @Test
     fun `PERSONALIZADAS_GROUP is never locked for a Free user`() {
-        assertFalse(isLocked(PERSONALIZADAS_GROUP, EntitlementTier.FREE))
+        assertFalse(isLocked(PERSONALIZADAS_GROUP, AccessTier.FREE))
     }
 
     @Test
     fun `PERSONALIZADAS_GROUP is never locked for a Pro user`() {
-        assertFalse(isLocked(PERSONALIZADAS_GROUP, EntitlementTier.PRO))
+        assertFalse(isLocked(PERSONALIZADAS_GROUP, AccessTier.PRO))
     }
 
     @Test
     fun `PERSONALIZADAS_GROUP is never toggleable for a Free user`() {
-        assertFalse(isToggleable(PERSONALIZADAS_GROUP, EntitlementTier.FREE))
+        assertFalse(isToggleable(PERSONALIZADAS_GROUP, AccessTier.FREE))
     }
 
     @Test
     fun `PERSONALIZADAS_GROUP is never toggleable for a Pro user`() {
-        assertFalse(isToggleable(PERSONALIZADAS_GROUP, EntitlementTier.PRO))
+        assertFalse(isToggleable(PERSONALIZADAS_GROUP, AccessTier.PRO))
     }
 
     @Test
     fun `PERSONALIZADAS_GROUP is always unlocked at either tier`() {
-        assertTrue(isUnlocked(PERSONALIZADAS_GROUP, EntitlementTier.FREE))
-        assertTrue(isUnlocked(PERSONALIZADAS_GROUP, EntitlementTier.PRO))
+        assertTrue(isUnlocked(PERSONALIZADAS_GROUP, AccessTier.FREE))
+        assertTrue(isUnlocked(PERSONALIZADAS_GROUP, AccessTier.PRO))
     }
 
     // --- FREE access group (bienestar): unlocked/toggleable at both tiers -------------------
 
     @Test
     fun `a FREE-access group is unlocked and toggleable for a Free user`() {
-        assertTrue(isUnlocked(bienestar, EntitlementTier.FREE))
-        assertFalse(isLocked(bienestar, EntitlementTier.FREE))
-        assertTrue(isToggleable(bienestar, EntitlementTier.FREE))
+        assertTrue(isUnlocked(bienestar, AccessTier.FREE))
+        assertFalse(isLocked(bienestar, AccessTier.FREE))
+        assertTrue(isToggleable(bienestar, AccessTier.FREE))
     }
 
     @Test
     fun `a FREE-access group is unlocked and toggleable for a Pro user`() {
-        assertTrue(isUnlocked(bienestar, EntitlementTier.PRO))
-        assertFalse(isLocked(bienestar, EntitlementTier.PRO))
-        assertTrue(isToggleable(bienestar, EntitlementTier.PRO))
+        assertTrue(isUnlocked(bienestar, AccessTier.PRO))
+        assertFalse(isLocked(bienestar, AccessTier.PRO))
+        assertTrue(isToggleable(bienestar, AccessTier.PRO))
     }
 
     // --- PREMIUM group (autocuidado): locked for Free, unlocked+toggleable for Pro ----------
 
     @Test
     fun `a PREMIUM group is locked and not toggleable for a Free user`() {
-        assertFalse(isUnlocked(autocuidado, EntitlementTier.FREE))
-        assertTrue(isLocked(autocuidado, EntitlementTier.FREE))
-        assertFalse(isToggleable(autocuidado, EntitlementTier.FREE))
+        assertFalse(isUnlocked(autocuidado, AccessTier.FREE))
+        assertTrue(isLocked(autocuidado, AccessTier.FREE))
+        assertFalse(isToggleable(autocuidado, AccessTier.FREE))
     }
 
     @Test
     fun `a PREMIUM group is unlocked and toggleable for a Pro user`() {
-        assertTrue(isUnlocked(autocuidado, EntitlementTier.PRO))
-        assertFalse(isLocked(autocuidado, EntitlementTier.PRO))
-        assertTrue(isToggleable(autocuidado, EntitlementTier.PRO))
+        assertTrue(isUnlocked(autocuidado, AccessTier.PRO))
+        assertFalse(isLocked(autocuidado, AccessTier.PRO))
+        assertTrue(isToggleable(autocuidado, AccessTier.PRO))
     }
 
     // --- AD_SUPPORTED group (fuerza_de_voluntad): Pro-only, no ad-unlock path in v1 ----------
 
     @Test
     fun `an AD_SUPPORTED group is locked and not toggleable for a Free user`() {
-        assertFalse(isUnlocked(fuerzaDeVoluntad, EntitlementTier.FREE))
-        assertTrue(isLocked(fuerzaDeVoluntad, EntitlementTier.FREE))
-        assertFalse(isToggleable(fuerzaDeVoluntad, EntitlementTier.FREE))
+        assertFalse(isUnlocked(fuerzaDeVoluntad, AccessTier.FREE))
+        assertTrue(isLocked(fuerzaDeVoluntad, AccessTier.FREE))
+        assertFalse(isToggleable(fuerzaDeVoluntad, AccessTier.FREE))
     }
 
     @Test
     fun `an AD_SUPPORTED group is unlocked and toggleable for a Pro user`() {
-        assertTrue(isUnlocked(fuerzaDeVoluntad, EntitlementTier.PRO))
-        assertFalse(isLocked(fuerzaDeVoluntad, EntitlementTier.PRO))
-        assertTrue(isToggleable(fuerzaDeVoluntad, EntitlementTier.PRO))
+        assertTrue(isUnlocked(fuerzaDeVoluntad, AccessTier.PRO))
+        assertFalse(isLocked(fuerzaDeVoluntad, AccessTier.PRO))
+        assertTrue(isToggleable(fuerzaDeVoluntad, AccessTier.PRO))
     }
 }

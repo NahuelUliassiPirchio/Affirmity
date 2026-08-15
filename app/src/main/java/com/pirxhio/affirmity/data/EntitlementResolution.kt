@@ -1,7 +1,7 @@
 package com.pirxhio.affirmity.data
 
+import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
-import com.pirxhio.affirmity.data.repository.EntitlementTier
 
 /**
  * Pure, Firestore-agnostic mirror of the fields `FirestoreEntitlementRepository` reads off the
@@ -22,11 +22,11 @@ data class RawEntitlementDoc(
  * machine (design.md D1/D5): the server already only ever writes `tier = "pro"` for a state that
  * still grants access, and this function's only job is the time-based boundary within that grant.
  */
-fun resolveTier(doc: RawEntitlementDoc?, nowMillis: Long): EntitlementTier {
-    if (doc == null || doc.tier != "pro") return EntitlementTier.FREE
+fun resolveTier(doc: RawEntitlementDoc?, nowMillis: Long): AccessTier {
+    if (doc == null || doc.tier != "pro") return AccessTier.FREE
     val expiry = doc.expiryTimeMillis
-    if (expiry != null && nowMillis >= expiry) return EntitlementTier.FREE
-    return EntitlementTier.PRO
+    if (expiry != null && nowMillis >= expiry) return AccessTier.FREE
+    return AccessTier.PRO
 }
 
 /**

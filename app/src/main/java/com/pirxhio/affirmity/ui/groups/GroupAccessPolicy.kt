@@ -1,6 +1,6 @@
 package com.pirxhio.affirmity.ui.groups
 
-import com.pirxhio.affirmity.data.repository.EntitlementTier
+import com.pirxhio.affirmity.access.AccessTier
 
 /**
  * Single source of truth for group lock/toggle state (design.md D6). Previously duplicated
@@ -15,11 +15,11 @@ import com.pirxhio.affirmity.data.repository.EntitlementTier
  * `AD_SUPPORTED` is not `FREE`, so it is Pro-only per the confirmed product mapping — there is no
  * ad-unlock path in v1.
  */
-fun isUnlocked(group: AffirmationGroup, tier: EntitlementTier): Boolean =
-    group.alwaysSelected || group.access == AffirmationGroupAccess.FREE || tier == EntitlementTier.PRO
+fun isUnlocked(group: AffirmationGroup, tier: AccessTier): Boolean =
+    group.alwaysSelected || group.access == AffirmationGroupAccess.FREE || tier == AccessTier.PRO
 
-fun isLocked(group: AffirmationGroup, tier: EntitlementTier): Boolean =
+fun isLocked(group: AffirmationGroup, tier: AccessTier): Boolean =
     !group.alwaysSelected && !isUnlocked(group, tier)
 
-fun isToggleable(group: AffirmationGroup, tier: EntitlementTier): Boolean =
+fun isToggleable(group: AffirmationGroup, tier: AccessTier): Boolean =
     !group.alwaysSelected && isUnlocked(group, tier)

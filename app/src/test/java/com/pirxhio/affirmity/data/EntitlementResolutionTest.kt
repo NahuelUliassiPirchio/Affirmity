@@ -1,7 +1,7 @@
 package com.pirxhio.affirmity.data
 
+import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
-import com.pirxhio.affirmity.data.repository.EntitlementTier
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -14,37 +14,37 @@ class EntitlementResolutionTest {
 
     @Test
     fun `null doc resolves to Free`() {
-        assertEquals(EntitlementTier.FREE, resolveTier(doc = null, nowMillis = 1_000L))
+        assertEquals(AccessTier.FREE, resolveTier(doc = null, nowMillis = 1_000L))
     }
 
     @Test
     fun `a doc with tier free resolves to Free regardless of expiry`() {
         val doc = RawEntitlementDoc(tier = "free", expiryTimeMillis = 5_000L)
-        assertEquals(EntitlementTier.FREE, resolveTier(doc, nowMillis = 1_000L))
+        assertEquals(AccessTier.FREE, resolveTier(doc, nowMillis = 1_000L))
     }
 
     @Test
     fun `a pro doc not yet expired resolves to Pro`() {
         val doc = RawEntitlementDoc(tier = "pro", expiryTimeMillis = 5_000L)
-        assertEquals(EntitlementTier.PRO, resolveTier(doc, nowMillis = 4_999L))
+        assertEquals(AccessTier.PRO, resolveTier(doc, nowMillis = 4_999L))
     }
 
     @Test
     fun `a pro doc exactly at its expiry instant is downgraded to Free`() {
         val doc = RawEntitlementDoc(tier = "pro", expiryTimeMillis = 5_000L)
-        assertEquals(EntitlementTier.FREE, resolveTier(doc, nowMillis = 5_000L))
+        assertEquals(AccessTier.FREE, resolveTier(doc, nowMillis = 5_000L))
     }
 
     @Test
     fun `a pro doc past its expiry resolves to Free`() {
         val doc = RawEntitlementDoc(tier = "pro", expiryTimeMillis = 5_000L)
-        assertEquals(EntitlementTier.FREE, resolveTier(doc, nowMillis = 5_001L))
+        assertEquals(AccessTier.FREE, resolveTier(doc, nowMillis = 5_001L))
     }
 
     @Test
     fun `a pro doc with no expiry (null) never downgrades on time alone`() {
         val doc = RawEntitlementDoc(tier = "pro", expiryTimeMillis = null)
-        assertEquals(EntitlementTier.PRO, resolveTier(doc, nowMillis = Long.MAX_VALUE))
+        assertEquals(AccessTier.PRO, resolveTier(doc, nowMillis = Long.MAX_VALUE))
     }
 
     // --- deselectLockedGroups ----------------------------------------------------------------

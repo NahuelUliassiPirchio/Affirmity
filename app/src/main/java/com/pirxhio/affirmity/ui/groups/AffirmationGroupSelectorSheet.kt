@@ -45,7 +45,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
-import com.pirxhio.affirmity.data.repository.EntitlementTier
+import com.pirxhio.affirmity.access.AccessTier
 
 /**
  * Persistent, non-dismissible sheet docked under the affirmations feed. Peek row is always
@@ -57,7 +57,7 @@ fun AffirmationGroupSelectorSheet(
     selectedIds: Set<String>,
     isValid: Boolean,
     isExpanded: Boolean,
-    tier: EntitlementTier,
+    tier: AccessTier,
     onToggle: (AffirmationGroup) -> Unit,
     onApply: () -> Unit,
     onPeekClick: () -> Unit,
@@ -171,7 +171,7 @@ private fun GroupSelectorPeekRow(isExpanded: Boolean, onClick: () -> Unit) {
 private fun AffirmationGroupSelectableRow(
     group: AffirmationGroup,
     checked: Boolean,
-    tier: EntitlementTier,
+    tier: AccessTier,
     onToggle: () -> Unit,
     onUpgradeClick: () -> Unit,
     modifier: Modifier = Modifier,

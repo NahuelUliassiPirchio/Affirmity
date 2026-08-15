@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.data.repository
 
+import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
@@ -73,19 +74,15 @@ interface NotificationSettingsRepository {
     suspend fun setTimeZone(zoneId: String)
 }
 
-/** Free/Pro gating tier, resolved client-side from the server-written entitlement doc — see
- * `EntitlementResolution.resolveTier` (design.md D5). */
-enum class EntitlementTier { FREE, PRO }
-
 /** Client-facing entitlement snapshot. [expiryTimeMillis] is `null` for a Free tier or a
  * non-expiring grant. */
 data class Entitlement(
-    val tier: EntitlementTier,
+    val tier: AccessTier,
     val expiryTimeMillis: Long? = null,
     val productId: String? = null,
 ) {
     companion object {
-        val Free = Entitlement(tier = EntitlementTier.FREE)
+        val Free = Entitlement(tier = AccessTier.FREE)
     }
 }
 
