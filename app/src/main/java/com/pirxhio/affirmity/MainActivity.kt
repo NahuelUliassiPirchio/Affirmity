@@ -56,6 +56,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import com.pirxhio.affirmity.access.AdUnlockState
 import com.pirxhio.affirmity.auth.AuthState
 import com.pirxhio.affirmity.billing.BillingService
 import com.pirxhio.affirmity.data.MOOD_MAX
@@ -64,6 +65,7 @@ import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
 import com.pirxhio.affirmity.ui.components.FloatingStatusOverlay
 import com.pirxhio.affirmity.ui.groups.AffirmationGroupSelectorSheet
+import com.pirxhio.affirmity.ui.groups.groupAccessDecision
 import com.pirxhio.affirmity.ui.groups.isToggleable
 import com.pirxhio.affirmity.ui.groups.selectableAffirmationGroups
 import com.pirxhio.affirmity.ui.healer.StreakHealerGrantedScreen
@@ -468,12 +470,28 @@ fun AffirmityApp(
                                 selectedIds = appState.draftGroupIds.value,
                                 isValid = appState.isDraftSelectionValid,
                                 isExpanded = sheetState.currentValue == SheetValue.Expanded,
-                                tier = appState.entitlementTier.value,
+                                // AdUnlockState() is an empty-defaults placeholder -- there is no
+                                // live ad-unlock state on AffirmityAppState until the seam lands
+                                // (commit E), so this is behavior-identical to pre-refactor.
+                                accessDecisionFor = {
+                                    groupAccessDecision(
+                                        it,
+                                        appState.entitlementTier.value,
+                                        AdUnlockState(),
+                                        System.currentTimeMillis(),
+                                    )
+                                },
                                 onUpgradeClick = onUpgradeClick,
                                 onToggle = { group ->
+                                    val decision = groupAccessDecision(
+                                        group,
+                                        appState.entitlementTier.value,
+                                        AdUnlockState(),
+                                        System.currentTimeMillis(),
+                                    )
                                     appState.toggleGroup(
                                         group.id,
-                                        toggleable = isToggleable(group, appState.entitlementTier.value),
+                                        toggleable = isToggleable(group, decision),
                                     )
                                 },
                                 onApply = {

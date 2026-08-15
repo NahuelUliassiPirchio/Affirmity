@@ -65,7 +65,6 @@ import com.pirxhio.affirmity.data.repository.RoomNotificationSettingsRepository
 import com.pirxhio.affirmity.data.repository.RoomStreakHealerRepository
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
-import com.pirxhio.affirmity.ui.groups.AffirmationGroupAccess
 import com.pirxhio.affirmity.ui.groups.defaultAffirmationGroups
 import com.pirxhio.affirmity.ui.groups.selectableAffirmationGroups
 import com.pirxhio.affirmity.widget.WeeklyTrackerWidget
@@ -209,9 +208,9 @@ class AffirmityAppState(
     /** First-launch default thematic selection (unlocked thematic groups), also resolved by the
      * caller for the same D9 reason. */
     private val defaultThematicGroupIds: Set<String> = emptySet(),
-    /** Every group id that requires Pro entitlement (`PREMIUM`/`AD_SUPPORTED` access, excluding
-     * `alwaysSelected`), resolved by the caller for the same D9 reason. Consumed by the
-     * downgrade-auto-deselect collector ([deselectLockedGroups] call site). */
+    /** Every group id whose `access.requiredTier == AccessTier.PRO`, excluding `alwaysSelected`,
+     * resolved by the caller for the same D9 reason. Consumed by the downgrade-auto-deselect
+     * collector ([deselectLockedGroups] call site). */
     private val proOnlyGroupIds: Set<String> = emptySet(),
 ) {
     val affirmations = mutableStateListOf<Affirmation>()
@@ -578,17 +577,31 @@ class AffirmityAppState(
                 .collect { entitlement ->
                     // Compared against the repository-emitted value only, never a client-side
                     // optimistic purchase overlay (design.md D7/D8) -- an expiring optimistic
-                    // window can never masquerade as a real lapse.
+                    // window can never masquerade as a real lapse. proLapseNotice stays scoped to
+                    // a LIVE Pro->Free transition only (design §10 Q4(iv)) -- it is a one-time
+                    // snackbar, not a general "you are Free" indicator.
                     if (entitlementFlowInitialized &&
                         entitlementTier.value == AccessTier.PRO &&
                         entitlement.tier == AccessTier.FREE
                     ) {
                         proLapseNotice.value = true
+                    }
+                    // Q4(iv) fix: run the deselect sweep on EVERY FREE-resolved emission, not only
+                    // a live transition -- otherwise a stale Pro-only group left in a persisted
+                    // selection (a lapse that happened while the app was closed, or a dead PER_USE
+                    // grant) would silently survive forever. Re-persist only when the result
+                    // actually differs, so a steady-state Free user causes no redundant DataStore
+                    // write on every emission. Living inside this collector (not the
+                    // group-preferences collector) guarantees it never fires before the tier has
+                    // resolved, so a cold start can never strip a Pro user's groups.
+                    if (entitlement.tier == AccessTier.FREE) {
                         selectedGroupIds.value?.let { committed ->
                             val updated = deselectLockedGroups(committed, proOnlyGroupIds, defaultThematicGroupIds)
-                            selectedGroupIds.value = updated
-                            draftGroupIds.value = updated
-                            scope.launch { groupPreferences.saveSelectedGroupIds(updated) }
+                            if (updated != committed) {
+                                selectedGroupIds.value = updated
+                                draftGroupIds.value = updated
+                                scope.launch { groupPreferences.saveSelectedGroupIds(updated) }
+                            }
                         }
                     }
                     entitlementFlowInitialized = true
@@ -901,12 +914,13 @@ fun rememberAffirmityAppState(): AffirmityAppState {
     // `ui.groups` (design D9) — only this composable wiring function does, mirroring [dayLetters].
     val knownGroupIds = selectableAffirmationGroups().map { it.id }.toSet()
     val defaultThematicGroupIds = defaultAffirmationGroups()
-        .filter { it.access == AffirmationGroupAccess.FREE }
+        .filter { it.access.requiredTier == AccessTier.FREE }
         .map { it.id }.toSet()
     // Every group that requires Pro to unlock -- mirrors GroupAccessPolicy.isLocked's condition
-    // (access != FREE && !alwaysSelected) without importing ui.groups' policy file itself (D9).
+    // (access.requiredTier == PRO && !alwaysSelected) without importing ui.groups' policy file
+    // itself (D9).
     val proOnlyGroupIds = defaultAffirmationGroups()
-        .filter { it.access != AffirmationGroupAccess.FREE }
+        .filter { it.access.requiredTier != AccessTier.FREE }
         .map { it.id }.toSet()
     return remember {
         val database = AffirmityDatabase.getInstance(context)

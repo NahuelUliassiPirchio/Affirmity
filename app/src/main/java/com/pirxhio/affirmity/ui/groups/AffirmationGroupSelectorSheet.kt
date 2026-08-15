@@ -45,7 +45,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
-import com.pirxhio.affirmity.access.AccessTier
+import com.pirxhio.affirmity.access.AccessDecision
 
 /**
  * Persistent, non-dismissible sheet docked under the affirmations feed. Peek row is always
@@ -57,7 +57,7 @@ fun AffirmationGroupSelectorSheet(
     selectedIds: Set<String>,
     isValid: Boolean,
     isExpanded: Boolean,
-    tier: AccessTier,
+    accessDecisionFor: (AffirmationGroup) -> AccessDecision,
     onToggle: (AffirmationGroup) -> Unit,
     onApply: () -> Unit,
     onPeekClick: () -> Unit,
@@ -89,7 +89,7 @@ fun AffirmationGroupSelectorSheet(
                     AffirmationGroupSelectableRow(
                         group = group,
                         checked = group.id in selectedIds,
-                        tier = tier,
+                        decision = accessDecisionFor(group),
                         onToggle = { onToggle(group) },
                         onUpgradeClick = onUpgradeClick,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
@@ -171,16 +171,16 @@ private fun GroupSelectorPeekRow(isExpanded: Boolean, onClick: () -> Unit) {
 private fun AffirmationGroupSelectableRow(
     group: AffirmationGroup,
     checked: Boolean,
-    tier: AccessTier,
+    decision: AccessDecision,
     onToggle: () -> Unit,
     onUpgradeClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Single source of lock/toggle truth (design.md D6) -- `alwaysSelected` short-circuits first,
+    // Single source of lock/toggle truth (design §6) -- `alwaysSelected` short-circuits first,
     // so `PERSONALIZADAS_GROUP` is never locked/toggleable at either tier.
-    val toggleable = isToggleable(group, tier)
-    val locked = isLocked(group, tier)
-    val showsAccessBadge = group.access != AffirmationGroupAccess.FREE
+    val toggleable = isToggleable(group, decision)
+    val locked = isLocked(decision)
+    val badge = deriveBadge(group, decision)
     val rowModifier = modifier
         .fillMaxWidth()
         .then(
@@ -230,8 +230,8 @@ private fun AffirmationGroupSelectableRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (showsAccessBadge) {
-                    AffirmationGroupAccessBadge(group.access)
+                if (badge != null) {
+                    AffirmationGroupAccessBadge(badge)
                 }
             }
 
@@ -301,19 +301,18 @@ private fun AddCustomAffirmationsCard(onClick: () -> Unit, modifier: Modifier = 
 }
 
 /** Relocated from the now-deleted `AffirmationGroupsScreen.kt` (design D8) — still used by the
- * selector's locked rows. */
+ * selector's locked rows. Caller derives [badge] via `GroupAccessPolicy.deriveBadge` (spec §0). */
 @Composable
-fun AffirmationGroupAccessBadge(access: AffirmationGroupAccess) {
-    when (access) {
-        AffirmationGroupAccess.FREE -> Unit
-        AffirmationGroupAccess.PREMIUM -> AccessBadge(
+fun AffirmationGroupAccessBadge(badge: GroupBadge) {
+    when (badge) {
+        GroupBadge.PREMIUM -> AccessBadge(
             icon = Icons.Filled.WorkspacePremium,
             label = stringResource(R.string.affirmation_group_badge_premium),
             containerColor = PremiumBadgeColor.copy(alpha = 0.2f),
             contentColor = PremiumBadgeColor,
             borderColor = PremiumBadgeColor.copy(alpha = 0.3f),
         )
-        AffirmationGroupAccess.AD_SUPPORTED -> AccessBadge(
+        GroupBadge.AD_UNLOCK -> AccessBadge(
             icon = Icons.Filled.PlayCircle,
             label = stringResource(R.string.affirmation_group_badge_ad),
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,

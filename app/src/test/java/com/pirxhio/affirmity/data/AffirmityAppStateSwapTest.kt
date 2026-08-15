@@ -50,6 +50,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -266,6 +267,8 @@ private fun buildState(
     authRepository: AuthRepository,
     scope: CoroutineScope,
     groupPreferences: GroupSelectionPreferences = FakeGroupSelectionPreferences(),
+    knownGroupIds: Set<String> = setOf("personalizadas", "bienestar"),
+    proOnlyGroupIds: Set<String> = emptySet(),
 ): AffirmityAppState {
     val trackerPreferences = mock(TrackerPreferences::class.java)
     whenever(trackerPreferences.observeAffirmationsViewedToday())
@@ -296,8 +299,9 @@ private fun buildState(
         onboardingPreferences = onboardingPreferences,
         deviceTimeZoneId = { "UTC" },
         groupPreferences = groupPreferences,
-        knownGroupIds = setOf("personalizadas", "bienestar"),
+        knownGroupIds = knownGroupIds,
         defaultThematicGroupIds = setOf("bienestar"),
+        proOnlyGroupIds = proOnlyGroupIds,
     )
 }
 
@@ -496,6 +500,52 @@ class AffirmityAppStateSwapTest {
             "local-only record must be the only one that actually inserted (idempotent replay)",
             1,
             remoteAdUnlocks.granted.size,
+        )
+
+        scope.cancel()
+    }
+
+    @Test
+    fun `a cold-start FREE-resolved emission deselects a stale Pro-only group with no live transition`() = runBlocking {
+        // EC-2(iv)/REQ-9.6 (design §10 Q4(iv), spec §9): before this fix, the deselect sweep only
+        // fired on a LIVE Pro->Free transition (entitlementFlowInitialized == true). A signed-out
+        // cold start's FIRST entitlement emission never satisfies that guard, so a Pro-only group
+        // left over in a persisted selection -- from a lapse that happened while the app was
+        // closed, or a dead PER_USE grant -- silently survived forever. This is a DELIBERATE,
+        // documented behavior fix (not a regression): the sweep must now also run on this very
+        // first, non-transition emission whenever the resolved tier is FREE.
+        val events = mutableListOf<String>()
+        val local = fakeLocal(events) // entitlements defaults to LocalFreeEntitlementRepository (always Free)
+        val authRepository = FakeAuthRepository() // stays SignedOut -- no live transition ever occurs
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val groupPreferences = FakeGroupSelectionPreferences(
+            initial = setOf("personalizadas", "autocuidado"),
+        )
+        val state = buildState(
+            local = local,
+            remote = { fakeRemote("uid-cold-start", events) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = authRepository,
+            scope = scope,
+            groupPreferences = groupPreferences,
+            knownGroupIds = setOf("personalizadas", "bienestar", "autocuidado"),
+            proOnlyGroupIds = setOf("autocuidado"),
+        )
+        delay(200)
+
+        assertEquals(
+            "the stale Pro-only group must be deselected and the minimum-thematic invariant" +
+                " restored from defaultThematicGroupIds, even though no live transition occurred",
+            setOf("personalizadas", "bienestar"),
+            state.selectedGroupIds.value,
+        )
+        assertTrue(
+            "the sweep's result must actually be persisted back",
+            groupPreferences.saved.any { it == setOf("personalizadas", "bienestar") },
+        )
+        assertFalse(
+            "no live Pro->Free transition occurred, so no lapse notice should fire",
+            state.proLapseNotice.value,
         )
 
         scope.cancel()

@@ -1,6 +1,8 @@
 package com.pirxhio.affirmity.data
 
 import com.pirxhio.affirmity.access.AccessTier
+import com.pirxhio.affirmity.access.ContentKey
+import com.pirxhio.affirmity.access.ContentType
 import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -78,5 +80,41 @@ class EntitlementResolutionTest {
             defaultThematicIds = setOf("bienestar"),
         )
         assertEquals(setOf(PERSONALIZADAS_GROUP_ID, "bienestar"), result)
+    }
+
+    @Test
+    fun `a pro-only group covered by a durable ad grant survives the downgrade sweep`() {
+        // design §10 Q4(ii): a ONE_TIME_TRIAL grant legitimately survives a downgrade -- only
+        // this carve-out id is exempted, "autocuidado" is still stripped normally.
+        val result = deselectLockedGroups(
+            selected = setOf(PERSONALIZADAS_GROUP_ID, "autocuidado", "fuerza_de_voluntad"),
+            proOnlyIds = setOf("autocuidado", "fuerza_de_voluntad"),
+            defaultThematicIds = setOf("bienestar"),
+            adUnlockedIds = setOf("fuerza_de_voluntad"),
+        )
+        assertEquals(setOf(PERSONALIZADAS_GROUP_ID, "fuerza_de_voluntad"), result)
+    }
+
+    // --- retainSelectionScopedUnlocks ---------------------------------------------------------
+
+    @Test
+    fun `retainSelectionScopedUnlocks drops an affirmation-group unlock whose group left the selection`() {
+        val stillCommitted = ContentKey(ContentType.AFFIRMATION_GROUP, "fuerza_de_voluntad")
+        val noLongerCommitted = ContentKey(ContentType.AFFIRMATION_GROUP, "autocuidado")
+        val result = retainSelectionScopedUnlocks(
+            unlocks = setOf(stillCommitted, noLongerCommitted),
+            committedGroupIds = setOf(PERSONALIZADAS_GROUP_ID, "fuerza_de_voluntad"),
+        )
+        assertEquals(setOf(stillCommitted), result)
+    }
+
+    @Test
+    fun `retainSelectionScopedUnlocks leaves non-affirmation-group unlocks untouched`() {
+        val meditationUnlock = ContentKey(ContentType.MEDITATION, "some_meditation")
+        val result = retainSelectionScopedUnlocks(
+            unlocks = setOf(meditationUnlock),
+            committedGroupIds = emptySet(),
+        )
+        assertEquals(setOf(meditationUnlock), result)
     }
 }
