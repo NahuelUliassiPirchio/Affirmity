@@ -260,7 +260,7 @@
     <string name="widget_action_meditate_label">Meditate</string>
 
     <string name="affirmation_group_badge_premium">Premium</string>
-    <string name="affirmation_group_badge_ad">Watch ad</string>
+    <string name="affirmation_group_badge_ad">Pro only</string>
     <string name="affirmation_group_bienestar_title">Wellbeing</string>
     <string name="affirmation_group_bienestar_description">Daily affirmations to cultivate inner peace and physical and mental balance.</string>
     <string name="affirmation_group_autocuidado_title">Self-Care</string>

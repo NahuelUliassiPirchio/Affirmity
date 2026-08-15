@@ -32,10 +32,16 @@ data class AffirmationGroup(
     val isThematic: Boolean = true,
 )
 
-/** `access = PREMIUM` here is display-only (shows the Premium badge/icon as a monetization
- * preview) — it must NOT be treated as locked. `alwaysSelected` already keeps this group
- * permanently checked and non-interactive, independent of `access`, so existing users (like the
- * one who filed this) keep using it uninterrupted until real entitlement gating ships. */
+/** `access = PREMIUM` here is display-only (shows the Premium badge/icon) and must NOT be treated
+ * as locked. `alwaysSelected` short-circuits the entitlement check in `GroupAccessPolicy`, so this
+ * group stays permanently checked and non-interactive for Free and Pro users alike.
+ *
+ * This is a deliberate deferral, not an oversight: this group is currently in use for personal
+ * testing, the production group definitions are not finalized, and no Premium test account exists
+ * yet. Revisit when ALL of the following hold: (1) the real group catalog is frozen, (2) a Play
+ * Console license/test account can exercise the Pro path end to end, and (3) a decision exists on
+ * whether user-authored affirmations are a Pro feature at all. Until then keep this a single-line,
+ * easily revertible piece of temporary state. */
 val PERSONALIZADAS_GROUP = AffirmationGroup(
     id = PERSONALIZADAS_GROUP_ID,
     titleRes = R.string.affirmation_group_personalizadas_title,

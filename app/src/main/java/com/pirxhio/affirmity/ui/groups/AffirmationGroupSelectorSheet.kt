@@ -32,6 +32,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,6 +45,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
+import com.pirxhio.affirmity.data.repository.EntitlementTier
 
 /**
  * Persistent, non-dismissible sheet docked under the affirmations feed. Peek row is always
@@ -55,10 +57,12 @@ fun AffirmationGroupSelectorSheet(
     selectedIds: Set<String>,
     isValid: Boolean,
     isExpanded: Boolean,
+    tier: EntitlementTier,
     onToggle: (AffirmationGroup) -> Unit,
     onApply: () -> Unit,
     onPeekClick: () -> Unit,
     onAddCustomClick: () -> Unit,
+    onUpgradeClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxHeight(0.85f)) {
@@ -85,7 +89,9 @@ fun AffirmationGroupSelectorSheet(
                     AffirmationGroupSelectableRow(
                         group = group,
                         checked = group.id in selectedIds,
+                        tier = tier,
                         onToggle = { onToggle(group) },
+                        onUpgradeClick = onUpgradeClick,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                     )
                 }
@@ -165,13 +171,15 @@ private fun GroupSelectorPeekRow(isExpanded: Boolean, onClick: () -> Unit) {
 private fun AffirmationGroupSelectableRow(
     group: AffirmationGroup,
     checked: Boolean,
+    tier: EntitlementTier,
     onToggle: () -> Unit,
+    onUpgradeClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val toggleable = !group.alwaysSelected && group.access == AffirmationGroupAccess.FREE
-    // alwaysSelected groups (personalizadas) can show a non-FREE access badge purely as a
-    // monetization preview without being visually/functionally locked -- see PERSONALIZADAS_GROUP.
-    val locked = group.access != AffirmationGroupAccess.FREE && !group.alwaysSelected
+    // Single source of lock/toggle truth (design.md D6) -- `alwaysSelected` short-circuits first,
+    // so `PERSONALIZADAS_GROUP` is never locked/toggleable at either tier.
+    val toggleable = isToggleable(group, tier)
+    val locked = isLocked(group, tier)
     val showsAccessBadge = group.access != AffirmationGroupAccess.FREE
     val rowModifier = modifier
         .fillMaxWidth()
@@ -228,14 +236,18 @@ private fun AffirmationGroupSelectableRow(
             }
 
             when {
-                locked -> Icon(
-                    imageVector = Icons.Filled.Lock,
-                    contentDescription = stringResource(
-                        R.string.affirmation_group_locked_a11y,
-                        stringResource(group.titleRes),
-                    ),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                // Locked rows expose an actionable upgrade CTA (spec's "Upgrade CTA opens inline
+                // paywall") instead of a dead lock icon -- tapping it opens the paywall sheet.
+                locked -> IconButton(onClick = onUpgradeClick) {
+                    Icon(
+                        imageVector = Icons.Filled.Lock,
+                        contentDescription = stringResource(
+                            R.string.affirmation_group_locked_a11y,
+                            stringResource(group.titleRes),
+                        ),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
                 group.alwaysSelected -> Icon(
                     imageVector = Icons.Filled.CheckCircle,
                     contentDescription = stringResource(R.string.affirmation_group_always_on_a11y),

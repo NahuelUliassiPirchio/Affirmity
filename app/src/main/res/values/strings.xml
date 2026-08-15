@@ -260,7 +260,7 @@
     <string name="widget_action_meditate_label">Meditar</string>
 
     <string name="affirmation_group_badge_premium">Premium</string>
-    <string name="affirmation_group_badge_ad">Ver anuncio</string>
+    <string name="affirmation_group_badge_ad">Solo Pro</string>
     <string name="affirmation_group_bienestar_title">Bienestar</string>
     <string name="affirmation_group_bienestar_description">Afirmaciones diarias para cultivar la paz interior y el equilibrio físico y mental.</string>
     <string name="affirmation_group_autocuidado_title">Autocuidado</string>
