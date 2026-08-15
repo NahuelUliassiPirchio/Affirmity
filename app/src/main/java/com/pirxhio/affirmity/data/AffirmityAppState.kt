@@ -17,6 +17,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging
 import com.pirxhio.affirmity.access.AccessTier
+import com.pirxhio.affirmity.access.AdUnlockRecord
 import com.pirxhio.affirmity.auth.AuthError
 import com.pirxhio.affirmity.auth.AuthException
 import com.pirxhio.affirmity.auth.AuthProviderId
@@ -42,6 +43,7 @@ import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.FcmTokenRepository
+import com.pirxhio.affirmity.data.remote.FirestoreAdUnlockRepository
 import com.pirxhio.affirmity.data.remote.FirestoreAffirmationRepository
 import com.pirxhio.affirmity.data.remote.FirestoreDailyCompletionRepository
 import com.pirxhio.affirmity.data.remote.FirestoreDailyMoodRepository
@@ -52,7 +54,9 @@ import com.pirxhio.affirmity.data.remote.FirestoreNotificationSettingsRepository
 import com.pirxhio.affirmity.data.remote.FirestoreOnboardingRepository
 import com.pirxhio.affirmity.data.remote.FirestoreStreakHealerRepository
 import com.pirxhio.affirmity.data.remote.MigrationSnapshot
+import com.pirxhio.affirmity.data.repository.AdUnlockRepository
 import com.pirxhio.affirmity.data.repository.DataSession
+import com.pirxhio.affirmity.data.repository.RoomAdUnlockRepository
 import com.pirxhio.affirmity.data.repository.RoomAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomDailyCompletionRepository
 import com.pirxhio.affirmity.data.repository.RoomDailyMoodRepository
@@ -363,7 +367,13 @@ class AffirmityAppState(
             try {
                 migrator.ensureMigrated(migrationSnapshotFor(uid))
                 syncError.value = null
-                emit(remoteSessionFactory(uid))
+                val remote = remoteSessionFactory(uid)
+                // EC-1/Q3 reconciliation: replay every local durable ad-unlock into the remote
+                // repository on EVERY promotion to Remote (not only the one-time migration), so
+                // sign-out -> consume a trial locally -> sign-in-again still merges. The local
+                // Room copy is never deleted (design §10).
+                replayDurableAdUnlocks(local.adUnlocks.getDurableUnlocks(), remote.adUnlocks)
+                emit(remote)
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (failure: Exception) {
@@ -397,6 +407,18 @@ class AffirmityAppState(
             quietHours = local.notifications.observeQuietHours().first(),
             migratedAt = System.currentTimeMillis(),
         )
+    }
+
+    /** EC-1/Q3 reconciliation: an additive union, never an overwrite (design §10). Idempotent —
+     * [AdUnlockRepository.grantDurableUnlock] is create-if-absent, so replaying an
+     * already-present [AdUnlockRecord] costs at most one denied write and never mutates the
+     * remote record. Extracted as its own function so this replay step is independently testable
+     * and readable at the call site. */
+    private suspend fun replayDurableAdUnlocks(
+        localRecords: List<AdUnlockRecord>,
+        remoteAdUnlocks: AdUnlockRepository,
+    ) {
+        localRecords.forEach { remoteAdUnlocks.grantDurableUnlock(it) }
     }
 
     init {
@@ -901,6 +923,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             healerUses = RoomStreakHealerRepository(database.streakHealerUseDao()),
             meditation = RoomMeditationPreferencesRepository(trackerPreferences),
             notifications = RoomNotificationSettingsRepository(notificationPreferences),
+            adUnlocks = RoomAdUnlockRepository(database.adUnlockDao()),
         )
         AffirmityAppState(
             scope = scope,
@@ -915,6 +938,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
                     meditation = FirestoreMeditationPreferencesRepository(firestore, uid),
                     notifications = FirestoreNotificationSettingsRepository(firestore, uid),
                     entitlements = FirestoreEntitlementRepository(firestore, uid),
+                    adUnlocks = FirestoreAdUnlockRepository(firestore, uid),
                 )
             },
             migrator = FirestoreMigrator(firestore),

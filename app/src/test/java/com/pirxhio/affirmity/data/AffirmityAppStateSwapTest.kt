@@ -1,5 +1,8 @@
 package com.pirxhio.affirmity.data
 
+import com.pirxhio.affirmity.access.AdUnlockRecord
+import com.pirxhio.affirmity.access.ContentKey
+import com.pirxhio.affirmity.access.ContentType
 import com.pirxhio.affirmity.auth.AuthProviderId
 import com.pirxhio.affirmity.auth.AuthRepository
 import com.pirxhio.affirmity.auth.AuthState
@@ -21,6 +24,7 @@ import com.pirxhio.affirmity.data.remote.FcmTokenRepository
 import com.pirxhio.affirmity.data.remote.FirestoreMigrationSource
 import com.pirxhio.affirmity.data.remote.FirestoreMigrator
 import com.pirxhio.affirmity.data.remote.FirestoreOnboardingRepository
+import com.pirxhio.affirmity.data.repository.AdUnlockRepository
 import com.pirxhio.affirmity.data.repository.AffirmationRepository
 import com.pirxhio.affirmity.data.repository.DailyCompletionRepository
 import com.pirxhio.affirmity.data.repository.DailyMoodRepository
@@ -156,6 +160,25 @@ private class FakeEntitlementRepository(
     override fun observe(): Flow<Entitlement> = flow
 }
 
+/** Fake [AdUnlockRepository] mirroring the real repositories' create-if-absent semantics
+ * (design §8/§10 EC-1): a second [grantDurableUnlock] call for an already-present key is a
+ * silent no-op, never an overwrite. [granted] records every call that actually inserted a row,
+ * so tests can assert reconciliation-replay idempotency. */
+private class FakeAdUnlockRepository(
+    initial: List<AdUnlockRecord> = emptyList(),
+) : AdUnlockRepository {
+    private val state = MutableStateFlow(initial)
+    val granted = CopyOnWriteArrayList<AdUnlockRecord>()
+    override fun observeDurableUnlocks(): Flow<List<AdUnlockRecord>> = state
+    override suspend fun getDurableUnlocks(): List<AdUnlockRecord> = state.value
+    override suspend fun grantDurableUnlock(record: AdUnlockRecord) {
+        if (state.value.none { it.key == record.key }) {
+            state.value = state.value + record
+            granted += record
+        }
+    }
+}
+
 private class FakeAuthRepository(
     initial: AuthState = AuthState.SignedOut,
 ) : AuthRepository {
@@ -187,7 +210,11 @@ private class ImmediateFirestoreMigrationSource : FirestoreMigrationSource {
     override suspend fun commitChunk(writes: List<DocWrite>) = Unit
 }
 
-private fun fakeLocal(events: MutableList<String>, id: String = "local-1"): DataSession.Local = DataSession.Local(
+private fun fakeLocal(
+    events: MutableList<String>,
+    id: String = "local-1",
+    adUnlocks: AdUnlockRepository = FakeAdUnlockRepository(),
+): DataSession.Local = DataSession.Local(
     affirmations = FakeAffirmationRepository(
         EventedFlow("local-affirmations", events, listOf(listOf(affirmation(id)))),
     ),
@@ -198,9 +225,15 @@ private fun fakeLocal(events: MutableList<String>, id: String = "local-1"): Data
     notifications = FakeNotificationSettingsRepository(
         EventedFlow("local-notifications", events, listOf(ChannelSettings(enabled = false, segments = setOf(DaySegment.MANANA, DaySegment.TARDE)))),
     ),
+    adUnlocks = adUnlocks,
 )
 
-private fun fakeRemote(uid: String, events: MutableList<String>, id: String = "remote-1"): DataSession.Remote = DataSession.Remote(
+private fun fakeRemote(
+    uid: String,
+    events: MutableList<String>,
+    id: String = "remote-1",
+    adUnlocks: AdUnlockRepository = FakeAdUnlockRepository(),
+): DataSession.Remote = DataSession.Remote(
     uid = uid,
     affirmations = FakeAffirmationRepository(
         EventedFlow("remote-affirmations", events, listOf(listOf(affirmation(id)))),
@@ -213,6 +246,7 @@ private fun fakeRemote(uid: String, events: MutableList<String>, id: String = "r
         EventedFlow("remote-notifications", events, listOf(ChannelSettings(enabled = false, segments = setOf(DaySegment.MANANA, DaySegment.TARDE)))),
     ),
     entitlements = FakeEntitlementRepository(),
+    adUnlocks = adUnlocks,
 )
 
 private fun affirmation(id: String) = AffirmationEntity(
@@ -415,6 +449,54 @@ class AffirmityAppStateSwapTest {
         assertEquals(setOf("bienestar", "personalizadas"), state.selectedGroupIds.value)
         assertTrue(state.filteredAffirmations.any { it.id == "remote-swap" })
         assertTrue(state.filteredAffirmations.none { it.id == "local-swap" })
+
+        scope.cancel()
+    }
+
+    @Test
+    fun `sign-in replays local durable ad-unlocks into the remote repository, create-if-absent`() = runBlocking {
+        val events = mutableListOf<String>()
+        val onlyLocalRecord = AdUnlockRecord(
+            key = ContentKey(ContentType.AFFIRMATION_GROUP, "fuerza_de_voluntad"),
+            grantedAtMillis = 1_000L,
+        )
+        val alreadyOnRemoteKey = ContentKey(ContentType.MEDITATION, "calma")
+        val remoteOriginal = AdUnlockRecord(key = alreadyOnRemoteKey, grantedAtMillis = 999L)
+        val localAdUnlocks = FakeAdUnlockRepository(
+            listOf(onlyLocalRecord, AdUnlockRecord(key = alreadyOnRemoteKey, grantedAtMillis = 5_000L)),
+        )
+        val remoteAdUnlocks = FakeAdUnlockRepository(listOf(remoteOriginal))
+        val local = fakeLocal(events, adUnlocks = localAdUnlocks)
+        val authRepository = FakeAuthRepository()
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        buildState(
+            local = local,
+            remote = { fakeRemote("uid-6", events, adUnlocks = remoteAdUnlocks) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = authRepository,
+            scope = scope,
+        )
+        delay(50)
+
+        authRepository.emit(AuthState.SignedIn(uid = "uid-6", displayName = null, email = null))
+        delay(200)
+
+        val remoteRecords = remoteAdUnlocks.getDurableUnlocks()
+        assertTrue(
+            "the local-only record must be replayed into the remote repository",
+            remoteRecords.any { it.key == onlyLocalRecord.key && it.grantedAtMillis == onlyLocalRecord.grantedAtMillis },
+        )
+        val alreadyPresentRecord = remoteRecords.first { it.key == alreadyOnRemoteKey }
+        assertEquals(
+            "an already-present remote record must never be overwritten by the replay",
+            999L,
+            alreadyPresentRecord.grantedAtMillis,
+        )
+        assertEquals(
+            "local-only record must be the only one that actually inserted (idempotent replay)",
+            1,
+            remoteAdUnlocks.granted.size,
+        )
 
         scope.cancel()
     }

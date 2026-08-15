@@ -20,6 +20,11 @@ sealed interface DataSession {
     val notifications: NotificationSettingsRepository
     val entitlements: EntitlementRepository
 
+    // No default on either Local or Remote: unlike `entitlements` (Local's Free default is
+    // intentional), a default here would silently drop durable ad-unlock grant data -- the exact
+    // bug class this comment on `entitlements` warns against, reused deliberately (design §4a).
+    val adUnlocks: AdUnlockRepository
+
     class Local(
         override val affirmations: AffirmationRepository,
         override val completions: DailyCompletionRepository,
@@ -28,6 +33,7 @@ sealed interface DataSession {
         override val meditation: MeditationPreferencesRepository,
         override val notifications: NotificationSettingsRepository,
         override val entitlements: EntitlementRepository = LocalFreeEntitlementRepository(),
+        override val adUnlocks: AdUnlockRepository,
     ) : DataSession
 
     class Migrating(
@@ -41,6 +47,7 @@ sealed interface DataSession {
         override val meditation: MeditationPreferencesRepository get() = local.meditation
         override val notifications: NotificationSettingsRepository get() = local.notifications
         override val entitlements: EntitlementRepository get() = local.entitlements
+        override val adUnlocks: AdUnlockRepository get() = local.adUnlocks
     }
 
     class Remote(
@@ -55,5 +62,6 @@ sealed interface DataSession {
         // would mask a real wiring bug instead of failing loudly at the `rememberAffirmityAppState`
         // call site (unlike Local, where "signed-out = Free" is the correct, intentional default).
         override val entitlements: EntitlementRepository,
+        override val adUnlocks: AdUnlockRepository,
     ) : DataSession
 }

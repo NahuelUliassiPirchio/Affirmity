@@ -66,14 +66,35 @@ val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
     }
 }
 
+/** Additive: creates `ad_unlock` empty. No backfill — durable ad-unlock persistence starts from
+ * this version (design §4a); PER_USE unlocks are never persisted (design §0/§4b), so there is
+ * nothing to migrate from a prior in-memory-only state. */
+val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `ad_unlock` (
+                `contentKey` TEXT NOT NULL,
+                `contentType` TEXT NOT NULL,
+                `contentId` TEXT NOT NULL,
+                `grantedAtMillis` INTEGER NOT NULL,
+                `expiresAtMillis` INTEGER,
+                PRIMARY KEY(`contentKey`)
+            )
+            """.trimIndent(),
+        )
+    }
+}
+
 @Database(
     entities = [
         AffirmationEntity::class,
         DailyCompletionEntity::class,
         DailyMoodEntity::class,
         StreakHealerUseEntity::class,
+        AdUnlockEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class AffirmityDatabase : RoomDatabase() {
@@ -81,6 +102,7 @@ abstract class AffirmityDatabase : RoomDatabase() {
     abstract fun dailyCompletionDao(): DailyCompletionDao
     abstract fun dailyMoodDao(): DailyMoodDao
     abstract fun streakHealerUseDao(): StreakHealerUseDao
+    abstract fun adUnlockDao(): AdUnlockDao
 
     companion object {
         @Volatile
@@ -92,7 +114,7 @@ abstract class AffirmityDatabase : RoomDatabase() {
                     context.applicationContext,
                     AffirmityDatabase::class.java,
                     "affirmity.db",
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build().also { instance = it }
             }
     }
 }
