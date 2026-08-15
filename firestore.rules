@@ -42,5 +42,14 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false;
     }
+
+    // Server-written only (Admin SDK bypasses rules) -- the client can never grant itself Pro.
+    // Written exclusively by the `playRtdn`/`syncEntitlement` Cloud Functions after re-verifying
+    // the purchase against the Play Developer API (design.md's D1/D4). Owner may read their own
+    // entitlement to drive gating; write is unconditionally denied, including to the owner.
+    match /users/{uid}/entitlements/{doc} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
   }
 }

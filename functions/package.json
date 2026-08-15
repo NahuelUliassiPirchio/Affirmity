@@ -10,16 +10,20 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:rules": "firebase emulators:exec --project demo-affirmity-rules-test --only firestore \"vitest run test/firestore.rules.test.ts --config vitest.rules.config.ts\""
   },
   "dependencies": {
     "@google-cloud/tasks": "^5.5.0",
     "firebase-admin": "^14.2.0",
     "firebase-functions": "^7.3.2",
-    "google-auth-library": "^9.14.2"
+    "google-auth-library": "^9.14.2",
+    "googleapis": "^174.0.1"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
     "@types/node": "^22.10.2",
+    "firebase": "^12.17.1",
     "typescript": "^5.6.3",
     "vitest": "^2.1.4"
   }

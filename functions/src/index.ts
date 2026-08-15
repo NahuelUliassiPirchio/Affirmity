@@ -10,15 +10,26 @@
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getFirestore, FieldValue, type QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
+import { getAuth } from 'firebase-admin/auth';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { onRequest } from 'firebase-functions/v2/https';
 import { CloudTasksClient as GoogleCloudTasksClient } from '@google-cloud/tasks';
 import { OAuth2Client } from 'google-auth-library';
+import { google } from 'googleapis';
 
 import { localHourInZone, utcMillisToLocalEpochDay } from './localDay';
 import { planAllUsers, type PlanStore, type PlanResult, type TaskEnqueuer, type UserPlanInput } from './planner';
 import { taskName } from './tasks';
 import { sendAndPrune, type FcmClient, type TokenStore } from './fcm';
+import {
+  handleRtdn,
+  resolveEntitlement,
+  type EntitlementDoc,
+  type EntitlementStore,
+  type OidcClaims,
+  type PlayApiClient,
+  type PlaySubscriptionV2,
+} from './billing';
 
 export * from './schedule';
 export * from './localDay';
@@ -26,6 +37,7 @@ export * from './streak';
 export * from './planner';
 export * from './tasks';
 export * from './fcm';
+export * from './billing';
 
 if (getApps().length === 0) {
   initializeApp();
@@ -237,4 +249,161 @@ export const sendNotification = onRequest(async (req, res) => {
 
   await sendAndPrune(fcmClient, tokenStore, uid, tokens, { channel, title, body });
   res.status(200).send('OK');
+});
+
+// -------------------------------------------------------------------------------------------
+// Play Billing entitlement (design.md's free-pro-subscription change, D1/D2). Pure logic lives
+// in `billing.ts` (Vitest); this section is SDK wiring only, same split as the rest of this file.
+// -------------------------------------------------------------------------------------------
+
+// Deploy-time configuration -- differs per environment, same category as QUEUE_PATH/SEND_URL above.
+const RTDN_PUSH_AUDIENCE = process.env.RTDN_PUSH_AUDIENCE ?? '';
+const RTDN_PUSH_SERVICE_ACCOUNT = process.env.RTDN_PUSH_SERVICE_ACCOUNT ?? '';
+const ANDROID_PACKAGE_NAME = process.env.ANDROID_PACKAGE_NAME ?? 'com.pirxhio.affirmity';
+// JSON key for the Play Developer API service account (user-owned prerequisite, design.md Phase 0).
+const PLAY_SERVICE_ACCOUNT_KEY_JSON = process.env.PLAY_SERVICE_ACCOUNT_KEY_JSON;
+
+function entitlementDocRef(uid: string) {
+  return getFirestore().doc(`users/${uid}/entitlements/current`);
+}
+
+function firestoreEntitlementStore(): EntitlementStore {
+  return {
+    async getLastVerifiedAt(uid) {
+      const snapshot = await entitlementDocRef(uid).get();
+      const value = snapshot.data()?.lastVerifiedAt;
+      return typeof value === 'number' ? value : null;
+    },
+    async writeEntitlement(uid, doc: EntitlementDoc) {
+      await entitlementDocRef(uid).set({ ...doc, updatedAt: FieldValue.serverTimestamp() });
+    },
+  };
+}
+
+let playApiClientPromise: Promise<PlayApiClient> | null = null;
+
+/** Lazily-built Play Developer API client (design D1 step 5 -- the sole source of purchase
+ * authority). Memoized so the OAuth client/JWT is built once per function instance, not per call. */
+function playApiClient(): Promise<PlayApiClient> {
+  if (!playApiClientPromise) {
+    playApiClientPromise = (async () => {
+      const auth = new google.auth.GoogleAuth({
+        scopes: ['https://www.googleapis.com/auth/androidpublisher'],
+        credentials: PLAY_SERVICE_ACCOUNT_KEY_JSON ? JSON.parse(PLAY_SERVICE_ACCOUNT_KEY_JSON) : undefined,
+      });
+      const androidPublisher = google.androidpublisher({ version: 'v3', auth });
+      return {
+        async getSubscription(packageName, purchaseToken) {
+          const response = await androidPublisher.purchases.subscriptionsv2.get({
+            packageName,
+            token: purchaseToken,
+          });
+          return response.data as unknown as PlaySubscriptionV2;
+        },
+      };
+    })();
+  }
+  return playApiClientPromise;
+}
+
+/** Verifies the Pub/Sub push OIDC token and extracts the claims `isTrustedPushClaims` checks
+ * (design D1 step 2-3). Returns `null` on any verification failure -- `handleRtdn` maps that to 401. */
+async function verifyRtdnPushClaims(authorizationHeader: string | undefined): Promise<OidcClaims | null> {
+  if (!authorizationHeader?.startsWith('Bearer ')) return null;
+  const idToken = authorizationHeader.slice('Bearer '.length);
+  try {
+    const ticket = await oauthClient.verifyIdToken({ idToken, audience: RTDN_PUSH_AUDIENCE });
+    const payload = ticket.getPayload();
+    if (!payload) return null;
+    return {
+      iss: payload.iss,
+      aud: typeof payload.aud === 'string' ? payload.aud : undefined,
+      email: payload.email,
+      email_verified: payload.email_verified,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Play RTDN push endpoint (design.md D1). Pub/Sub retries any non-2xx response, so the status
+ * contract computed by `handleRtdn` (401 auth failure, 200 drop-or-write, 500 transient failure)
+ * is forwarded verbatim.
+ */
+export const playRtdn = onRequest(async (req, res) => {
+  if (req.method !== 'POST') {
+    res.status(405).send('Method Not Allowed');
+    return;
+  }
+
+  const claims = await verifyRtdnPushClaims(req.headers.authorization);
+  const playApi = await playApiClient();
+  const result = await handleRtdn({
+    claims,
+    claimPolicy: { audience: RTDN_PUSH_AUDIENCE, serviceAccountEmail: RTDN_PUSH_SERVICE_ACCOUNT },
+    body: req.body,
+    packageName: ANDROID_PACKAGE_NAME,
+    playApi,
+    store: firestoreEntitlementStore(),
+    nowMillis: Date.now(),
+  });
+
+  if (result.status === 401) {
+    res.status(401).send('Unauthorized');
+    return;
+  }
+  if (result.status === 500) {
+    res.status(500).send(result.reason);
+    return;
+  }
+  res.status(200).send('OK');
+});
+
+/**
+ * Client-triggered re-sync (design.md D2): called right after a purchase is acknowledged, and on
+ * cold start when the client believes it should be Pro but the cached doc still says Free.
+ * Authenticated with a Firebase ID token -- a different trust leg from `playRtdn`'s Pub/Sub push
+ * OIDC token. The resolved uid always comes from the Play API's `externalAccountIdentifiers`
+ * (D3), never from the caller's self-reported identity, so a caller can only ever trigger a
+ * (harmless, idempotent) re-verification of whichever account the purchase token truly belongs to.
+ */
+export const syncEntitlement = onRequest(async (req, res) => {
+  if (req.method !== 'POST') {
+    res.status(405).send('Method Not Allowed');
+    return;
+  }
+
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith('Bearer ')) {
+    res.status(401).send('Unauthorized');
+    return;
+  }
+  try {
+    await getAuth().verifyIdToken(authorization.slice('Bearer '.length));
+  } catch {
+    res.status(401).send('Unauthorized');
+    return;
+  }
+
+  const { purchaseToken } = req.body as { purchaseToken?: string };
+  if (!purchaseToken) {
+    res.status(400).send('Missing purchaseToken');
+    return;
+  }
+
+  try {
+    const playApi = await playApiClient();
+    const result = await resolveEntitlement(
+      playApi,
+      firestoreEntitlementStore(),
+      ANDROID_PACKAGE_NAME,
+      purchaseToken,
+      'sync',
+      Date.now(),
+    );
+    res.status(200).json({ outcome: result.outcome });
+  } catch (err) {
+    res.status(500).send(err instanceof Error ? err.message : 'unknown-error');
+  }
 });
