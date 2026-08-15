@@ -140,8 +140,9 @@ private class FakeNotificationSettingsRepository(
 }
 
 /** Fake [GroupSelectionPreferences] — the real class needs an Android [Context], so JVM tests
- * that construct [AffirmityAppState] directly must fake this narrow interface (design risk #4). */
-private class FakeGroupSelectionPreferences(
+ * that construct [AffirmityAppState] directly must fake this narrow interface (design risk #4).
+ * Deliberately NOT `private`: reused as-is by [com.pirxhio.affirmity.data.AdUnlockEndToEndTest]. */
+class FakeGroupSelectionPreferences(
     initial: Set<String>? = null,
 ) : GroupSelectionPreferences {
     private val flow = MutableStateFlow(initial)
@@ -164,8 +165,11 @@ private class FakeEntitlementRepository(
 /** Fake [AdUnlockRepository] mirroring the real repositories' create-if-absent semantics
  * (design §8/§10 EC-1): a second [grantDurableUnlock] call for an already-present key is a
  * silent no-op, never an overwrite. [granted] records every call that actually inserted a row,
- * so tests can assert reconciliation-replay idempotency. */
-private class FakeAdUnlockRepository(
+ * so tests can assert reconciliation-replay idempotency.
+ *
+ * Deliberately NOT `private`: reused as-is by [com.pirxhio.affirmity.data.AdUnlockEndToEndTest]
+ * (task E.4) rather than duplicated. */
+class FakeAdUnlockRepository(
     initial: List<AdUnlockRecord> = emptyList(),
 ) : AdUnlockRepository {
     private val state = MutableStateFlow(initial)

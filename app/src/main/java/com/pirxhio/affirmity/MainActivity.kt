@@ -56,7 +56,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import com.pirxhio.affirmity.access.AdUnlockState
 import com.pirxhio.affirmity.auth.AuthState
 import com.pirxhio.affirmity.billing.BillingService
 import com.pirxhio.affirmity.data.MOOD_MAX
@@ -470,14 +469,11 @@ fun AffirmityApp(
                                 selectedIds = appState.draftGroupIds.value,
                                 isValid = appState.isDraftSelectionValid,
                                 isExpanded = sheetState.currentValue == SheetValue.Expanded,
-                                // AdUnlockState() is an empty-defaults placeholder -- there is no
-                                // live ad-unlock state on AffirmityAppState until the seam lands
-                                // (commit E), so this is behavior-identical to pre-refactor.
                                 accessDecisionFor = {
                                     groupAccessDecision(
                                         it,
                                         appState.entitlementTier.value,
-                                        AdUnlockState(),
+                                        appState.adUnlockState,
                                         System.currentTimeMillis(),
                                     )
                                 },
@@ -486,7 +482,7 @@ fun AffirmityApp(
                                     val decision = groupAccessDecision(
                                         group,
                                         appState.entitlementTier.value,
-                                        AdUnlockState(),
+                                        appState.adUnlockState,
                                         System.currentTimeMillis(),
                                     )
                                     appState.toggleGroup(
