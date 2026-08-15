@@ -44,6 +44,7 @@ import com.pirxhio.affirmity.data.remote.FcmTokenRepository
 import com.pirxhio.affirmity.data.remote.FirestoreAffirmationRepository
 import com.pirxhio.affirmity.data.remote.FirestoreDailyCompletionRepository
 import com.pirxhio.affirmity.data.remote.FirestoreDailyMoodRepository
+import com.pirxhio.affirmity.data.remote.FirestoreEntitlementRepository
 import com.pirxhio.affirmity.data.remote.FirestoreMeditationPreferencesRepository
 import com.pirxhio.affirmity.data.remote.FirestoreMigrator
 import com.pirxhio.affirmity.data.remote.FirestoreNotificationSettingsRepository
@@ -51,6 +52,7 @@ import com.pirxhio.affirmity.data.remote.FirestoreOnboardingRepository
 import com.pirxhio.affirmity.data.remote.FirestoreStreakHealerRepository
 import com.pirxhio.affirmity.data.remote.MigrationSnapshot
 import com.pirxhio.affirmity.data.repository.DataSession
+import com.pirxhio.affirmity.data.repository.EntitlementTier
 import com.pirxhio.affirmity.data.repository.RoomAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomDailyCompletionRepository
 import com.pirxhio.affirmity.data.repository.RoomDailyMoodRepository
@@ -203,6 +205,10 @@ class AffirmityAppState(
     /** First-launch default thematic selection (unlocked thematic groups), also resolved by the
      * caller for the same D9 reason. */
     private val defaultThematicGroupIds: Set<String> = emptySet(),
+    /** Every group id that requires Pro entitlement (`PREMIUM`/`AD_SUPPORTED` access, excluding
+     * `alwaysSelected`), resolved by the caller for the same D9 reason. Consumed by the
+     * downgrade-auto-deselect collector ([deselectLockedGroups] call site). */
+    private val proOnlyGroupIds: Set<String> = emptySet(),
 ) {
     val affirmations = mutableStateListOf<Affirmation>()
 
@@ -282,6 +288,25 @@ class AffirmityAppState(
 
     private var healerFlowInitialized = false
         private set
+
+    /** Current Free/Pro gating tier, resolved from the live entitlement repository (design.md
+     * D5/D8). Read by [rememberAffirmityAppState]'s callers to drive `GroupAccessPolicy`. */
+    var entitlementTier = mutableStateOf(EntitlementTier.FREE)
+        private set
+
+    /** True right after a live entitlement transition from Pro to Free is observed (design.md D8,
+     * spec's "Explicit in-app lapse notice"). Never set on the first emission of a (re)started
+     * entitlement flow, so a cold start or sign-in/out session swap that happens to load an
+     * already-Free state doesn't fire a spurious notice. */
+    var proLapseNotice = mutableStateOf(false)
+        private set
+
+    /** Dismisses [proLapseNotice] once the user has seen the snackbar (design.md D8). */
+    fun acknowledgeProLapse() {
+        proLapseNotice.value = false
+    }
+
+    private var entitlementFlowInitialized = false
 
     /** Rolling [STREAK_LOOKBACK_DAYS]-day window of mood check-ins, oldest first — the calendar
      * and "Resumen" stats derive everything else (average/distribution/trend) from this list. */
@@ -518,6 +543,35 @@ class AffirmityAppState(
                     draftInitialized = true
                 }
             }
+        }
+        scope.launch {
+            // Same class of problem as the healer-grant collector above (design.md D8): reset the
+            // initialized flag INSIDE flatMapLatest so a fresh (re)started flow -- cold start or a
+            // sign-in/sign-out session swap -- only ever seeds entitlementTier, never fires a
+            // spurious lapse notice for a session that happens to load an already-Free state.
+            session.flatMapLatest { s ->
+                entitlementFlowInitialized = false
+                s.entitlements.observe()
+            }.catch { error -> Log.e(TAG, "entitlement flow failed", error) }
+                .collect { entitlement ->
+                    // Compared against the repository-emitted value only, never a client-side
+                    // optimistic purchase overlay (design.md D7/D8) -- an expiring optimistic
+                    // window can never masquerade as a real lapse.
+                    if (entitlementFlowInitialized &&
+                        entitlementTier.value == EntitlementTier.PRO &&
+                        entitlement.tier == EntitlementTier.FREE
+                    ) {
+                        proLapseNotice.value = true
+                        selectedGroupIds.value?.let { committed ->
+                            val updated = deselectLockedGroups(committed, proOnlyGroupIds, defaultThematicGroupIds)
+                            selectedGroupIds.value = updated
+                            draftGroupIds.value = updated
+                            scope.launch { groupPreferences.saveSelectedGroupIds(updated) }
+                        }
+                    }
+                    entitlementFlowInitialized = true
+                    entitlementTier.value = entitlement.tier
+                }
         }
     }
 
@@ -827,6 +881,11 @@ fun rememberAffirmityAppState(): AffirmityAppState {
     val defaultThematicGroupIds = defaultAffirmationGroups()
         .filter { it.access == AffirmationGroupAccess.FREE }
         .map { it.id }.toSet()
+    // Every group that requires Pro to unlock -- mirrors GroupAccessPolicy.isLocked's condition
+    // (access != FREE && !alwaysSelected) without importing ui.groups' policy file itself (D9).
+    val proOnlyGroupIds = defaultAffirmationGroups()
+        .filter { it.access != AffirmationGroupAccess.FREE }
+        .map { it.id }.toSet()
     return remember {
         val database = AffirmityDatabase.getInstance(context)
         val notificationPreferences = NotificationPreferences(context)
@@ -855,6 +914,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
                     healerUses = FirestoreStreakHealerRepository(firestore, uid),
                     meditation = FirestoreMeditationPreferencesRepository(firestore, uid),
                     notifications = FirestoreNotificationSettingsRepository(firestore, uid),
+                    entitlements = FirestoreEntitlementRepository(firestore, uid),
                 )
             },
             migrator = FirestoreMigrator(firestore),
@@ -875,6 +935,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             groupPreferences = AffirmationGroupPreferences(context.applicationContext),
             knownGroupIds = knownGroupIds,
             defaultThematicGroupIds = defaultThematicGroupIds,
+            proOnlyGroupIds = proOnlyGroupIds,
         )
     }
 }

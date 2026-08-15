@@ -72,3 +72,28 @@ interface NotificationSettingsRepository {
      */
     suspend fun setTimeZone(zoneId: String)
 }
+
+/** Free/Pro gating tier, resolved client-side from the server-written entitlement doc — see
+ * `EntitlementResolution.resolveTier` (design.md D5). */
+enum class EntitlementTier { FREE, PRO }
+
+/** Client-facing entitlement snapshot. [expiryTimeMillis] is `null` for a Free tier or a
+ * non-expiring grant. */
+data class Entitlement(
+    val tier: EntitlementTier,
+    val expiryTimeMillis: Long? = null,
+    val productId: String? = null,
+) {
+    companion object {
+        val Free = Entitlement(tier = EntitlementTier.FREE)
+    }
+}
+
+/**
+ * Store-agnostic, **read-only by design** contract for the user's Play Billing entitlement
+ * (design.md D5) — no write methods exist so the client can never grant itself Pro; the doc is
+ * server-write-only (`firestore.rules`: `write: if false`).
+ */
+interface EntitlementRepository {
+    fun observe(): Flow<Entitlement>
+}

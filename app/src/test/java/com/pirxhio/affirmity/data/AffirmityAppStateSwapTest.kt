@@ -25,6 +25,8 @@ import com.pirxhio.affirmity.data.repository.AffirmationRepository
 import com.pirxhio.affirmity.data.repository.DailyCompletionRepository
 import com.pirxhio.affirmity.data.repository.DailyMoodRepository
 import com.pirxhio.affirmity.data.repository.DataSession
+import com.pirxhio.affirmity.data.repository.Entitlement
+import com.pirxhio.affirmity.data.repository.EntitlementRepository
 import com.pirxhio.affirmity.data.repository.MeditationPreferencesRepository
 import com.pirxhio.affirmity.data.repository.NotificationSettingsRepository
 import com.pirxhio.affirmity.data.repository.StreakHealerRepository
@@ -146,6 +148,14 @@ private class FakeGroupSelectionPreferences(
     }
 }
 
+/** Fake [EntitlementRepository] that always reports Free — none of the swap-lifecycle tests in
+ * this file exercise entitlement transitions (covered separately). */
+private class FakeEntitlementRepository(
+    private val flow: Flow<Entitlement> = flowOf(Entitlement.Free),
+) : EntitlementRepository {
+    override fun observe(): Flow<Entitlement> = flow
+}
+
 private class FakeAuthRepository(
     initial: AuthState = AuthState.SignedOut,
 ) : AuthRepository {
@@ -202,6 +212,7 @@ private fun fakeRemote(uid: String, events: MutableList<String>, id: String = "r
     notifications = FakeNotificationSettingsRepository(
         EventedFlow("remote-notifications", events, listOf(ChannelSettings(enabled = false, segments = setOf(DaySegment.MANANA, DaySegment.TARDE)))),
     ),
+    entitlements = FakeEntitlementRepository(),
 )
 
 private fun affirmation(id: String) = AffirmationEntity(

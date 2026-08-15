@@ -18,6 +18,7 @@ sealed interface DataSession {
     val healerUses: StreakHealerRepository
     val meditation: MeditationPreferencesRepository
     val notifications: NotificationSettingsRepository
+    val entitlements: EntitlementRepository
 
     class Local(
         override val affirmations: AffirmationRepository,
@@ -26,6 +27,7 @@ sealed interface DataSession {
         override val healerUses: StreakHealerRepository,
         override val meditation: MeditationPreferencesRepository,
         override val notifications: NotificationSettingsRepository,
+        override val entitlements: EntitlementRepository = LocalFreeEntitlementRepository(),
     ) : DataSession
 
     class Migrating(
@@ -38,6 +40,7 @@ sealed interface DataSession {
         override val healerUses: StreakHealerRepository get() = local.healerUses
         override val meditation: MeditationPreferencesRepository get() = local.meditation
         override val notifications: NotificationSettingsRepository get() = local.notifications
+        override val entitlements: EntitlementRepository get() = local.entitlements
     }
 
     class Remote(
@@ -48,5 +51,9 @@ sealed interface DataSession {
         override val healerUses: StreakHealerRepository,
         override val meditation: MeditationPreferencesRepository,
         override val notifications: NotificationSettingsRepository,
+        // No default: a signed-in Remote session must never silently fall back to Free -- that
+        // would mask a real wiring bug instead of failing loudly at the `rememberAffirmityAppState`
+        // call site (unlike Local, where "signed-out = Free" is the correct, intentional default).
+        override val entitlements: EntitlementRepository,
     ) : DataSession
 }

@@ -44,4 +44,14 @@ class FirestorePathsTest {
     fun `streak healer use doc path uses the stringified healedEpochDay as the doc id`() {
         assertEquals("users/uid-1/streakHealerUses/19876", FirestorePaths.streakHealerUseDoc("uid-1", 19_876L))
     }
+
+    @Test
+    fun `entitlements collection path is scoped under the user`() {
+        assertEquals("users/uid-1/entitlements", FirestorePaths.entitlementsCollection("uid-1"))
+    }
+
+    @Test
+    fun `entitlement doc path is the single shared 'current' document`() {
+        assertEquals("users/uid-1/entitlements/current", FirestorePaths.entitlementDoc("uid-1"))
+    }
 }

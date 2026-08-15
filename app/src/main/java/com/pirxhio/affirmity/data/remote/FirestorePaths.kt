@@ -33,4 +33,8 @@ object FirestorePaths {
 
     fun streakHealerUseDoc(uid: String, healedEpochDay: Long): String =
         "${streakHealerUsesCollection(uid)}/$healedEpochDay"
+
+    fun entitlementsCollection(uid: String): String = "users/$uid/entitlements"
+
+    fun entitlementDoc(uid: String): String = "${entitlementsCollection(uid)}/current"
 }
