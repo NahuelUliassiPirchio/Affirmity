@@ -279,6 +279,51 @@ class MeditationEngineTest {
         assertEquals(SessionStatus.Completed, tinyEngine.state.value.status)
     }
 
+    @Test
+    fun `natural completion dispatches EndSession with the Completed reason`() {
+        engine.send(MeditationEvent.Start)
+        repeat(12) { engine.send(MeditationEvent.TimerCompleted(lastTimerGeneration())) }
+
+        assertEquals(SessionStatus.Completed, state.status)
+        assertTrue(executor.commands.contains(EndSession(SessionEndReason.Completed)))
+    }
+
+    @Test
+    fun `cancelling dispatches EndSession with the Cancelled reason and does not run the phase onExit`() {
+        engine.send(MeditationEvent.Start)
+        repeat(4) { engine.send(MeditationEvent.TimerCompleted(lastTimerGeneration())) }
+        assertEquals("retention", state.currentPhaseId)
+
+        engine.send(MeditationEvent.Cancel)
+
+        assertEquals(SessionStatus.Cancelled, state.status)
+        assertTrue(executor.commands.contains(EndSession(SessionEndReason.Cancelled)))
+        assertFalse(executor.commands.contains(EndLap("retention")))
+    }
+
+    @Test
+    fun `a fade dispatched by the final phase onExit is followed immediately by EndSession`() {
+        val fadeOutDefinition = MeditationDefinition(
+            id = "fade-out-demo",
+            root = Phase(
+                id = "only",
+                duration = PhaseDuration.Fixed(1_000L),
+                onExit = listOf(StopAmbient(fadeOutMillis = 5_000L)),
+            ),
+        )
+        val fadeExecutor = RecordingCommandExecutor()
+        val fadeEngine = MeditationEngine(fadeOutDefinition, fadeExecutor)
+        fun lastGen() = (fadeExecutor.commands.last { it is StartTimer } as StartTimer).generation
+
+        fadeEngine.send(MeditationEvent.Start)
+        fadeEngine.send(MeditationEvent.TimerCompleted(lastGen()))
+
+        assertEquals(
+            listOf<MeditationCommand>(StopAmbient(5_000L), EndSession(SessionEndReason.Completed)),
+            fadeExecutor.commands.takeLast(2),
+        )
+    }
+
     private class RecordingCommandExecutor : MeditationCommandExecutor {
         val commands: MutableList<MeditationCommand> = mutableListOf()
         override fun execute(command: MeditationCommand) {

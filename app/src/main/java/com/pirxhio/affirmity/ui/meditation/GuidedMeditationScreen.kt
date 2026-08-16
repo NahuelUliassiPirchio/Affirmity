@@ -66,17 +66,20 @@ fun GuidedMeditationScreen(
 
     val definition = remember(config) { breathingMeditationDefinition(config) }
     val textExecutor = remember(definition) { TextDisplayCommandExecutor() }
-    val audioExecutor = remember(definition) {
-        GuidedMeditationAudioExecutor(
+
+    // The engine and audioExecutor/TimerCommandExecutor need each other before either exists —
+    // resolved via a lateinit closed over by their sendEvent lambdas, only actually invoked once
+    // the clock/MediaPlayer emits its first event, by which point engineRef is assigned. Both
+    // executors are therefore built inside this single remember block, alongside the engine.
+    val (audioExecutor, engine) = remember(definition) {
+        lateinit var engineRef: MeditationEngine
+        val audio = GuidedMeditationAudioExecutor(
             context = context.applicationContext,
             resourcesByAudioId = mapOf(BreathingAudio.RETENTION_START to R.raw.meditation_gong),
+            scope = scope,
+            timeSource = AndroidMonotonicTimeSource,
+            sendEvent = { event -> engineRef.send(event) },
         )
-    }
-    val engine = remember(definition) {
-        // The engine and TimerCommandExecutor need each other before either exists — resolved via
-        // a lateinit closed over by TimerCommandExecutor's sendEvent lambda, only actually invoked
-        // once the clock emits its first event, by which point engineRef is assigned.
-        lateinit var engineRef: MeditationEngine
         val clock = RealSessionClock(scope = scope, timeSource = AndroidMonotonicTimeSource)
         val timerExecutor = TimerCommandExecutor(
             clock = clock,
@@ -84,10 +87,10 @@ fun GuidedMeditationScreen(
             scope = scope,
         )
         val commandExecutor = CompositeCommandExecutor(
-            listOf(timerExecutor, textExecutor, LapTrackerCommandExecutor(AndroidMonotonicTimeSource), audioExecutor),
+            listOf(timerExecutor, textExecutor, LapTrackerCommandExecutor(AndroidMonotonicTimeSource), audio),
         )
         engineRef = MeditationEngine(definition, commandExecutor)
-        engineRef
+        audio to engineRef
     }
 
     DisposableEffect(audioExecutor) {
