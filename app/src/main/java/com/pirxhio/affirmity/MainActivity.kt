@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
@@ -70,6 +71,9 @@ import com.pirxhio.affirmity.ui.groups.selectableAffirmationGroups
 import com.pirxhio.affirmity.ui.healer.StreakHealerGrantedScreen
 import com.pirxhio.affirmity.ui.meditation.GuidedMeditationScreen
 import com.pirxhio.affirmity.ui.meditation.MeditationScreen
+import com.pirxhio.affirmity.ui.meditation.catalog.findMeditationCatalogEntry
+import com.pirxhio.affirmity.ui.meditation.catalog.isMeditationLocked
+import com.pirxhio.affirmity.ui.meditation.catalog.meditationAccessDecision
 import com.pirxhio.affirmity.ui.mood.MoodScreen
 import com.pirxhio.affirmity.ui.myaffirmations.MyAffirmationsScreen
 import com.pirxhio.affirmity.ui.onboarding.OnboardingScreen
@@ -154,7 +158,9 @@ fun AffirmityApp(
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showNotificationDebug by rememberSaveable { mutableStateOf(false) }
     var showMyAffirmations by rememberSaveable { mutableStateOf(false) }
-    var showGuidedMeditationDemo by rememberSaveable { mutableStateOf(false) }
+    // REQ-5.4: replaces the old single-demo boolean. Holds a MeditationCatalogEntry.id so the
+    // guided session route is parameterized on which entry to play, not just whether to show one.
+    var selectedMeditationEntryId by rememberSaveable { mutableStateOf<String?>(null) }
     var showPaywall by rememberSaveable { mutableStateOf(false) }
     val appState = rememberAffirmityAppState()
     val context = LocalContext.current
@@ -303,25 +309,63 @@ fun AffirmityApp(
         return
     }
 
-    if (showGuidedMeditationDemo) {
-        BackHandler { showGuidedMeditationDemo = false }
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            topBar = {
-                TopAppBar(
-                    title = { Text(stringResource(R.string.guided_meditation_title)) },
-                    navigationIcon = {
-                        IconButton(onClick = { showGuidedMeditationDemo = false }) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.nav_back_content_description)
-                            )
+    val selectedMeditationEntry = selectedMeditationEntryId?.let { findMeditationCatalogEntry(it) }
+    if (selectedMeditationEntry != null) {
+        // Launch-time access re-check (REQ-5.4.1, EC-5): re-resolved at composition time, not
+        // reused from the tap-time decision -- a session swap or a live Pro->Free transition
+        // between the Discover tap and this composition clears sessionAdUnlocks, and a screen left
+        // open across that boundary must not keep playing gated content. Same "validate at action
+        // time, never from rendered state" convention AffirmityAppState.activateStreakHealer
+        // already documents.
+        val decision = meditationAccessDecision(
+            selectedMeditationEntry,
+            appState.entitlementTier.value,
+            appState.adUnlockState,
+            System.currentTimeMillis(),
+        )
+        if (isMeditationLocked(decision)) {
+            // Unknown/removed/newly-locked entry (REQ-5.4.3, EC-4): fall through instead of ever
+            // composing GuidedMeditationScreen for gated content.
+            LaunchedEffect(selectedMeditationEntry.id) { selectedMeditationEntryId = null }
+        } else {
+            val backDispatcherOwner = LocalOnBackPressedDispatcherOwner.current
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                topBar = {
+                    TopAppBar(
+                        title = { Text(stringResource(selectedMeditationEntry.titleRes)) },
+                        navigationIcon = {
+                            // Single back path (REQ-5.4.2): GuidedMeditationScreen owns the one
+                            // BackHandler for this route -- it must dispatch
+                            // MeditationEvent.Cancel and emit onSessionEnded before exiting. This
+                            // icon triggers that SAME registered callback via the system back
+                            // dispatcher instead of reimplementing the exit logic here, so there
+                            // is exactly one back path, not two.
+                            IconButton(
+                                onClick = {
+                                    backDispatcherOwner?.onBackPressedDispatcher?.onBackPressed()
+                                },
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = stringResource(R.string.nav_back_content_description)
+                                )
+                            }
                         }
-                    }
+                    )
+                }
+            ) { innerPadding ->
+                GuidedMeditationScreen(
+                    entry = selectedMeditationEntry,
+                    modifier = Modifier.padding(innerPadding),
+                    // PR5 wires the real consumer (consumeMeditationPlaybackUnlock +
+                    // recordMeditationCompleted). This PR only parameterizes the screen and proves
+                    // both onSessionEnded emission sites fire correctly; no downstream effect is
+                    // wired yet.
+                    onSessionEnded = {},
+                    onExit = { selectedMeditationEntryId = null },
                 )
             }
-        ) { innerPadding ->
-            GuidedMeditationScreen(modifier = Modifier.padding(innerPadding))
         }
         return
     }
@@ -516,7 +560,10 @@ fun AffirmityApp(
                     initialDurationSeconds = appState.meditationDurationSeconds.value ?: (15 * 60),
                     onDurationSelected = { seconds -> appState.recordMeditationDurationSelected(seconds) },
                     onSessionCompleted = { appState.recordMeditationCompleted() },
-                    onOpenGuidedDemo = { showGuidedMeditationDemo = true }
+                    // Temporary (PR3): routes to the real reset_rapido entry so the parameterized
+                    // screen is manually testable end-to-end. Replaced by the real Discover
+                    // per-row onLaunch wiring in PR4 (T4.3), which also deletes this demo button.
+                    onOpenGuidedDemo = { selectedMeditationEntryId = "reset_rapido" }
                 )
 
                 AppDestinations.PROGRESO -> ProgressScreen(

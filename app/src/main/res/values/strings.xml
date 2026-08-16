@@ -241,7 +241,6 @@
     <string name="meditation_discover_track_3_title">Horizonte Sereno</string>
     <string name="meditation_discover_track_3_meta">15 min • Enfoque</string>
 
-    <string name="guided_meditation_title">Respiración guiada</string>
     <string name="guided_meditation_round_label">Ronda %1$d de %2$d</string>
     <string name="guided_meditation_breath_label">Respiración %1$d de %2$d</string>
     <string name="guided_meditation_inhale">Inhalá</string>

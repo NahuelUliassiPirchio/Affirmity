@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.ui.meditation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,13 +41,13 @@ import com.pirxhio.affirmity.meditation.MeditationEngine
 import com.pirxhio.affirmity.meditation.MeditationEvent
 import com.pirxhio.affirmity.meditation.MeditationRuntimeState
 import com.pirxhio.affirmity.meditation.RealSessionClock
+import com.pirxhio.affirmity.meditation.SessionEndReason
 import com.pirxhio.affirmity.meditation.SessionStatus
 import com.pirxhio.affirmity.meditation.TextDisplayCommandExecutor
 import com.pirxhio.affirmity.meditation.TimerCommandExecutor
-import com.pirxhio.affirmity.meditation.breathing.BreathingAudio
-import com.pirxhio.affirmity.meditation.breathing.BreathingConfig
-import com.pirxhio.affirmity.meditation.breathing.BreathingText
-import com.pirxhio.affirmity.meditation.breathing.breathingMeditationDefinition
+import com.pirxhio.affirmity.ui.meditation.catalog.CounterEmphasis
+import com.pirxhio.affirmity.ui.meditation.catalog.MeditationCatalogEntry
+import com.pirxhio.affirmity.ui.meditation.catalog.fixedPhaseDurationsById
 
 /**
  * First screen built on the guided-meditation engine (`com.pirxhio.affirmity.meditation`) — wires
@@ -54,18 +55,28 @@ import com.pirxhio.affirmity.meditation.breathing.breathingMeditationDefinition
  * meditation.MeditationCommandExecutor]s (timer, text, laps, audio), following the same
  * manual-wiring-in-`remember` convention [com.pirxhio.affirmity.data.rememberAffirmityAppState]
  * uses, but scoped to this screen: session state is ephemeral, not persisted app state.
+ *
+ * Generic over [MeditationCatalogEntry] (REQ-5.1) — the screen holds no knowledge of any specific
+ * meditation; every entry-specific value (definition, audio resources, counters, manual-release
+ * gate, phase text) is read from [entry].
  */
 @Composable
 fun GuidedMeditationScreen(
+    entry: MeditationCatalogEntry,
     modifier: Modifier = Modifier,
-    config: BreathingConfig = BreathingConfig(),
-    onSessionCompleted: () -> Unit = {},
+    /** Fired exactly once per playback session that reaches a terminal state. Never fired when the
+     * screen is disposed from [SessionStatus.Idle] (EC-1) — a user who never pressed Start has not
+     * spent anything. */
+    onSessionEnded: (SessionEndReason) -> Unit = {},
+    /** Called after any cancellation bookkeeping, to leave the screen. Owned by the caller. */
+    onExit: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    val definition = remember(config) { breathingMeditationDefinition(config) }
+    val definition = remember(entry) { entry.definition() }
     val textExecutor = remember(definition) { TextDisplayCommandExecutor() }
+    val phaseDurations = remember(definition) { fixedPhaseDurationsById(definition) }
 
     // The engine and audioExecutor/TimerCommandExecutor need each other before either exists —
     // resolved via a lateinit closed over by their sendEvent lambdas, only actually invoked once
@@ -75,7 +86,7 @@ fun GuidedMeditationScreen(
         lateinit var engineRef: MeditationEngine
         val audio = GuidedMeditationAudioExecutor(
             context = context.applicationContext,
-            resourcesByAudioId = mapOf(BreathingAudio.RETENTION_START to R.raw.meditation_gong),
+            resourcesByAudioId = entry.presentation.audioResources,
             scope = scope,
             timeSource = AndroidMonotonicTimeSource,
             sendEvent = { event -> engineRef.send(event) },
@@ -100,15 +111,40 @@ fun GuidedMeditationScreen(
     val state by engine.state.collectAsState()
     val currentTextId by textExecutor.currentTextId.collectAsState()
 
+    // Site A (REQ-5.2): extends the existing status-driven effect in place, fires exactly on
+    // reaching Completed.
     LaunchedEffect(state.status) {
-        if (state.status == SessionStatus.Completed) onSessionCompleted()
+        if (state.status == SessionStatus.Completed) onSessionEnded(SessionEndReason.Completed)
     }
+
+    // Site B (REQ-5.2, EC-2): emitted synchronously from the exit handler rather than from a
+    // recomposition-driven effect. Exiting removes this composable in the same frame the exit is
+    // requested, so an effect keyed on state.status may never get a chance to run before disposal.
+    // engine.send is synchronous (MeditationEngine.send holds a plain monitor and updates
+    // _state.value inline), so by the line after engine.send(Cancel) the session is already
+    // terminal and safe to report. Idle is deliberately excluded (EC-1): a user who never pressed
+    // Start has not spent anything.
+    val requestExit: () -> Unit = {
+        if (state.status == SessionStatus.Running || state.status == SessionStatus.Paused) {
+            engine.send(MeditationEvent.Cancel)
+            onSessionEnded(SessionEndReason.Cancelled)
+        }
+        onExit()
+    }
+
+    // Single back path (REQ-5.4.2): this screen is the ONLY BackHandler owner for the guided
+    // session route. A caller-side back affordance (e.g. a TopAppBar navigationIcon) MUST trigger
+    // this same registered callback via the system back dispatcher rather than reimplementing the
+    // exit logic — a second independent implementation would risk skipping the Cancel dispatch and
+    // silently drop PER_USE consumption.
+    BackHandler(onBack = requestExit)
 
     GuidedMeditationContent(
         modifier = modifier,
         state = state,
         currentTextId = currentTextId,
-        config = config,
+        entry = entry,
+        phaseDurations = phaseDurations,
         onStart = { engine.send(MeditationEvent.Start) },
         onPause = { engine.send(MeditationEvent.Pause) },
         onResume = { engine.send(MeditationEvent.Resume) },
@@ -122,7 +158,8 @@ private fun GuidedMeditationContent(
     modifier: Modifier,
     state: MeditationRuntimeState,
     currentTextId: String?,
-    config: BreathingConfig,
+    entry: MeditationCatalogEntry,
+    phaseDurations: Map<String, Long>,
     onStart: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
@@ -137,28 +174,23 @@ private fun GuidedMeditationContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(
-            text = stringResource(R.string.guided_meditation_title),
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-
-        val roundIndex = state.iterationCounts["rounds"]
-        if (roundIndex != null && state.status != SessionStatus.Completed) {
-            Text(
-                text = stringResource(R.string.guided_meditation_round_label, roundIndex + 1, config.rounds),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        }
-        val breathIndex = state.iterationCounts["breathing"]
-        if (breathIndex != null && state.status != SessionStatus.Completed) {
-            Text(
-                text = stringResource(R.string.guided_meditation_breath_label, breathIndex + 1, config.breathsPerRound),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline,
-            )
+        entry.presentation.counters.forEach { counter ->
+            val index = state.iterationCounts[counter.repeatId]
+            if (index != null && state.status != SessionStatus.Completed) {
+                Text(
+                    text = stringResource(counter.labelRes, index + 1, counter.total),
+                    style = when (counter.emphasis) {
+                        CounterEmphasis.PRIMARY -> MaterialTheme.typography.bodyMedium
+                        CounterEmphasis.SECONDARY -> MaterialTheme.typography.bodySmall
+                    },
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = if (counter.emphasis == CounterEmphasis.PRIMARY) {
+                        Modifier.padding(top = 8.dp)
+                    } else {
+                        Modifier
+                    },
+                )
+            }
         }
 
         Box(
@@ -168,7 +200,7 @@ private fun GuidedMeditationContent(
             contentAlignment = Alignment.Center,
         ) {
             if (state.status == SessionStatus.Running || state.status == SessionStatus.Paused) {
-                val totalMillis = phaseTotalMillis(state.currentPhaseId, config)
+                val totalMillis = phaseDurations[state.currentPhaseId]
                 val progress = if (totalMillis != null && totalMillis > 0) {
                     (state.elapsedInPhaseMillis.toFloat() / totalMillis).coerceIn(0f, 1f)
                 } else {
@@ -184,7 +216,7 @@ private fun GuidedMeditationContent(
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = phaseLabel(currentTextId, state.status),
+                    text = phaseLabel(currentTextId, state.status, entry.presentation.textResources),
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center,
@@ -203,9 +235,10 @@ private fun GuidedMeditationContent(
             }
         }
 
-        if (state.currentPhaseId == "retention" && state.status == SessionStatus.Running) {
+        val release = entry.presentation.manualRelease?.takeIf { it.phaseId == state.currentPhaseId }
+        if (release != null && state.status == SessionStatus.Running) {
             TextButton(onClick = onRelease, modifier = Modifier.padding(top = 16.dp)) {
-                Text(stringResource(R.string.guided_meditation_retention_hint))
+                Text(stringResource(release.hintRes))
             }
         }
 
@@ -270,20 +303,13 @@ private fun RoundIconButton(
     }
 }
 
-private fun phaseTotalMillis(phaseId: String?, config: BreathingConfig): Long? = when (phaseId) {
-    "inhale" -> config.inhaleMillis
-    "exhale" -> config.exhaleMillis
-    "retention" -> config.retentionMillis
-    "recovery" -> config.recoveryMillis
-    else -> null
-}
-
 @Composable
-private fun phaseLabel(currentTextId: String?, status: SessionStatus): String = when {
+private fun phaseLabel(
+    currentTextId: String?,
+    status: SessionStatus,
+    textResources: Map<String, Int>,
+): String = when {
+    // Terminal copy stays global, not per-entry: it is a screen state, not content.
     status == SessionStatus.Completed -> stringResource(R.string.guided_meditation_completed)
-    currentTextId == BreathingText.INHALE -> stringResource(R.string.guided_meditation_inhale)
-    currentTextId == BreathingText.EXHALE -> stringResource(R.string.guided_meditation_exhale)
-    currentTextId == BreathingText.RETENTION -> stringResource(R.string.guided_meditation_retention)
-    currentTextId == BreathingText.RECOVERY -> stringResource(R.string.guided_meditation_recovery)
-    else -> ""
+    else -> currentTextId?.let { textResources[it] }?.let { stringResource(it) } ?: ""
 }

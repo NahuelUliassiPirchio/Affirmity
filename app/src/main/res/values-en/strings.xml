@@ -241,7 +241,6 @@
     <string name="meditation_discover_track_3_title">Serene Horizon</string>
     <string name="meditation_discover_track_3_meta">15 min • Focus</string>
 
-    <string name="guided_meditation_title">Guided breathing</string>
     <string name="guided_meditation_round_label">Round %1$d of %2$d</string>
     <string name="guided_meditation_breath_label">Breath %1$d of %2$d</string>
     <string name="guided_meditation_inhale">Breathe in</string>
