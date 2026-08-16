@@ -159,13 +159,10 @@ class MeditationAccessPolicyTest {
         // The trial was already spent — it must never be re-offered as an ad CTA, regardless of
         // what badge is shown.
         assertFalse(canWatchAdToUnlockMeditation(decision))
-        // NOTE (spec/design inconsistency, deliberately preserved — see apply-progress "Issues
-        // Found"): deriveMeditationBadge (REQ-4.7's exact, authoritative code block) keys off
-        // entry.access.adUnlock, not the resolved AccessDecision, so a ProOrAdTrial entry always
-        // renders GroupBadge.AD_UNLOCK once locked -- including a spent trial -- even though
-        // spec REQ-5.3's UI narrative separately describes "a spent dormir trial" as showing
-        // GroupBadge.PREMIUM. This test pins the function's actual, as-designed behavior.
-        assertEquals(GroupBadge.AD_UNLOCK, deriveMeditationBadge(trialEntry, decision))
+        // deriveMeditationBadge branches on the resolved AccessDecision, not the entry's static
+        // policy declaration, so a spent ONE_TIME_TRIAL (resolved to LockedNeedsPro) correctly
+        // shows GroupBadge.PREMIUM — no ad path remains, upgrade is the only route (REQ-5.3).
+        assertEquals(GroupBadge.PREMIUM, deriveMeditationBadge(trialEntry, decision))
     }
 
     @Test

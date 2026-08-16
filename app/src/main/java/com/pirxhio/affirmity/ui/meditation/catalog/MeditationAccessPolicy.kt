@@ -2,8 +2,8 @@ package com.pirxhio.affirmity.ui.meditation.catalog
 
 import com.pirxhio.affirmity.access.AccessDecision
 import com.pirxhio.affirmity.access.AccessTier
-import com.pirxhio.affirmity.access.AdUnlockPolicy
 import com.pirxhio.affirmity.access.AdUnlockState
+import com.pirxhio.affirmity.access.ContentAccess
 import com.pirxhio.affirmity.access.ContentKey
 import com.pirxhio.affirmity.access.ContentType
 import com.pirxhio.affirmity.access.isUnlocked
@@ -43,14 +43,18 @@ fun canWatchAdToUnlockMeditation(decision: AccessDecision): Boolean = decision.o
  * Badge rule, mirroring `GroupAccessPolicy.deriveBadge` minus its `alwaysSelected` branch — no
  * meditation entry is permanently on. Applies the "hide the badge once resolved-unlocked" rule
  * unconditionally (no `alwaysSelected` carve-out exists here, unlike groups).
+ *
+ * Branches on the resolved [AccessDecision], not the entry's static [ContentAccess] declaration:
+ * a spent ONE_TIME_TRIAL resolves to [AccessDecision.LockedNeedsPro] (REQ-4.8 — a spent trial must
+ * never re-offer the ad), so it must show [GroupBadge.PREMIUM], not [GroupBadge.AD_UNLOCK]. Keying
+ * off `entry.access.adUnlock` instead would show the ad badge for content that can never be
+ * ad-unlocked again, since the static declaration doesn't change once the trial is spent. `_entry`
+ * is unused by this implementation but kept in the signature — no production call sites yet
+ * (PR1), and later PRs' call-site design already assumes this shape.
  */
-fun deriveMeditationBadge(entry: MeditationCatalogEntry, decision: AccessDecision): GroupBadge? =
-    if (decision.isUnlocked) {
-        null
-    } else {
-        when {
-            entry.access.requiredTier == AccessTier.FREE -> null
-            entry.access.adUnlock == AdUnlockPolicy.NONE -> GroupBadge.PREMIUM
-            else -> GroupBadge.AD_UNLOCK
-        }
+fun deriveMeditationBadge(_entry: MeditationCatalogEntry, decision: AccessDecision): GroupBadge? =
+    when (decision) {
+        is AccessDecision.Unlocked, is AccessDecision.UnlockedByAd -> null
+        AccessDecision.LockedNeedsPro -> GroupBadge.PREMIUM
+        is AccessDecision.LockedAdUnlockable -> GroupBadge.AD_UNLOCK
     }
