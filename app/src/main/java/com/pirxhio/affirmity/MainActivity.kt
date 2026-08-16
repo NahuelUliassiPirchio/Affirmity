@@ -64,6 +64,7 @@ import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
 import com.pirxhio.affirmity.ui.components.FloatingStatusOverlay
 import com.pirxhio.affirmity.ui.groups.AffirmationGroupSelectorSheet
+import com.pirxhio.affirmity.ui.groups.groupAccessDecision
 import com.pirxhio.affirmity.ui.groups.isToggleable
 import com.pirxhio.affirmity.ui.groups.selectableAffirmationGroups
 import com.pirxhio.affirmity.ui.healer.StreakHealerGrantedScreen
@@ -468,12 +469,25 @@ fun AffirmityApp(
                                 selectedIds = appState.draftGroupIds.value,
                                 isValid = appState.isDraftSelectionValid,
                                 isExpanded = sheetState.currentValue == SheetValue.Expanded,
-                                tier = appState.entitlementTier.value,
+                                accessDecisionFor = {
+                                    groupAccessDecision(
+                                        it,
+                                        appState.entitlementTier.value,
+                                        appState.adUnlockState,
+                                        System.currentTimeMillis(),
+                                    )
+                                },
                                 onUpgradeClick = onUpgradeClick,
                                 onToggle = { group ->
+                                    val decision = groupAccessDecision(
+                                        group,
+                                        appState.entitlementTier.value,
+                                        appState.adUnlockState,
+                                        System.currentTimeMillis(),
+                                    )
                                     appState.toggleGroup(
                                         group.id,
-                                        toggleable = isToggleable(group, appState.entitlementTier.value),
+                                        toggleable = isToggleable(group, decision),
                                     )
                                 },
                                 onApply = {

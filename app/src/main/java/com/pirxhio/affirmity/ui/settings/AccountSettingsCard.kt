@@ -18,8 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
+import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.auth.AuthState
-import com.pirxhio.affirmity.data.repository.EntitlementTier
 
 /**
  * Settings entry point for the subscription (design.md's Phase 7): a Free user sees an upgrade
@@ -29,7 +29,7 @@ import com.pirxhio.affirmity.data.repository.EntitlementTier
  */
 @Composable
 fun SubscriptionSection(
-    tier: EntitlementTier,
+    tier: AccessTier,
     onUpgradeClick: () -> Unit,
     onManageSubscriptionClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -47,10 +47,10 @@ fun SubscriptionSection(
                 style = MaterialTheme.typography.titleMedium,
             )
             when (tier) {
-                EntitlementTier.FREE -> Button(onClick = onUpgradeClick) {
+                AccessTier.FREE -> Button(onClick = onUpgradeClick) {
                     Text(stringResource(id = R.string.affirmation_group_upgrade_cta))
                 }
-                EntitlementTier.PRO -> TextButton(onClick = onManageSubscriptionClick) {
+                AccessTier.PRO -> TextButton(onClick = onManageSubscriptionClick) {
                     Text(stringResource(id = R.string.settings_subscription_manage_button))
                 }
             }

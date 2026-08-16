@@ -1,5 +1,8 @@
 package com.pirxhio.affirmity.data
 
+import com.pirxhio.affirmity.access.AdUnlockRecord
+import com.pirxhio.affirmity.access.ContentKey
+import com.pirxhio.affirmity.access.ContentType
 import com.pirxhio.affirmity.auth.AuthProviderId
 import com.pirxhio.affirmity.auth.AuthRepository
 import com.pirxhio.affirmity.auth.AuthState
@@ -21,6 +24,7 @@ import com.pirxhio.affirmity.data.remote.FcmTokenRepository
 import com.pirxhio.affirmity.data.remote.FirestoreMigrationSource
 import com.pirxhio.affirmity.data.remote.FirestoreMigrator
 import com.pirxhio.affirmity.data.remote.FirestoreOnboardingRepository
+import com.pirxhio.affirmity.data.repository.AdUnlockRepository
 import com.pirxhio.affirmity.data.repository.AffirmationRepository
 import com.pirxhio.affirmity.data.repository.DailyCompletionRepository
 import com.pirxhio.affirmity.data.repository.DailyMoodRepository
@@ -46,6 +50,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -135,8 +140,9 @@ private class FakeNotificationSettingsRepository(
 }
 
 /** Fake [GroupSelectionPreferences] — the real class needs an Android [Context], so JVM tests
- * that construct [AffirmityAppState] directly must fake this narrow interface (design risk #4). */
-private class FakeGroupSelectionPreferences(
+ * that construct [AffirmityAppState] directly must fake this narrow interface (design risk #4).
+ * Deliberately NOT `private`: reused as-is by [com.pirxhio.affirmity.data.AdUnlockEndToEndTest]. */
+class FakeGroupSelectionPreferences(
     initial: Set<String>? = null,
 ) : GroupSelectionPreferences {
     private val flow = MutableStateFlow(initial)
@@ -154,6 +160,28 @@ private class FakeEntitlementRepository(
     private val flow: Flow<Entitlement> = flowOf(Entitlement.Free),
 ) : EntitlementRepository {
     override fun observe(): Flow<Entitlement> = flow
+}
+
+/** Fake [AdUnlockRepository] mirroring the real repositories' create-if-absent semantics
+ * (design §8/§10 EC-1): a second [grantDurableUnlock] call for an already-present key is a
+ * silent no-op, never an overwrite. [granted] records every call that actually inserted a row,
+ * so tests can assert reconciliation-replay idempotency.
+ *
+ * Deliberately NOT `private`: reused as-is by [com.pirxhio.affirmity.data.AdUnlockEndToEndTest]
+ * (task E.4) rather than duplicated. */
+class FakeAdUnlockRepository(
+    initial: List<AdUnlockRecord> = emptyList(),
+) : AdUnlockRepository {
+    private val state = MutableStateFlow(initial)
+    val granted = CopyOnWriteArrayList<AdUnlockRecord>()
+    override fun observeDurableUnlocks(): Flow<List<AdUnlockRecord>> = state
+    override suspend fun getDurableUnlocks(): List<AdUnlockRecord> = state.value
+    override suspend fun grantDurableUnlock(record: AdUnlockRecord) {
+        if (state.value.none { it.key == record.key }) {
+            state.value = state.value + record
+            granted += record
+        }
+    }
 }
 
 private class FakeAuthRepository(
@@ -187,7 +215,11 @@ private class ImmediateFirestoreMigrationSource : FirestoreMigrationSource {
     override suspend fun commitChunk(writes: List<DocWrite>) = Unit
 }
 
-private fun fakeLocal(events: MutableList<String>, id: String = "local-1"): DataSession.Local = DataSession.Local(
+private fun fakeLocal(
+    events: MutableList<String>,
+    id: String = "local-1",
+    adUnlocks: AdUnlockRepository = FakeAdUnlockRepository(),
+): DataSession.Local = DataSession.Local(
     affirmations = FakeAffirmationRepository(
         EventedFlow("local-affirmations", events, listOf(listOf(affirmation(id)))),
     ),
@@ -198,9 +230,15 @@ private fun fakeLocal(events: MutableList<String>, id: String = "local-1"): Data
     notifications = FakeNotificationSettingsRepository(
         EventedFlow("local-notifications", events, listOf(ChannelSettings(enabled = false, segments = setOf(DaySegment.MANANA, DaySegment.TARDE)))),
     ),
+    adUnlocks = adUnlocks,
 )
 
-private fun fakeRemote(uid: String, events: MutableList<String>, id: String = "remote-1"): DataSession.Remote = DataSession.Remote(
+private fun fakeRemote(
+    uid: String,
+    events: MutableList<String>,
+    id: String = "remote-1",
+    adUnlocks: AdUnlockRepository = FakeAdUnlockRepository(),
+): DataSession.Remote = DataSession.Remote(
     uid = uid,
     affirmations = FakeAffirmationRepository(
         EventedFlow("remote-affirmations", events, listOf(listOf(affirmation(id)))),
@@ -213,6 +251,7 @@ private fun fakeRemote(uid: String, events: MutableList<String>, id: String = "r
         EventedFlow("remote-notifications", events, listOf(ChannelSettings(enabled = false, segments = setOf(DaySegment.MANANA, DaySegment.TARDE)))),
     ),
     entitlements = FakeEntitlementRepository(),
+    adUnlocks = adUnlocks,
 )
 
 private fun affirmation(id: String) = AffirmationEntity(
@@ -232,6 +271,8 @@ private fun buildState(
     authRepository: AuthRepository,
     scope: CoroutineScope,
     groupPreferences: GroupSelectionPreferences = FakeGroupSelectionPreferences(),
+    knownGroupIds: Set<String> = setOf("personalizadas", "bienestar"),
+    proOnlyGroupIds: Set<String> = emptySet(),
 ): AffirmityAppState {
     val trackerPreferences = mock(TrackerPreferences::class.java)
     whenever(trackerPreferences.observeAffirmationsViewedToday())
@@ -262,8 +303,9 @@ private fun buildState(
         onboardingPreferences = onboardingPreferences,
         deviceTimeZoneId = { "UTC" },
         groupPreferences = groupPreferences,
-        knownGroupIds = setOf("personalizadas", "bienestar"),
+        knownGroupIds = knownGroupIds,
         defaultThematicGroupIds = setOf("bienestar"),
+        proOnlyGroupIds = proOnlyGroupIds,
     )
 }
 
@@ -415,6 +457,100 @@ class AffirmityAppStateSwapTest {
         assertEquals(setOf("bienestar", "personalizadas"), state.selectedGroupIds.value)
         assertTrue(state.filteredAffirmations.any { it.id == "remote-swap" })
         assertTrue(state.filteredAffirmations.none { it.id == "local-swap" })
+
+        scope.cancel()
+    }
+
+    @Test
+    fun `sign-in replays local durable ad-unlocks into the remote repository, create-if-absent`() = runBlocking {
+        val events = mutableListOf<String>()
+        val onlyLocalRecord = AdUnlockRecord(
+            key = ContentKey(ContentType.AFFIRMATION_GROUP, "fuerza_de_voluntad"),
+            grantedAtMillis = 1_000L,
+        )
+        val alreadyOnRemoteKey = ContentKey(ContentType.MEDITATION, "calma")
+        val remoteOriginal = AdUnlockRecord(key = alreadyOnRemoteKey, grantedAtMillis = 999L)
+        val localAdUnlocks = FakeAdUnlockRepository(
+            listOf(onlyLocalRecord, AdUnlockRecord(key = alreadyOnRemoteKey, grantedAtMillis = 5_000L)),
+        )
+        val remoteAdUnlocks = FakeAdUnlockRepository(listOf(remoteOriginal))
+        val local = fakeLocal(events, adUnlocks = localAdUnlocks)
+        val authRepository = FakeAuthRepository()
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        buildState(
+            local = local,
+            remote = { fakeRemote("uid-6", events, adUnlocks = remoteAdUnlocks) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = authRepository,
+            scope = scope,
+        )
+        delay(50)
+
+        authRepository.emit(AuthState.SignedIn(uid = "uid-6", displayName = null, email = null))
+        delay(200)
+
+        val remoteRecords = remoteAdUnlocks.getDurableUnlocks()
+        assertTrue(
+            "the local-only record must be replayed into the remote repository",
+            remoteRecords.any { it.key == onlyLocalRecord.key && it.grantedAtMillis == onlyLocalRecord.grantedAtMillis },
+        )
+        val alreadyPresentRecord = remoteRecords.first { it.key == alreadyOnRemoteKey }
+        assertEquals(
+            "an already-present remote record must never be overwritten by the replay",
+            999L,
+            alreadyPresentRecord.grantedAtMillis,
+        )
+        assertEquals(
+            "local-only record must be the only one that actually inserted (idempotent replay)",
+            1,
+            remoteAdUnlocks.granted.size,
+        )
+
+        scope.cancel()
+    }
+
+    @Test
+    fun `a cold-start FREE-resolved emission deselects a stale Pro-only group with no live transition`() = runBlocking {
+        // EC-2(iv)/REQ-9.6 (design §10 Q4(iv), spec §9): before this fix, the deselect sweep only
+        // fired on a LIVE Pro->Free transition (entitlementFlowInitialized == true). A signed-out
+        // cold start's FIRST entitlement emission never satisfies that guard, so a Pro-only group
+        // left over in a persisted selection -- from a lapse that happened while the app was
+        // closed, or a dead PER_USE grant -- silently survived forever. This is a DELIBERATE,
+        // documented behavior fix (not a regression): the sweep must now also run on this very
+        // first, non-transition emission whenever the resolved tier is FREE.
+        val events = mutableListOf<String>()
+        val local = fakeLocal(events) // entitlements defaults to LocalFreeEntitlementRepository (always Free)
+        val authRepository = FakeAuthRepository() // stays SignedOut -- no live transition ever occurs
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val groupPreferences = FakeGroupSelectionPreferences(
+            initial = setOf("personalizadas", "autocuidado"),
+        )
+        val state = buildState(
+            local = local,
+            remote = { fakeRemote("uid-cold-start", events) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = authRepository,
+            scope = scope,
+            groupPreferences = groupPreferences,
+            knownGroupIds = setOf("personalizadas", "bienestar", "autocuidado"),
+            proOnlyGroupIds = setOf("autocuidado"),
+        )
+        delay(200)
+
+        assertEquals(
+            "the stale Pro-only group must be deselected and the minimum-thematic invariant" +
+                " restored from defaultThematicGroupIds, even though no live transition occurred",
+            setOf("personalizadas", "bienestar"),
+            state.selectedGroupIds.value,
+        )
+        assertTrue(
+            "the sweep's result must actually be persisted back",
+            groupPreferences.saved.any { it == setOf("personalizadas", "bienestar") },
+        )
+        assertFalse(
+            "no live Pro->Free transition occurred, so no lapse notice should fire",
+            state.proLapseNotice.value,
+        )
 
         scope.cancel()
     }

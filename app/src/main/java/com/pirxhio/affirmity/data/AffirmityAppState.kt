@@ -16,6 +16,14 @@ import com.pirxhio.affirmity.R
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging
+import com.pirxhio.affirmity.access.AccessTier
+import com.pirxhio.affirmity.access.AdUnlockOutcome
+import com.pirxhio.affirmity.access.AdUnlockPolicy
+import com.pirxhio.affirmity.access.AdUnlockRecord
+import com.pirxhio.affirmity.access.AdUnlockSource
+import com.pirxhio.affirmity.access.AdUnlockState
+import com.pirxhio.affirmity.access.ContentKey
+import com.pirxhio.affirmity.access.NoAdUnlockSource
 import com.pirxhio.affirmity.auth.AuthError
 import com.pirxhio.affirmity.auth.AuthException
 import com.pirxhio.affirmity.auth.AuthProviderId
@@ -41,6 +49,7 @@ import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.FcmTokenRepository
+import com.pirxhio.affirmity.data.remote.FirestoreAdUnlockRepository
 import com.pirxhio.affirmity.data.remote.FirestoreAffirmationRepository
 import com.pirxhio.affirmity.data.remote.FirestoreDailyCompletionRepository
 import com.pirxhio.affirmity.data.remote.FirestoreDailyMoodRepository
@@ -51,8 +60,9 @@ import com.pirxhio.affirmity.data.remote.FirestoreNotificationSettingsRepository
 import com.pirxhio.affirmity.data.remote.FirestoreOnboardingRepository
 import com.pirxhio.affirmity.data.remote.FirestoreStreakHealerRepository
 import com.pirxhio.affirmity.data.remote.MigrationSnapshot
+import com.pirxhio.affirmity.data.repository.AdUnlockRepository
 import com.pirxhio.affirmity.data.repository.DataSession
-import com.pirxhio.affirmity.data.repository.EntitlementTier
+import com.pirxhio.affirmity.data.repository.RoomAdUnlockRepository
 import com.pirxhio.affirmity.data.repository.RoomAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomDailyCompletionRepository
 import com.pirxhio.affirmity.data.repository.RoomDailyMoodRepository
@@ -61,7 +71,6 @@ import com.pirxhio.affirmity.data.repository.RoomNotificationSettingsRepository
 import com.pirxhio.affirmity.data.repository.RoomStreakHealerRepository
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
-import com.pirxhio.affirmity.ui.groups.AffirmationGroupAccess
 import com.pirxhio.affirmity.ui.groups.defaultAffirmationGroups
 import com.pirxhio.affirmity.ui.groups.selectableAffirmationGroups
 import com.pirxhio.affirmity.widget.WeeklyTrackerWidget
@@ -205,10 +214,15 @@ class AffirmityAppState(
     /** First-launch default thematic selection (unlocked thematic groups), also resolved by the
      * caller for the same D9 reason. */
     private val defaultThematicGroupIds: Set<String> = emptySet(),
-    /** Every group id that requires Pro entitlement (`PREMIUM`/`AD_SUPPORTED` access, excluding
-     * `alwaysSelected`), resolved by the caller for the same D9 reason. Consumed by the
-     * downgrade-auto-deselect collector ([deselectLockedGroups] call site). */
+    /** Every group id whose `access.requiredTier == AccessTier.PRO`, excluding `alwaysSelected`,
+     * resolved by the caller for the same D9 reason. Consumed by the downgrade-auto-deselect
+     * collector ([deselectLockedGroups] call site). */
     private val proOnlyGroupIds: Set<String> = emptySet(),
+    /** The seam Spec 5 replaces (design §9): the only way an ad unlock is ever created.
+     *  Defaulted to [NoAdUnlockSource] -- the same injection convention as [deviceTimeZoneId] /
+     *  [groupPreferences] / [knownGroupIds] -- so Spec 5's entire integration into this class is
+     *  one changed argument at the `rememberAffirmityAppState` call site. */
+    private val adUnlockSource: AdUnlockSource = NoAdUnlockSource,
 ) {
     val affirmations = mutableStateListOf<Affirmation>()
 
@@ -291,7 +305,7 @@ class AffirmityAppState(
 
     /** Current Free/Pro gating tier, resolved from the live entitlement repository (design.md
      * D5/D8). Read by [rememberAffirmityAppState]'s callers to drive `GroupAccessPolicy`. */
-    var entitlementTier = mutableStateOf(EntitlementTier.FREE)
+    var entitlementTier = mutableStateOf(AccessTier.FREE)
         private set
 
     /** True right after a live entitlement transition from Pro to Free is observed (design.md D8,
@@ -307,6 +321,24 @@ class AffirmityAppState(
     }
 
     private var entitlementFlowInitialized = false
+
+    /** PER_USE ad unlocks earned in THIS process for THIS identity. Deliberately NOT in Room or
+     *  Firestore: a PER_USE grant dies with the process by product definition (design §0/§4b).
+     *  Cleared whenever the session identity changes (uid `null` <-> uid, see [session]) and on a
+     *  live PRO->FREE transition (design §10 Q4(i)) -- at that instant it can only contain stale
+     *  entries, since a PRO user can never acquire one by construction ([resolveAccess] returns
+     *  `Unlocked` before ever reading grants). */
+    var sessionAdUnlocks = mutableStateOf<Set<ContentKey>>(emptySet())
+        private set
+
+    /** Durable ONE_TIME_TRIAL grants, mirrored from the active session's `adUnlocks` repository
+     *  (design §4b) -- same collector shape as [entitlementTier]. */
+    var durableAdUnlocks = mutableStateOf<Map<ContentKey, AdUnlockRecord>>(emptyMap())
+        private set
+
+    /** The complete grant state fed to `groupAccessDecision`/`resolveAccess` (design §9). */
+    val adUnlockState: AdUnlockState
+        get() = AdUnlockState(sessionAdUnlocks.value, durableAdUnlocks.value)
 
     /** Rolling [STREAK_LOOKBACK_DAYS]-day window of mood check-ins, oldest first — the calendar
      * and "Resumen" stats derive everything else (average/distribution/trend) from this list. */
@@ -355,6 +387,9 @@ class AffirmityAppState(
         .map { (it as? AuthState.SignedIn)?.uid }
         .distinctUntilChanged()
         .transformLatest { uid ->
+            // A PER_USE grant belongs to a user, not a process (design §4b): every identity change
+            // -- uid `null` <-> uid, including the very first emission at cold start -- clears it.
+            sessionAdUnlocks.value = emptySet()
             if (uid == null || !useRemoteSession) {
                 emit(local)
                 return@transformLatest
@@ -363,7 +398,13 @@ class AffirmityAppState(
             try {
                 migrator.ensureMigrated(migrationSnapshotFor(uid))
                 syncError.value = null
-                emit(remoteSessionFactory(uid))
+                val remote = remoteSessionFactory(uid)
+                // EC-1/Q3 reconciliation: replay every local durable ad-unlock into the remote
+                // repository on EVERY promotion to Remote (not only the one-time migration), so
+                // sign-out -> consume a trial locally -> sign-in-again still merges. The local
+                // Room copy is never deleted (design §10).
+                replayDurableAdUnlocks(local.adUnlocks.getDurableUnlocks(), remote.adUnlocks)
+                emit(remote)
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (failure: Exception) {
@@ -397,6 +438,18 @@ class AffirmityAppState(
             quietHours = local.notifications.observeQuietHours().first(),
             migratedAt = System.currentTimeMillis(),
         )
+    }
+
+    /** EC-1/Q3 reconciliation: an additive union, never an overwrite (design §10). Idempotent —
+     * [AdUnlockRepository.grantDurableUnlock] is create-if-absent, so replaying an
+     * already-present [AdUnlockRecord] costs at most one denied write and never mutates the
+     * remote record. Extracted as its own function so this replay step is independently testable
+     * and readable at the call site. */
+    private suspend fun replayDurableAdUnlocks(
+        localRecords: List<AdUnlockRecord>,
+        remoteAdUnlocks: AdUnlockRepository,
+    ) {
+        localRecords.forEach { remoteAdUnlocks.grantDurableUnlock(it) }
     }
 
     init {
@@ -545,6 +598,14 @@ class AffirmityAppState(
             }
         }
         scope.launch {
+            // Durable ONE_TIME_TRIAL grants (design §4b) -- same flatMapLatest-per-swap shape as
+            // every other session-scoped collector above, so a stale Firestore/Room subscription
+            // can never survive a sign-in/sign-out swap.
+            session.flatMapLatest { it.adUnlocks.observeDurableUnlocks() }
+                .catch { error -> Log.e(TAG, "durable ad-unlock flow failed", error) }
+                .collect { records -> durableAdUnlocks.value = records.associateBy(AdUnlockRecord::key) }
+        }
+        scope.launch {
             // Same class of problem as the healer-grant collector above (design.md D8): reset the
             // initialized flag INSIDE flatMapLatest so a fresh (re)started flow -- cold start or a
             // sign-in/sign-out session swap -- only ever seeds entitlementTier, never fires a
@@ -556,17 +617,35 @@ class AffirmityAppState(
                 .collect { entitlement ->
                     // Compared against the repository-emitted value only, never a client-side
                     // optimistic purchase overlay (design.md D7/D8) -- an expiring optimistic
-                    // window can never masquerade as a real lapse.
+                    // window can never masquerade as a real lapse. proLapseNotice stays scoped to
+                    // a LIVE Pro->Free transition only (design §10 Q4(iv)) -- it is a one-time
+                    // snackbar, not a general "you are Free" indicator.
                     if (entitlementFlowInitialized &&
-                        entitlementTier.value == EntitlementTier.PRO &&
-                        entitlement.tier == EntitlementTier.FREE
+                        entitlementTier.value == AccessTier.PRO &&
+                        entitlement.tier == AccessTier.FREE
                     ) {
                         proLapseNotice.value = true
+                        // design §10 Q4(i): enforced, not just argued -- a PRO user can never
+                        // acquire a PER_USE grant by construction, so at the instant of a live
+                        // downgrade this set can only hold stale entries.
+                        sessionAdUnlocks.value = emptySet()
+                    }
+                    // Q4(iv) fix: run the deselect sweep on EVERY FREE-resolved emission, not only
+                    // a live transition -- otherwise a stale Pro-only group left in a persisted
+                    // selection (a lapse that happened while the app was closed, or a dead PER_USE
+                    // grant) would silently survive forever. Re-persist only when the result
+                    // actually differs, so a steady-state Free user causes no redundant DataStore
+                    // write on every emission. Living inside this collector (not the
+                    // group-preferences collector) guarantees it never fires before the tier has
+                    // resolved, so a cold start can never strip a Pro user's groups.
+                    if (entitlement.tier == AccessTier.FREE) {
                         selectedGroupIds.value?.let { committed ->
                             val updated = deselectLockedGroups(committed, proOnlyGroupIds, defaultThematicGroupIds)
-                            selectedGroupIds.value = updated
-                            draftGroupIds.value = updated
-                            scope.launch { groupPreferences.saveSelectedGroupIds(updated) }
+                            if (updated != committed) {
+                                selectedGroupIds.value = updated
+                                draftGroupIds.value = updated
+                                scope.launch { groupPreferences.saveSelectedGroupIds(updated) }
+                            }
                         }
                     }
                     entitlementFlowInitialized = true
@@ -818,6 +897,25 @@ class AffirmityAppState(
         scope.launch { ready().meditation.saveMeditationDurationSeconds(seconds) }
     }
 
+    /**
+     * The single outcome -> persistence orchestration for the ad-unlock seam (design §9). Calls
+     * [adUnlockSource]; on [AdUnlockOutcome.Earned] only, routes [AdUnlockPolicy.PER_USE] into the
+     * in-memory [sessionAdUnlocks] and [AdUnlockPolicy.ONE_TIME_TRIAL] into the active session's
+     * durable `adUnlocks` repository. Any other outcome (Dismissed/Failed/Unavailable) is a no-op.
+     */
+    fun requestAdUnlock(key: ContentKey, policy: AdUnlockPolicy) {
+        scope.launch {
+            if (adUnlockSource.requestUnlock(key, policy) != AdUnlockOutcome.Earned) return@launch
+            when (policy) {
+                AdUnlockPolicy.PER_USE -> sessionAdUnlocks.value = sessionAdUnlocks.value + key
+                AdUnlockPolicy.ONE_TIME_TRIAL -> ready().adUnlocks.grantDurableUnlock(
+                    AdUnlockRecord(key, System.currentTimeMillis(), expiresAtMillis = null),
+                )
+                AdUnlockPolicy.NONE -> Unit
+            }
+        }
+    }
+
     /** Flips [groupId]'s membership in [draftGroupIds]. No-op for `alwaysSelected`/locked groups —
      * the UI also disables them; this is defense in depth. */
     fun toggleGroup(groupId: String, toggleable: Boolean) {
@@ -836,6 +934,9 @@ class AffirmityAppState(
         if (!isDraftSelectionValid) return false
         val committed = draftGroupIds.value
         selectedGroupIds.value = committed
+        // design §0/§4b: a PER_USE unlock on an affirmation group is spent the moment its group
+        // leaves the committed selection.
+        sessionAdUnlocks.value = retainSelectionScopedUnlocks(sessionAdUnlocks.value, committed)
         scope.launch { groupPreferences.saveSelectedGroupIds(committed) }
         return true
     }
@@ -879,12 +980,13 @@ fun rememberAffirmityAppState(): AffirmityAppState {
     // `ui.groups` (design D9) — only this composable wiring function does, mirroring [dayLetters].
     val knownGroupIds = selectableAffirmationGroups().map { it.id }.toSet()
     val defaultThematicGroupIds = defaultAffirmationGroups()
-        .filter { it.access == AffirmationGroupAccess.FREE }
+        .filter { it.access.requiredTier == AccessTier.FREE }
         .map { it.id }.toSet()
     // Every group that requires Pro to unlock -- mirrors GroupAccessPolicy.isLocked's condition
-    // (access != FREE && !alwaysSelected) without importing ui.groups' policy file itself (D9).
+    // (access.requiredTier == PRO && !alwaysSelected) without importing ui.groups' policy file
+    // itself (D9).
     val proOnlyGroupIds = defaultAffirmationGroups()
-        .filter { it.access != AffirmationGroupAccess.FREE }
+        .filter { it.access.requiredTier != AccessTier.FREE }
         .map { it.id }.toSet()
     return remember {
         val database = AffirmityDatabase.getInstance(context)
@@ -901,6 +1003,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             healerUses = RoomStreakHealerRepository(database.streakHealerUseDao()),
             meditation = RoomMeditationPreferencesRepository(trackerPreferences),
             notifications = RoomNotificationSettingsRepository(notificationPreferences),
+            adUnlocks = RoomAdUnlockRepository(database.adUnlockDao()),
         )
         AffirmityAppState(
             scope = scope,
@@ -915,6 +1018,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
                     meditation = FirestoreMeditationPreferencesRepository(firestore, uid),
                     notifications = FirestoreNotificationSettingsRepository(firestore, uid),
                     entitlements = FirestoreEntitlementRepository(firestore, uid),
+                    adUnlocks = FirestoreAdUnlockRepository(firestore, uid),
                 )
             },
             migrator = FirestoreMigrator(firestore),

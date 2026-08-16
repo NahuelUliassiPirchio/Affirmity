@@ -1,5 +1,7 @@
 package com.pirxhio.affirmity.data.remote
 
+import com.pirxhio.affirmity.access.ContentKey
+import com.pirxhio.affirmity.access.ContentType
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -53,5 +55,19 @@ class FirestorePathsTest {
     @Test
     fun `entitlement doc path is the single shared 'current' document`() {
         assertEquals("users/uid-1/entitlements/current", FirestorePaths.entitlementDoc("uid-1"))
+    }
+
+    @Test
+    fun `ad unlocks collection path is scoped under the user`() {
+        assertEquals("users/uid-1/adUnlocks", FirestorePaths.adUnlocksCollection("uid-1"))
+    }
+
+    @Test
+    fun `ad unlock doc path uses the content key's storage key as the doc id`() {
+        val key = ContentKey(ContentType.AFFIRMATION_GROUP, "fuerza_de_voluntad")
+        assertEquals(
+            "users/uid-1/adUnlocks/affirmationGroup_fuerza_de_voluntad",
+            FirestorePaths.adUnlockDoc("uid-1", key),
+        )
     }
 }

@@ -1,10 +1,10 @@
 package com.pirxhio.affirmity.data.remote
 
 import com.google.firebase.firestore.FirebaseFirestore
+import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.data.RawEntitlementDoc
 import com.pirxhio.affirmity.data.repository.Entitlement
 import com.pirxhio.affirmity.data.repository.EntitlementRepository
-import com.pirxhio.affirmity.data.repository.EntitlementTier
 import com.pirxhio.affirmity.data.resolveTier
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -45,9 +45,9 @@ class FirestoreEntitlementRepository(
             }
             val tier = resolveTier(doc, System.currentTimeMillis())
             trySend(
-                if (tier == EntitlementTier.PRO) {
+                if (tier == AccessTier.PRO) {
                     Entitlement(
-                        tier = EntitlementTier.PRO,
+                        tier = AccessTier.PRO,
                         expiryTimeMillis = doc?.expiryTimeMillis,
                         productId = snapshot?.getString(FIELD_PRODUCT_ID),
                     )
