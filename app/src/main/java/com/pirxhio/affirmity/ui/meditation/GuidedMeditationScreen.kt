@@ -123,13 +123,16 @@ fun GuidedMeditationScreen(
     // engine.send is synchronous (MeditationEngine.send holds a plain monitor and updates
     // _state.value inline), so by the line after engine.send(Cancel) the session is already
     // terminal and safe to report. Idle is deliberately excluded (EC-1): a user who never pressed
-    // Start has not spent anything.
+    // Start has not spent anything. The ordering/branching itself lives in the extracted
+    // `performGuidedSessionExit` below so it can be exercised by a plain JUnit test against a real
+    // MeditationEngine (verify REQ-5.2/AC7) without a Compose test harness.
     val requestExit: () -> Unit = {
-        if (state.status == SessionStatus.Running || state.status == SessionStatus.Paused) {
-            engine.send(MeditationEvent.Cancel)
-            onSessionEnded(SessionEndReason.Cancelled)
-        }
-        onExit()
+        performGuidedSessionExit(
+            status = state.status,
+            cancel = { engine.send(MeditationEvent.Cancel) },
+            onSessionEnded = onSessionEnded,
+            onExit = onExit,
+        )
     }
 
     // Single back path (REQ-5.4.2): this screen is the ONLY BackHandler owner for the guided
@@ -151,6 +154,28 @@ fun GuidedMeditationScreen(
         onSkip = { engine.send(MeditationEvent.Next) },
         onRelease = { engine.send(MeditationEvent.UserAction()) },
     )
+}
+
+/**
+ * Pure exit-decision logic for [GuidedMeditationScreen]'s single back/exit path (REQ-5.2, AC7,
+ * EC-2). Extracted out of the Composable so it can be driven by a plain JUnit test against a real
+ * [MeditationEngine] — proving [cancel] (which synchronously drives the engine to
+ * [SessionStatus.Cancelled]) runs, and [onSessionEnded] is invoked with
+ * [SessionEndReason.Cancelled], strictly before [onExit] — without needing a Compose test
+ * harness. [status] is a snapshot read by the caller at call time (mirrors the composable's own
+ * `state.status` read); [cancel] is expected to synchronously dispatch [MeditationEvent.Cancel].
+ */
+internal fun performGuidedSessionExit(
+    status: SessionStatus,
+    cancel: () -> Unit,
+    onSessionEnded: (SessionEndReason) -> Unit,
+    onExit: () -> Unit,
+) {
+    if (status == SessionStatus.Running || status == SessionStatus.Paused) {
+        cancel()
+        onSessionEnded(SessionEndReason.Cancelled)
+    }
+    onExit()
 }
 
 @Composable

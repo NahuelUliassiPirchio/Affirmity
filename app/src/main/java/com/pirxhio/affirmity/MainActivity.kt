@@ -105,6 +105,50 @@ private fun resolveMoodValue(intent: Intent?): Int? {
     return value.takeIf { it in 1..MOOD_MAX }
 }
 
+/**
+ * Route-lookup fall-through for a persisted/restored `selectedMeditationEntryId` (REQ-5.4.3,
+ * AC15, EC-4). Extracted out of [AffirmityApp] so the "unknown id resolves to no entry, and the
+ * caller simply never composes [com.pirxhio.affirmity.ui.meditation.GuidedMeditationScreen]"
+ * behavior can be driven directly by a plain JUnit test rather than only static inspection.
+ * [findMeditationCatalogEntry] itself already returns null for an unknown id (covered by
+ * `MeditationCatalogTest`); this function is the exact expression the composable evaluates on
+ * every recomposition to decide whether the guided-session route renders at all.
+ */
+internal fun resolveSelectedMeditationEntry(
+    selectedMeditationEntryId: String?,
+): com.pirxhio.affirmity.ui.meditation.catalog.MeditationCatalogEntry? =
+    selectedMeditationEntryId?.let { findMeditationCatalogEntry(it) }
+
+/**
+ * Launch-time access re-check predicate (REQ-5.4.1, AC14, EC-5). Extracted out of [AffirmityApp]
+ * so a plain JUnit test can drive the exact same re-resolution the composable performs at
+ * composition time -- proving that a grant/tier that changed between the Discover tap and this
+ * render is picked up (never reused from a stale tap-time decision) without needing a Compose
+ * test harness.
+ */
+internal fun isMeditationLaunchBlocked(
+    entry: com.pirxhio.affirmity.ui.meditation.catalog.MeditationCatalogEntry,
+    tier: com.pirxhio.affirmity.access.AccessTier,
+    grants: com.pirxhio.affirmity.access.AdUnlockState,
+    nowMillis: Long,
+): Boolean = isMeditationLocked(meditationAccessDecision(entry, tier, grants, nowMillis))
+
+/**
+ * Guided-completion streak bookkeeping (REQ-5.6, AC6). Extracted out of [AffirmityApp]'s
+ * `onSessionEnded` callback so a plain JUnit test can prove [recordMeditationCompleted] is
+ * invoked if and only if [reason] is [SessionEndReason.Completed], while [consumePlaybackUnlock]
+ * runs for every terminal reason -- without needing a Compose test harness.
+ */
+internal fun handleGuidedMeditationSessionEnded(
+    entryId: String,
+    reason: SessionEndReason,
+    consumePlaybackUnlock: (String, SessionEndReason) -> Unit,
+    recordMeditationCompleted: () -> Unit,
+) {
+    consumePlaybackUnlock(entryId, reason)
+    if (reason == SessionEndReason.Completed) recordMeditationCompleted()
+}
+
 class MainActivity : AppCompatActivity() {
     private val startDestination = mutableStateOf(AppDestinations.AFIRMACIONES)
     private val startMoodValue = mutableStateOf<Int?>(null)
@@ -312,7 +356,7 @@ fun AffirmityApp(
         return
     }
 
-    val selectedMeditationEntry = selectedMeditationEntryId?.let { findMeditationCatalogEntry(it) }
+    val selectedMeditationEntry = resolveSelectedMeditationEntry(selectedMeditationEntryId)
     if (selectedMeditationEntry != null) {
         // Launch-time access re-check (REQ-5.4.1, EC-5): re-resolved at composition time, not
         // reused from the tap-time decision -- a session swap or a live Pro->Free transition
@@ -320,13 +364,13 @@ fun AffirmityApp(
         // open across that boundary must not keep playing gated content. Same "validate at action
         // time, never from rendered state" convention AffirmityAppState.activateStreakHealer
         // already documents.
-        val decision = meditationAccessDecision(
+        val isBlocked = isMeditationLaunchBlocked(
             selectedMeditationEntry,
             appState.entitlementTier.value,
             appState.adUnlockState,
             System.currentTimeMillis(),
         )
-        if (isMeditationLocked(decision)) {
+        if (isBlocked) {
             // Unknown/removed/newly-locked entry (REQ-5.4.3, EC-4): fall through instead of ever
             // composing GuidedMeditationScreen for gated content.
             LaunchedEffect(selectedMeditationEntry.id) { selectedMeditationEntryId = null }
@@ -367,8 +411,12 @@ fun AffirmityApp(
                     // watched and then abandoned mid-session is still a use); recordMeditationCompleted
                     // only for Completed.
                     onSessionEnded = { reason ->
-                        appState.consumeMeditationPlaybackUnlock(selectedMeditationEntry.id, reason)
-                        if (reason == SessionEndReason.Completed) appState.recordMeditationCompleted()
+                        handleGuidedMeditationSessionEnded(
+                            entryId = selectedMeditationEntry.id,
+                            reason = reason,
+                            consumePlaybackUnlock = appState::consumeMeditationPlaybackUnlock,
+                            recordMeditationCompleted = appState::recordMeditationCompleted,
+                        )
                     },
                     onExit = { selectedMeditationEntryId = null },
                 )
