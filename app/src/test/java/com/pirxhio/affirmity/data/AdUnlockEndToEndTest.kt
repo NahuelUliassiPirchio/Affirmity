@@ -39,11 +39,15 @@ import com.pirxhio.affirmity.data.repository.LocalFreeEntitlementRepository
 import com.pirxhio.affirmity.data.repository.MeditationPreferencesRepository
 import com.pirxhio.affirmity.data.repository.NotificationSettingsRepository
 import com.pirxhio.affirmity.data.repository.StreakHealerRepository
+import com.pirxhio.affirmity.meditation.SessionEndReason
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
 import com.pirxhio.affirmity.ui.groups.defaultAffirmationGroups
 import com.pirxhio.affirmity.ui.groups.groupAccessDecision
 import com.pirxhio.affirmity.ui.groups.isToggleable
+import com.pirxhio.affirmity.ui.meditation.catalog.findMeditationCatalogEntry
+import com.pirxhio.affirmity.ui.meditation.catalog.meditationAccessDecision
+import com.pirxhio.affirmity.ui.meditation.catalog.meditationContentKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -388,5 +392,84 @@ class AdUnlockEndToEndTest {
             decisionScope4,
         )
         scope4.cancel()
+    }
+
+    // 7. enfoque (ProOrAdPerUse) full round trip: FREE -> LockedAdUnlockable(PER_USE) ->
+    //    requestAdUnlock earns -> UnlockedByAd(PER_USE) -> consumeMeditationPlaybackUnlock(Completed)
+    //    -> back to LockedAdUnlockable(PER_USE). First end-to-end proof of the playback-scoped
+    //    binding this whole spec exists to make true (REQ-5.5, acceptance criterion 12).
+    @Test
+    fun `enfoque PER_USE round trip -- earned then consumed on session Completed re-locks it`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val adUnlockSource = FakeAdUnlockSource(AdUnlockOutcome.Earned)
+        val state = buildState(scope, adUnlockSource = adUnlockSource)
+        delay(50)
+        val enfoque = findMeditationCatalogEntry("enfoque")!!
+
+        val beforeEarn = meditationAccessDecision(
+            enfoque, state.entitlementTier.value, state.adUnlockState, System.currentTimeMillis(),
+        )
+        assertEquals(AccessDecision.LockedAdUnlockable(AdUnlockPolicy.PER_USE), beforeEarn)
+
+        state.requestAdUnlock(meditationContentKey(enfoque.id), AdUnlockPolicy.PER_USE)
+        delay(50)
+        val afterEarn = meditationAccessDecision(
+            enfoque, state.entitlementTier.value, state.adUnlockState, System.currentTimeMillis(),
+        )
+        assertEquals(AccessDecision.UnlockedByAd(AdUnlockPolicy.PER_USE), afterEarn)
+
+        state.consumeMeditationPlaybackUnlock(enfoque.id, SessionEndReason.Completed)
+        val afterConsume = meditationAccessDecision(
+            enfoque, state.entitlementTier.value, state.adUnlockState, System.currentTimeMillis(),
+        )
+        assertEquals(
+            "a spent PER_USE session grant must re-lock the entry",
+            AccessDecision.LockedAdUnlockable(AdUnlockPolicy.PER_USE),
+            afterConsume,
+        )
+
+        scope.cancel()
+    }
+
+    // 8. dormir (ProOrAdTrial) asymmetry: FREE -> LockedAdUnlockable(ONE_TIME_TRIAL) -> earn ->
+    //    durable record persisted via the fake repo -> UnlockedByAd(ONE_TIME_TRIAL) -> session ends
+    //    (consumeMeditationPlaybackUnlock(Completed)) -> STILL UnlockedByAd(ONE_TIME_TRIAL), because
+    //    consumePlaybackScopedUnlock only ever touches sessionAdUnlocks (in-memory), never the
+    //    durable grant -- a durable trial is spent once, ever, not once per session (EC-3,
+    //    acceptance criterion 13). This is easy to get backwards; it MUST explicitly assert the
+    //    grant SURVIVES a completed playback session.
+    @Test
+    fun `dormir ONE_TIME_TRIAL survives a completed playback session -- durable, not playback-scoped`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val adUnlockSource = FakeAdUnlockSource(AdUnlockOutcome.Earned)
+        val sharedAdUnlocks = FakeAdUnlockRepository()
+        val state = buildState(scope, adUnlockSource = adUnlockSource, adUnlocks = sharedAdUnlocks)
+        delay(50)
+        val dormir = findMeditationCatalogEntry("dormir")!!
+
+        val beforeEarn = meditationAccessDecision(
+            dormir, state.entitlementTier.value, state.adUnlockState, System.currentTimeMillis(),
+        )
+        assertEquals(AccessDecision.LockedAdUnlockable(AdUnlockPolicy.ONE_TIME_TRIAL), beforeEarn)
+
+        state.requestAdUnlock(meditationContentKey(dormir.id), AdUnlockPolicy.ONE_TIME_TRIAL)
+        delay(50)
+        val afterEarn = meditationAccessDecision(
+            dormir, state.entitlementTier.value, state.adUnlockState, System.currentTimeMillis(),
+        )
+        assertEquals(AccessDecision.UnlockedByAd(AdUnlockPolicy.ONE_TIME_TRIAL), afterEarn)
+
+        state.consumeMeditationPlaybackUnlock(dormir.id, SessionEndReason.Completed)
+        val afterConsume = meditationAccessDecision(
+            dormir, state.entitlementTier.value, state.adUnlockState, System.currentTimeMillis(),
+        )
+        assertEquals(
+            "a durable ONE_TIME_TRIAL grant must survive a completed playback session -- it is " +
+                "spent once, ever, not once per session",
+            AccessDecision.UnlockedByAd(AdUnlockPolicy.ONE_TIME_TRIAL),
+            afterConsume,
+        )
+
+        scope.cancel()
     }
 }

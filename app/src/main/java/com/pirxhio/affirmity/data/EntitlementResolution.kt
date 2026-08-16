@@ -4,6 +4,7 @@ import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.access.ContentKey
 import com.pirxhio.affirmity.access.ContentType
 import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
+import com.pirxhio.affirmity.meditation.SessionEndReason
 
 /**
  * Pure, Firestore-agnostic mirror of the fields `FirestoreEntitlementRepository` reads off the
@@ -67,3 +68,23 @@ fun retainSelectionScopedUnlocks(
 ): Set<ContentKey> = unlocks.filterNot {
     it.type == ContentType.AFFIRMATION_GROUP && it.id !in committedGroupIds
 }.toSet()
+
+/**
+ * A meditation [AdUnlockPolicy.PER_USE][com.pirxhio.affirmity.access.AdUnlockPolicy.PER_USE]
+ * unlock is spent the moment its playback session reaches a terminal state -- [SessionEndReason.Completed]
+ * or [SessionEndReason.Cancelled] (design §5.5, REQ-5.5). Both terminal reasons spend the grant: an
+ * ad watched and then abandoned mid-session is still a use. Deliberately excludes disposal from
+ * `Idle` (never started) -- that carve-out is enforced by the caller (`GuidedMeditationScreen`'s
+ * `requestExit` guard), not by this function. Exhaustive `when`, no `else`: if a third
+ * [SessionEndReason] is ever added, this must force a decision, not default silently. Non-meditation
+ * keys pass through untouched -- a safe no-op for content whose unlock is scoped some other way
+ * (e.g. [retainSelectionScopedUnlocks] for affirmation groups).
+ */
+fun consumePlaybackScopedUnlock(
+    unlocks: Set<ContentKey>,
+    key: ContentKey,
+    reason: SessionEndReason,
+): Set<ContentKey> = when (reason) {
+    SessionEndReason.Completed, SessionEndReason.Cancelled ->
+        if (key.type == ContentType.MEDITATION) unlocks - key else unlocks
+}

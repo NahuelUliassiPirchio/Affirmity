@@ -4,6 +4,7 @@ import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.access.ContentKey
 import com.pirxhio.affirmity.access.ContentType
 import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
+import com.pirxhio.affirmity.meditation.SessionEndReason
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -116,5 +117,57 @@ class EntitlementResolutionTest {
             committedGroupIds = emptySet(),
         )
         assertEquals(setOf(meditationUnlock), result)
+    }
+
+    // --- consumePlaybackScopedUnlock -----------------------------------------------------------
+
+    @Test
+    fun `consumePlaybackScopedUnlock removes a MEDITATION key on Completed`() {
+        val key = ContentKey(ContentType.MEDITATION, "enfoque")
+        val result = consumePlaybackScopedUnlock(
+            unlocks = setOf(key), key = key, reason = SessionEndReason.Completed,
+        )
+        assertEquals(emptySet<ContentKey>(), result)
+    }
+
+    @Test
+    fun `consumePlaybackScopedUnlock removes a MEDITATION key on Cancelled`() {
+        val key = ContentKey(ContentType.MEDITATION, "enfoque")
+        val result = consumePlaybackScopedUnlock(
+            unlocks = setOf(key), key = key, reason = SessionEndReason.Cancelled,
+        )
+        assertEquals(emptySet<ContentKey>(), result)
+    }
+
+    @Test
+    fun `consumePlaybackScopedUnlock leaves an AFFIRMATION_GROUP key untouched under both reasons`() {
+        val key = ContentKey(ContentType.AFFIRMATION_GROUP, "fuerza_de_voluntad")
+        val completedResult = consumePlaybackScopedUnlock(
+            unlocks = setOf(key), key = key, reason = SessionEndReason.Completed,
+        )
+        val cancelledResult = consumePlaybackScopedUnlock(
+            unlocks = setOf(key), key = key, reason = SessionEndReason.Cancelled,
+        )
+        assertEquals(setOf(key), completedResult)
+        assertEquals(setOf(key), cancelledResult)
+    }
+
+    @Test
+    fun `consumePlaybackScopedUnlock is a no-op for a key not in the set`() {
+        val absentKey = ContentKey(ContentType.MEDITATION, "enfoque")
+        val result = consumePlaybackScopedUnlock(
+            unlocks = emptySet(), key = absentKey, reason = SessionEndReason.Completed,
+        )
+        assertEquals(emptySet<ContentKey>(), result)
+    }
+
+    @Test
+    fun `consumePlaybackScopedUnlock leaves other meditation keys untouched`() {
+        val target = ContentKey(ContentType.MEDITATION, "enfoque")
+        val other = ContentKey(ContentType.MEDITATION, "dormir")
+        val result = consumePlaybackScopedUnlock(
+            unlocks = setOf(target, other), key = target, reason = SessionEndReason.Completed,
+        )
+        assertEquals(setOf(other), result)
     }
 }

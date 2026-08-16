@@ -23,6 +23,7 @@ import com.pirxhio.affirmity.access.AdUnlockRecord
 import com.pirxhio.affirmity.access.AdUnlockSource
 import com.pirxhio.affirmity.access.AdUnlockState
 import com.pirxhio.affirmity.access.ContentKey
+import com.pirxhio.affirmity.access.ContentType
 import com.pirxhio.affirmity.access.NoAdUnlockSource
 import com.pirxhio.affirmity.auth.AuthError
 import com.pirxhio.affirmity.auth.AuthException
@@ -69,6 +70,7 @@ import com.pirxhio.affirmity.data.repository.RoomDailyMoodRepository
 import com.pirxhio.affirmity.data.repository.RoomMeditationPreferencesRepository
 import com.pirxhio.affirmity.data.repository.RoomNotificationSettingsRepository
 import com.pirxhio.affirmity.data.repository.RoomStreakHealerRepository
+import com.pirxhio.affirmity.meditation.SessionEndReason
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
 import com.pirxhio.affirmity.ui.groups.defaultAffirmationGroups
@@ -914,6 +916,19 @@ class AffirmityAppState(
                 AdUnlockPolicy.NONE -> Unit
             }
         }
+    }
+
+    /**
+     * Consumes a meditation playback-scoped unlock when its session reaches a terminal state
+     * (design §5.5, REQ-5.5). Synchronous, no coroutine -- mutates in-memory [sessionAdUnlocks]
+     * only, matching [toggleGroup]/`applyGroupSelection`'s pattern. Nothing is persisted here:
+     * `PER_USE` is never persisted (design §4.2), and a durable `ONE_TIME_TRIAL` grant is untouched
+     * by [consumePlaybackScopedUnlock] (it only ever touches [sessionAdUnlocks]) -- see EC-3.
+     */
+    fun consumeMeditationPlaybackUnlock(entryId: String, reason: SessionEndReason) {
+        sessionAdUnlocks.value = consumePlaybackScopedUnlock(
+            sessionAdUnlocks.value, ContentKey(ContentType.MEDITATION, entryId), reason,
+        )
     }
 
     /** Flips [groupId]'s membership in [draftGroupIds]. No-op for `alwaysSelected`/locked groups —

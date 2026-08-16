@@ -61,6 +61,7 @@ import com.pirxhio.affirmity.auth.AuthState
 import com.pirxhio.affirmity.billing.BillingService
 import com.pirxhio.affirmity.data.MOOD_MAX
 import com.pirxhio.affirmity.data.rememberAffirmityAppState
+import com.pirxhio.affirmity.meditation.SessionEndReason
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
 import com.pirxhio.affirmity.ui.components.FloatingStatusOverlay
@@ -360,11 +361,15 @@ fun AffirmityApp(
                 GuidedMeditationScreen(
                     entry = selectedMeditationEntry,
                     modifier = Modifier.padding(innerPadding),
-                    // PR5 wires the real consumer (consumeMeditationPlaybackUnlock +
-                    // recordMeditationCompleted). This PR only parameterizes the screen and proves
-                    // both onSessionEnded emission sites fire correctly; no downstream effect is
-                    // wired yet.
-                    onSessionEnded = {},
+                    // The streak-bug fix (REQ-5.6): guided completion now calls the same
+                    // recordMeditationCompleted() the free timer already calls at its own call
+                    // site. consumeMeditationPlaybackUnlock runs for BOTH terminal reasons (an ad
+                    // watched and then abandoned mid-session is still a use); recordMeditationCompleted
+                    // only for Completed.
+                    onSessionEnded = { reason ->
+                        appState.consumeMeditationPlaybackUnlock(selectedMeditationEntry.id, reason)
+                        if (reason == SessionEndReason.Completed) appState.recordMeditationCompleted()
+                    },
                     onExit = { selectedMeditationEntryId = null },
                 )
             }
