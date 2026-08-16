@@ -255,6 +255,61 @@
     <string name="guided_meditation_resume_content_description">Reanudar</string>
     <string name="guided_meditation_skip_content_description">Avanzar fase</string>
 
+    <!-- Meditation catalog (Spec 3, REQ-4.6/4.11) — titles, descriptions, categories for the 7
+         shipping entries, and every ShowText cue id their definitions reference. Copy is an
+         engineering placeholder pending product/editorial review (spec §14 risk R5). -->
+    <string name="meditation_catalog_reset_rapido_title">Reset rápido</string>
+    <string name="meditation_catalog_reset_rapido_description">Una pausa breve de 2 minutos para recuperar el centro.</string>
+    <string name="meditation_catalog_calma_title">Calma</string>
+    <string name="meditation_catalog_calma_description">Respiración guiada de 5 minutos para bajar la ansiedad.</string>
+    <string name="meditation_catalog_enfoque_title">Enfoque</string>
+    <string name="meditation_catalog_enfoque_description">Respiración en caja de 10 minutos para concentrarte.</string>
+    <string name="meditation_catalog_dormir_title">Dormir</string>
+    <string name="meditation_catalog_dormir_description">Guía de 10 minutos para prepararte a dormir.</string>
+    <string name="meditation_catalog_body_scan_title">Body Scan</string>
+    <string name="meditation_catalog_body_scan_description">Recorré tu cuerpo con atención plena durante 10 minutos.</string>
+    <string name="meditation_catalog_autocompasion_5_title">Autocompasión 5</string>
+    <string name="meditation_catalog_autocompasion_5_description">Practicá autocompasión en 5 minutos.</string>
+    <string name="meditation_catalog_autocompasion_10_title">Autocompasión 10</string>
+    <string name="meditation_catalog_autocompasion_10_description">Una práctica extendida de autocompasión de 10 minutos.</string>
+
+    <string name="meditation_catalog_category_relajacion">Relajación</string>
+    <string name="meditation_catalog_category_calma">Calma</string>
+    <string name="meditation_catalog_category_enfoque">Enfoque</string>
+    <string name="meditation_catalog_category_sueno">Sueño</string>
+    <string name="meditation_catalog_category_cuerpo">Cuerpo</string>
+    <string name="meditation_catalog_category_autocompasion">Autocompasión</string>
+
+    <string name="meditation_quickreset_intro">Encontrá una postura cómoda y soltá los hombros.</string>
+    <string name="meditation_quickreset_closing">Volvé a tu día con esta calma.</string>
+    <string name="meditation_calm_intro">Dejá que tu respiración se haga más lenta.</string>
+    <string name="meditation_calm_hold">Sostené suavemente.</string>
+    <string name="meditation_calm_rest">Notá cómo se siente tu respiración ahora.</string>
+    <string name="meditation_calm_closing">Llevá esta calma con vos.</string>
+    <string name="meditation_focus_intro">Preparate para enfocar tu atención.</string>
+    <string name="meditation_focus_hold">Sostené con firmeza.</string>
+    <string name="meditation_focus_anchor">Mantené la atención en el presente.</string>
+    <string name="meditation_focus_closing">Tu enfoque está listo.</string>
+    <string name="meditation_sleep_settle">Acomodate y dejá que tu cuerpo se hunda.</string>
+    <string name="meditation_sleep_guidance">Soltá el día que dejás atrás.</string>
+    <string name="meditation_sleep_rest_1">Dejate llevar por el sonido.</string>
+    <string name="meditation_sleep_release">Soltá cualquier tensión que quede.</string>
+    <string name="meditation_sleep_rest_2">Cada respiración te acerca más al sueño.</string>
+    <string name="meditation_sleep_closing">Descansá bien.</string>
+    <string name="meditation_bodyscan_intro">Recorré tu cuerpo con atención, sin juzgar.</string>
+    <string name="meditation_bodyscan_feet">Llevá tu atención a los pies.</string>
+    <string name="meditation_bodyscan_legs">Llevá tu atención a las piernas.</string>
+    <string name="meditation_bodyscan_torso">Llevá tu atención al torso.</string>
+    <string name="meditation_bodyscan_arms">Llevá tu atención a los brazos.</string>
+    <string name="meditation_bodyscan_head">Llevá tu atención a la cabeza.</string>
+    <string name="meditation_bodyscan_whole">Sentí tu cuerpo entero como un todo.</string>
+    <string name="meditation_bodyscan_closing">Volvé al espacio a tu alrededor.</string>
+    <string name="meditation_selfcompassion_intro">Ponete una mano en el pecho, con suavidad.</string>
+    <string name="meditation_selfcompassion_phrase_1">Que pueda ser amable conmigo mismo/a.</string>
+    <string name="meditation_selfcompassion_phrase_2">Que pueda aceptar este momento tal como es.</string>
+    <string name="meditation_selfcompassion_phrase_3">Que pueda darme la compasión que necesito.</string>
+    <string name="meditation_selfcompassion_closing">Llevá esta amabilidad con vos.</string>
+
     <string name="widget_empty_state_label">Empezá hoy</string>
     <string name="widget_action_affirm_label">Afirmar</string>
     <string name="widget_action_meditate_label">Meditar</string>

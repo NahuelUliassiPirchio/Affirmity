@@ -1,13 +1,10 @@
 package com.pirxhio.affirmity.ui.meditation.catalog
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
 import com.pirxhio.affirmity.access.AccessDecision
 import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.access.AdUnlockPolicy
 import com.pirxhio.affirmity.access.AdUnlockRecord
 import com.pirxhio.affirmity.access.AdUnlockState
-import com.pirxhio.affirmity.access.ContentAccess
 import com.pirxhio.affirmity.access.ContentKey
 import com.pirxhio.affirmity.access.ContentType
 import com.pirxhio.affirmity.access.isUnlocked
@@ -21,27 +18,20 @@ import org.junit.Test
 /**
  * Covers [meditationAccessDecision]/[meditationContentKey]/[isMeditationLocked]/
  * [canWatchAdToUnlockMeditation]/[deriveMeditationBadge] (REQ-4.7, design §3.4) across the full
- * tier x policy x grant-state matrix, over hand-built FIXTURE entries only — the real 7 catalog
- * entries do not exist until PR2 (design/spec §13's PR1 line item).
+ * tier x policy x grant-state matrix, over the real 7 catalog entries (T2.10 — retargeted from
+ * PR1's hand-built fixture entries now that `meditationCatalog()` exists, spec §11).
+ *
+ * One representative real entry per [com.pirxhio.affirmity.access.ContentAccess] shape: `calma`
+ * (Free), `body_scan` (Pro), `enfoque` (ProOrAdPerUse), `dormir` (ProOrAdTrial) — matching REQ-4.6.
  */
 class MeditationAccessPolicyTest {
 
-    private fun fixtureEntry(id: String, access: ContentAccess) = MeditationCatalogEntry(
-        id = id,
-        titleRes = 1,
-        descriptionRes = 2,
-        categoryRes = 3,
-        icon = Icons.Filled.Favorite,
-        approxDurationMinutes = 5,
-        access = access,
-        definition = { error("not used by access-decision logic") },
-        presentation = MeditationPresentation(),
-    )
+    private fun entry(id: String) = requireNotNull(findMeditationCatalogEntry(id)) { "unknown id: $id" }
 
-    private val freeEntry = fixtureEntry("fixture_free", ContentAccess.Free)
-    private val proEntry = fixtureEntry("fixture_pro", ContentAccess.Pro)
-    private val perUseEntry = fixtureEntry("fixture_per_use", ContentAccess.ProOrAdPerUse)
-    private val trialEntry = fixtureEntry("fixture_trial", ContentAccess.ProOrAdTrial)
+    private val freeEntry = entry("calma")
+    private val proEntry = entry("body_scan")
+    private val perUseEntry = entry("enfoque")
+    private val trialEntry = entry("dormir")
 
     private val noGrants = AdUnlockState()
     private val now = 1_000_000L
@@ -53,7 +43,7 @@ class MeditationAccessPolicyTest {
 
     @Test
     fun `meditationContentKey builds a MEDITATION-typed ContentKey from the entry id`() {
-        assertEquals(ContentKey(ContentType.MEDITATION, "fixture_free"), meditationContentKey("fixture_free"))
+        assertEquals(ContentKey(ContentType.MEDITATION, freeEntry.id), meditationContentKey(freeEntry.id))
     }
 
     // --- Free entry: unlocked at both tiers, never locked, never badged -------------------------
