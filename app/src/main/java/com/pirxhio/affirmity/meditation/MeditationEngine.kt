@@ -68,6 +68,7 @@ class MeditationEngine(
                     activePath = emptyList(),
                     remainingInPhaseMillis = null,
                 )
+                dispatch(EndSession(SessionEndReason.Cancelled))
             }
 
             is MeditationEvent.UserAction -> handlePhaseExitEvent(current, MeditationEvent.UserAction::class)
@@ -140,6 +141,7 @@ class MeditationEngine(
                     elapsedInPhaseMillis = 0L,
                     remainingInPhaseMillis = null,
                 )
+                dispatch(EndSession(SessionEndReason.Completed))
             }
         }
     }

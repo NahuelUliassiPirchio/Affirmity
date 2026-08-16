@@ -11,6 +11,7 @@ import com.pirxhio.affirmity.meditation.Repeat
 import com.pirxhio.affirmity.meditation.ShowText
 import com.pirxhio.affirmity.meditation.StartLap
 import com.pirxhio.affirmity.meditation.EndLap
+import com.pirxhio.affirmity.meditation.authoring.breathingBlock
 
 /**
  * A configurable breathing meditation, used as this engine's first (and demo) meditation type —
@@ -58,29 +59,19 @@ fun breathingMeditationDefinition(config: BreathingConfig): MeditationDefinition
     require(config.rounds > 0) { "rounds must be > 0, got ${config.rounds}" }
     require(config.breathsPerRound > 0) { "breathsPerRound must be > 0, got ${config.breathsPerRound}" }
 
-    val breath = MeditationSequence(
-        id = "breath",
-        children = listOf(
-            Phase(
-                id = "inhale",
-                duration = PhaseDuration.Fixed(config.inhaleMillis),
-                onEnter = listOf(ShowText(BreathingText.INHALE)),
-            ),
-            Phase(
-                id = "exhale",
-                duration = PhaseDuration.Fixed(config.exhaleMillis),
-                onEnter = listOf(ShowText(BreathingText.EXHALE)),
-            ),
-        ),
-    )
-
     val round = MeditationSequence(
         id = "round",
         children = listOf(
-            Repeat(
+            breathingBlock(
                 id = "breathing",
-                child = breath,
-                strategy = FixedCountRepetition(config.breathsPerRound),
+                breaths = config.breathsPerRound,
+                inhaleMillis = config.inhaleMillis,
+                exhaleMillis = config.exhaleMillis,
+                inhaleTextId = BreathingText.INHALE,
+                exhaleTextId = BreathingText.EXHALE,
+                breathId = "breath",
+                inhaleId = "inhale",
+                exhaleId = "exhale",
             ),
             Phase(
                 id = "retention",
