@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.ui.meditation
 import android.media.MediaPlayer
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -18,14 +19,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlayCircle
-import androidx.compose.material.icons.filled.SelfImprovement
-import androidx.compose.material.icons.filled.WaterDrop
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,7 +33,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -47,14 +43,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
+import com.pirxhio.affirmity.access.AccessDecision
+import com.pirxhio.affirmity.access.AdUnlockPolicy
+import com.pirxhio.affirmity.ui.groups.AffirmationGroupAccessBadge
+import com.pirxhio.affirmity.ui.meditation.catalog.MeditationCatalogEntry
+import com.pirxhio.affirmity.ui.meditation.catalog.deriveMeditationBadge
+import com.pirxhio.affirmity.ui.meditation.catalog.isMeditationLocked
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -71,7 +72,11 @@ fun MeditationScreen(
     initialDurationSeconds: Int = 15 * 60,
     onDurationSelected: (Int) -> Unit,
     onSessionCompleted: () -> Unit,
-    onOpenGuidedDemo: () -> Unit = {},
+    entries: List<MeditationCatalogEntry>,
+    decisionFor: (MeditationCatalogEntry) -> AccessDecision,
+    onLaunch: (MeditationCatalogEntry) -> Unit,
+    onUpgradeClick: () -> Unit,
+    onWatchAd: (MeditationCatalogEntry, AdUnlockPolicy) -> Unit,
 ) {
     // Keyed on initialDurationSeconds so that when the persisted value arrives asynchronously
     // (DataStore's first read completes after this composable's initial composition), the
@@ -231,38 +236,31 @@ fun MeditationScreen(
             }
 
             MeditationDiscoverSection(
-                modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp)
+                entries = entries,
+                decisionFor = decisionFor,
+                onLaunch = onLaunch,
+                onUpgradeClick = onUpgradeClick,
+                onWatchAd = onWatchAd,
+                modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 24.dp)
             )
-
-            TextButton(
-                onClick = onOpenGuidedDemo,
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .padding(top = 8.dp, bottom = 24.dp)
-            ) {
-                Text(stringResource(R.string.meditation_guided_demo_button))
-            }
         }
     }
 }
 
-private data class MockMeditationTrack(
-    val icon: ImageVector,
-    val titleRes: Int,
-    val metaRes: Int,
-)
-
-private val mockDiscoverTracks = listOf(
-    MockMeditationTrack(Icons.Filled.WaterDrop, R.string.meditation_discover_track_1_title, R.string.meditation_discover_track_1_meta),
-    MockMeditationTrack(Icons.Filled.Bookmark, R.string.meditation_discover_track_2_title, R.string.meditation_discover_track_2_meta),
-    MockMeditationTrack(Icons.Filled.SelfImprovement, R.string.meditation_discover_track_3_title, R.string.meditation_discover_track_3_meta),
-)
-
-/** Mock discovery list, styled after the Stitch "Meditación: Descubrimiento Minimalista"
- * reference — kept deliberately small and left peeking under the timer via
- * [DISCOVER_LIST_PEEK_HEIGHT] so the user notices there's more to scroll to. */
+/** Real Discover list (REQ-5.3): renders every shipping [MeditationCatalogEntry], each row's
+ * lock state resolved via [decisionFor] at composition time. Left peeking under the timer via
+ * [DISCOVER_LIST_PEEK_HEIGHT] so the user notices there's more to scroll to. No [androidx.compose
+ * .foundation.lazy.LazyColumn]: this section nests inside the screen's own unbounded-height
+ * `verticalScroll` (design §4.3) — a nested LazyColumn there would crash. */
 @Composable
-private fun MeditationDiscoverSection(modifier: Modifier = Modifier) {
+fun MeditationDiscoverSection(
+    entries: List<MeditationCatalogEntry>,
+    decisionFor: (MeditationCatalogEntry) -> AccessDecision,
+    onLaunch: (MeditationCatalogEntry) -> Unit,
+    onUpgradeClick: () -> Unit,
+    onWatchAd: (MeditationCatalogEntry, AdUnlockPolicy) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
             text = stringResource(R.string.meditation_discover_header),
@@ -271,17 +269,41 @@ private fun MeditationDiscoverSection(modifier: Modifier = Modifier) {
             modifier = Modifier.padding(bottom = 12.dp)
         )
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            mockDiscoverTracks.forEach { track ->
-                MeditationDiscoverCard(track)
+            entries.forEach { entry ->
+                MeditationDiscoverCard(
+                    entry = entry,
+                    decision = decisionFor(entry),
+                    onLaunch = onLaunch,
+                    onUpgradeClick = onUpgradeClick,
+                    onWatchAd = onWatchAd,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun MeditationDiscoverCard(track: MockMeditationTrack) {
+private fun MeditationDiscoverCard(
+    entry: MeditationCatalogEntry,
+    decision: AccessDecision,
+    onLaunch: (MeditationCatalogEntry) -> Unit,
+    onUpgradeClick: () -> Unit,
+    onWatchAd: (MeditationCatalogEntry, AdUnlockPolicy) -> Unit,
+) {
+    val locked = isMeditationLocked(decision)
+    val badge = deriveMeditationBadge(entry, decision)
+    // Three interaction branches (REQ-5.3/design §4.2), mirroring AffirmationGroupSelectableRow.
+    val onRowClick: () -> Unit = when (decision) {
+        is AccessDecision.Unlocked, is AccessDecision.UnlockedByAd -> { { onLaunch(entry) } }
+        is AccessDecision.LockedAdUnlockable -> { { onWatchAd(entry, decision.policy) } }
+        AccessDecision.LockedNeedsPro -> onUpgradeClick
+    }
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onRowClick)
+            .let { if (locked) it.alpha(0.6f) else it },
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
@@ -298,7 +320,7 @@ private fun MeditationDiscoverCard(track: MockMeditationTrack) {
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = track.icon,
+                    imageVector = entry.icon,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
@@ -306,25 +328,41 @@ private fun MeditationDiscoverCard(track: MockMeditationTrack) {
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = stringResource(track.titleRes),
+                    text = stringResource(entry.titleRes),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1
                 )
                 Text(
-                    text = stringResource(track.metaRes),
+                    text = "${entry.approxDurationMinutes} min • ${stringResource(entry.categoryRes)}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline,
                     maxLines = 1
                 )
+                if (badge != null) {
+                    AffirmationGroupAccessBadge(badge)
+                }
             }
-            Icon(
-                imageVector = Icons.Filled.PlayCircle,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.size(22.dp)
-            )
+            if (locked) {
+                IconButton(onClick = onUpgradeClick) {
+                    Icon(
+                        imageVector = Icons.Filled.Lock,
+                        contentDescription = stringResource(
+                            R.string.affirmation_group_locked_a11y,
+                            stringResource(entry.titleRes),
+                        ),
+                        tint = MaterialTheme.colorScheme.outline,
+                    )
+                }
+            } else {
+                Icon(
+                    imageVector = Icons.Filled.PlayCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
         }
     }
 }

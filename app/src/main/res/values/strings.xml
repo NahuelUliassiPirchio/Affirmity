@@ -232,14 +232,7 @@
     <string name="meditation_preset_relax">Relax</string>
     <string name="meditation_preset_focus">Focus</string>
     <string name="meditation_preset_sleep">Sleep</string>
-    <string name="meditation_guided_demo_button">Meditación guiada (demo)</string>
     <string name="meditation_discover_header">Descubre más sesiones</string>
-    <string name="meditation_discover_track_1_title">Ondas de Calma</string>
-    <string name="meditation_discover_track_1_meta">10 min • Relajación</string>
-    <string name="meditation_discover_track_2_title">Cielo Nocturno</string>
-    <string name="meditation_discover_track_2_meta">20 min • Sueño</string>
-    <string name="meditation_discover_track_3_title">Horizonte Sereno</string>
-    <string name="meditation_discover_track_3_meta">15 min • Enfoque</string>
 
     <string name="guided_meditation_round_label">Ronda %1$d de %2$d</string>
     <string name="guided_meditation_breath_label">Respiración %1$d de %2$d</string>

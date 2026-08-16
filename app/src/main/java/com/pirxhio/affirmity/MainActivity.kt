@@ -74,6 +74,8 @@ import com.pirxhio.affirmity.ui.meditation.MeditationScreen
 import com.pirxhio.affirmity.ui.meditation.catalog.findMeditationCatalogEntry
 import com.pirxhio.affirmity.ui.meditation.catalog.isMeditationLocked
 import com.pirxhio.affirmity.ui.meditation.catalog.meditationAccessDecision
+import com.pirxhio.affirmity.ui.meditation.catalog.meditationCatalog
+import com.pirxhio.affirmity.ui.meditation.catalog.meditationContentKey
 import com.pirxhio.affirmity.ui.mood.MoodScreen
 import com.pirxhio.affirmity.ui.myaffirmations.MyAffirmationsScreen
 import com.pirxhio.affirmity.ui.onboarding.OnboardingScreen
@@ -560,10 +562,20 @@ fun AffirmityApp(
                     initialDurationSeconds = appState.meditationDurationSeconds.value ?: (15 * 60),
                     onDurationSelected = { seconds -> appState.recordMeditationDurationSelected(seconds) },
                     onSessionCompleted = { appState.recordMeditationCompleted() },
-                    // Temporary (PR3): routes to the real reset_rapido entry so the parameterized
-                    // screen is manually testable end-to-end. Replaced by the real Discover
-                    // per-row onLaunch wiring in PR4 (T4.3), which also deletes this demo button.
-                    onOpenGuidedDemo = { selectedMeditationEntryId = "reset_rapido" }
+                    entries = meditationCatalog(),
+                    decisionFor = { entry ->
+                        meditationAccessDecision(
+                            entry,
+                            appState.entitlementTier.value,
+                            appState.adUnlockState,
+                            System.currentTimeMillis(),
+                        )
+                    },
+                    onLaunch = { entry -> selectedMeditationEntryId = entry.id },
+                    onUpgradeClick = onUpgradeClick,
+                    onWatchAd = { entry, policy ->
+                        appState.requestAdUnlock(meditationContentKey(entry.id), policy)
+                    },
                 )
 
                 AppDestinations.PROGRESO -> ProgressScreen(
