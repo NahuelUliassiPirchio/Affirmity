@@ -141,6 +141,7 @@ dependencies {
     // Mocks android.content.Context for auth unit tests that only pass it through to a fake
     // AuthProvider — never calls a real platform method.
     testImplementation(libs.mockito.core)
+    testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
