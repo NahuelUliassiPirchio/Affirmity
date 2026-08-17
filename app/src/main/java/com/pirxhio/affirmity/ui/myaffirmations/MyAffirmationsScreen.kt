@@ -46,6 +46,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
+import com.pirxhio.affirmity.access.AccessDecision
 import com.pirxhio.affirmity.data.Affirmation
 
 private val swatches = listOf(
@@ -59,11 +60,13 @@ fun MyAffirmationsScreen(
     affirmations: List<Affirmation>,
     addImageError: String?,
     importError: String?,
+    createDecision: AccessDecision,
     onAddAffirmationWithColor: (title: String, subtitle: String, colorHex: String) -> Unit,
     onAddAffirmationWithImage: (title: String, subtitle: String, imageUrl: String) -> Unit,
     onAddAffirmationWithGalleryImage: (title: String, subtitle: String, imageUri: Uri) -> Unit,
     onImportAffirmationsJson: (json: String, replaceExisting: Boolean) -> Unit,
     onDeleteAffirmation: (id: String) -> Unit,
+    onUpgradeClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -77,10 +80,12 @@ fun MyAffirmationsScreen(
             AddAffirmationCard(
                 downloadError = addImageError,
                 importError = importError,
+                locked = isCustomAffirmationCreationLocked(createDecision),
                 onAddAffirmationWithColor = onAddAffirmationWithColor,
                 onAddAffirmationWithImage = onAddAffirmationWithImage,
                 onAddAffirmationWithGalleryImage = onAddAffirmationWithGalleryImage,
                 onImportAffirmationsJson = onImportAffirmationsJson,
+                onUpgradeClick = onUpgradeClick,
             )
         }
 
@@ -108,10 +113,12 @@ private const val AFFIRMATIONS_JSON_EXAMPLE = """[
 private fun AddAffirmationCard(
     downloadError: String?,
     importError: String?,
+    locked: Boolean,
     onAddAffirmationWithColor: (String, String, String) -> Unit,
     onAddAffirmationWithImage: (String, String, String) -> Unit,
     onAddAffirmationWithGalleryImage: (String, String, Uri) -> Unit,
     onImportAffirmationsJson: (json: String, replaceExisting: Boolean) -> Unit,
+    onUpgradeClick: () -> Unit,
 ) {
     var title by remember { mutableStateOf("") }
     var subtitle by remember { mutableStateOf("") }
@@ -286,7 +293,28 @@ private fun AddAffirmationCard(
                     color = MaterialTheme.colorScheme.error
                 )
             }
+            // Free tier: no count, no partial state -- creation is a binary Pro gate (spec §0
+            // Q1/REQ-4.4). Applies to all 4 entry points identically; existing affirmations and
+            // delete stay fully unaffected (REQ-2.6, EC-1/EC-2).
+            if (locked) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = stringResource(R.string.my_affirmations_locked_headline),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = stringResource(R.string.my_affirmations_locked_body),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                OutlinedButton(onClick = onUpgradeClick, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.my_affirmations_locked_cta))
+                }
+            }
             Button(
+                enabled = !locked,
                 onClick = {
                     when (backgroundMode) {
                         BackgroundMode.COLOR -> {

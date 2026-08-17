@@ -216,6 +216,9 @@
     <string name="progress_save_button">Save</string>
     <string name="progress_import_button">Import</string>
     <string name="progress_delete_content_description">Delete</string>
+    <string name="my_affirmations_locked_headline">Creating custom affirmations requires Pro</string>
+    <string name="my_affirmations_locked_body">Your existing affirmations are still available and you can delete them anytime. Creating new ones requires a Pro subscription.</string>
+    <string name="my_affirmations_locked_cta">Upgrade to Pro</string>
 
     <string name="settings_notification_debug_title">Notification debug</string>
     <string name="settings_notification_debug_view_history_button">View history</string>

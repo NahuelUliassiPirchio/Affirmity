@@ -85,6 +85,7 @@ import com.pirxhio.affirmity.ui.progress.ProgressScreen
 import com.pirxhio.affirmity.ui.settings.NotificationDebugScreen
 import com.pirxhio.affirmity.ui.settings.SettingsScreen
 import com.pirxhio.affirmity.ui.theme.AffirmityTheme
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /** Extra key a launcher (e.g. the home-screen widget) sets to pick the initial [AppDestinations]. */
@@ -338,6 +339,7 @@ fun AffirmityApp(
                 affirmations = appState.affirmations,
                 addImageError = appState.addImageError.value,
                 importError = appState.importAffirmationsError.value,
+                createDecision = appState.customAffirmationCreateDecision,
                 onAddAffirmationWithColor = { title, subtitle, colorHex ->
                     appState.addAffirmationWithColor(title, subtitle, colorHex)
                 },
@@ -351,8 +353,14 @@ fun AffirmityApp(
                     appState.importAffirmationsFromJson(json, replace)
                 },
                 onDeleteAffirmation = { id -> appState.removeAffirmation(id) },
+                onUpgradeClick = onUpgradeClick,
             )
         }
+        PaywallHost(
+            visible = showPaywall,
+            onDismiss = { showPaywall = false },
+            snackbarScope = snackbarScope,
+        )
         return
     }
 
@@ -668,37 +676,54 @@ fun AffirmityApp(
         }
     }
 
-    if (showPaywall) {
-        val activity = context as? Activity
-        val billingService = remember {
-            BillingService(
-                context = context.applicationContext,
-                proSubscriptionProductId = PRO_SUBSCRIPTION_PRODUCT_ID,
-                syncEntitlementUrl = SYNC_ENTITLEMENT_URL,
-                scope = snackbarScope,
-            )
-        }
-        DisposableEffect(billingService) {
-            billingService.connect()
-            onDispose { billingService.disconnect() }
-        }
-        val monthlyOffer by billingService.monthlyOffer.collectAsState()
-        val annualOffer by billingService.annualOffer.collectAsState()
+    PaywallHost(
+        visible = showPaywall,
+        onDismiss = { showPaywall = false },
+        snackbarScope = snackbarScope,
+    )
+}
 
-        PaywallSheet(
-            monthlyPriceLabel = monthlyOffer?.formattedPrice,
-            annualPriceLabel = annualOffer?.formattedPrice,
-            onSelectMonthly = {
-                val offer = monthlyOffer ?: return@PaywallSheet
-                activity?.let { billingService.launchPurchaseFlow(it, offer.offerToken) }
-            },
-            onSelectAnnual = {
-                val offer = annualOffer ?: return@PaywallSheet
-                activity?.let { billingService.launchPurchaseFlow(it, offer.offerToken) }
-            },
-            onDismiss = { showPaywall = false },
+/** Extracted from the bottom of [AffirmityApp] (D5): the original `if (showPaywall)` block lived
+ *  after the My Affirmations branch's early `return`, making the paywall unreachable from that
+ *  screen. Behavior at the original call site is byte-identical; this host is now also called from
+ *  the My Affirmations branch so its `onUpgradeClick` (shared, unchanged) actually opens something. */
+@Composable
+private fun PaywallHost(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    snackbarScope: CoroutineScope,
+) {
+    if (!visible) return
+    val context = LocalContext.current
+    val activity = context as? Activity
+    val billingService = remember {
+        BillingService(
+            context = context.applicationContext,
+            proSubscriptionProductId = PRO_SUBSCRIPTION_PRODUCT_ID,
+            syncEntitlementUrl = SYNC_ENTITLEMENT_URL,
+            scope = snackbarScope,
         )
     }
+    DisposableEffect(billingService) {
+        billingService.connect()
+        onDispose { billingService.disconnect() }
+    }
+    val monthlyOffer by billingService.monthlyOffer.collectAsState()
+    val annualOffer by billingService.annualOffer.collectAsState()
+
+    PaywallSheet(
+        monthlyPriceLabel = monthlyOffer?.formattedPrice,
+        annualPriceLabel = annualOffer?.formattedPrice,
+        onSelectMonthly = {
+            val offer = monthlyOffer ?: return@PaywallSheet
+            activity?.let { billingService.launchPurchaseFlow(it, offer.offerToken) }
+        },
+        onSelectAnnual = {
+            val offer = annualOffer ?: return@PaywallSheet
+            activity?.let { billingService.launchPurchaseFlow(it, offer.offerToken) }
+        },
+        onDismiss = onDismiss,
+    )
 }
 
 /** Play Console product/base-plan id -- part of the Phase 0 user-owned prerequisite (Play Console

@@ -216,6 +216,9 @@
     <string name="progress_save_button">Guardar</string>
     <string name="progress_import_button">Importar</string>
     <string name="progress_delete_content_description">Eliminar</string>
+    <string name="my_affirmations_locked_headline">Crear afirmaciones propias requiere Pro</string>
+    <string name="my_affirmations_locked_body">Tus afirmaciones existentes siguen disponibles y podés eliminarlas cuando quieras. Para crear nuevas, necesitás una suscripción Pro.</string>
+    <string name="my_affirmations_locked_cta">Mejorar a Pro</string>
 
     <string name="settings_notification_debug_title">Debug de notificaciones</string>
     <string name="settings_notification_debug_view_history_button">Ver historial</string>
