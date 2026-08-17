@@ -325,6 +325,11 @@
     <string name="affirmation_group_locked_a11y">%1$s (locked)</string>
     <string name="affirmation_group_always_on_a11y">Always selected</string>
     <string name="affirmation_group_upgrade_cta">Upgrade to Pro</string>
+    <string name="ad_unlock_cta_a11y">Watch an ad to unlock %1$s</string>
+    <string name="ad_unlock_loading_a11y">Loading ad…</string>
+    <string name="ad_unlock_earned_message">Done! You can now use this session.</string>
+    <string name="ad_unlock_dismissed_message">You closed the ad before it finished, so nothing was unlocked.</string>
+    <string name="ad_unlock_unavailable_message">No ads are available right now. Try again later.</string>
     <string name="paywall_title">Affirmity Pro</string>
     <string name="paywall_description">Unlock every thematic group with a Pro subscription.</string>
     <string name="paywall_monthly_cta">Monthly — %1$s</string>

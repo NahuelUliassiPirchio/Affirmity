@@ -59,6 +59,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.pirxhio.affirmity.auth.AuthState
 import com.pirxhio.affirmity.billing.BillingService
+import com.pirxhio.affirmity.data.AdRequestNotice
 import com.pirxhio.affirmity.data.MOOD_MAX
 import com.pirxhio.affirmity.data.rememberAffirmityAppState
 import com.pirxhio.affirmity.meditation.SessionEndReason
@@ -243,6 +244,27 @@ fun AffirmityApp(
                 }
                 appState.acknowledgeProLapse()
             }
+        }
+    }
+
+    // Ad-unlock outcome notice (design §6.3, D8): Earned/Dismissed/Unavailable each get a short
+    // snackbar via the same host used by proLapseNotice above. D8 (closed): Earned never
+    // auto-launches the meditation session or auto-selects an affirmation group -- it is
+    // acknowledgement only.
+    LaunchedEffect(appState.adRequestNotice.value) {
+        val notice = appState.adRequestNotice.value ?: return@LaunchedEffect
+        snackbarScope.launch {
+            snackbarHostState.showSnackbar(
+                message = context.getString(
+                    when (notice) {
+                        AdRequestNotice.EARNED -> R.string.ad_unlock_earned_message
+                        AdRequestNotice.DISMISSED -> R.string.ad_unlock_dismissed_message
+                        AdRequestNotice.UNAVAILABLE -> R.string.ad_unlock_unavailable_message
+                    },
+                ),
+                duration = androidx.compose.material3.SnackbarDuration.Short,
+            )
+            appState.acknowledgeAdRequestNotice()
         }
     }
 
@@ -637,6 +659,10 @@ fun AffirmityApp(
                     onWatchAd = { entry, policy ->
                         appState.requestAdUnlock(meditationContentKey(entry.id), policy)
                     },
+                    adInFlightFor = { entry ->
+                        appState.adRequestInFlight.value == meditationContentKey(entry.id)
+                    },
+                    anyAdInFlight = appState.adRequestInFlight.value != null,
                 )
 
                 AppDestinations.PROGRESO -> ProgressScreen(

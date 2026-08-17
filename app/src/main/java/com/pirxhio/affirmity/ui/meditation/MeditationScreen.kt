@@ -47,6 +47,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
@@ -77,6 +79,8 @@ fun MeditationScreen(
     onLaunch: (MeditationCatalogEntry) -> Unit,
     onUpgradeClick: () -> Unit,
     onWatchAd: (MeditationCatalogEntry, AdUnlockPolicy) -> Unit,
+    adInFlightFor: (MeditationCatalogEntry) -> Boolean = { false },
+    anyAdInFlight: Boolean = false,
 ) {
     // Keyed on initialDurationSeconds so that when the persisted value arrives asynchronously
     // (DataStore's first read completes after this composable's initial composition), the
@@ -241,6 +245,8 @@ fun MeditationScreen(
                 onLaunch = onLaunch,
                 onUpgradeClick = onUpgradeClick,
                 onWatchAd = onWatchAd,
+                adInFlightFor = adInFlightFor,
+                anyAdInFlight = anyAdInFlight,
                 modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 24.dp)
             )
         }
@@ -259,6 +265,8 @@ fun MeditationDiscoverSection(
     onLaunch: (MeditationCatalogEntry) -> Unit,
     onUpgradeClick: () -> Unit,
     onWatchAd: (MeditationCatalogEntry, AdUnlockPolicy) -> Unit,
+    adInFlightFor: (MeditationCatalogEntry) -> Boolean = { false },
+    anyAdInFlight: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -276,6 +284,8 @@ fun MeditationDiscoverSection(
                     onLaunch = onLaunch,
                     onUpgradeClick = onUpgradeClick,
                     onWatchAd = onWatchAd,
+                    adInFlight = adInFlightFor(entry),
+                    anyAdInFlight = anyAdInFlight,
                 )
             }
         }
@@ -289,13 +299,19 @@ private fun MeditationDiscoverCard(
     onLaunch: (MeditationCatalogEntry) -> Unit,
     onUpgradeClick: () -> Unit,
     onWatchAd: (MeditationCatalogEntry, AdUnlockPolicy) -> Unit,
+    adInFlight: Boolean = false,
+    anyAdInFlight: Boolean = false,
 ) {
     val locked = isMeditationLocked(decision)
     val badge = deriveMeditationBadge(entry, decision)
+    val adUnlockLoadingA11y = stringResource(R.string.ad_unlock_loading_a11y)
     // Three interaction branches (REQ-5.3/design §4.2), mirroring AffirmationGroupSelectableRow.
+    // An ad-unlockable row is inert while ANY ad request is in flight (§6.1) -- the tap is
+    // dropped, not queued -- defense in depth over AffirmityAppState's single-flight guard.
     val onRowClick: () -> Unit = when (decision) {
         is AccessDecision.Unlocked, is AccessDecision.UnlockedByAd -> { { onLaunch(entry) } }
-        is AccessDecision.LockedAdUnlockable -> { { onWatchAd(entry, decision.policy) } }
+        is AccessDecision.LockedAdUnlockable ->
+            if (anyAdInFlight) { {} } else { { onWatchAd(entry, decision.policy) } }
         AccessDecision.LockedNeedsPro -> onUpgradeClick
     }
 
@@ -344,7 +360,15 @@ private fun MeditationDiscoverCard(
                     AffirmationGroupAccessBadge(badge)
                 }
             }
-            if (locked) {
+            if (adInFlight) {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .size(22.dp)
+                        .semantics { contentDescription = adUnlockLoadingA11y },
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+            } else if (locked) {
                 IconButton(onClick = onUpgradeClick) {
                     Icon(
                         imageVector = Icons.Filled.Lock,
