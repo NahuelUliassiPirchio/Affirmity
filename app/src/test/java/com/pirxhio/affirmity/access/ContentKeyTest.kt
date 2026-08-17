@@ -31,6 +31,12 @@ class ContentKeyTest {
         assertEquals("affirmationGroup_bienestar", key.storageKey)
     }
 
+    @Test
+    fun `storageKey then parse round-trips a custom affirmation slot key`() {
+        val key = ContentKey(ContentType.CUSTOM_AFFIRMATION_SLOT, "create")
+        assertEquals(key, ContentKey.parse(key.storageKey))
+    }
+
     // --- ids containing underscores --------------------------------------------------------
 
     @Test

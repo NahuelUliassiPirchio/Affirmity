@@ -5,7 +5,8 @@ package com.pirxhio.affirmity.access
  *  splits on the FIRST underscore — content ids do contain underscores (`fuerza_de_voluntad`). */
 enum class ContentType(val wireName: String) {
     AFFIRMATION_GROUP("affirmationGroup"),
-    MEDITATION("meditation");
+    MEDITATION("meditation"),
+    CUSTOM_AFFIRMATION_SLOT("customAffirmationSlot");
 
     companion object {
         fun fromWireName(wireName: String): ContentType? = entries.firstOrNull { it.wireName == wireName }
