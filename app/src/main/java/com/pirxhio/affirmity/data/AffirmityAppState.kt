@@ -16,6 +16,7 @@ import com.pirxhio.affirmity.R
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging
+import com.pirxhio.affirmity.access.AccessDecision
 import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.access.AdUnlockOutcome
 import com.pirxhio.affirmity.access.AdUnlockPolicy
@@ -75,6 +76,8 @@ import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
 import com.pirxhio.affirmity.ui.groups.defaultAffirmationGroups
 import com.pirxhio.affirmity.ui.groups.selectableAffirmationGroups
+import com.pirxhio.affirmity.access.isUnlocked
+import com.pirxhio.affirmity.ui.myaffirmations.customAffirmationAccessDecision
 import com.pirxhio.affirmity.widget.WeeklyTrackerWidget
 import androidx.glance.appwidget.updateAll
 import java.util.TimeZone
@@ -341,6 +344,13 @@ class AffirmityAppState(
     /** The complete grant state fed to `groupAccessDecision`/`resolveAccess` (design §9). */
     val adUnlockState: AdUnlockState
         get() = AdUnlockState(sessionAdUnlocks.value, durableAdUnlocks.value)
+
+    /** Creation-time gate for the 4 custom-affirmation mutation surfaces (Spec 4, REQ-5.1/5.3).
+     *  Derived on every read from [entitlementTier]/[adUnlockState] -- no polling, no recomposition
+     *  logic beyond `collectAsState`. Count-independent: existing affirmations are never inspected
+     *  (grandfathering, spec §0 Q3). */
+    val customAffirmationCreateDecision: AccessDecision
+        get() = customAffirmationAccessDecision(entitlementTier.value, adUnlockState, System.currentTimeMillis())
 
     /** Rolling [STREAK_LOOKBACK_DAYS]-day window of mood check-ins, oldest first — the calendar
      * and "Resumen" stats derive everything else (average/distribution/trend) from this list. */
@@ -752,6 +762,7 @@ class AffirmityAppState(
     }
 
     fun addAffirmationWithColor(title: String, subtitle: String, colorHex: String) {
+        if (!customAffirmationCreateDecision.isUnlocked) return
         addImageError.value = null
         scope.launch {
             ready().affirmations.insert(
@@ -765,6 +776,7 @@ class AffirmityAppState(
     }
 
     fun addAffirmationWithImage(title: String, subtitle: String, imageUrl: String) {
+        if (!customAffirmationCreateDecision.isUnlocked) return
         addImageError.value = null
         scope.launch {
             val localPath = runCatching { imageStore.download(imageUrl) }
@@ -775,6 +787,7 @@ class AffirmityAppState(
     }
 
     fun addAffirmationWithGalleryImage(title: String, subtitle: String, imageUri: Uri) {
+        if (!customAffirmationCreateDecision.isUnlocked) return
         addImageError.value = null
         scope.launch {
             val localPath = runCatching { imageStore.importFromGallery(imageUri) }
@@ -795,6 +808,14 @@ class AffirmityAppState(
     }
 
     fun importAffirmationsFromJson(json: String, replaceExisting: Boolean) {
+        // CRITICAL (D4): this guard MUST be the first statement -- strictly before deleteAll() is
+        // ever reached below. A guard placed inside the forEach/after the replaceExisting wipe
+        // would delete a Free user's entire table and then import nothing: data loss caused by the
+        // gate itself. Blocked = zero side effects of any kind (no parse, no deleteAll, no insert).
+        if (!customAffirmationCreateDecision.isUnlocked) {
+            importAffirmationsError.value = "Importar afirmaciones requiere una suscripción Pro."
+            return
+        }
         importAffirmationsError.value = null
         val parsed = try {
             parseAffirmationsJson(json)

@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.data
 
+import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.access.AdUnlockRecord
 import com.pirxhio.affirmity.access.ContentKey
 import com.pirxhio.affirmity.access.ContentType
@@ -31,11 +32,13 @@ import com.pirxhio.affirmity.data.repository.DailyMoodRepository
 import com.pirxhio.affirmity.data.repository.DataSession
 import com.pirxhio.affirmity.data.repository.Entitlement
 import com.pirxhio.affirmity.data.repository.EntitlementRepository
+import com.pirxhio.affirmity.data.repository.LocalFreeEntitlementRepository
 import com.pirxhio.affirmity.data.repository.MeditationPreferencesRepository
 import com.pirxhio.affirmity.data.repository.NotificationSettingsRepository
 import com.pirxhio.affirmity.data.repository.StreakHealerRepository
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
+import com.pirxhio.affirmity.ui.myaffirmations.isCustomAffirmationCreationLocked
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -83,12 +86,16 @@ private class FakeAffirmationRepository(
     private val flow: Flow<List<AffirmationEntity>>,
 ) : AffirmationRepository {
     val inserted = CopyOnWriteArrayList<AffirmationEntity>()
+    var deleteAllCallCount = 0
+        private set
     override fun observeAll(): Flow<List<AffirmationEntity>> = flow
     override suspend fun insert(entity: AffirmationEntity) {
         inserted += entity
     }
     override suspend fun deleteById(id: String) = Unit
-    override suspend fun deleteAll() = Unit
+    override suspend fun deleteAll() {
+        deleteAllCallCount++
+    }
 }
 
 private class FakeDailyCompletionRepository(
@@ -219,13 +226,16 @@ private fun fakeLocal(
     events: MutableList<String>,
     id: String = "local-1",
     adUnlocks: AdUnlockRepository = FakeAdUnlockRepository(),
+    seededAffirmations: List<AffirmationEntity> = listOf(affirmation(id)),
+    entitlements: EntitlementRepository = LocalFreeEntitlementRepository(),
 ): DataSession.Local = DataSession.Local(
     affirmations = FakeAffirmationRepository(
-        EventedFlow("local-affirmations", events, listOf(listOf(affirmation(id)))),
+        EventedFlow("local-affirmations", events, listOf(seededAffirmations)),
     ),
     completions = FakeDailyCompletionRepository(EventedFlow("local-completions", events, listOf(emptyList()))),
     moods = FakeDailyMoodRepository(EventedFlow("local-moods", events, listOf(emptyList()))),
     healerUses = FakeStreakHealerRepository(EventedFlow("local-healerUses", events, listOf(emptyList()))),
+    entitlements = entitlements,
     meditation = FakeMeditationPreferencesRepository(EventedFlow("local-meditation", events, listOf(600))),
     notifications = FakeNotificationSettingsRepository(
         EventedFlow("local-notifications", events, listOf(ChannelSettings(enabled = false, segments = setOf(DaySegment.MANANA, DaySegment.TARDE)))),
@@ -238,6 +248,7 @@ private fun fakeRemote(
     events: MutableList<String>,
     id: String = "remote-1",
     adUnlocks: AdUnlockRepository = FakeAdUnlockRepository(),
+    entitlements: EntitlementRepository = FakeEntitlementRepository(),
 ): DataSession.Remote = DataSession.Remote(
     uid = uid,
     affirmations = FakeAffirmationRepository(
@@ -250,7 +261,7 @@ private fun fakeRemote(
     notifications = FakeNotificationSettingsRepository(
         EventedFlow("remote-notifications", events, listOf(ChannelSettings(enabled = false, segments = setOf(DaySegment.MANANA, DaySegment.TARDE)))),
     ),
-    entitlements = FakeEntitlementRepository(),
+    entitlements = entitlements,
     adUnlocks = adUnlocks,
 )
 
@@ -342,14 +353,24 @@ class AffirmityAppStateSwapTest {
     @Test
     fun `writes issued while migrating land in the remote fake, never the Room fake`() = runBlocking {
         val events = mutableListOf<String>()
-        val local = fakeLocal(events)
+        // Entitlements during Migrating delegate to the LOCAL session (design §9's documented
+        // residual risk), independent of Spec 4's creation guard under test here -- this test
+        // exercises write ROUTING, not access control, so it stays PRO throughout to avoid the
+        // guard interfering with its actual purpose.
+        val local = fakeLocal(events, entitlements = FakeEntitlementRepository(flowOf(Entitlement(tier = AccessTier.PRO))))
         var remoteInstance: DataSession.Remote? = null
         val gate = CompletableDeferred<Unit>()
         val authRepository = FakeAuthRepository()
         val scope = CoroutineScope(Dispatchers.Unconfined)
         val state = buildState(
             local = local,
-            remote = { fakeRemote("uid-2", events).also { remoteInstance = it } },
+            remote = {
+                fakeRemote(
+                    "uid-2",
+                    events,
+                    entitlements = FakeEntitlementRepository(flowOf(Entitlement(tier = AccessTier.PRO))),
+                ).also { remoteInstance = it }
+            },
             migrator = FirestoreMigrator(GatedFirestoreMigrationSource(gate)),
             authRepository = authRepository,
             scope = scope,
@@ -550,6 +571,162 @@ class AffirmityAppStateSwapTest {
         assertFalse(
             "no live Pro->Free transition occurred, so no lapse notice should fire",
             state.proLapseNotice.value,
+        )
+
+        scope.cancel()
+    }
+
+    // --- Spec 4 (Custom Affirmations Pro): creation-surface guards ----------------------------
+
+    /** Builds a signed-in, PRO-tier [AffirmityAppState] -- the swap completes to [DataSession.Remote]
+     *  with a PRO-resolving [FakeEntitlementRepository], so [AffirmityAppState.entitlementTier]
+     *  settles to [com.pirxhio.affirmity.access.AccessTier.PRO] once the entitlement flow emits.
+     *  [onRemote] captures the constructed [DataSession.Remote] so a test can assert against its
+     *  fake repositories. */
+    private fun buildProState(
+        events: MutableList<String>,
+        scope: CoroutineScope,
+        local: DataSession.Local = fakeLocal(events, id = "local-pro"),
+        onRemote: (DataSession.Remote) -> Unit = {},
+    ): AffirmityAppState {
+        val authRepository = FakeAuthRepository(
+            initial = AuthState.SignedIn(uid = "uid-pro", displayName = null, email = null),
+        )
+        return buildState(
+            local = local,
+            remote = {
+                fakeRemote(
+                    "uid-pro",
+                    events,
+                    id = "remote-pro",
+                    entitlements = FakeEntitlementRepository(flowOf(Entitlement(tier = AccessTier.PRO))),
+                ).also(onRemote)
+            },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = authRepository,
+            scope = scope,
+        )
+    }
+
+    @Test
+    fun `a FREE user's 3 add functions are true no-ops -- zero repo inserts, zero image-store calls`() = runBlocking {
+        val events = mutableListOf<String>()
+        val local = fakeLocal(events, id = "local-free")
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val state = buildState(
+            local = local,
+            remote = { fakeRemote("uid-free", events) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = FakeAuthRepository(), // stays SignedOut -- Local session, FREE by default
+            scope = scope,
+        )
+        delay(50)
+        assertEquals(AccessTier.FREE, state.entitlementTier.value)
+
+        state.addAffirmationWithColor("t", "s", "#111111")
+        state.addAffirmationWithImage("t", "s", "https://example.com/a.jpg")
+        state.addAffirmationWithGalleryImage("t", "s", mock(android.net.Uri::class.java))
+        delay(50)
+
+        val localRepo = local.affirmations as FakeAffirmationRepository
+        assertEquals("a FREE user's creation attempts must insert nothing", 0, localRepo.inserted.size)
+
+        scope.cancel()
+    }
+
+    @Test
+    fun `a PRO user's addAffirmationWithColor is unaffected by the guard`() = runBlocking {
+        val events = mutableListOf<String>()
+        val local = fakeLocal(events, id = "local-pro-color")
+        var remoteInstance: DataSession.Remote? = null
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val state = buildProState(events, scope, local) { remoteInstance = it }
+        delay(200)
+        assertEquals(AccessTier.PRO, state.entitlementTier.value)
+
+        state.addAffirmationWithColor("t", "s", "#222222")
+        delay(50)
+
+        val remoteRepo = remoteInstance?.affirmations as? FakeAffirmationRepository
+        assertNotNull(remoteRepo)
+        assertEquals(
+            "a PRO user's creation must be unaffected by the guard",
+            1,
+            remoteRepo!!.inserted.size,
+        )
+
+        scope.cancel()
+    }
+
+    @Test
+    fun `a FREE user's importAffirmationsFromJson with replaceExisting=true never wipes the table`() = runBlocking {
+        val events = mutableListOf<String>()
+        val local = fakeLocal(events, id = "local-import-free")
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val state = buildState(
+            local = local,
+            remote = { fakeRemote("uid-import-free", events) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = FakeAuthRepository(),
+            scope = scope,
+        )
+        delay(50)
+        assertEquals(AccessTier.FREE, state.entitlementTier.value)
+
+        val json = """[{"title":"t","subtitle":"s","backgroundType":"color","backgroundValue":"#000000"}]"""
+        state.importAffirmationsFromJson(json, replaceExisting = true)
+        delay(50)
+
+        val localRepo = local.affirmations as FakeAffirmationRepository
+        assertEquals(
+            "a blocked import must never call deleteAll(), even with replaceExisting=true",
+            0,
+            localRepo.deleteAllCallCount,
+        )
+        assertEquals("a blocked import must insert nothing", 0, localRepo.inserted.size)
+        assertNotNull(
+            "a blocked import must report the decline honestly",
+            state.importAffirmationsError.value,
+        )
+
+        scope.cancel()
+    }
+
+    @Test
+    fun `grandfathering -- a pre-seeded FREE user is still LockedNeedsPro, count is never consulted`() = runBlocking {
+        val events = mutableListOf<String>()
+        val seeded = (1..12).map { affirmation("seed-$it") }
+        val local = fakeLocal(events, seededAffirmations = seeded)
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val state = buildState(
+            local = local,
+            remote = { fakeRemote("uid-seed", events) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = FakeAuthRepository(),
+            scope = scope,
+        )
+        delay(50)
+        assertEquals(12, state.affirmations.size)
+        assertTrue(
+            "a FREE user with 12 pre-existing affirmations must still be locked -- the count is never read",
+            isCustomAffirmationCreationLocked(state.customAffirmationCreateDecision),
+        )
+
+        scope.cancel()
+    }
+
+    @Test
+    fun `grandfathering -- a pre-seeded PRO user is Unlocked, count is never consulted`() = runBlocking {
+        val events = mutableListOf<String>()
+        val seeded = (1..12).map { affirmation("seed-pro-$it") }
+        val local = fakeLocal(events, seededAffirmations = seeded)
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val state = buildProState(events, scope, local)
+        delay(200)
+        assertEquals(AccessTier.PRO, state.entitlementTier.value)
+        assertFalse(
+            "a PRO user with 12 pre-existing affirmations must be unlocked",
+            isCustomAffirmationCreationLocked(state.customAffirmationCreateDecision),
         )
 
         scope.cancel()
