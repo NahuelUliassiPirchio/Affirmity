@@ -405,6 +405,7 @@ fun AffirmityApp(
                 },
                 onDeleteAffirmation = { id -> appState.removeAffirmation(id) },
                 onUpgradeClick = { onUpgradeClick(PaywallSource.MY_AFFIRMATIONS) },
+                onEvent = appState::logAnalyticsEvent,
             )
         }
         PaywallHost(
@@ -687,6 +688,7 @@ fun AffirmityApp(
                                         ContentKey(ContentType.AFFIRMATION_GROUP, group.id)
                                 },
                                 anyAdInFlight = appState.adRequestInFlight.value != null,
+                                onEvent = appState::logAnalyticsEvent,
                             )
                         },
                     ) {

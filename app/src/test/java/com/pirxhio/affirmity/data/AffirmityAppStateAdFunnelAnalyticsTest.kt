@@ -357,4 +357,20 @@ class AffirmityAppStateAdFunnelAnalyticsTest {
         )
         scope.cancel()
     }
+
+    // --- Event 18 (REQ-5.5): custom_affirmation_deleted carries zero parameters -------------------
+
+    @Test
+    fun `removeAffirmation emits custom_affirmation_deleted with zero parameters`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val analytics = FakeAnalyticsLogger()
+        val state = buildAnalyticsState(scope, analytics, FixedOutcomeAdUnlockSource(AdUnlockOutcome.Unavailable))
+        delay(50)
+
+        state.removeAffirmation("some-id")
+        delay(20)
+
+        assertEquals(listOf(AnalyticsEvent.CustomAffirmationDeleted), analytics.recorded)
+        scope.cancel()
+    }
 }

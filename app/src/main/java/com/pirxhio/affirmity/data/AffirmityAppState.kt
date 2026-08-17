@@ -810,6 +810,9 @@ class AffirmityAppState(
                     background = AffirmationBackground.Color(colorHex),
                 ).toEntity()
             )
+            // REQ-5.5/17: emitted after insert() succeeds -- creation_method is the entire
+            // payload, never affirmation text (REQ-4.8).
+            analytics.log(AnalyticsEvent.CustomAffirmationCreated(CreationMethod.COLOR))
         }
     }
 
@@ -820,7 +823,9 @@ class AffirmityAppState(
             val localPath = runCatching { imageStore.download(imageUrl) }
                 .onFailure { addImageError.value = "No se pudo descargar la imagen: ${it.message}" }
                 .getOrNull() ?: return@launch
-            insertImageAffirmation(title, subtitle, localPath)
+            // D10.4: emit only after the download guard above -- a failed download must never
+            // report a creation that never happened.
+            insertImageAffirmation(title, subtitle, localPath, CreationMethod.IMAGE_URL)
         }
     }
 
@@ -831,11 +836,13 @@ class AffirmityAppState(
             val localPath = runCatching { imageStore.importFromGallery(imageUri) }
                 .onFailure { addImageError.value = "No se pudo importar la imagen: ${it.message}" }
                 .getOrNull() ?: return@launch
-            insertImageAffirmation(title, subtitle, localPath)
+            // D10.4: emit only after the import guard above -- a failed import must never report
+            // a creation that never happened.
+            insertImageAffirmation(title, subtitle, localPath, CreationMethod.GALLERY)
         }
     }
 
-    private suspend fun insertImageAffirmation(title: String, subtitle: String, localPath: String) {
+    private suspend fun insertImageAffirmation(title: String, subtitle: String, localPath: String, method: CreationMethod) {
         ready().affirmations.insert(
             Affirmation(
                 title = title,
@@ -843,6 +850,7 @@ class AffirmityAppState(
                 background = AffirmationBackground.Image(localPath),
             ).toEntity()
         )
+        analytics.log(AnalyticsEvent.CustomAffirmationCreated(method))
     }
 
     fun importAffirmationsFromJson(json: String, replaceExisting: Boolean) {
@@ -896,7 +904,10 @@ class AffirmityAppState(
     }
 
     fun removeAffirmation(id: String) {
-        scope.launch { ready().affirmations.deleteById(id) }
+        scope.launch {
+            ready().affirmations.deleteById(id)
+            analytics.log(AnalyticsEvent.CustomAffirmationDeleted)
+        }
     }
 
     /** Call once per affirmation the user settles on while swiping the feed. */

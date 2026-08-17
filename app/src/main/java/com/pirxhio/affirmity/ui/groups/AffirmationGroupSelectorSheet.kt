@@ -48,6 +48,10 @@ import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.AccessDecision
 import com.pirxhio.affirmity.access.AdUnlockPolicy
+import com.pirxhio.affirmity.analytics.AnalyticsContentType
+import com.pirxhio.affirmity.analytics.AnalyticsEvent
+import com.pirxhio.affirmity.analytics.AnalyticsId
+import com.pirxhio.affirmity.analytics.provenance
 
 /**
  * Persistent, non-dismissible sheet docked under the affirmations feed. Peek row is always
@@ -68,6 +72,8 @@ fun AffirmationGroupSelectorSheet(
     onWatchAd: (AffirmationGroup, AdUnlockPolicy) -> Unit = { _, _ -> },
     adInFlightFor: (AffirmationGroup) -> Boolean = { false },
     anyAdInFlight: Boolean = false,
+    /** Spec 6 emit surface (REQ-5.4) -- fires `content_locked_tapped` from a locked row's CTA. */
+    onEvent: (AnalyticsEvent) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxHeight(0.85f)) {
@@ -100,6 +106,7 @@ fun AffirmationGroupSelectorSheet(
                         onWatchAd = onWatchAd,
                         adInFlight = adInFlightFor(group),
                         anyAdInFlight = anyAdInFlight,
+                        onEvent = onEvent,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                     )
                 }
@@ -185,6 +192,7 @@ private fun AffirmationGroupSelectableRow(
     onWatchAd: (AffirmationGroup, AdUnlockPolicy) -> Unit = { _, _ -> },
     adInFlight: Boolean = false,
     anyAdInFlight: Boolean = false,
+    onEvent: (AnalyticsEvent) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     // Single source of lock/toggle truth (design §6) -- `alwaysSelected` short-circuits first,
@@ -274,7 +282,18 @@ private fun AffirmationGroupSelectableRow(
                 }
                 // Locked rows expose an actionable upgrade CTA (spec's "Upgrade CTA opens inline
                 // paywall") instead of a dead lock icon -- tapping it opens the paywall sheet.
-                locked -> IconButton(onClick = onUpgradeClick) {
+                // REQ-5.4: content_locked_tapped fires here, AFTER the adUnlockable branch above,
+                // so an ad-unlockable row never reports a locked tap.
+                locked -> IconButton(
+                    onClick = {
+                        onEvent(
+                            AnalyticsEvent.ContentLockedTapped(
+                                AnalyticsId.of(group), AnalyticsContentType.AFFIRMATION_GROUP, decision.provenance(),
+                            ),
+                        )
+                        onUpgradeClick()
+                    },
+                ) {
                     Icon(
                         imageVector = Icons.Filled.Lock,
                         contentDescription = stringResource(

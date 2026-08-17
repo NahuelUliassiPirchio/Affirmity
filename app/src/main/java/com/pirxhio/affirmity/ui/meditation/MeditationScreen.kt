@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.AccessDecision
 import com.pirxhio.affirmity.access.AdUnlockPolicy
+import com.pirxhio.affirmity.analytics.AnalyticsContentType
 import com.pirxhio.affirmity.analytics.AnalyticsEvent
 import com.pirxhio.affirmity.analytics.AnalyticsId
 import com.pirxhio.affirmity.analytics.provenance
@@ -317,6 +318,12 @@ private fun MeditationDiscoverCard(
     val locked = isMeditationLocked(decision)
     val badge = deriveMeditationBadge(entry, decision)
     val adUnlockLoadingA11y = stringResource(R.string.ad_unlock_loading_a11y)
+    // REQ-5.4: one shared local, used by BOTH the LockedNeedsPro row branch and the trailing lock
+    // IconButton below -- two affordances, one event, no double-count.
+    val onLockedTap: () -> Unit = {
+        onEvent(AnalyticsEvent.ContentLockedTapped(AnalyticsId.of(entry), AnalyticsContentType.MEDITATION, decision.provenance()))
+        onUpgradeClick()
+    }
     // Three interaction branches (REQ-5.3/design §4.2), mirroring AffirmationGroupSelectableRow.
     // An ad-unlockable row is inert while ANY ad request is in flight (§6.1) -- the tap is
     // dropped, not queued -- defense in depth over AffirmityAppState's single-flight guard.
@@ -329,7 +336,7 @@ private fun MeditationDiscoverCard(
         }
         is AccessDecision.LockedAdUnlockable ->
             if (anyAdInFlight) { {} } else { { onWatchAd(entry, decision.policy) } }
-        AccessDecision.LockedNeedsPro -> onUpgradeClick
+        AccessDecision.LockedNeedsPro -> onLockedTap
     }
 
     Card(
@@ -386,7 +393,7 @@ private fun MeditationDiscoverCard(
                     color = MaterialTheme.colorScheme.outline,
                 )
             } else if (locked) {
-                IconButton(onClick = onUpgradeClick) {
+                IconButton(onClick = onLockedTap) {
                     Icon(
                         imageVector = Icons.Filled.Lock,
                         contentDescription = stringResource(

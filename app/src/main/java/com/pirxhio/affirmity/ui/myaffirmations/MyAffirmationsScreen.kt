@@ -47,6 +47,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.AccessDecision
+import com.pirxhio.affirmity.analytics.AnalyticsEvent
+import com.pirxhio.affirmity.analytics.provenance
 import com.pirxhio.affirmity.data.Affirmation
 
 private val swatches = listOf(
@@ -67,6 +69,8 @@ fun MyAffirmationsScreen(
     onImportAffirmationsJson: (json: String, replaceExisting: Boolean) -> Unit,
     onDeleteAffirmation: (id: String) -> Unit,
     onUpgradeClick: () -> Unit,
+    /** Spec 6 emit surface (REQ-5.5) -- fires `custom_affirmation_create_blocked`. */
+    onEvent: (AnalyticsEvent) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -85,7 +89,10 @@ fun MyAffirmationsScreen(
                 onAddAffirmationWithImage = onAddAffirmationWithImage,
                 onAddAffirmationWithGalleryImage = onAddAffirmationWithGalleryImage,
                 onImportAffirmationsJson = onImportAffirmationsJson,
-                onUpgradeClick = onUpgradeClick,
+                onUpgradeClick = {
+                    onEvent(AnalyticsEvent.CustomAffirmationCreateBlocked(createDecision.provenance()))
+                    onUpgradeClick()
+                },
             )
         }
 
