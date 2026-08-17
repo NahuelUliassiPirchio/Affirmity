@@ -12,12 +12,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringArrayResource
 import androidx.credentials.CredentialManager
+import com.pirxhio.affirmity.BuildConfig
 import com.pirxhio.affirmity.R
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging
 import com.pirxhio.affirmity.access.AccessDecision
 import com.pirxhio.affirmity.access.AccessTier
+import com.pirxhio.affirmity.access.AdUnitIds
 import com.pirxhio.affirmity.access.AdUnlockOutcome
 import com.pirxhio.affirmity.access.AdUnlockPolicy
 import com.pirxhio.affirmity.access.AdUnlockRecord
@@ -26,6 +28,9 @@ import com.pirxhio.affirmity.access.AdUnlockState
 import com.pirxhio.affirmity.access.ContentKey
 import com.pirxhio.affirmity.access.ContentType
 import com.pirxhio.affirmity.access.NoAdUnlockSource
+import com.pirxhio.affirmity.access.RewardedAdUnlockSource
+import com.pirxhio.affirmity.ads.GoogleRewardedAdGateway
+import com.pirxhio.affirmity.ads.findActivity
 import com.pirxhio.affirmity.auth.AuthError
 import com.pirxhio.affirmity.auth.AuthException
 import com.pirxhio.affirmity.auth.AuthProviderId
@@ -186,6 +191,11 @@ private object NoOpGroupSelectionPreferences : GroupSelectionPreferences {
     override suspend fun saveSelectedGroupIds(ids: Set<String>) = Unit
 }
 
+/** One-shot ad-request outcome, mapped from [AdUnlockOutcome] for display (design D7). `Failed`
+ *  and `Unavailable` collapse to the same [UNAVAILABLE] notice -- an SDK error string is not user
+ *  copy -- while [DISMISSED] stays distinct, matching "you closed it early" vs "no ad available". */
+enum class AdRequestNotice { EARNED, DISMISSED, UNAVAILABLE }
+
 /**
  * Shared in-memory state for the whole app, backed by Room (affirmations) and DataStore
  * (trackers) — see README "Decisions". Screens read plain [Affirmation]/[WeeklyStreak] state;
@@ -323,6 +333,23 @@ class AffirmityAppState(
     /** Dismisses [proLapseNotice] once the user has seen the snackbar (design.md D8). */
     fun acknowledgeProLapse() {
         proLapseNotice.value = false
+    }
+
+    /** The ONE ad request allowed in flight app-wide (REQ-4.8/6.1). Non-null = that key's CTA is
+     *  busy and every ad CTA anywhere -- meditation catalog and affirmation groups alike -- is
+     *  inert. UI-level half of the single-flight rule; [RewardedAdUnlockSource] holds the
+     *  authoritative half so a non-UI caller cannot bypass it. */
+    var adRequestInFlight = mutableStateOf<ContentKey?>(null)
+        private set
+
+    /** One-shot user-visible result of the last ad request (design D7). Mirrors [proLapseNotice] /
+     *  [acknowledgeProLapse]'s snackbar consumption pattern exactly. */
+    var adRequestNotice = mutableStateOf<AdRequestNotice?>(null)
+        private set
+
+    /** Dismisses [adRequestNotice] once the user has seen the snackbar (design D7). */
+    fun acknowledgeAdRequestNotice() {
+        adRequestNotice.value = null
     }
 
     private var entitlementFlowInitialized = false
@@ -927,14 +954,30 @@ class AffirmityAppState(
      * durable `adUnlocks` repository. Any other outcome (Dismissed/Failed/Unavailable) is a no-op.
      */
     fun requestAdUnlock(key: ContentKey, policy: AdUnlockPolicy) {
+        if (adRequestInFlight.value != null) return // taps are IGNORED, never queued (REQ-4.8)
+        adRequestInFlight.value = key
         scope.launch {
-            if (adUnlockSource.requestUnlock(key, policy) != AdUnlockOutcome.Earned) return@launch
-            when (policy) {
-                AdUnlockPolicy.PER_USE -> sessionAdUnlocks.value = sessionAdUnlocks.value + key
-                AdUnlockPolicy.ONE_TIME_TRIAL -> ready().adUnlocks.grantDurableUnlock(
-                    AdUnlockRecord(key, System.currentTimeMillis(), expiresAtMillis = null),
-                )
-                AdUnlockPolicy.NONE -> Unit
+            try {
+                when (val outcome = adUnlockSource.requestUnlock(key, policy)) {
+                    AdUnlockOutcome.Earned -> {
+                        when (policy) {
+                            AdUnlockPolicy.PER_USE -> sessionAdUnlocks.value = sessionAdUnlocks.value + key
+                            AdUnlockPolicy.ONE_TIME_TRIAL -> ready().adUnlocks.grantDurableUnlock(
+                                AdUnlockRecord(key, System.currentTimeMillis(), expiresAtMillis = null),
+                            )
+                            AdUnlockPolicy.NONE -> Unit
+                        }
+                        adRequestNotice.value = AdRequestNotice.EARNED
+                    }
+                    AdUnlockOutcome.Dismissed -> adRequestNotice.value = AdRequestNotice.DISMISSED
+                    is AdUnlockOutcome.Failed -> {
+                        Log.w(TAG, "ad unlock failed for $key: ${outcome.reason}")
+                        adRequestNotice.value = AdRequestNotice.UNAVAILABLE
+                    }
+                    AdUnlockOutcome.Unavailable -> adRequestNotice.value = AdRequestNotice.UNAVAILABLE
+                }
+            } finally {
+                adRequestInFlight.value = null // `finally`: cancellation must not wedge the CTA
             }
         }
     }
@@ -1076,6 +1119,21 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             knownGroupIds = knownGroupIds,
             defaultThematicGroupIds = defaultThematicGroupIds,
             proOnlyGroupIds = proOnlyGroupIds,
+            adUnlockSource = RewardedAdUnlockSource(
+                gateway = GoogleRewardedAdGateway(
+                    // Re-resolved per call from the composable's own captured `context`, never
+                    // retained past this composition (design D1) -- a locale switch/Activity
+                    // recreation re-runs this whole composable, so `remember` closes over the
+                    // NEW context on the next recomposition.
+                    activityProvider = { context.findActivity() },
+                    testDeviceHash = BuildConfig.ADMOB_TEST_DEVICE_HASH,
+                    isDebug = BuildConfig.DEBUG,
+                ),
+                adUnitIds = AdUnitIds(
+                    perUse = BuildConfig.ADMOB_REWARDED_UNIT_PER_USE,
+                    oneTimeTrial = BuildConfig.ADMOB_REWARDED_UNIT_ONE_TIME_TRIAL,
+                ),
+            ),
         )
     }
 }
