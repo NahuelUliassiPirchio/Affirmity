@@ -33,9 +33,13 @@ data class AffirmationGroup(
     val isThematic: Boolean = true,
 )
 
-/** `access = ContentAccess.Free` here is the honest declaration -- `alwaysSelected` short-circuits
- * the entitlement check in `GroupAccessPolicy`, so this group stays permanently checked and
- * non-interactive for Free and Pro users alike, regardless of what [AffirmationGroup.access] says.
+/** `access = ContentAccess.Pro` is the honest declaration (Spec 1 Q5, closed): custom affirmations
+ * are a Pro feature -- creating one requires Pro (Spec 4's create-gate), so the group that holds
+ * them is declared Pro-only too. `alwaysSelected` still short-circuits the entitlement check in
+ * `GroupAccessPolicy`, so this group stays permanently checked and non-interactive for Free and Pro
+ * users alike, regardless of what [AffirmationGroup.access] says -- a Free user's *existing* custom
+ * affirmations (grandfathered per Spec 4) must remain visible in their daily selection even though
+ * they can't add more. `access` here is provenance/labeling, not a live gate.
  *
  * `badgeOverride = GroupBadge.PREMIUM` is a deliberate, unconditional product decision (spec §0
  * decision-1): this group always shows the Premium badge, at every tier, because
@@ -49,7 +53,7 @@ val PERSONALIZADAS_GROUP = AffirmationGroup(
     titleRes = R.string.affirmation_group_personalizadas_title,
     descriptionRes = R.string.affirmation_group_personalizadas_description,
     icon = Icons.Filled.Bookmark,
-    access = ContentAccess.Free,
+    access = ContentAccess.Pro,
     badgeOverride = GroupBadge.PREMIUM,
     alwaysSelected = true,
     isThematic = false,
