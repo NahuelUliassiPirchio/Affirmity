@@ -64,6 +64,8 @@ import com.pirxhio.affirmity.access.ContentKey
 import com.pirxhio.affirmity.access.ContentType
 import com.pirxhio.affirmity.analytics.AnalyticsEvent
 import com.pirxhio.affirmity.analytics.AnalyticsId
+import com.pirxhio.affirmity.analytics.PaywallPlan
+import com.pirxhio.affirmity.analytics.PaywallSource
 import com.pirxhio.affirmity.analytics.provenance
 import com.pirxhio.affirmity.data.AdRequestNotice
 import com.pirxhio.affirmity.data.MOOD_MAX
@@ -232,16 +234,19 @@ fun AffirmityApp(
     // REQ-5.4: replaces the old single-demo boolean. Holds a MeditationCatalogEntry.id so the
     // guided session route is parameterized on which entry to play, not just whether to show one.
     var selectedMeditationEntryId by rememberSaveable { mutableStateOf<String?>(null) }
-    var showPaywall by rememberSaveable { mutableStateOf(false) }
+    // D8: replaces the old showPaywall boolean -- null means hidden, and "shown without a source"
+    // is unrepresentable. Every trigger surface supplies its own PaywallSource (spec §5.3).
+    var paywallSource by rememberSaveable { mutableStateOf<PaywallSource?>(null) }
     val appState = rememberAffirmityAppState()
     val context = LocalContext.current
 
     // Shared upgrade-CTA routing (design.md D7): signed-out taps route to sign-in, never straight
     // to the paywall -- used by both the group selector sheet's per-row CTA and any other entry
-    // point (e.g. AccountSettingsCard) that opens the paywall.
-    val onUpgradeClick: () -> Unit = {
+    // point (e.g. AccountSettingsCard) that opens the paywall. D8: partially applied per call site
+    // with the surface's PaywallSource so paywall_shown can attribute its trigger correctly.
+    val onUpgradeClick: (PaywallSource) -> Unit = { source ->
         if (appState.authState.value is AuthState.SignedIn) {
-            showPaywall = true
+            paywallSource = source
         } else {
             appState.signIn(context)
         }
@@ -262,7 +267,7 @@ fun AffirmityApp(
                     duration = androidx.compose.material3.SnackbarDuration.Long,
                 )
                 if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
-                    showPaywall = true
+                    paywallSource = PaywallSource.OTHER
                 }
                 appState.acknowledgeProLapse()
             }
@@ -399,13 +404,14 @@ fun AffirmityApp(
                     appState.importAffirmationsFromJson(json, replace)
                 },
                 onDeleteAffirmation = { id -> appState.removeAffirmation(id) },
-                onUpgradeClick = onUpgradeClick,
+                onUpgradeClick = { onUpgradeClick(PaywallSource.MY_AFFIRMATIONS) },
             )
         }
         PaywallHost(
-            visible = showPaywall,
-            onDismiss = { showPaywall = false },
+            source = paywallSource,
+            onDismiss = { paywallSource = null },
             snackbarScope = snackbarScope,
+            emit = appState::logAnalyticsEvent,
         )
         return
     }
@@ -566,7 +572,7 @@ fun AffirmityApp(
                 },
                 onOpenNotificationDebug = { showNotificationDebug = true },
                 tier = appState.entitlementTier.value,
-                onUpgradeClick = onUpgradeClick,
+                onUpgradeClick = { onUpgradeClick(PaywallSource.SETTINGS) },
                 onManageSubscriptionClick = {
                     // Play has no in-app cancel/downgrade API -- routes to Play Store's own
                     // subscription management surface (design.md Phase 7).
@@ -645,7 +651,7 @@ fun AffirmityApp(
                                         System.currentTimeMillis(),
                                     )
                                 },
-                                onUpgradeClick = onUpgradeClick,
+                                onUpgradeClick = { onUpgradeClick(PaywallSource.GROUP_SELECTOR) },
                                 onToggle = { group ->
                                     val decision = groupAccessDecision(
                                         group,
@@ -708,7 +714,7 @@ fun AffirmityApp(
                         )
                     },
                     onLaunch = { entry -> selectedMeditationEntryId = entry.id },
-                    onUpgradeClick = onUpgradeClick,
+                    onUpgradeClick = { onUpgradeClick(PaywallSource.MEDITATION_CATALOG) },
                     onWatchAd = { entry, policy ->
                         appState.requestAdUnlock(meditationContentKey(entry.id), policy)
                     },
@@ -757,23 +763,29 @@ fun AffirmityApp(
     }
 
     PaywallHost(
-        visible = showPaywall,
-        onDismiss = { showPaywall = false },
+        source = paywallSource,
+        onDismiss = { paywallSource = null },
         snackbarScope = snackbarScope,
+        emit = appState::logAnalyticsEvent,
     )
 }
 
 /** Extracted from the bottom of [AffirmityApp] (D5): the original `if (showPaywall)` block lived
  *  after the My Affirmations branch's early `return`, making the paywall unreachable from that
  *  screen. Behavior at the original call site is byte-identical; this host is now also called from
- *  the My Affirmations branch so its `onUpgradeClick` (shared, unchanged) actually opens something. */
+ *  the My Affirmations branch so its `onUpgradeClick` (shared, unchanged) actually opens something.
+ *
+ *  D8: [source] replaces the old `visible: Boolean` -- null means hidden. `paywall_shown` fires
+ *  inside `LaunchedEffect(source)`, NEVER in the composable body: this composable recomposes on
+ *  every `monthlyOffer`/`annualOffer` emission, so a body-level emit would multi-count. */
 @Composable
 private fun PaywallHost(
-    visible: Boolean,
+    source: PaywallSource?,
     onDismiss: () -> Unit,
     snackbarScope: CoroutineScope,
+    emit: (AnalyticsEvent) -> Unit = {},
 ) {
-    if (!visible) return
+    if (source == null) return
     val context = LocalContext.current
     val activity = context as? Activity
     val billingService = remember {
@@ -791,18 +803,27 @@ private fun PaywallHost(
     val monthlyOffer by billingService.monthlyOffer.collectAsState()
     val annualOffer by billingService.annualOffer.collectAsState()
 
+    LaunchedEffect(source) {
+        emit(AnalyticsEvent.PaywallShown(source, access = null))
+    }
+
     PaywallSheet(
         monthlyPriceLabel = monthlyOffer?.formattedPrice,
         annualPriceLabel = annualOffer?.formattedPrice,
         onSelectMonthly = {
+            emit(AnalyticsEvent.PaywallPlanSelected(PaywallPlan.MONTHLY, source))
             val offer = monthlyOffer ?: return@PaywallSheet
             activity?.let { billingService.launchPurchaseFlow(it, offer.offerToken) }
         },
         onSelectAnnual = {
+            emit(AnalyticsEvent.PaywallPlanSelected(PaywallPlan.ANNUAL, source))
             val offer = annualOffer ?: return@PaywallSheet
             activity?.let { billingService.launchPurchaseFlow(it, offer.offerToken) }
         },
-        onDismiss = onDismiss,
+        onDismiss = {
+            emit(AnalyticsEvent.PaywallDismissed(source))
+            onDismiss()
+        },
     )
 }
 
