@@ -142,6 +142,9 @@ dependencies {
     // AuthProvider — never calls a real platform method.
     testImplementation(libs.mockito.core)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Reflection-based structural tests only (e.g. the analytics no-PII-representable invariant,
+    // REQ-6.3.2) — never used by production code.
+    testImplementation(kotlin("reflect"))
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
