@@ -252,18 +252,20 @@ fun AffirmityApp(
     // Ad-unlock outcome notice (design §6.3, D8): Earned/Dismissed/Unavailable each get a short
     // snackbar via the same host used by proLapseNotice above. D8 (closed): Earned never
     // auto-launches the meditation session or auto-selects an affirmation group -- it is
-    // acknowledgement only.
+    // acknowledgement only. Strings resolved here (composable scope), not via context.getString
+    // inside the launched coroutine below, per LocalContextGetResourceValueCall lint.
+    val adUnlockEarnedMessage = stringResource(R.string.ad_unlock_earned_message)
+    val adUnlockDismissedMessage = stringResource(R.string.ad_unlock_dismissed_message)
+    val adUnlockUnavailableMessage = stringResource(R.string.ad_unlock_unavailable_message)
     LaunchedEffect(appState.adRequestNotice.value) {
         val notice = appState.adRequestNotice.value ?: return@LaunchedEffect
         snackbarScope.launch {
             snackbarHostState.showSnackbar(
-                message = context.getString(
-                    when (notice) {
-                        AdRequestNotice.EARNED -> R.string.ad_unlock_earned_message
-                        AdRequestNotice.DISMISSED -> R.string.ad_unlock_dismissed_message
-                        AdRequestNotice.UNAVAILABLE -> R.string.ad_unlock_unavailable_message
-                    },
-                ),
+                message = when (notice) {
+                    AdRequestNotice.EARNED -> adUnlockEarnedMessage
+                    AdRequestNotice.DISMISSED -> adUnlockDismissedMessage
+                    AdRequestNotice.UNAVAILABLE -> adUnlockUnavailableMessage
+                },
                 duration = androidx.compose.material3.SnackbarDuration.Short,
             )
             appState.acknowledgeAdRequestNotice()
