@@ -59,8 +59,12 @@ import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.pirxhio.affirmity.auth.AuthState
 import com.pirxhio.affirmity.billing.BillingService
+import com.pirxhio.affirmity.access.AccessDecision
 import com.pirxhio.affirmity.access.ContentKey
 import com.pirxhio.affirmity.access.ContentType
+import com.pirxhio.affirmity.analytics.AnalyticsEvent
+import com.pirxhio.affirmity.analytics.AnalyticsId
+import com.pirxhio.affirmity.analytics.provenance
 import com.pirxhio.affirmity.data.AdRequestNotice
 import com.pirxhio.affirmity.data.MOOD_MAX
 import com.pirxhio.affirmity.data.rememberAffirmityAppState
@@ -142,15 +146,31 @@ internal fun isMeditationLaunchBlocked(
  * `onSessionEnded` callback so a plain JUnit test can prove [recordMeditationCompleted] is
  * invoked if and only if [reason] is [SessionEndReason.Completed], while [consumePlaybackUnlock]
  * runs for every terminal reason -- without needing a Compose test harness.
+ *
+ * Spec 6 (D7, REQ-5.2): [elapsedSeconds] and [emit] are appended, existing call order preserved
+ * EXACTLY -- [consumePlaybackUnlock] first, then [recordMeditationCompleted] only for `Completed`,
+ * [emit] always last so a thrown analytics call can never reorder or skip either existing effect.
  */
 internal fun handleGuidedMeditationSessionEnded(
     entryId: String,
     reason: SessionEndReason,
+    elapsedSeconds: Long,
+    accessDecision: AccessDecision,
     consumePlaybackUnlock: (String, SessionEndReason) -> Unit,
     recordMeditationCompleted: () -> Unit,
+    emit: (AnalyticsEvent) -> Unit = {},
 ) {
     consumePlaybackUnlock(entryId, reason)
     if (reason == SessionEndReason.Completed) recordMeditationCompleted()
+    val entry = findMeditationCatalogEntry(entryId) ?: return
+    val analyticsId = AnalyticsId.of(entry)
+    emit(
+        if (reason == SessionEndReason.Completed) {
+            AnalyticsEvent.MeditationCompleted(analyticsId, accessDecision.provenance(), elapsedSeconds)
+        } else {
+            AnalyticsEvent.MeditationCancelled(analyticsId, elapsedSeconds)
+        },
+    )
 }
 
 class MainActivity : AppCompatActivity() {
@@ -439,20 +459,35 @@ fun AffirmityApp(
                 GuidedMeditationScreen(
                     entry = selectedMeditationEntry,
                     modifier = Modifier.padding(innerPadding),
+                    access = meditationAccessDecision(
+                        selectedMeditationEntry,
+                        appState.entitlementTier.value,
+                        appState.adUnlockState,
+                        System.currentTimeMillis(),
+                    ),
                     // The streak-bug fix (REQ-5.6): guided completion now calls the same
                     // recordMeditationCompleted() the free timer already calls at its own call
                     // site. consumeMeditationPlaybackUnlock runs for BOTH terminal reasons (an ad
                     // watched and then abandoned mid-session is still a use); recordMeditationCompleted
                     // only for Completed.
-                    onSessionEnded = { reason ->
+                    onSessionEnded = { reason, elapsedSeconds ->
                         handleGuidedMeditationSessionEnded(
                             entryId = selectedMeditationEntry.id,
                             reason = reason,
+                            elapsedSeconds = elapsedSeconds,
+                            accessDecision = meditationAccessDecision(
+                                selectedMeditationEntry,
+                                appState.entitlementTier.value,
+                                appState.adUnlockState,
+                                System.currentTimeMillis(),
+                            ),
                             consumePlaybackUnlock = appState::consumeMeditationPlaybackUnlock,
                             recordMeditationCompleted = appState::recordMeditationCompleted,
+                            emit = appState::logAnalyticsEvent,
                         )
                     },
                     onExit = { selectedMeditationEntryId = null },
+                    onEvent = appState::logAnalyticsEvent,
                 )
             }
         }
@@ -659,7 +694,10 @@ fun AffirmityApp(
                 AppDestinations.MEDITAR -> MeditationScreen(
                     initialDurationSeconds = appState.meditationDurationSeconds.value ?: (15 * 60),
                     onDurationSelected = { seconds -> appState.recordMeditationDurationSelected(seconds) },
-                    onSessionCompleted = { appState.recordMeditationCompleted() },
+                    onSessionCompleted = { durationSeconds ->
+                        appState.recordMeditationCompleted()
+                        appState.logAnalyticsEvent(AnalyticsEvent.FreeTimerCompleted(durationSeconds))
+                    },
                     entries = meditationCatalog(),
                     decisionFor = { entry ->
                         meditationAccessDecision(
@@ -678,6 +716,7 @@ fun AffirmityApp(
                         appState.adRequestInFlight.value == meditationContentKey(entry.id)
                     },
                     anyAdInFlight = appState.adRequestInFlight.value != null,
+                    onEvent = appState::logAnalyticsEvent,
                 )
 
                 AppDestinations.PROGRESO -> ProgressScreen(

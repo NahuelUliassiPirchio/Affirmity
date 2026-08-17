@@ -914,16 +914,41 @@ class AffirmityAppState(
             if (updated.count >= AFFIRMATIONS_GOAL_PER_DAY) {
                 ready().completions.markAffirmation(today)
                 widgetUpdater.refresh()
+                // D9: emit on the exact crossing (==), not on every subsequent >= call this day --
+                // recordAffirmationViewed is idempotent-repeat-called, the >= branch above is
+                // unchanged, this is a nested, additional condition.
+                if (updated.count == AFFIRMATIONS_GOAL_PER_DAY) {
+                    analytics.log(AnalyticsEvent.DailyGoalReached(DailyGoal.AFFIRMATION))
+                }
             }
         }
     }
 
+    /** In-memory per-process day guard (D9) -- recordMeditationCompleted has no counter to test a
+     *  crossing against, so this bounds `daily_goal_reached(MEDITATION)` to at most once per
+     *  process launch per day. Accepted limitation: a process restart plus a second completion the
+     *  same day can double-count -- bounded, denominator-only, cheaper than a schema change. */
+    private var meditationGoalEmittedEpochDay: Long? = null
+
     /** Call when a meditation session finishes its full countdown. */
     fun recordMeditationCompleted() {
         scope.launch {
-            ready().completions.markMeditation(DayClock.epochDay())
+            val today = DayClock.epochDay()
+            ready().completions.markMeditation(today)
             widgetUpdater.refresh()
+            if (today != meditationGoalEmittedEpochDay) {
+                meditationGoalEmittedEpochDay = today
+                analytics.log(AnalyticsEvent.DailyGoalReached(DailyGoal.MEDITATION))
+            }
         }
+    }
+
+    /** UI-originated emit surface (design D1) for interaction events this class does not already
+     *  own emitting itself (taps, screen renders) -- routes through the same injected [analytics]
+     *  instance so the composition-root kill switch covers every event, not only this class's own
+     *  emit points. */
+    fun logAnalyticsEvent(event: AnalyticsEvent) {
+        analytics.log(event)
     }
 
     /** Call from the day-detail sheet, for today or any past day the user is backfilling. */

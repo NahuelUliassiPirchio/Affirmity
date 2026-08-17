@@ -314,4 +314,47 @@ class AffirmityAppStateAdFunnelAnalyticsTest {
         }
         assertEquals(4, pairs)
     }
+
+    // --- D9: daily_goal_reached fires on the exact crossing, not on every subsequent call ---------
+
+    @Test
+    fun `daily_goal_reached AFFIRMATION fires exactly once, on the exact threshold crossing`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val analytics = FakeAnalyticsLogger()
+        val state = buildAnalyticsState(scope, analytics, FixedOutcomeAdUnlockSource(AdUnlockOutcome.Unavailable))
+        delay(50)
+
+        // AFFIRMATIONS_GOAL_PER_DAY == 5: views 1-4 must not emit, view 5 must, view 6 must not re-emit.
+        repeat(6) {
+            state.recordAffirmationViewed()
+            delay(20)
+        }
+
+        assertEquals(1, analytics.recorded.filterIsInstance<AnalyticsEvent.DailyGoalReached>().size)
+        assertEquals(
+            com.pirxhio.affirmity.analytics.DailyGoal.AFFIRMATION,
+            analytics.recorded.filterIsInstance<AnalyticsEvent.DailyGoalReached>().single().goal,
+        )
+        scope.cancel()
+    }
+
+    @Test
+    fun `daily_goal_reached MEDITATION fires once per process per day, guarded across repeat completions`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val analytics = FakeAnalyticsLogger()
+        val state = buildAnalyticsState(scope, analytics, FixedOutcomeAdUnlockSource(AdUnlockOutcome.Unavailable))
+        delay(50)
+
+        state.recordMeditationCompleted()
+        delay(20)
+        state.recordMeditationCompleted()
+        delay(20)
+
+        assertEquals(1, analytics.recorded.filterIsInstance<AnalyticsEvent.DailyGoalReached>().size)
+        assertEquals(
+            com.pirxhio.affirmity.analytics.DailyGoal.MEDITATION,
+            analytics.recorded.filterIsInstance<AnalyticsEvent.DailyGoalReached>().single().goal,
+        )
+        scope.cancel()
+    }
 }

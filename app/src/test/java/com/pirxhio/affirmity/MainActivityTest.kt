@@ -1,7 +1,10 @@
 package com.pirxhio.affirmity
 
+import com.pirxhio.affirmity.access.AccessDecision
 import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.access.AdUnlockState
+import com.pirxhio.affirmity.analytics.AnalyticsEvent
+import com.pirxhio.affirmity.analytics.AnalyticsId
 import com.pirxhio.affirmity.meditation.SessionEndReason
 import com.pirxhio.affirmity.ui.meditation.catalog.findMeditationCatalogEntry
 import org.junit.Assert.assertEquals
@@ -77,6 +80,8 @@ class MainActivityTest {
         handleGuidedMeditationSessionEnded(
             entryId = "calma",
             reason = SessionEndReason.Completed,
+            elapsedSeconds = 42L,
+            accessDecision = AccessDecision.Unlocked,
             consumePlaybackUnlock = { id, reason -> consumedCalls.add(id to reason) },
             recordMeditationCompleted = { recordedStreak = true },
         )
@@ -93,6 +98,8 @@ class MainActivityTest {
         handleGuidedMeditationSessionEnded(
             entryId = "calma",
             reason = SessionEndReason.Cancelled,
+            elapsedSeconds = 7L,
+            accessDecision = AccessDecision.Unlocked,
             consumePlaybackUnlock = { id, reason -> consumedCalls.add(id to reason) },
             recordMeditationCompleted = { recordedStreak = true },
         )
@@ -101,5 +108,52 @@ class MainActivityTest {
         // then abandoned mid-session is still a use) -- only the streak call is Completed-gated.
         assertFalse(recordedStreak)
         assertEquals(listOf("calma" to SessionEndReason.Cancelled), consumedCalls)
+    }
+
+    // --- Spec 6 (D7, REQ-5.2): events 3/4 emit with the correct elapsed duration -------------------
+
+    @Test
+    fun `handleGuidedMeditationSessionEnded emits meditation_completed with the elapsed duration on Completed`() {
+        val emitted = mutableListOf<AnalyticsEvent>()
+
+        handleGuidedMeditationSessionEnded(
+            entryId = "calma",
+            reason = SessionEndReason.Completed,
+            elapsedSeconds = 123L,
+            accessDecision = AccessDecision.Unlocked,
+            consumePlaybackUnlock = { _, _ -> },
+            recordMeditationCompleted = {},
+            emit = emitted::add,
+        )
+
+        val entry = requireNotNull(findMeditationCatalogEntry("calma"))
+        assertEquals(
+            listOf(
+                AnalyticsEvent.MeditationCompleted(
+                    AnalyticsId.of(entry),
+                    com.pirxhio.affirmity.analytics.AccessDecisionValue.UNLOCKED,
+                    123L,
+                ),
+            ),
+            emitted,
+        )
+    }
+
+    @Test
+    fun `handleGuidedMeditationSessionEnded emits meditation_cancelled with the elapsed duration on Cancelled`() {
+        val emitted = mutableListOf<AnalyticsEvent>()
+
+        handleGuidedMeditationSessionEnded(
+            entryId = "calma",
+            reason = SessionEndReason.Cancelled,
+            elapsedSeconds = 9L,
+            accessDecision = AccessDecision.LockedNeedsPro,
+            consumePlaybackUnlock = { _, _ -> },
+            recordMeditationCompleted = {},
+            emit = emitted::add,
+        )
+
+        val entry = requireNotNull(findMeditationCatalogEntry("calma"))
+        assertEquals(listOf(AnalyticsEvent.MeditationCancelled(AnalyticsId.of(entry), 9L)), emitted)
     }
 }

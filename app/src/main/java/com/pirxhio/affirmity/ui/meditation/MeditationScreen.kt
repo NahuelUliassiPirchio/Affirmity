@@ -54,6 +54,9 @@ import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.AccessDecision
 import com.pirxhio.affirmity.access.AdUnlockPolicy
+import com.pirxhio.affirmity.analytics.AnalyticsEvent
+import com.pirxhio.affirmity.analytics.AnalyticsId
+import com.pirxhio.affirmity.analytics.provenance
 import com.pirxhio.affirmity.ui.groups.AffirmationGroupAccessBadge
 import com.pirxhio.affirmity.ui.meditation.catalog.MeditationCatalogEntry
 import com.pirxhio.affirmity.ui.meditation.catalog.deriveMeditationBadge
@@ -73,7 +76,9 @@ private val DISCOVER_LIST_PEEK_HEIGHT = 96.dp
 fun MeditationScreen(
     initialDurationSeconds: Int = 15 * 60,
     onDurationSelected: (Int) -> Unit,
-    onSessionCompleted: () -> Unit,
+    /** D7: the free timer already knows its own [durationSeconds] -- it simply passes it, kept
+     *  structurally distinct from the catalog `meditation_completed` event (REQ-5.2). */
+    onSessionCompleted: (durationSeconds: Long) -> Unit,
     entries: List<MeditationCatalogEntry>,
     decisionFor: (MeditationCatalogEntry) -> AccessDecision,
     onLaunch: (MeditationCatalogEntry) -> Unit,
@@ -81,6 +86,9 @@ fun MeditationScreen(
     onWatchAd: (MeditationCatalogEntry, AdUnlockPolicy) -> Unit,
     adInFlightFor: (MeditationCatalogEntry) -> Boolean = { false },
     anyAdInFlight: Boolean = false,
+    /** Spec 6 emit surface (REQ-5.2/5.4) -- fires `meditation_entry_tapped` and
+     *  `content_locked_tapped` from the Discover list. */
+    onEvent: (AnalyticsEvent) -> Unit = {},
 ) {
     // Keyed on initialDurationSeconds so that when the persisted value arrives asynchronously
     // (DataStore's first read completes after this composable's initial composition), the
@@ -112,7 +120,7 @@ fun MeditationScreen(
             gongPlayer.seekTo(0)
             gongPlayer.start()
             secondsRemaining = durationSeconds
-            onSessionCompleted()
+            onSessionCompleted(durationSeconds.toLong())
         }
     }
 
@@ -247,6 +255,7 @@ fun MeditationScreen(
                 onWatchAd = onWatchAd,
                 adInFlightFor = adInFlightFor,
                 anyAdInFlight = anyAdInFlight,
+                onEvent = onEvent,
                 modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 24.dp)
             )
         }
@@ -267,6 +276,7 @@ fun MeditationDiscoverSection(
     onWatchAd: (MeditationCatalogEntry, AdUnlockPolicy) -> Unit,
     adInFlightFor: (MeditationCatalogEntry) -> Boolean = { false },
     anyAdInFlight: Boolean = false,
+    onEvent: (AnalyticsEvent) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -286,6 +296,7 @@ fun MeditationDiscoverSection(
                     onWatchAd = onWatchAd,
                     adInFlight = adInFlightFor(entry),
                     anyAdInFlight = anyAdInFlight,
+                    onEvent = onEvent,
                 )
             }
         }
@@ -301,6 +312,7 @@ private fun MeditationDiscoverCard(
     onWatchAd: (MeditationCatalogEntry, AdUnlockPolicy) -> Unit,
     adInFlight: Boolean = false,
     anyAdInFlight: Boolean = false,
+    onEvent: (AnalyticsEvent) -> Unit = {},
 ) {
     val locked = isMeditationLocked(decision)
     val badge = deriveMeditationBadge(entry, decision)
@@ -309,7 +321,12 @@ private fun MeditationDiscoverCard(
     // An ad-unlockable row is inert while ANY ad request is in flight (§6.1) -- the tap is
     // dropped, not queued -- defense in depth over AffirmityAppState's single-flight guard.
     val onRowClick: () -> Unit = when (decision) {
-        is AccessDecision.Unlocked, is AccessDecision.UnlockedByAd -> { { onLaunch(entry) } }
+        is AccessDecision.Unlocked, is AccessDecision.UnlockedByAd -> {
+            {
+                onEvent(AnalyticsEvent.MeditationEntryTapped(AnalyticsId.of(entry), decision.provenance(), entry.access.adUnlock))
+                onLaunch(entry)
+            }
+        }
         is AccessDecision.LockedAdUnlockable ->
             if (anyAdInFlight) { {} } else { { onWatchAd(entry, decision.policy) } }
         AccessDecision.LockedNeedsPro -> onUpgradeClick

@@ -25,8 +25,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -35,6 +37,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
+import com.pirxhio.affirmity.access.AccessDecision
+import com.pirxhio.affirmity.analytics.AnalyticsEvent
+import com.pirxhio.affirmity.analytics.AnalyticsId
+import com.pirxhio.affirmity.analytics.provenance
 import com.pirxhio.affirmity.meditation.CompositeCommandExecutor
 import com.pirxhio.affirmity.meditation.LapTrackerCommandExecutor
 import com.pirxhio.affirmity.meditation.MeditationEngine
@@ -64,15 +70,30 @@ import com.pirxhio.affirmity.ui.meditation.catalog.fixedPhaseDurationsById
 fun GuidedMeditationScreen(
     entry: MeditationCatalogEntry,
     modifier: Modifier = Modifier,
-    /** Fired exactly once per playback session that reaches a terminal state. Never fired when the
-     * screen is disposed from [SessionStatus.Idle] (EC-1) — a user who never pressed Start has not
-     * spent anything. */
-    onSessionEnded: (SessionEndReason) -> Unit = {},
+    /** Re-resolved by the caller at composition time (D7/REQ-5.2) — never a stale tap-time value.
+     *  Used only to tag [AnalyticsEvent.MeditationStarted]'s `access_decision` parameter. */
+    access: AccessDecision = AccessDecision.Unlocked,
+    /** Fired exactly once per playback session that reaches a terminal state, carrying the
+     * UI-local wall-clock elapsed duration (design D7 -- the engine tracks no session-wide
+     * elapsed). Never fired when the screen is disposed from [SessionStatus.Idle] (EC-1) — a user
+     * who never pressed Start has not spent anything. */
+    onSessionEnded: (SessionEndReason, elapsedSeconds: Long) -> Unit = { _, _ -> },
     /** Called after any cancellation bookkeeping, to leave the screen. Owned by the caller. */
     onExit: () -> Unit = {},
+    /** Spec 6 emit surface (REQ-5.2) -- fires `meditation_started` at the Start dispatch below. */
+    onEvent: (AnalyticsEvent) -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // D7: UI-local wall clock, captured at the Start dispatch below and diffed at both terminal
+    // paths (Completed LaunchedEffect, Cancelled exit). Measures wall time including pauses --
+    // the honest engagement number, and zero engine change.
+    var sessionStartMillis by remember { mutableStateOf<Long?>(null) }
+    fun elapsedSecondsSinceStart(): Long {
+        val start = sessionStartMillis ?: return 0L
+        return ((AndroidMonotonicTimeSource.nowMillis() - start) / 1000L).coerceAtLeast(0L)
+    }
 
     val definition = remember(entry) { entry.definition() }
     val textExecutor = remember(definition) { TextDisplayCommandExecutor() }
@@ -114,7 +135,9 @@ fun GuidedMeditationScreen(
     // Site A (REQ-5.2): extends the existing status-driven effect in place, fires exactly on
     // reaching Completed.
     LaunchedEffect(state.status) {
-        if (state.status == SessionStatus.Completed) onSessionEnded(SessionEndReason.Completed)
+        if (state.status == SessionStatus.Completed) {
+            onSessionEnded(SessionEndReason.Completed, elapsedSecondsSinceStart())
+        }
     }
 
     // Site B (REQ-5.2, EC-2): emitted synchronously from the exit handler rather than from a
@@ -130,7 +153,7 @@ fun GuidedMeditationScreen(
         performGuidedSessionExit(
             status = state.status,
             cancel = { engine.send(MeditationEvent.Cancel) },
-            onSessionEnded = onSessionEnded,
+            onSessionEnded = { reason -> onSessionEnded(reason, elapsedSecondsSinceStart()) },
             onExit = onExit,
         )
     }
@@ -148,7 +171,11 @@ fun GuidedMeditationScreen(
         currentTextId = currentTextId,
         entry = entry,
         phaseDurations = phaseDurations,
-        onStart = { engine.send(MeditationEvent.Start) },
+        onStart = {
+            sessionStartMillis = AndroidMonotonicTimeSource.nowMillis()
+            onEvent(AnalyticsEvent.MeditationStarted(AnalyticsId.of(entry), access.provenance()))
+            engine.send(MeditationEvent.Start)
+        },
         onPause = { engine.send(MeditationEvent.Pause) },
         onResume = { engine.send(MeditationEvent.Resume) },
         onSkip = { engine.send(MeditationEvent.Next) },
