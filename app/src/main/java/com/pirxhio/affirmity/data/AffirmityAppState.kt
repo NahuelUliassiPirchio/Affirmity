@@ -29,9 +29,11 @@ import com.pirxhio.affirmity.access.ContentKey
 import com.pirxhio.affirmity.access.ContentType
 import com.pirxhio.affirmity.access.NoAdUnlockSource
 import com.pirxhio.affirmity.access.RewardedAdUnlockSource
+import com.pirxhio.affirmity.analytics.AnalyticsConsentState
 import com.pirxhio.affirmity.analytics.AnalyticsEvent
 import com.pirxhio.affirmity.analytics.AnalyticsId
 import com.pirxhio.affirmity.analytics.AnalyticsLogger
+import com.pirxhio.affirmity.analytics.ConsentGatedAnalyticsLogger
 import com.pirxhio.affirmity.analytics.CreationMethod
 import com.pirxhio.affirmity.analytics.DailyGoal
 import com.pirxhio.affirmity.analytics.NoOpAnalyticsLogger
@@ -1194,6 +1196,14 @@ fun rememberAffirmityAppState(): AffirmityAppState {
                     perUse = BuildConfig.ADMOB_REWARDED_UNIT_PER_USE,
                     oneTimeTrial = BuildConfig.ADMOB_REWARDED_UNIT_ONE_TIME_TRIAL,
                 ),
+            ),
+            analytics = ConsentGatedAnalyticsLogger(
+                delegate = NoOpAnalyticsLogger, // becomes FirebaseAnalyticsLogger(...) once spec §9.1 item 4 lands
+                // PD-1: default-DENY, globally. UNKNOWN and DENIED both suppress fully. This
+                // lambda is the ONE place a future consent surface (spec §9.1 item 3) plugs in
+                // (design D5) -- swapping this whole `analytics` argument for NoOpAnalyticsLogger
+                // is the one-line kill switch (design D1/REQ-4.6).
+                consentState = { AnalyticsConsentState.UNKNOWN },
             ),
         )
     }
