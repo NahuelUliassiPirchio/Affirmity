@@ -29,6 +29,7 @@ import com.pirxhio.affirmity.access.ContentKey
 import com.pirxhio.affirmity.access.ContentType
 import com.pirxhio.affirmity.access.NoAdUnlockSource
 import com.pirxhio.affirmity.access.RewardedAdUnlockSource
+import com.google.firebase.analytics.FirebaseAnalytics
 import com.pirxhio.affirmity.analytics.AnalyticsConsentState
 import com.pirxhio.affirmity.analytics.AnalyticsEvent
 import com.pirxhio.affirmity.analytics.AnalyticsId
@@ -36,7 +37,9 @@ import com.pirxhio.affirmity.analytics.AnalyticsLogger
 import com.pirxhio.affirmity.analytics.ConsentGatedAnalyticsLogger
 import com.pirxhio.affirmity.analytics.CreationMethod
 import com.pirxhio.affirmity.analytics.DailyGoal
+import com.pirxhio.affirmity.analytics.FirebaseAnalyticsLogger
 import com.pirxhio.affirmity.analytics.NoOpAnalyticsLogger
+import com.pirxhio.affirmity.analytics.firebase.AndroidFirebaseAnalyticsSink
 import com.pirxhio.affirmity.analytics.toAdFailureReason
 import com.pirxhio.affirmity.ads.GoogleRewardedAdGateway
 import com.pirxhio.affirmity.ads.findActivity
@@ -1198,7 +1201,12 @@ fun rememberAffirmityAppState(): AffirmityAppState {
                 ),
             ),
             analytics = ConsentGatedAnalyticsLogger(
-                delegate = NoOpAnalyticsLogger, // becomes FirebaseAnalyticsLogger(...) once spec §9.1 item 4 lands
+                // Real delegate as of PR7 -- delivers nothing end-to-end until spec §9.1 item 4
+                // (Firebase console Analytics enablement + a regenerated google-services.json) is
+                // done; until then this is exactly as inert as NoOpAnalyticsLogger was.
+                delegate = FirebaseAnalyticsLogger(
+                    AndroidFirebaseAnalyticsSink(FirebaseAnalytics.getInstance(context.applicationContext)),
+                ),
                 // PD-1: default-DENY, globally. UNKNOWN and DENIED both suppress fully. This
                 // lambda is the ONE place a future consent surface (spec §9.1 item 3) plugs in
                 // (design D5) -- swapping this whole `analytics` argument for NoOpAnalyticsLogger

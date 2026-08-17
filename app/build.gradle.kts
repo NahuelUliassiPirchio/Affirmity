@@ -126,6 +126,9 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.messaging)
+    // Versionless, BOM-managed (matches firebase.auth/firestore/messaging above) -- NOT the
+    // deprecated firebase-analytics-ktx, folded into the main artifact since BOM 32.x (D6).
+    implementation(libs.firebase.analytics)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
