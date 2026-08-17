@@ -29,6 +29,13 @@ import com.pirxhio.affirmity.access.ContentKey
 import com.pirxhio.affirmity.access.ContentType
 import com.pirxhio.affirmity.access.NoAdUnlockSource
 import com.pirxhio.affirmity.access.RewardedAdUnlockSource
+import com.pirxhio.affirmity.analytics.AnalyticsEvent
+import com.pirxhio.affirmity.analytics.AnalyticsId
+import com.pirxhio.affirmity.analytics.AnalyticsLogger
+import com.pirxhio.affirmity.analytics.CreationMethod
+import com.pirxhio.affirmity.analytics.DailyGoal
+import com.pirxhio.affirmity.analytics.NoOpAnalyticsLogger
+import com.pirxhio.affirmity.analytics.toAdFailureReason
 import com.pirxhio.affirmity.ads.GoogleRewardedAdGateway
 import com.pirxhio.affirmity.ads.findActivity
 import com.pirxhio.affirmity.auth.AuthError
@@ -238,6 +245,10 @@ class AffirmityAppState(
      *  [groupPreferences] / [knownGroupIds] -- so Spec 5's entire integration into this class is
      *  one changed argument at the `rememberAffirmityAppState` call site. */
     private val adUnlockSource: AdUnlockSource = NoAdUnlockSource,
+    /** Spec 6's one frozen seam (design D1) -- defaulted to [NoOpAnalyticsLogger], the same
+     *  injection convention as [adUnlockSource]. The composition root swaps this once for the
+     *  real, consent-gated instance ([ConsentGatedAnalyticsLogger]) -- the one-line kill switch. */
+    private val analytics: AnalyticsLogger = NoOpAnalyticsLogger,
 ) {
     val affirmations = mutableStateListOf<Affirmation>()
 
@@ -954,8 +965,12 @@ class AffirmityAppState(
      * durable `adUnlocks` repository. Any other outcome (Dismissed/Failed/Unavailable) is a no-op.
      */
     fun requestAdUnlock(key: ContentKey, policy: AdUnlockPolicy) {
-        if (adRequestInFlight.value != null) return // taps are IGNORED, never queued (REQ-4.8)
+        if (adRequestInFlight.value != null) {
+            analytics.log(AnalyticsEvent.AdUnlockTapIgnored(AnalyticsId.of(key)))
+            return // taps are IGNORED, never queued (REQ-4.8)
+        }
         adRequestInFlight.value = key
+        analytics.log(AnalyticsEvent.AdUnlockRequested(AnalyticsId.of(key), policy))
         scope.launch {
             try {
                 when (val outcome = adUnlockSource.requestUnlock(key, policy)) {
@@ -967,14 +982,24 @@ class AffirmityAppState(
                             )
                             AdUnlockPolicy.NONE -> Unit
                         }
+                        analytics.log(AnalyticsEvent.AdUnlockEarned(AnalyticsId.of(key), policy))
                         adRequestNotice.value = AdRequestNotice.EARNED
                     }
-                    AdUnlockOutcome.Dismissed -> adRequestNotice.value = AdRequestNotice.DISMISSED
+                    AdUnlockOutcome.Dismissed -> {
+                        analytics.log(AnalyticsEvent.AdUnlockDismissed(AnalyticsId.of(key), policy))
+                        adRequestNotice.value = AdRequestNotice.DISMISSED
+                    }
                     is AdUnlockOutcome.Failed -> {
                         Log.w(TAG, "ad unlock failed for $key: ${outcome.reason}")
+                        analytics.log(
+                            AnalyticsEvent.AdUnlockFailed(AnalyticsId.of(key), policy, outcome.reason.toAdFailureReason()),
+                        )
                         adRequestNotice.value = AdRequestNotice.UNAVAILABLE
                     }
-                    AdUnlockOutcome.Unavailable -> adRequestNotice.value = AdRequestNotice.UNAVAILABLE
+                    AdUnlockOutcome.Unavailable -> {
+                        analytics.log(AnalyticsEvent.AdUnlockUnavailable(AnalyticsId.of(key), policy))
+                        adRequestNotice.value = AdRequestNotice.UNAVAILABLE
+                    }
                 }
             } finally {
                 adRequestInFlight.value = null // `finally`: cancellation must not wedge the CTA
