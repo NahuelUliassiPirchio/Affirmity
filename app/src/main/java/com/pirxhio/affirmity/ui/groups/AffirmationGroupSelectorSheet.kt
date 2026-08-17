@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +47,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.AccessDecision
+import com.pirxhio.affirmity.access.AdUnlockPolicy
 
 /**
  * Persistent, non-dismissible sheet docked under the affirmations feed. Peek row is always
@@ -63,6 +65,9 @@ fun AffirmationGroupSelectorSheet(
     onPeekClick: () -> Unit,
     onAddCustomClick: () -> Unit,
     onUpgradeClick: () -> Unit,
+    onWatchAd: (AffirmationGroup, AdUnlockPolicy) -> Unit = { _, _ -> },
+    adInFlightFor: (AffirmationGroup) -> Boolean = { false },
+    anyAdInFlight: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxHeight(0.85f)) {
@@ -92,6 +97,9 @@ fun AffirmationGroupSelectorSheet(
                         decision = accessDecisionFor(group),
                         onToggle = { onToggle(group) },
                         onUpgradeClick = onUpgradeClick,
+                        onWatchAd = onWatchAd,
+                        adInFlight = adInFlightFor(group),
+                        anyAdInFlight = anyAdInFlight,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                     )
                 }
@@ -174,21 +182,29 @@ private fun AffirmationGroupSelectableRow(
     decision: AccessDecision,
     onToggle: () -> Unit,
     onUpgradeClick: () -> Unit,
+    onWatchAd: (AffirmationGroup, AdUnlockPolicy) -> Unit = { _, _ -> },
+    adInFlight: Boolean = false,
+    anyAdInFlight: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     // Single source of lock/toggle truth (design §6) -- `alwaysSelected` short-circuits first,
     // so `PERSONALIZADAS_GROUP` is never locked/toggleable at either tier.
     val toggleable = isToggleable(group, decision)
     val locked = isLocked(decision)
+    // MUST be checked before `locked` below -- LockedAdUnlockable satisfies both `locked` and
+    // `adUnlockable` (hard constraint, §6.2): an ad-unlockable row is not just "any locked row".
+    val adUnlockable = canWatchAdToUnlock(decision)
     val badge = deriveBadge(group, decision)
     val rowModifier = modifier
         .fillMaxWidth()
         .then(
-            if (toggleable) {
-                Modifier.toggleable(value = checked, role = Role.Checkbox, onValueChange = { onToggle() })
-            } else {
-                Modifier
-            }
+            when {
+                toggleable -> Modifier.toggleable(value = checked, role = Role.Checkbox, onValueChange = { onToggle() })
+                adUnlockable && !anyAdInFlight -> Modifier.clickable {
+                    onWatchAd(group, (decision as AccessDecision.LockedAdUnlockable).policy)
+                }
+                else -> Modifier
+            },
         )
         .let { if (locked) it.alpha(0.6f) else it }
 
@@ -236,6 +252,26 @@ private fun AffirmationGroupSelectableRow(
             }
 
             when {
+                // MUST precede `locked` below -- an ad-unlockable row also satisfies `locked`,
+                // but it must render the play CTA, not the dead lock icon (§6.2, hard constraint).
+                adInFlight -> CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                adUnlockable -> IconButton(
+                    onClick = { onWatchAd(group, (decision as AccessDecision.LockedAdUnlockable).policy) },
+                    enabled = !anyAdInFlight,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.PlayCircle,
+                        contentDescription = stringResource(
+                            R.string.ad_unlock_cta_a11y,
+                            stringResource(group.titleRes),
+                        ),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
                 // Locked rows expose an actionable upgrade CTA (spec's "Upgrade CTA opens inline
                 // paywall") instead of a dead lock icon -- tapping it opens the paywall sheet.
                 locked -> IconButton(onClick = onUpgradeClick) {

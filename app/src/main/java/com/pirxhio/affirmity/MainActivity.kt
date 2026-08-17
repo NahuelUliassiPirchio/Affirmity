@@ -59,6 +59,8 @@ import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.pirxhio.affirmity.auth.AuthState
 import com.pirxhio.affirmity.billing.BillingService
+import com.pirxhio.affirmity.access.ContentKey
+import com.pirxhio.affirmity.access.ContentType
 import com.pirxhio.affirmity.data.AdRequestNotice
 import com.pirxhio.affirmity.data.MOOD_MAX
 import com.pirxhio.affirmity.data.rememberAffirmityAppState
@@ -631,6 +633,17 @@ fun AffirmityApp(
                                     }
                                 },
                                 onAddCustomClick = { showMyAffirmations = true },
+                                onWatchAd = { group, policy ->
+                                    appState.requestAdUnlock(
+                                        ContentKey(ContentType.AFFIRMATION_GROUP, group.id),
+                                        policy,
+                                    )
+                                },
+                                adInFlightFor = { group ->
+                                    appState.adRequestInFlight.value ==
+                                        ContentKey(ContentType.AFFIRMATION_GROUP, group.id)
+                                },
+                                anyAdInFlight = appState.adRequestInFlight.value != null,
                             )
                         },
                     ) {
