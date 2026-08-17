@@ -24,6 +24,8 @@ coreSplashscreen = "1.0.1"
 coilCompose = "3.3.0"
 appcompat = "1.7.1"
 billing = "7.1.1"
+playServicesAds = "25.4.0"
+userMessagingPlatform = "4.0.0"
 
 [libraries]
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
@@ -67,6 +69,8 @@ androidx-glance-appwidget-testing = { group = "androidx.glance", name = "glance-
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coilCompose" }
 coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coilCompose" }
 billing-ktx = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "billing" }
+play-services-ads = { group = "com.google.android.gms", name = "play-services-ads", version.ref = "playServicesAds" }
+user-messaging-platform = { group = "com.google.android.ump", name = "user-messaging-platform", version.ref = "userMessagingPlatform" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -1,9 +1,36 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.google.services)
 }
+
+// Ad secrets are resolved from (in order): a Gradle project property (-P), local.properties (not
+// committed, git-ignored), or an environment variable. Debug builds always use Google's committed
+// public test ids (see buildConfigField block below) and never consult this resolution.
+val localProps = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+}
+
+fun adSecret(propKey: String, envKey: String): String? =
+    (project.findProperty(propKey) as String?) ?: localProps.getProperty(propKey) ?: System.getenv(envKey)
+
+// Fail-fast is scoped to an actually-requested Release task. Failing unconditionally at
+// configuration time would break `assembleDebug` and `testDebugUnitTest` for a developer who has
+// no production ad ids -- i.e. for everyone until the AdMob account exists.
+val releaseRequested = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
+
+fun requiredAdSecret(propKey: String, envKey: String): String = adSecret(propKey, envKey)
+    ?: if (releaseRequested) {
+        error(
+            "Missing $propKey in local.properties / -P$propKey / \$$envKey. Release builds must never " +
+                "ship Google's public TEST ad units: that serves unpaid ads to real users and is a policy risk."
+        )
+    } else {
+        "MISSING_$envKey"
+    }
 
 android {
     namespace = "com.pirxhio.affirmity"
@@ -24,10 +51,32 @@ android {
     }
 
     buildTypes {
+        debug {
+            manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713"
+            buildConfigField("String", "ADMOB_REWARDED_UNIT_PER_USE", "\"ca-app-pub-3940256099942544/5224354917\"")
+            buildConfigField("String", "ADMOB_REWARDED_UNIT_ONE_TIME_TRIAL", "\"ca-app-pub-3940256099942544/5224354917\"")
+            buildConfigField(
+                "String",
+                "ADMOB_TEST_DEVICE_HASH",
+                "\"${adSecret("admob.testDeviceHash", "ADMOB_TEST_DEVICE_HASH") ?: ""}\"",
+            )
+        }
         release {
             optimization {
                 enable = false
             }
+            manifestPlaceholders["admobAppId"] = requiredAdSecret("admob.appId", "ADMOB_APP_ID")
+            buildConfigField(
+                "String",
+                "ADMOB_REWARDED_UNIT_PER_USE",
+                "\"${requiredAdSecret("admob.rewardedUnit.perUse", "ADMOB_REWARDED_UNIT_PER_USE")}\"",
+            )
+            buildConfigField(
+                "String",
+                "ADMOB_REWARDED_UNIT_ONE_TIME_TRIAL",
+                "\"${requiredAdSecret("admob.rewardedUnit.oneTimeTrial", "ADMOB_REWARDED_UNIT_ONE_TIME_TRIAL")}\"",
+            )
+            buildConfigField("String", "ADMOB_TEST_DEVICE_HASH", "\"\"")
         }
     }
     compileOptions {
@@ -36,6 +85,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     androidResources {
         localeFilters += listOf("es", "en")
@@ -82,6 +132,8 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
     implementation(libs.billing.ktx)
+    implementation(libs.play.services.ads)
+    implementation(libs.user.messaging.platform)
     testImplementation(libs.junit)
     // Real org.json impl for JVM unit tests only — Android provides org.json at runtime, but the
     // stub android.jar used by testDebugUnitTest throws "not mocked" for its real methods.
