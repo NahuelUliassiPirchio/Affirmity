@@ -946,14 +946,19 @@ class AffirmityAppState(
      *  same day can double-count -- bounded, denominator-only, cheaper than a schema change. */
     private var meditationGoalEmittedEpochDay: Long? = null
 
-    /** Call when a meditation session finishes its full countdown. */
-    fun recordMeditationCompleted() {
+    /**
+     * Call when a meditation session finishes its full countdown. [startMillis]/[endMillis] are
+     * wall-clock timestamps (`System.currentTimeMillis()`, not the monotonic clock the session
+     * timer itself runs on) so a session crossing local midnight is archived on the day it mostly
+     * ran on, via [DayClock.attributedEpochDay] -- not always the day it happened to finish on.
+     */
+    fun recordMeditationCompleted(startMillis: Long, endMillis: Long = System.currentTimeMillis()) {
         scope.launch {
-            val today = DayClock.epochDay()
-            ready().completions.markMeditation(today)
+            val day = DayClock.attributedEpochDay(startMillis, endMillis)
+            ready().completions.markMeditation(day)
             widgetUpdater.refresh()
-            if (today != meditationGoalEmittedEpochDay) {
-                meditationGoalEmittedEpochDay = today
+            if (day != meditationGoalEmittedEpochDay) {
+                meditationGoalEmittedEpochDay = day
                 analytics.log(AnalyticsEvent.DailyGoalReached(DailyGoal.MEDITATION))
             }
         }

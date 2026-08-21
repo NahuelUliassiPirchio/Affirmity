@@ -40,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,11 +59,13 @@ import com.pirxhio.affirmity.analytics.AnalyticsContentType
 import com.pirxhio.affirmity.analytics.AnalyticsEvent
 import com.pirxhio.affirmity.analytics.AnalyticsId
 import com.pirxhio.affirmity.analytics.provenance
+import com.pirxhio.affirmity.data.DayClock
+import com.pirxhio.affirmity.meditation.ClockEvent
+import com.pirxhio.affirmity.meditation.RealSessionClock
 import com.pirxhio.affirmity.ui.groups.AffirmationGroupAccessBadge
 import com.pirxhio.affirmity.ui.meditation.catalog.MeditationCatalogEntry
 import com.pirxhio.affirmity.ui.meditation.catalog.deriveMeditationBadge
 import com.pirxhio.affirmity.ui.meditation.catalog.isMeditationLocked
-import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 private const val MIN_DURATION_SECONDS = 30
@@ -78,8 +81,10 @@ fun MeditationScreen(
     initialDurationSeconds: Int = 15 * 60,
     onDurationSelected: (Int) -> Unit,
     /** D7: the free timer already knows its own [durationSeconds] -- it simply passes it, kept
-     *  structurally distinct from the catalog `meditation_completed` event (REQ-5.2). */
-    onSessionCompleted: (durationSeconds: Long) -> Unit,
+     *  structurally distinct from the catalog `meditation_completed` event (REQ-5.2).
+     *  [startWallMillis] is the wall-clock instant Start was pressed, for day-of-completion
+     *  attribution across a local-midnight crossing (see [DayClock.attributedEpochDay]). */
+    onSessionCompleted: (durationSeconds: Long, startWallMillis: Long) -> Unit,
     entries: List<MeditationCatalogEntry>,
     decisionFor: (MeditationCatalogEntry) -> AccessDecision,
     onLaunch: (MeditationCatalogEntry) -> Unit,
@@ -97,6 +102,12 @@ fun MeditationScreen(
     var durationSeconds by remember(initialDurationSeconds) { mutableIntStateOf(initialDurationSeconds) }
     var secondsRemaining by remember(initialDurationSeconds) { mutableIntStateOf(durationSeconds) }
     var isRunning by remember { mutableStateOf(false) }
+    // Tracks first-start vs. resume-from-pause, since RealSessionClock.start() resets the
+    // accumulated elapsed time while resume() continues it.
+    var hasStarted by remember(initialDurationSeconds) { mutableStateOf(false) }
+    // Wall-clock instant of the first Start press, for DayClock.attributedEpochDay -- not touched
+    // on resume, only on a fresh start (mirrors hasStarted).
+    var sessionStartWallMillis by remember(initialDurationSeconds) { mutableStateOf<Long?>(null) }
     var selectedPreset by remember { mutableStateOf<String?>(null) }
     val presets = listOf(
         stringResource(R.string.meditation_preset_relax) to 5 * 60,
@@ -110,18 +121,27 @@ fun MeditationScreen(
         onDispose { gongPlayer.release() }
     }
 
-    // Real countdown driven by a coroutine delay loop (not a fake animation).
-    LaunchedEffect(isRunning) {
-        while (isRunning && secondsRemaining > 0) {
-            delay(1000)
-            secondsRemaining -= 1
-        }
-        if (isRunning && secondsRemaining <= 0) {
-            isRunning = false
-            gongPlayer.seekTo(0)
-            gongPlayer.start()
-            secondsRemaining = durationSeconds
-            onSessionCompleted(durationSeconds.toLong())
+    val scope = rememberCoroutineScope()
+    val clock = remember { RealSessionClock(scope = scope, timeSource = AndroidMonotonicTimeSource) }
+
+    // Timestamp-based, not tick-counted: while the phone is locked, Android throttles this
+    // coroutine's scheduling (Doze, no wake lock held), so a "delay(1000); secondsRemaining -= 1"
+    // loop only counts the iterations that actually got to run and drifts behind real time.
+    // RealSessionClock instead recomputes remainingMillis from elapsedRealtime() on every tick, so
+    // it's always correct the moment ticking resumes, no matter how long it was stalled.
+    LaunchedEffect(Unit) {
+        clock.events.collect { event ->
+            when (event) {
+                is ClockEvent.Tick -> event.remainingMillis?.let { secondsRemaining = (it / 1000L).toInt() }
+                ClockEvent.Completed -> {
+                    isRunning = false
+                    hasStarted = false
+                    gongPlayer.seekTo(0)
+                    gongPlayer.start()
+                    secondsRemaining = durationSeconds
+                    onSessionCompleted(durationSeconds.toLong(), sessionStartWallMillis ?: System.currentTimeMillis())
+                }
+            }
         }
     }
 
@@ -177,7 +197,21 @@ fun MeditationScreen(
                             modifier = Modifier.padding(bottom = 24.dp)
                         )
                         IconButton(
-                            onClick = { isRunning = !isRunning },
+                            onClick = {
+                                if (isRunning) {
+                                    clock.pause()
+                                    isRunning = false
+                                } else {
+                                    if (hasStarted) {
+                                        clock.resume()
+                                    } else {
+                                        clock.start(durationSeconds * 1000L)
+                                        sessionStartWallMillis = System.currentTimeMillis()
+                                    }
+                                    hasStarted = true
+                                    isRunning = true
+                                }
+                            },
                             modifier = Modifier
                                 .size(64.dp)
                                 .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
@@ -211,6 +245,7 @@ fun MeditationScreen(
                             // from a finger landing anywhere in its upper half.
                             durationSeconds = (it / STEP_SECONDS).roundToInt() * STEP_SECONDS
                             secondsRemaining = durationSeconds
+                            hasStarted = false
                         },
                         onValueChangeFinished = { onDurationSelected(durationSeconds) },
                         valueRange = MIN_DURATION_SECONDS.toFloat()..MAX_DURATION_SECONDS.toFloat(),
@@ -237,6 +272,7 @@ fun MeditationScreen(
                                         selectedPreset = label
                                         durationSeconds = seconds
                                         secondsRemaining = durationSeconds
+                                        hasStarted = false
                                         onDurationSelected(durationSeconds)
                                     }
                                 },

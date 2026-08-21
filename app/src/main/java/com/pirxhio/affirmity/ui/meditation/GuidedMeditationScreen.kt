@@ -41,6 +41,7 @@ import com.pirxhio.affirmity.access.AccessDecision
 import com.pirxhio.affirmity.analytics.AnalyticsEvent
 import com.pirxhio.affirmity.analytics.AnalyticsId
 import com.pirxhio.affirmity.analytics.provenance
+import com.pirxhio.affirmity.data.DayClock
 import com.pirxhio.affirmity.meditation.CompositeCommandExecutor
 import com.pirxhio.affirmity.meditation.LapTrackerCommandExecutor
 import com.pirxhio.affirmity.meditation.MeditationEngine
@@ -75,9 +76,11 @@ fun GuidedMeditationScreen(
     access: AccessDecision = AccessDecision.Unlocked,
     /** Fired exactly once per playback session that reaches a terminal state, carrying the
      * UI-local wall-clock elapsed duration (design D7 -- the engine tracks no session-wide
-     * elapsed). Never fired when the screen is disposed from [SessionStatus.Idle] (EC-1) — a user
-     * who never pressed Start has not spent anything. */
-    onSessionEnded: (SessionEndReason, elapsedSeconds: Long) -> Unit = { _, _ -> },
+     * elapsed) and the wall-clock instant the session started (for day-of-completion attribution
+     * across a local-midnight crossing, see [DayClock.attributedEpochDay]). Never fired when the
+     * screen is disposed from [SessionStatus.Idle] (EC-1) — a user who never pressed Start has not
+     * spent anything. */
+    onSessionEnded: (SessionEndReason, elapsedSeconds: Long, startWallMillis: Long) -> Unit = { _, _, _ -> },
     /** Called after any cancellation bookkeeping, to leave the screen. Owned by the caller. */
     onExit: () -> Unit = {},
     /** Spec 6 emit surface (REQ-5.2) -- fires `meditation_started` at the Start dispatch below. */
@@ -90,6 +93,10 @@ fun GuidedMeditationScreen(
     // paths (Completed LaunchedEffect, Cancelled exit). Measures wall time including pauses --
     // the honest engagement number, and zero engine change.
     var sessionStartMillis by remember { mutableStateOf<Long?>(null) }
+    // Wall-clock (System.currentTimeMillis()), captured alongside sessionStartMillis but never used
+    // for duration math -- only to attribute the session to a calendar day (DayClock.
+    // attributedEpochDay), which the monotonic elapsedRealtime-based sessionStartMillis can't do.
+    var sessionStartWallMillis by remember { mutableStateOf<Long?>(null) }
     fun elapsedSecondsSinceStart(): Long {
         val start = sessionStartMillis ?: return 0L
         return ((AndroidMonotonicTimeSource.nowMillis() - start) / 1000L).coerceAtLeast(0L)
@@ -136,7 +143,7 @@ fun GuidedMeditationScreen(
     // reaching Completed.
     LaunchedEffect(state.status) {
         if (state.status == SessionStatus.Completed) {
-            onSessionEnded(SessionEndReason.Completed, elapsedSecondsSinceStart())
+            onSessionEnded(SessionEndReason.Completed, elapsedSecondsSinceStart(), sessionStartWallMillis ?: System.currentTimeMillis())
         }
     }
 
@@ -153,7 +160,9 @@ fun GuidedMeditationScreen(
         performGuidedSessionExit(
             status = state.status,
             cancel = { engine.send(MeditationEvent.Cancel) },
-            onSessionEnded = { reason -> onSessionEnded(reason, elapsedSecondsSinceStart()) },
+            onSessionEnded = { reason ->
+                onSessionEnded(reason, elapsedSecondsSinceStart(), sessionStartWallMillis ?: System.currentTimeMillis())
+            },
             onExit = onExit,
         )
     }
@@ -173,6 +182,7 @@ fun GuidedMeditationScreen(
         phaseDurations = phaseDurations,
         onStart = {
             sessionStartMillis = AndroidMonotonicTimeSource.nowMillis()
+            sessionStartWallMillis = System.currentTimeMillis()
             onEvent(AnalyticsEvent.MeditationStarted(AnalyticsId.of(entry), access.provenance()))
             engine.send(MeditationEvent.Start)
         },

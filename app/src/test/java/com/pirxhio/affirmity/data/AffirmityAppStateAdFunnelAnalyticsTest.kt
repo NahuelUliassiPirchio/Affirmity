@@ -345,9 +345,9 @@ class AffirmityAppStateAdFunnelAnalyticsTest {
         val state = buildAnalyticsState(scope, analytics, FixedOutcomeAdUnlockSource(AdUnlockOutcome.Unavailable))
         delay(50)
 
-        state.recordMeditationCompleted()
+        state.recordMeditationCompleted(System.currentTimeMillis())
         delay(20)
-        state.recordMeditationCompleted()
+        state.recordMeditationCompleted(System.currentTimeMillis())
         delay(20)
 
         assertEquals(1, analytics.recorded.filterIsInstance<AnalyticsEvent.DailyGoalReached>().size)

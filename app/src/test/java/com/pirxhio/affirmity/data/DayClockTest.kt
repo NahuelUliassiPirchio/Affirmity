@@ -57,6 +57,41 @@ class DayClockTest {
         )
     }
 
+    @Test
+    fun `attributedEpochDay returns the calendar day for a session that stays within it`() {
+        val calendar = calendarAt(2026, Calendar.JANUARY, 14, hour = 20, minute = 0)
+        val start = calendarAt(2026, Calendar.JANUARY, 14, hour = 20, minute = 0).timeInMillis
+        val end = calendarAt(2026, Calendar.JANUARY, 14, hour = 20, minute = 10).timeInMillis
+
+        assertEquals(DayClock.epochDay(calendar), DayClock.attributedEpochDay(start, end, calendar))
+    }
+
+    @Test
+    fun `attributedEpochDay attributes a midnight-crossing session to whichever day held most of it`() {
+        val calendar = calendarAt(2026, Calendar.JANUARY, 14, hour = 12, minute = 0)
+        // 23:57 -> 00:07: 3 min in Jan 14, 7 min in Jan 15 -- Jan 15 wins.
+        val start = calendarAt(2026, Calendar.JANUARY, 14, hour = 23, minute = 57).timeInMillis
+        val end = calendarAt(2026, Calendar.JANUARY, 15, hour = 0, minute = 7).timeInMillis
+
+        assertEquals(
+            DayClock.epochDay(calendarAt(2026, Calendar.JANUARY, 15, hour = 12, minute = 0)),
+            DayClock.attributedEpochDay(start, end, calendar),
+        )
+    }
+
+    @Test
+    fun `attributedEpochDay keeps a midnight-crossing session on the start day when it held most of it`() {
+        val calendar = calendarAt(2026, Calendar.JANUARY, 14, hour = 12, minute = 0)
+        // 23:50 -> 00:02: 10 min in Jan 14, 2 min in Jan 15 -- Jan 14 wins.
+        val start = calendarAt(2026, Calendar.JANUARY, 14, hour = 23, minute = 50).timeInMillis
+        val end = calendarAt(2026, Calendar.JANUARY, 15, hour = 0, minute = 2).timeInMillis
+
+        assertEquals(
+            DayClock.epochDay(calendarAt(2026, Calendar.JANUARY, 14, hour = 12, minute = 0)),
+            DayClock.attributedEpochDay(start, end, calendar),
+        )
+    }
+
     private val spanishLetters = listOf("D", "L", "M", "M", "J", "V", "S") // Sun..Sat
     private val englishLetters = listOf("S", "M", "T", "W", "T", "F", "S") // Sun..Sat
 

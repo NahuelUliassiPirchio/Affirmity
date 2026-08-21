@@ -477,7 +477,7 @@ fun AffirmityApp(
                     // site. consumeMeditationPlaybackUnlock runs for BOTH terminal reasons (an ad
                     // watched and then abandoned mid-session is still a use); recordMeditationCompleted
                     // only for Completed.
-                    onSessionEnded = { reason, elapsedSeconds ->
+                    onSessionEnded = { reason, elapsedSeconds, startWallMillis ->
                         handleGuidedMeditationSessionEnded(
                             entryId = selectedMeditationEntry.id,
                             reason = reason,
@@ -489,7 +489,7 @@ fun AffirmityApp(
                                 System.currentTimeMillis(),
                             ),
                             consumePlaybackUnlock = appState::consumeMeditationPlaybackUnlock,
-                            recordMeditationCompleted = appState::recordMeditationCompleted,
+                            recordMeditationCompleted = { appState.recordMeditationCompleted(startWallMillis) },
                             emit = appState::logAnalyticsEvent,
                         )
                     },
@@ -702,8 +702,8 @@ fun AffirmityApp(
                 AppDestinations.MEDITAR -> MeditationScreen(
                     initialDurationSeconds = appState.meditationDurationSeconds.value ?: (15 * 60),
                     onDurationSelected = { seconds -> appState.recordMeditationDurationSelected(seconds) },
-                    onSessionCompleted = { durationSeconds ->
-                        appState.recordMeditationCompleted()
+                    onSessionCompleted = { durationSeconds, startWallMillis ->
+                        appState.recordMeditationCompleted(startWallMillis)
                         appState.logAnalyticsEvent(AnalyticsEvent.FreeTimerCompleted(durationSeconds))
                     },
                     entries = meditationCatalog(),
