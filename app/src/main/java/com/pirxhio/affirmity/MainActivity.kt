@@ -429,6 +429,7 @@ fun AffirmityApp(
                     appState.importAffirmationsFromJson(json, replace)
                 },
                 onDeleteAffirmation = { id -> appState.removeAffirmation(id) },
+                onOverrideCommitted = appState::setTokenOverride,
                 onUpgradeClick = { onUpgradeClick(PaywallSource.MY_AFFIRMATIONS) },
                 onEvent = appState::logAnalyticsEvent,
             )
@@ -741,7 +742,8 @@ fun AffirmityApp(
                     ) {
                         AffirmationsScreen(
                             affirmations = appState.filteredAffirmations,
-                            onAffirmationViewed = { appState.recordAffirmationViewed() }
+                            onAffirmationViewed = { appState.recordAffirmationViewed() },
+                            onOverrideCommitted = appState::setTokenOverride,
                         )
                     }
                 }

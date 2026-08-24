@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.PagerState
@@ -26,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,11 +37,12 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.data.Affirmation
 import com.pirxhio.affirmity.data.AffirmationBackground
+import com.pirxhio.affirmity.data.AffirmationTemplateParser
+import com.pirxhio.affirmity.data.TemplateField
 import com.pirxhio.affirmity.data.backgroundColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -59,7 +62,11 @@ import kotlinx.coroutines.withContext
 private const val LOOP_MULTIPLIER = 10_000
 
 @Composable
-fun AffirmationsScreen(affirmations: List<Affirmation>, onAffirmationViewed: () -> Unit) {
+fun AffirmationsScreen(
+    affirmations: List<Affirmation>,
+    onAffirmationViewed: () -> Unit,
+    onOverrideCommitted: (affirmationId: String, tokenKey: String, value: String) -> Unit = { _, _, _ -> },
+) {
     if (affirmations.isEmpty()) {
         Box(
             modifier = Modifier
@@ -102,12 +109,18 @@ fun AffirmationsScreen(affirmations: List<Affirmation>, onAffirmationViewed: () 
         modifier = Modifier.fillMaxSize()
     ) { page ->
         val affirmation = affirmations[page % affirmations.size]
-        AffirmationCard(affirmation)
+        AffirmationCard(
+            affirmation = affirmation,
+            onOverrideCommitted = { tokenKey, value -> onOverrideCommitted(affirmation.id, tokenKey, value) },
+        )
     }
 }
 
 @Composable
-private fun AffirmationCard(affirmation: Affirmation) {
+private fun AffirmationCard(
+    affirmation: Affirmation,
+    onOverrideCommitted: (tokenKey: String, value: String) -> Unit,
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -131,11 +144,19 @@ private fun AffirmationCard(affirmation: Affirmation) {
                 ),
             contentAlignment = Alignment.Center
         ) {
+            val tokenStyle = defaultTokenStyle
+            val titleTemplate = remember(affirmation.title) {
+                AffirmationTemplateParser.parse(TemplateField.TITLE, affirmation.title)
+            }
+            val subtitleTemplate = remember(affirmation.subtitle) {
+                AffirmationTemplateParser.parse(TemplateField.SUBTITLE, affirmation.subtitle)
+            }
             Column(
                 modifier = Modifier
                     .padding(24.dp)
                     .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
-                    .padding(24.dp),
+                    .padding(24.dp)
+                    .imePadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Icon(
@@ -144,10 +165,14 @@ private fun AffirmationCard(affirmation: Affirmation) {
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.height(32.dp)
                 )
-                Text(
-                    text = affirmation.title,
+                TokenizedAffirmationText(
+                    template = titleTemplate,
+                    overrides = affirmation.overrides,
                     style = MaterialTheme.typography.headlineLarge,
                     color = Color.White,
+                    tokenStyle = tokenStyle,
+                    editable = true,
+                    onOverrideCommitted = onOverrideCommitted,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 8.dp)
                 )
@@ -159,11 +184,15 @@ private fun AffirmationCard(affirmation: Affirmation) {
                             .height(1.dp)
                             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
                     )
-                    Text(
-                        text = affirmation.subtitle,
+                    TokenizedAffirmationText(
+                        template = subtitleTemplate,
+                        overrides = affirmation.overrides,
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color(0xFFCCCCCC),
-                        textAlign = TextAlign.Center
+                        tokenStyle = tokenStyle,
+                        editable = true,
+                        onOverrideCommitted = onOverrideCommitted,
+                        textAlign = TextAlign.Center,
                     )
                 }
             }

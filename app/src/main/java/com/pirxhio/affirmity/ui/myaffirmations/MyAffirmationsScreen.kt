@@ -50,6 +50,10 @@ import com.pirxhio.affirmity.access.AccessDecision
 import com.pirxhio.affirmity.analytics.AnalyticsEvent
 import com.pirxhio.affirmity.analytics.provenance
 import com.pirxhio.affirmity.data.Affirmation
+import com.pirxhio.affirmity.data.AffirmationTemplateParser
+import com.pirxhio.affirmity.data.TemplateField
+import com.pirxhio.affirmity.ui.affirmations.TokenizedAffirmationText
+import com.pirxhio.affirmity.ui.affirmations.defaultTokenStyle
 
 private val swatches = listOf(
     "#2A9D8F", "#00696F", "#5BBCC3", "#5E5E5E", "#8F4D22", "#BA1A1A"
@@ -68,6 +72,7 @@ fun MyAffirmationsScreen(
     onAddAffirmationWithGalleryImage: (title: String, subtitle: String, imageUri: Uri) -> Unit,
     onImportAffirmationsJson: (json: String, replaceExisting: Boolean) -> Unit,
     onDeleteAffirmation: (id: String) -> Unit,
+    onOverrideCommitted: (affirmationId: String, tokenKey: String, value: String) -> Unit = { _, _, _ -> },
     onUpgradeClick: () -> Unit,
     /** Spec 6 emit surface (REQ-5.5) -- fires `custom_affirmation_create_blocked`. */
     onEvent: (AnalyticsEvent) -> Unit = {},
@@ -97,7 +102,11 @@ fun MyAffirmationsScreen(
         }
 
         items(affirmations, key = { it.id }) { affirmation ->
-            AffirmationRow(affirmation, onDeleteAffirmation)
+            AffirmationRow(
+                affirmation = affirmation,
+                onDelete = onDeleteAffirmation,
+                onOverrideCommitted = { tokenKey, value -> onOverrideCommitted(affirmation.id, tokenKey, value) },
+            )
         }
     }
 }
@@ -112,6 +121,14 @@ private const val AFFIRMATIONS_JSON_EXAMPLE = """[
     "background": {
       "type": "color",
       "value": "#2A9D8F"
+    }
+  },
+  {
+    "title": "I earn [10k] a [month]",
+    "subtitle": "Tap the bracketed words to make them yours",
+    "background": {
+      "type": "color",
+      "value": "#00696F"
     }
   }
 ]"""
@@ -381,7 +398,11 @@ private fun AddAffirmationCard(
 }
 
 @Composable
-private fun AffirmationRow(affirmation: Affirmation, onDelete: (String) -> Unit) {
+private fun AffirmationRow(
+    affirmation: Affirmation,
+    onDelete: (String) -> Unit,
+    onOverrideCommitted: (tokenKey: String, value: String) -> Unit = { _, _ -> },
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
@@ -394,10 +415,17 @@ private fun AffirmationRow(affirmation: Affirmation, onDelete: (String) -> Unit)
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = affirmation.title,
+            val titleTemplate = remember(affirmation.title) {
+                AffirmationTemplateParser.parse(TemplateField.TITLE, affirmation.title)
+            }
+            TokenizedAffirmationText(
+                template = titleTemplate,
+                overrides = affirmation.overrides,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
+                tokenStyle = defaultTokenStyle,
+                editable = true,
+                onOverrideCommitted = onOverrideCommitted,
                 modifier = Modifier.weight(1f)
             )
             IconButton(onClick = { onDelete(affirmation.id) }) {
