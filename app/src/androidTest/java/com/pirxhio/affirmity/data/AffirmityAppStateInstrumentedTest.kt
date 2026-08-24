@@ -11,6 +11,7 @@ import com.pirxhio.affirmity.data.local.AffirmationImageStore
 import com.pirxhio.affirmity.data.local.AffirmityDatabase
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.NotificationPreferences
+import com.pirxhio.affirmity.data.local.OnboardingGuidePreferences
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.DocWrite
@@ -85,6 +86,7 @@ class AffirmityAppStateInstrumentedTest {
             migrator = FirestoreMigrator(UnreachableFirestoreMigrationSource()),
             trackerPreferences = trackerPreferences,
             onboardingPreferences = OnboardingPreferences(context.applicationContext),
+            onboardingGuidePreferences = OnboardingGuidePreferences(context.applicationContext),
             imageStore = AffirmationImageStore(context.applicationContext),
             notificationDebugLog = notificationDebugLog,
             notifier = Notifier(context.applicationContext, notificationDebugLog),

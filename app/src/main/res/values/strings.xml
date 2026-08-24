@@ -197,6 +197,26 @@
     <string name="healer_granted_confirm_button">Entendido</string>
     <string name="healer_granted_icon_content_description">Ícono de sanador de racha</string>
     <string name="progress_weekly_streak_format">Racha: %1$d días</string>
+
+    <!-- Post-survey onboarding guide (spec R3, design D6) -->
+    <string name="onboarding_guide_slide1_title">Afirmaciones a tu medida</string>
+    <string name="onboarding_guide_slide1_body">Tus afirmaciones aparecen como tarjetas que deslizás, organizadas en grupos temáticos como Bienestar o Fuerza de voluntad, más un grupo Personalizadas donde escribís las tuyas. Algunos grupos requieren Pro.</string>
+    <string name="onboarding_guide_slide1_icon_content_description">Ícono de afirmaciones</string>
+    <string name="onboarding_guide_slide2_title">Meditaciones para cada momento</string>
+    <string name="onboarding_guide_slide2_body">Las sesiones guiadas están organizadas por categoría —sueño, calma, enfoque— y muestran su duración aproximada. También tenés un temporizador libre para meditar a tu ritmo. Algunas sesiones son Pro o se desbloquean viendo un anuncio.</string>
+    <string name="onboarding_guide_slide2_icon_content_description">Ícono de meditación</string>
+    <string name="onboarding_guide_slide3_title">Registrá tu ánimo</string>
+    <string name="onboarding_guide_slide3_body">Anotá tu ánimo una vez por día y agregá una nota si querés. Si te olvidaste algún día, podés completarlo después: tu historial queda siempre disponible.</string>
+    <string name="onboarding_guide_slide3_icon_content_description">Ícono de registro de ánimo</string>
+    <string name="onboarding_guide_slide4_title">Tu racha y el sanador</string>
+    <string name="onboarding_guide_slide4_body">Tenés UNA sola racha general, que avanza cuando completás una afirmación y una meditación el mismo día. Dos días seguidos completos te dan un sanador guardado: si al día siguiente te olvidás, podés activarlo para reparar ese día dentro de la misma racha —no es una racha aparte. Guardás como máximo 1 sanador a la vez.</string>
+    <string name="onboarding_guide_slide4_icon_content_description">Ícono de racha y sanador</string>
+    <string name="onboarding_guide_skip_button">Omitir</string>
+    <string name="onboarding_guide_next_button">Siguiente</string>
+    <string name="onboarding_guide_get_started_button">Empezar</string>
+    <string name="onboarding_guide_progress_content_description">Diapositiva %1$d de %2$d</string>
+    <string name="settings_onboarding_guide_title">Cómo funciona Affirmity</string>
+    <string name="settings_onboarding_guide_open_button">Ver de nuevo</string>
     <string name="progress_affirmations_section_title">Mis Afirmaciones</string>
     <string name="progress_title_field_label">Título</string>
     <string name="progress_title_field_error">Falta el título</string>

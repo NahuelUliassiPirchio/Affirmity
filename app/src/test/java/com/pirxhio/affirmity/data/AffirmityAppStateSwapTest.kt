@@ -16,6 +16,7 @@ import com.pirxhio.affirmity.data.local.DailyViewCount
 import com.pirxhio.affirmity.data.local.DaySegment
 import com.pirxhio.affirmity.data.local.GroupSelectionPreferences
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
+import com.pirxhio.affirmity.data.local.OnboardingGuidePreferences
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
@@ -284,6 +285,8 @@ private fun buildState(
     groupPreferences: GroupSelectionPreferences = FakeGroupSelectionPreferences(),
     knownGroupIds: Set<String> = setOf("personalizadas", "bienestar"),
     proOnlyGroupIds: Set<String> = emptySet(),
+    onboardingPreferencesOverride: OnboardingPreferences? = null,
+    onboardingGuidePreferencesOverride: OnboardingGuidePreferences? = null,
 ): AffirmityAppState {
     val trackerPreferences = mock(TrackerPreferences::class.java)
     whenever(trackerPreferences.observeAffirmationsViewedToday())
@@ -294,9 +297,14 @@ private fun buildState(
     val notifier = mock(Notifier::class.java)
     val imageStore = mock(AffirmationImageStore::class.java)
     val fcmTokenRepository = mock(FcmTokenRepository::class.java)
-    val onboardingPreferences = mock(OnboardingPreferences::class.java)
-    whenever(onboardingPreferences.observeHasCompletedOnboarding())
-        .thenReturn(EventedFlow("onboarding-completed", mutableListOf(), listOf(true)))
+    val onboardingPreferences = onboardingPreferencesOverride ?: mock(OnboardingPreferences::class.java).also {
+        whenever(it.observeHasCompletedOnboarding())
+            .thenReturn(EventedFlow("onboarding-completed", mutableListOf(), listOf(true)))
+    }
+    val onboardingGuidePreferences = onboardingGuidePreferencesOverride ?: mock(OnboardingGuidePreferences::class.java).also {
+        whenever(it.observeHasSeenGuide())
+            .thenReturn(EventedFlow("onboarding-guide-seen", mutableListOf(), listOf(true)))
+    }
 
     return AffirmityAppState(
         scope = scope,
@@ -312,6 +320,7 @@ private fun buildState(
         fcmTokenRepository = fcmTokenRepository,
         onboardingRepository = mock(FirestoreOnboardingRepository::class.java),
         onboardingPreferences = onboardingPreferences,
+        onboardingGuidePreferences = onboardingGuidePreferences,
         deviceTimeZoneId = { "UTC" },
         groupPreferences = groupPreferences,
         knownGroupIds = knownGroupIds,
@@ -728,6 +737,40 @@ class AffirmityAppStateSwapTest {
             "a PRO user with 12 pre-existing affirmations must be unlocked",
             isCustomAffirmationCreationLocked(state.customAffirmationCreateDecision),
         )
+
+        scope.cancel()
+    }
+
+    // --- Spec R7.1: completeOnboarding() arms the guide as one atomic addition ----------------
+
+    @Test
+    fun `completeOnboarding arms the guide preferences without altering existing completion behavior`() = runBlocking {
+        val events = mutableListOf<String>()
+        val local = fakeLocal(events, id = "local-guide")
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val onboardingPreferences = mock(OnboardingPreferences::class.java)
+        whenever(onboardingPreferences.observeHasCompletedOnboarding())
+            .thenReturn(EventedFlow("onboarding-completed", mutableListOf(), listOf(false)))
+        val onboardingGuidePreferences = mock(OnboardingGuidePreferences::class.java)
+        whenever(onboardingGuidePreferences.observeHasSeenGuide())
+            .thenReturn(EventedFlow("onboarding-guide-seen", mutableListOf(), listOf(null)))
+        val state = buildState(
+            local = local,
+            remote = { fakeRemote("uid-guide", events) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = FakeAuthRepository(),
+            scope = scope,
+            onboardingPreferencesOverride = onboardingPreferences,
+            onboardingGuidePreferencesOverride = onboardingGuidePreferences,
+        )
+        delay(50)
+
+        state.completeOnboarding()
+        delay(50)
+
+        org.mockito.Mockito.verify(onboardingGuidePreferences).arm()
+        org.mockito.Mockito.verify(onboardingPreferences).setCompleted()
+        assertTrue("hasCompletedOnboarding must still flip synchronously", state.hasCompletedOnboarding.value == true)
 
         scope.cancel()
     }

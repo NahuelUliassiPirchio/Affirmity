@@ -68,8 +68,10 @@ import com.pirxhio.affirmity.analytics.PaywallPlan
 import com.pirxhio.affirmity.analytics.PaywallSource
 import com.pirxhio.affirmity.analytics.provenance
 import com.pirxhio.affirmity.data.AdRequestNotice
+import com.pirxhio.affirmity.data.GuideGateResolution
 import com.pirxhio.affirmity.data.MOOD_MAX
 import com.pirxhio.affirmity.data.rememberAffirmityAppState
+import com.pirxhio.affirmity.data.resolveGuideGate
 import com.pirxhio.affirmity.meditation.SessionEndReason
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
@@ -89,6 +91,7 @@ import com.pirxhio.affirmity.ui.meditation.catalog.meditationContentKey
 import com.pirxhio.affirmity.ui.mood.MoodScreen
 import com.pirxhio.affirmity.ui.myaffirmations.MyAffirmationsScreen
 import com.pirxhio.affirmity.ui.onboarding.OnboardingScreen
+import com.pirxhio.affirmity.ui.onboarding.guide.OnboardingGuideScreen
 import com.pirxhio.affirmity.ui.paywall.PaywallSheet
 import com.pirxhio.affirmity.ui.progress.ProgressScreen
 import com.pirxhio.affirmity.ui.settings.NotificationDebugScreen
@@ -229,6 +232,9 @@ fun AffirmityApp(
         if (startMoodValue != null) pendingMoodValue = startMoodValue
     }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    // D4: manual re-entry state, distinct from `appState.shouldShowOnboardingGuide` (the one-time
+    // auto-arm flag) -- reopening from Settings must never re-arm the auto flag (spec R5.4).
+    var showOnboardingGuide by rememberSaveable { mutableStateOf(false) }
     var showNotificationDebug by rememberSaveable { mutableStateOf(false) }
     var showMyAffirmations by rememberSaveable { mutableStateOf(false) }
     // REQ-5.4: replaces the old single-demo boolean. Holds a MeditationCatalogEntry.id so the
@@ -335,6 +341,25 @@ fun AffirmityApp(
     if (appState.hasCompletedOnboarding.value == null) {
         // DataStore hasn't resolved yet — the native splash (Theme.Affirmity.Starting) stays on
         // screen via keepSplashOnScreen until this resolves, so nothing needs to render here.
+        return
+    }
+
+    val guideGateResolution = resolveGuideGate(
+        autoShow = appState.shouldShowOnboardingGuide.value,
+        manualShow = showOnboardingGuide,
+        healerJustGranted = appState.healerJustGranted.value,
+    )
+
+    if (guideGateResolution == GuideGateResolution.AUTO_GUIDE) {
+        // R6.1: positioned immediately after the splash branch, before EVERY other overlay gate
+        // (including healerJustGranted below) -- this is the continuation of first-run onboarding
+        // and must own the first post-survey frame (design D3).
+        OnboardingGuideScreen(
+            modifier = Modifier.fillMaxSize(),
+            onDismiss = remember(appState) {
+                { appState.markOnboardingGuideSeen() }
+            },
+        )
         return
     }
 
@@ -528,6 +553,7 @@ fun AffirmityApp(
                 notificationsPermissionGranted = notificationsPermissionGranted,
                 authState = appState.authState.value,
                 syncError = appState.syncError.value,
+                onSignInClicked = { appState.signIn(context) },
                 onSignOutClicked = { appState.signOut() },
                 onReminderEnabledChanged = { enabled ->
                     appState.setChannelEnabled(
@@ -586,12 +612,33 @@ fun AffirmityApp(
                     )
                     context.startActivity(intent)
                 },
+                onOpenOnboardingGuide = {
+                    showOnboardingGuide = true
+                    showSettings = false
+                },
             )
         }
         return
     }
 
-    if (appState.healerJustGranted.value) {
+    if (guideGateResolution == GuideGateResolution.MANUAL_GUIDE) {
+        // R6.3/D4: manual re-entry, orthogonal to the auto-show flag -- always opens at slide 1
+        // (R5.2) and never re-arms/flips the DataStore guide-seen state on close, except as a
+        // safety net if it was somehow still unseen (R5.3, handled by markOnboardingGuideSeen()
+        // always writing `true`).
+        OnboardingGuideScreen(
+            modifier = Modifier.fillMaxSize(),
+            onDismiss = remember(appState) {
+                {
+                    showOnboardingGuide = false
+                    appState.markOnboardingGuideSeen()
+                }
+            },
+        )
+        return
+    }
+
+    if (guideGateResolution == GuideGateResolution.HEALER_GRANTED) {
         BackHandler { appState.acknowledgeHealerGrant() }
         StreakHealerGrantedScreen(
             modifier = Modifier.fillMaxSize(),

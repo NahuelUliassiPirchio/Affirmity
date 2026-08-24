@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringArrayResource
@@ -63,6 +64,7 @@ import com.pirxhio.affirmity.data.local.GroupSelectionPreferences
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.NotificationLogEntry
 import com.pirxhio.affirmity.data.local.NotificationPreferences
+import com.pirxhio.affirmity.data.local.OnboardingGuidePreferences
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
 import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
@@ -195,6 +197,56 @@ fun resolveSelectedGroupIds(
     return resolved + PERSONALIZADAS_GROUP_ID
 }
 
+/**
+ * Pure migration-default resolution for the onboarding guide's tri-state "seen" flag (spec R1.3,
+ * design D2), extracted so the legacy-install backfill is testable without DataStore.
+ *
+ * [guideSeen] is the raw DataStore read: `null` = key never written, `false` = armed (owed),
+ * `true` = seen. [hasCompletedOnboarding] is the survey's own completion flag.
+ *
+ * - `guideSeen != null` (armed or already seen): passed through unchanged -- an explicit write
+ *   always wins, regardless of [hasCompletedOnboarding].
+ * - `guideSeen == null && hasCompletedOnboarding == true`: a pre-existing install from before this
+ *   change shipped -- backfills to `true` (seen) so the auto-show gate can never retroactively
+ *   fire for it (R1.3's locked decision).
+ * - `guideSeen == null && hasCompletedOnboarding != true` (`false` or still-unresolved `null`):
+ *   either onboarding is genuinely mid-flow or not yet resolved -- stays `null` (unresolved); the
+ *   auto-show flag only ever gets armed explicitly by [AffirmityAppState.completeOnboarding]'s
+ *   `arm()` call, never by this backfill.
+ */
+fun resolveGuideBackfill(guideSeen: Boolean?, hasCompletedOnboarding: Boolean?): Boolean? =
+    when {
+        guideSeen != null -> guideSeen
+        hasCompletedOnboarding == true -> true
+        else -> null
+    }
+
+/** Derives the auto-show boolean from the resolved tri-state (spec R1.2): shown only when the
+ * resolved state is explicitly armed (`false`). `null` (unresolved) and `true` (seen) both mean
+ * "don't show". */
+fun shouldShowGuide(resolvedGuideSeen: Boolean?): Boolean = resolvedGuideSeen == false
+
+/**
+ * Gate-precedence helper (spec R6.2, design D3), extracted so [MainActivity]'s ordering can be
+ * driven by a plain JUnit test. The auto-show guide gate MUST take precedence over
+ * `healerJustGranted` whenever both are true on the same composition -- the guide renders first,
+ * and the healer celebration stays un-consumed (its own state is untouched by this function) so it
+ * still fires on the next composition after the guide is dismissed (covers the theoretical
+ * collision in spec E4).
+ */
+enum class GuideGateResolution { AUTO_GUIDE, MANUAL_GUIDE, HEALER_GRANTED, NONE }
+
+fun resolveGuideGate(
+    autoShow: Boolean,
+    manualShow: Boolean,
+    healerJustGranted: Boolean,
+): GuideGateResolution = when {
+    autoShow -> GuideGateResolution.AUTO_GUIDE
+    manualShow -> GuideGateResolution.MANUAL_GUIDE
+    healerJustGranted -> GuideGateResolution.HEALER_GRANTED
+    else -> GuideGateResolution.NONE
+}
+
 /** Default for tests/previews that don't care about group selection: never emits a persisted
  * value, so callers always resolve to the first-launch default. */
 private object NoOpGroupSelectionPreferences : GroupSelectionPreferences {
@@ -220,6 +272,7 @@ class AffirmityAppState(
     private val migrator: FirestoreMigrator,
     private val trackerPreferences: TrackerPreferences,
     private val onboardingPreferences: OnboardingPreferences,
+    private val onboardingGuidePreferences: OnboardingGuidePreferences,
     private val imageStore: AffirmationImageStore,
     private val notificationDebugLog: NotificationDebugLog,
     private val notifier: Notifier,
@@ -428,6 +481,21 @@ class AffirmityAppState(
      * or the main app until this resolves. */
     var hasCompletedOnboarding = mutableStateOf<Boolean?>(null)
         private set
+
+    /** True only when the post-survey onboarding guide is armed and not yet seen (spec R1.2, R1.3;
+     * design D2/D3) -- drives [MainActivity]'s auto-show gate, positioned before every other
+     * overlay gate. Resolved via [resolveGuideBackfill]/[shouldShowGuide] from the raw tri-state
+     * DataStore read, never re-evaluated once true (see [markOnboardingGuideSeen]). */
+    var shouldShowOnboardingGuide = mutableStateOf(false)
+        private set
+
+    /** Commits the guide as seen (spec R2.3, R4.2/R4.3) -- called by both the auto and manual
+     * dismiss paths. Never re-arms the auto flag (R5.3/R5.4: the manual gate is a separate state
+     * variable owned by [MainActivity]). */
+    fun markOnboardingGuideSeen() {
+        shouldShowOnboardingGuide.value = false
+        scope.launch { onboardingGuidePreferences.markSeen() }
+    }
 
     private var affirmationsViewedToday = DailyViewCount(epochDay = -1L, count = 0)
 
@@ -643,6 +711,22 @@ class AffirmityAppState(
             onboardingPreferences.observeHasCompletedOnboarding().collect { hasCompletedOnboarding.value = it }
         }
         scope.launch {
+            // D2 migration default: combines the raw tri-state guide-seen read with the survey's
+            // already-held completion state (via `combine`, not a one-shot read of `.value`) so
+            // ordering between the guide DataStore flow and completion-state updates can never
+            // leave a legacy install
+            // (guide-seen key absent, onboarding already complete) stuck unresolved -- see
+            // resolveGuideBackfill's KDoc for the full truth table.
+            combine(
+                onboardingGuidePreferences.observeHasSeenGuide(),
+                snapshotFlow { hasCompletedOnboarding.value },
+            ) { rawGuideSeen, completedOnboarding -> rawGuideSeen to completedOnboarding }
+                .collect { (rawGuideSeen, completedOnboarding) ->
+                    val resolved = resolveGuideBackfill(rawGuideSeen, completedOnboarding)
+                    shouldShowOnboardingGuide.value = shouldShowGuide(resolved)
+                }
+        }
+        scope.launch {
             groupPreferences.observeSelectedGroupIds().collect { persisted ->
                 val resolved = resolveSelectedGroupIds(persisted, knownGroupIds, defaultThematicGroupIds)
                 selectedGroupIds.value = resolved
@@ -718,6 +802,10 @@ class AffirmityAppState(
                 runCatching { onboardingRepository.markCompleted(uid) }
             }
         }
+        // R1.1/R7.1: arms the guide auto-show flag as one atomic addition to survey completion --
+        // the ONLY code path allowed to arm it (spec R1.1). Fire-and-forget like the other writes
+        // in this method; the collector above picks up the write once it lands.
+        scope.launch { onboardingGuidePreferences.arm() }
     }
 
     /** Used by the onboarding flow's "I already have an account" shortcut, right after sign-in,
@@ -1145,6 +1233,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
         val googleIdAuthProvider = GoogleIdAuthProvider(CredentialManager.create(context.applicationContext))
         val trackerPreferences = TrackerPreferences(context)
         val onboardingPreferences = OnboardingPreferences(context)
+        val onboardingGuidePreferences = OnboardingGuidePreferences(context)
         val firestore = FirebaseFirestore.getInstance()
         val local = DataSession.Local(
             affirmations = RoomAffirmationRepository(database.affirmationDao()),
@@ -1174,6 +1263,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             migrator = FirestoreMigrator(firestore),
             trackerPreferences = trackerPreferences,
             onboardingPreferences = onboardingPreferences,
+            onboardingGuidePreferences = onboardingGuidePreferences,
             imageStore = AffirmationImageStore(context.applicationContext),
             notificationDebugLog = notificationDebugLog,
             notifier = Notifier(context.applicationContext, notificationDebugLog),

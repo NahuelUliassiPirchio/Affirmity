@@ -11,16 +11,24 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
+// Bug 2b fix: this previously left secondaryContainer/onSecondaryContainer/onSurfaceVariant/
+// outline unset, falling back to Material's default purple baseline (mismatched from the app's
+// teal brand) for the selected-nav-tab indicator pill. See Color.kt for the contrast reasoning
+// (verified in ContrastRatioTest).
 private val DarkColorScheme = darkColorScheme(
     primary = TealPrimaryDark,
     onPrimary = OnPrimaryDark,
     secondary = SecondaryDark,
+    secondaryContainer = SecondaryContainerDark,
+    onSecondaryContainer = OnSecondaryContainerDark,
     background = BackgroundDark,
     surface = SurfaceDark,
     surfaceContainerLow = SurfaceContainerLowDark,
     surfaceContainer = SurfaceContainerDark,
     onBackground = OnSurfaceDark,
     onSurface = OnSurfaceDark,
+    onSurfaceVariant = OnSurfaceVariantDark,
+    outline = OutlineDark,
     error = ErrorDark,
 )
 
@@ -31,6 +39,7 @@ private val LightColorScheme = lightColorScheme(
     onPrimaryContainer = OnPrimaryContainerLight,
     secondary = SecondaryLight,
     secondaryContainer = SecondaryContainerLight,
+    onSecondaryContainer = OnSecondaryContainerLight,
     background = BackgroundLight,
     surface = SurfaceLight,
     surfaceContainerLowest = SurfaceContainerLowestLight,

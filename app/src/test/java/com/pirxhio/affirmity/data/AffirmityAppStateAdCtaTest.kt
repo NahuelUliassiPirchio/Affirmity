@@ -16,6 +16,7 @@ import com.pirxhio.affirmity.data.local.DailyMoodEntity
 import com.pirxhio.affirmity.data.local.DailyViewCount
 import com.pirxhio.affirmity.data.local.DaySegment
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
+import com.pirxhio.affirmity.data.local.OnboardingGuidePreferences
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
@@ -140,6 +141,8 @@ private fun buildAdCtaTestState(
     whenever(notificationDebugLog.entries).thenReturn(flowOf(emptyList()))
     val onboardingPreferences = mock(OnboardingPreferences::class.java)
     whenever(onboardingPreferences.observeHasCompletedOnboarding()).thenReturn(flowOf(true))
+    val onboardingGuidePreferences = mock(OnboardingGuidePreferences::class.java)
+    whenever(onboardingGuidePreferences.observeHasSeenGuide()).thenReturn(flowOf(true))
 
     return AffirmityAppState(
         scope = scope,
@@ -167,6 +170,7 @@ private fun buildAdCtaTestState(
         fcmTokenRepository = mock(FcmTokenRepository::class.java),
         onboardingRepository = mock(FirestoreOnboardingRepository::class.java),
         onboardingPreferences = onboardingPreferences,
+        onboardingGuidePreferences = onboardingGuidePreferences,
         deviceTimeZoneId = { "UTC" },
         groupPreferences = FakeGroupSelectionPreferences(),
         knownGroupIds = setOf("personalizadas", "fuerza_de_voluntad"),

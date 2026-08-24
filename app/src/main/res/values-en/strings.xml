@@ -197,6 +197,26 @@
     <string name="healer_granted_confirm_button">Got it</string>
     <string name="healer_granted_icon_content_description">Streak healer icon</string>
     <string name="progress_weekly_streak_format">Streak: %1$d days</string>
+
+    <!-- Post-survey onboarding guide (spec R3, design D6) -->
+    <string name="onboarding_guide_slide1_title">Affirmations, your way</string>
+    <string name="onboarding_guide_slide1_body">Your affirmations show up as swipeable cards, organized into themed groups like Wellbeing or Willpower, plus a Personalized group where you write your own. Some groups require Pro.</string>
+    <string name="onboarding_guide_slide1_icon_content_description">Affirmations icon</string>
+    <string name="onboarding_guide_slide2_title">Meditations for every moment</string>
+    <string name="onboarding_guide_slide2_body">Guided sessions are organized by category —sleep, calm, focus— and show an approximate duration. There\'s also a free timer to meditate at your own pace. Some sessions are Pro or unlock by watching an ad.</string>
+    <string name="onboarding_guide_slide2_icon_content_description">Meditation icon</string>
+    <string name="onboarding_guide_slide3_title">Track your mood</string>
+    <string name="onboarding_guide_slide3_body">Log your mood once a day and add a note if you want. If you missed a day, you can fill it in later — your history is always available.</string>
+    <string name="onboarding_guide_slide3_icon_content_description">Mood tracker icon</string>
+    <string name="onboarding_guide_slide4_title">Your streak and the healer</string>
+    <string name="onboarding_guide_slide4_body">You have ONE single overall streak, which advances when you complete an affirmation and a meditation the same day. Two complete days in a row earn you a saved healer: if you miss the next day, you can activate it to repair that day within the SAME streak — it\'s not a separate streak. You can hold at most 1 healer at a time.</string>
+    <string name="onboarding_guide_slide4_icon_content_description">Streak and healer icon</string>
+    <string name="onboarding_guide_skip_button">Skip</string>
+    <string name="onboarding_guide_next_button">Next</string>
+    <string name="onboarding_guide_get_started_button">Get Started</string>
+    <string name="onboarding_guide_progress_content_description">Slide %1$d of %2$d</string>
+    <string name="settings_onboarding_guide_title">How Affirmity works</string>
+    <string name="settings_onboarding_guide_open_button">View again</string>
     <string name="progress_affirmations_section_title">My Affirmations</string>
     <string name="progress_title_field_label">Title</string>
     <string name="progress_title_field_error">Title is missing</string>
