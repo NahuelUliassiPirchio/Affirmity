@@ -130,6 +130,7 @@ data class Affirmation(
     val subtitle: String,
     val background: AffirmationBackground,
     val groupId: String = PERSONALIZADAS_GROUP_ID,
+    val overrides: Map<String, String> = emptyMap(),
 )
 
 /** Rolling last-7-days completion flags (oldest first, today last) for a habit tracker.
@@ -162,6 +163,7 @@ private fun AffirmationEntity.toAffirmation(): Affirmation = Affirmation(
         AffirmationBackground.Color(backgroundValue)
     },
     groupId = groupId,
+    overrides = overrides,
 )
 
 private fun Affirmation.toEntity(): AffirmationEntity = AffirmationEntity(
@@ -180,6 +182,7 @@ private fun Affirmation.toEntity(): AffirmationEntity = AffirmationEntity(
     // [Affirmation.groupId] (spec: personalizadas Always-On; user-authored content is out of the
     // thematic-group scope for this change).
     groupId = PERSONALIZADAS_GROUP_ID,
+    overrides = overrides,
 )
 
 /**
@@ -1000,6 +1003,27 @@ class AffirmityAppState(
         scope.launch {
             ready().affirmations.deleteById(id)
             analytics.log(AnalyticsEvent.CustomAffirmationDeleted)
+        }
+    }
+
+    /**
+     * Sets or clears a per-user token override on [affirmationId]. No entitlement guard by
+     * design (design.md D13): placeholder editing is free for all users. Never emits an
+     * analytics event (design.md D14): override values are free-text and PII-representable.
+     */
+    fun setTokenOverride(affirmationId: String, tokenKey: String, rawValue: String) {
+        scope.launch {
+            val current = affirmations.firstOrNull { it.id == affirmationId } ?: return@launch
+            val next = current.overrides.toMutableMap().apply {
+                when (val normalized = AffirmationTemplateParser.normalizeOverrideValue(rawValue)) {
+                    null -> remove(tokenKey) // empty input == revert to the authored original
+                    else -> put(tokenKey, normalized)
+                }
+            }
+            ready().affirmations.setOverrides(
+                affirmationId,
+                AffirmationTemplateParser.pruneOverrides(current.title, current.subtitle, next),
+            )
         }
     }
 

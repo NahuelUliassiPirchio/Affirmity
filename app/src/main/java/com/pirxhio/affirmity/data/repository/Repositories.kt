@@ -22,6 +22,13 @@ interface AffirmationRepository {
     suspend fun insert(entity: AffirmationEntity)
     suspend fun deleteById(id: String)
     suspend fun deleteAll()
+
+    /**
+     * Replaces the ENTIRE override map for [id] with [overrides]. Whole-map replacement, not a
+     * patch: a key absent from [overrides] is deleted from the store. Callers pass the complete
+     * desired map (design.md D8). A blank value is never persisted.
+     */
+    suspend fun setOverrides(id: String, overrides: Map<String, String>)
 }
 
 /** Store-agnostic contract for the daily habit-completion tracker (streak source of truth). */

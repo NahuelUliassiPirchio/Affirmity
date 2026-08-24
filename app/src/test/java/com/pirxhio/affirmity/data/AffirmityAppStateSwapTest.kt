@@ -97,6 +97,7 @@ private class FakeAffirmationRepository(
     override suspend fun deleteAll() {
         deleteAllCallCount++
     }
+    override suspend fun setOverrides(id: String, overrides: Map<String, String>) = Unit
 }
 
 private class FakeDailyCompletionRepository(

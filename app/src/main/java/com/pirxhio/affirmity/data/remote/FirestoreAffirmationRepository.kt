@@ -34,7 +34,9 @@ class FirestoreAffirmationRepository(
     }
 
     override suspend fun insert(entity: AffirmationEntity) {
-        collection().document(entity.id).set(affirmationToMap(entity), SetOptions.merge()).await()
+        collection().document(entity.id)
+            .set(affirmationToMap(entity), SetOptions.mergeFields(*AFFIRMATION_FIELDS))
+            .await()
     }
 
     override suspend fun deleteById(id: String) {
@@ -46,5 +48,11 @@ class FirestoreAffirmationRepository(
         val batch = firestore.batch()
         documents.forEach { doc -> batch.delete(doc.reference) }
         batch.commit().await()
+    }
+
+    override suspend fun setOverrides(id: String, overrides: Map<String, String>) {
+        collection().document(id)
+            .set(overridesWritePayload(overrides), SetOptions.mergeFields(FIELD_OVERRIDES))
+            .await()
     }
 }

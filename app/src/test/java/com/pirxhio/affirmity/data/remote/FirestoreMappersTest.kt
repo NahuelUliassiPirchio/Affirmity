@@ -8,6 +8,7 @@ import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** See design.md's "Interfaces / Contracts" note: mappers convert 1:1, no cached streak field. */
@@ -61,6 +62,70 @@ class FirestoreMappersTest {
         val entity = affirmationFromMap(map)
 
         assertEquals("personalizadas", entity.groupId)
+    }
+
+    @Test
+    fun `affirmationToMap includes overrides and never emits blank values`() {
+        val entity = AffirmationEntity(
+            id = "aff-1",
+            title = "Gano [10k]",
+            subtitle = "al [mes]",
+            backgroundType = "color",
+            backgroundValue = "#000000",
+            overrides = mapOf("title:0:10k" to "20k", "subtitle:0:mes" to "   "),
+        )
+
+        val map = affirmationToMap(entity)
+
+        @Suppress("UNCHECKED_CAST")
+        val overrides = map["overrides"] as Map<String, Any>
+        assertEquals(mapOf("title:0:10k" to "20k"), overrides)
+    }
+
+    @Test
+    fun `affirmationFromMap on a legacy doc without overrides yields an empty map`() {
+        val map = mapOf<String, Any?>(
+            "id" to "aff-legacy",
+            "title" to "Legacy",
+            "subtitle" to "Doc synced before overrides existed",
+            "backgroundType" to "color",
+            "backgroundValue" to "#000000",
+        )
+
+        val entity = affirmationFromMap(map)
+
+        assertEquals(emptyMap<String, String>(), entity.overrides)
+    }
+
+    @Test
+    fun `affirmationFromMap ignores non-string override map values`() {
+        val map = mapOf<String, Any?>(
+            "id" to "aff-1",
+            "title" to "Gano [10k]",
+            "subtitle" to "al mes",
+            "backgroundType" to "color",
+            "backgroundValue" to "#000000",
+            "overrides" to mapOf("title:0:10k" to 20_000),
+        )
+
+        val entity = affirmationFromMap(map)
+
+        assertEquals(emptyMap<String, String>(), entity.overrides)
+    }
+
+    @Test
+    fun `overridesWritePayload always includes the field, present and empty when there are no overrides`() {
+        val payload = overridesWritePayload(emptyMap())
+
+        assertTrue(payload.containsKey(FIELD_OVERRIDES))
+        assertEquals(emptyMap<String, String>(), payload[FIELD_OVERRIDES])
+    }
+
+    @Test
+    fun `overridesWritePayload filters blank values`() {
+        val payload = overridesWritePayload(mapOf("title:0:10k" to "20k", "title:1:mes" to " "))
+
+        assertEquals(mapOf("title:0:10k" to "20k"), payload[FIELD_OVERRIDES])
     }
 
     @Test

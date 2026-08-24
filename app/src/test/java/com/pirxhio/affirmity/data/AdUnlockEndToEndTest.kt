@@ -77,6 +77,7 @@ private class NoopAffirmationRepository : AffirmationRepository {
     override suspend fun insert(entity: AffirmationEntity) = Unit
     override suspend fun deleteById(id: String) = Unit
     override suspend fun deleteAll() = Unit
+    override suspend fun setOverrides(id: String, overrides: Map<String, String>) = Unit
 }
 
 private class NoopDailyCompletionRepository : DailyCompletionRepository {
