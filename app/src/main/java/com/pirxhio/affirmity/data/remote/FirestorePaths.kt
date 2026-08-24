@@ -1,5 +1,7 @@
 package com.pirxhio.affirmity.data.remote
 
+import com.pirxhio.affirmity.access.ContentKey
+
 /**
  * Pure Firestore path builders for the `users/{uid}` schema (design.md's "Per-User Collection
  * Schema" section). No Firebase/Android dependency — unit-tested directly.
@@ -37,4 +39,8 @@ object FirestorePaths {
     fun entitlementsCollection(uid: String): String = "users/$uid/entitlements"
 
     fun entitlementDoc(uid: String): String = "${entitlementsCollection(uid)}/current"
+
+    fun adUnlocksCollection(uid: String): String = "users/$uid/adUnlocks"
+
+    fun adUnlockDoc(uid: String, key: ContentKey): String = "${adUnlocksCollection(uid)}/${key.storageKey}"
 }

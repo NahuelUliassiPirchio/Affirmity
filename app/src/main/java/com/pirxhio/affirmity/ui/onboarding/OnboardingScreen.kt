@@ -14,6 +14,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -73,72 +74,82 @@ fun OnboardingScreen(
         }
     }
 
-    Column(modifier = modifier.fillMaxSize().padding(24.dp)) {
-        LinearProgressIndicator(
-            progress = { (step + 1f) / totalSteps },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-
-        when {
-            step == 0 -> IntroStep(
-                authError = authError,
-                awaitingAccountCheck = awaitingAccountCheck,
-                onSignInClicked = {
-                    awaitingAccountCheck = true
-                    onSignInClicked()
-                },
-                onStartClicked = {
-                    awaitingAccountCheck = false
-                    step = 1
-                },
-                modifier = Modifier.weight(1f),
+    // Bug 2a fix: this root previously had no Surface/background, so its Text fell back to
+    // Compose's default black (instead of resolving through colorScheme.onBackground) and the
+    // background stayed transparent, showing the Activity window's near-black theme behind it in
+    // dark mode. Wrapping in a Surface keyed to colorScheme.background is the same pattern the
+    // rest of the app's Scaffold-hosted screens already get through Material3.
+    Surface(
+        modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+    ) {
+        Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+            LinearProgressIndicator(
+                progress = { (step + 1f) / totalSteps },
+                modifier = Modifier.fillMaxWidth(),
             )
+            Spacer(modifier = Modifier.height(24.dp))
 
-            step <= lastQuestionStep -> {
-                val question = onboardingQuestions[step - 1]
-                QuestionStep(
-                    question = question,
-                    selectedOption = answers[question.id],
-                    onOptionSelected = { answers[question.id] = it },
+            when {
+                step == 0 -> IntroStep(
+                    authError = authError,
+                    awaitingAccountCheck = awaitingAccountCheck,
+                    onSignInClicked = {
+                        awaitingAccountCheck = true
+                        onSignInClicked()
+                    },
+                    onStartClicked = {
+                        awaitingAccountCheck = false
+                        step = 1
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+
+                step <= lastQuestionStep -> {
+                    val question = onboardingQuestions[step - 1]
+                    QuestionStep(
+                        question = question,
+                        selectedOption = answers[question.id],
+                        onOptionSelected = { answers[question.id] = it },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+
+                else -> AuthStep(
+                    authState = authState,
+                    authError = authError,
+                    onSignInClicked = onSignInClicked,
                     modifier = Modifier.weight(1f),
                 )
             }
 
-            else -> AuthStep(
-                authState = authState,
-                authError = authError,
-                onSignInClicked = onSignInClicked,
-                modifier = Modifier.weight(1f),
-            )
-        }
-
-        if (step > 0) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                TextButton(onClick = { step -= 1 }) {
-                    Text(stringResource(id = R.string.onboarding_back_button))
-                }
-
-                if (step <= lastQuestionStep) {
-                    val question = onboardingQuestions[step - 1]
-                    Button(
-                        onClick = {
-                            if (step == lastQuestionStep && skipFinalAuthStep) {
-                                onFinished()
-                            } else {
-                                step += 1
-                            }
-                        },
-                        enabled = answers.containsKey(question.id),
-                    ) {
-                        Text(stringResource(id = R.string.onboarding_next_button))
+            if (step > 0) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    TextButton(onClick = { step -= 1 }) {
+                        Text(stringResource(id = R.string.onboarding_back_button))
                     }
-                } else {
-                    TextButton(onClick = onFinished) {
-                        Text(stringResource(id = R.string.onboarding_continue_without_account_button))
+
+                    if (step <= lastQuestionStep) {
+                        val question = onboardingQuestions[step - 1]
+                        Button(
+                            onClick = {
+                                if (step == lastQuestionStep && skipFinalAuthStep) {
+                                    onFinished()
+                                } else {
+                                    step += 1
+                                }
+                            },
+                            enabled = answers.containsKey(question.id),
+                        ) {
+                            Text(stringResource(id = R.string.onboarding_next_button))
+                        }
+                    } else {
+                        TextButton(onClick = onFinished) {
+                            Text(stringResource(id = R.string.onboarding_continue_without_account_button))
+                        }
                     }
                 }
             }

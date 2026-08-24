@@ -197,6 +197,26 @@
     <string name="healer_granted_confirm_button">Entendido</string>
     <string name="healer_granted_icon_content_description">Ícono de sanador de racha</string>
     <string name="progress_weekly_streak_format">Racha: %1$d días</string>
+
+    <!-- Post-survey onboarding guide (spec R3, design D6) -->
+    <string name="onboarding_guide_slide1_title">Afirmaciones a tu medida</string>
+    <string name="onboarding_guide_slide1_body">Tus afirmaciones aparecen como tarjetas que deslizás, organizadas en grupos temáticos como Bienestar o Fuerza de voluntad, más un grupo Personalizadas donde escribís las tuyas. Algunos grupos requieren Pro.</string>
+    <string name="onboarding_guide_slide1_icon_content_description">Ícono de afirmaciones</string>
+    <string name="onboarding_guide_slide2_title">Meditaciones para cada momento</string>
+    <string name="onboarding_guide_slide2_body">Las sesiones guiadas están organizadas por categoría —sueño, calma, enfoque— y muestran su duración aproximada. También tenés un temporizador libre para meditar a tu ritmo. Algunas sesiones son Pro o se desbloquean viendo un anuncio.</string>
+    <string name="onboarding_guide_slide2_icon_content_description">Ícono de meditación</string>
+    <string name="onboarding_guide_slide3_title">Registrá tu ánimo</string>
+    <string name="onboarding_guide_slide3_body">Anotá tu ánimo una vez por día y agregá una nota si querés. Si te olvidaste algún día, podés completarlo después: tu historial queda siempre disponible.</string>
+    <string name="onboarding_guide_slide3_icon_content_description">Ícono de registro de ánimo</string>
+    <string name="onboarding_guide_slide4_title">Tu racha y el sanador</string>
+    <string name="onboarding_guide_slide4_body">Tenés UNA sola racha general, que avanza cuando completás una afirmación y una meditación el mismo día. Dos días seguidos completos te dan un sanador guardado: si al día siguiente te olvidás, podés activarlo para reparar ese día dentro de la misma racha —no es una racha aparte. Guardás como máximo 1 sanador a la vez.</string>
+    <string name="onboarding_guide_slide4_icon_content_description">Ícono de racha y sanador</string>
+    <string name="onboarding_guide_skip_button">Omitir</string>
+    <string name="onboarding_guide_next_button">Siguiente</string>
+    <string name="onboarding_guide_get_started_button">Empezar</string>
+    <string name="onboarding_guide_progress_content_description">Diapositiva %1$d de %2$d</string>
+    <string name="settings_onboarding_guide_title">Cómo funciona Affirmity</string>
+    <string name="settings_onboarding_guide_open_button">Ver de nuevo</string>
     <string name="progress_affirmations_section_title">Mis Afirmaciones</string>
     <string name="progress_title_field_label">Título</string>
     <string name="progress_title_field_error">Falta el título</string>
@@ -216,6 +236,9 @@
     <string name="progress_save_button">Guardar</string>
     <string name="progress_import_button">Importar</string>
     <string name="progress_delete_content_description">Eliminar</string>
+    <string name="my_affirmations_locked_headline">Crear afirmaciones propias requiere Pro</string>
+    <string name="my_affirmations_locked_body">Tus afirmaciones existentes siguen disponibles y podés eliminarlas cuando quieras. Para crear nuevas, necesitás una suscripción Pro.</string>
+    <string name="my_affirmations_locked_cta">Mejorar a Pro</string>
 
     <string name="settings_notification_debug_title">Debug de notificaciones</string>
     <string name="settings_notification_debug_view_history_button">Ver historial</string>
@@ -232,16 +255,8 @@
     <string name="meditation_preset_relax">Relax</string>
     <string name="meditation_preset_focus">Focus</string>
     <string name="meditation_preset_sleep">Sleep</string>
-    <string name="meditation_guided_demo_button">Meditación guiada (demo)</string>
     <string name="meditation_discover_header">Descubre más sesiones</string>
-    <string name="meditation_discover_track_1_title">Ondas de Calma</string>
-    <string name="meditation_discover_track_1_meta">10 min • Relajación</string>
-    <string name="meditation_discover_track_2_title">Cielo Nocturno</string>
-    <string name="meditation_discover_track_2_meta">20 min • Sueño</string>
-    <string name="meditation_discover_track_3_title">Horizonte Sereno</string>
-    <string name="meditation_discover_track_3_meta">15 min • Enfoque</string>
 
-    <string name="guided_meditation_title">Respiración guiada</string>
     <string name="guided_meditation_round_label">Ronda %1$d de %2$d</string>
     <string name="guided_meditation_breath_label">Respiración %1$d de %2$d</string>
     <string name="guided_meditation_inhale">Inhalá</string>
@@ -254,6 +269,61 @@
     <string name="guided_meditation_pause_content_description">Pausar</string>
     <string name="guided_meditation_resume_content_description">Reanudar</string>
     <string name="guided_meditation_skip_content_description">Avanzar fase</string>
+
+    <!-- Meditation catalog (Spec 3, REQ-4.6/4.11) — titles, descriptions, categories for the 7
+         shipping entries, and every ShowText cue id their definitions reference. Copy is an
+         engineering placeholder pending product/editorial review (spec §14 risk R5). -->
+    <string name="meditation_catalog_reset_rapido_title">Reset rápido</string>
+    <string name="meditation_catalog_reset_rapido_description">Una pausa breve de 2 minutos para recuperar el centro.</string>
+    <string name="meditation_catalog_calma_title">Calma</string>
+    <string name="meditation_catalog_calma_description">Respiración guiada de 5 minutos para bajar la ansiedad.</string>
+    <string name="meditation_catalog_enfoque_title">Enfoque</string>
+    <string name="meditation_catalog_enfoque_description">Respiración en caja de 10 minutos para concentrarte.</string>
+    <string name="meditation_catalog_dormir_title">Dormir</string>
+    <string name="meditation_catalog_dormir_description">Guía de 10 minutos para prepararte a dormir.</string>
+    <string name="meditation_catalog_body_scan_title">Body Scan</string>
+    <string name="meditation_catalog_body_scan_description">Recorré tu cuerpo con atención plena durante 10 minutos.</string>
+    <string name="meditation_catalog_autocompasion_5_title">Autocompasión 5</string>
+    <string name="meditation_catalog_autocompasion_5_description">Practicá autocompasión en 5 minutos.</string>
+    <string name="meditation_catalog_autocompasion_10_title">Autocompasión 10</string>
+    <string name="meditation_catalog_autocompasion_10_description">Una práctica extendida de autocompasión de 10 minutos.</string>
+
+    <string name="meditation_catalog_category_relajacion">Relajación</string>
+    <string name="meditation_catalog_category_calma">Calma</string>
+    <string name="meditation_catalog_category_enfoque">Enfoque</string>
+    <string name="meditation_catalog_category_sueno">Sueño</string>
+    <string name="meditation_catalog_category_cuerpo">Cuerpo</string>
+    <string name="meditation_catalog_category_autocompasion">Autocompasión</string>
+
+    <string name="meditation_quickreset_intro">Encontrá una postura cómoda y soltá los hombros.</string>
+    <string name="meditation_quickreset_closing">Volvé a tu día con esta calma.</string>
+    <string name="meditation_calm_intro">Dejá que tu respiración se haga más lenta.</string>
+    <string name="meditation_calm_hold">Sostené suavemente.</string>
+    <string name="meditation_calm_rest">Notá cómo se siente tu respiración ahora.</string>
+    <string name="meditation_calm_closing">Llevá esta calma con vos.</string>
+    <string name="meditation_focus_intro">Preparate para enfocar tu atención.</string>
+    <string name="meditation_focus_hold">Sostené con firmeza.</string>
+    <string name="meditation_focus_anchor">Mantené la atención en el presente.</string>
+    <string name="meditation_focus_closing">Tu enfoque está listo.</string>
+    <string name="meditation_sleep_settle">Acomodate y dejá que tu cuerpo se hunda.</string>
+    <string name="meditation_sleep_guidance">Soltá el día que dejás atrás.</string>
+    <string name="meditation_sleep_rest_1">Dejate llevar por el sonido.</string>
+    <string name="meditation_sleep_release">Soltá cualquier tensión que quede.</string>
+    <string name="meditation_sleep_rest_2">Cada respiración te acerca más al sueño.</string>
+    <string name="meditation_sleep_closing">Descansá bien.</string>
+    <string name="meditation_bodyscan_intro">Recorré tu cuerpo con atención, sin juzgar.</string>
+    <string name="meditation_bodyscan_feet">Llevá tu atención a los pies.</string>
+    <string name="meditation_bodyscan_legs">Llevá tu atención a las piernas.</string>
+    <string name="meditation_bodyscan_torso">Llevá tu atención al torso.</string>
+    <string name="meditation_bodyscan_arms">Llevá tu atención a los brazos.</string>
+    <string name="meditation_bodyscan_head">Llevá tu atención a la cabeza.</string>
+    <string name="meditation_bodyscan_whole">Sentí tu cuerpo entero como un todo.</string>
+    <string name="meditation_bodyscan_closing">Volvé al espacio a tu alrededor.</string>
+    <string name="meditation_selfcompassion_intro">Ponete una mano en el pecho, con suavidad.</string>
+    <string name="meditation_selfcompassion_phrase_1">Que pueda ser amable conmigo mismo/a.</string>
+    <string name="meditation_selfcompassion_phrase_2">Que pueda aceptar este momento tal como es.</string>
+    <string name="meditation_selfcompassion_phrase_3">Que pueda darme la compasión que necesito.</string>
+    <string name="meditation_selfcompassion_closing">Llevá esta amabilidad con vos.</string>
 
     <string name="widget_empty_state_label">Empezá hoy</string>
     <string name="widget_action_affirm_label">Afirmar</string>
@@ -278,6 +348,11 @@
     <string name="affirmation_group_locked_a11y">%1$s (bloqueado)</string>
     <string name="affirmation_group_always_on_a11y">Siempre seleccionado</string>
     <string name="affirmation_group_upgrade_cta">Mejorar a Pro</string>
+    <string name="ad_unlock_cta_a11y">Mirá un anuncio para desbloquear %1$s</string>
+    <string name="ad_unlock_loading_a11y">Cargando anuncio…</string>
+    <string name="ad_unlock_earned_message">¡Listo! Ya podés usar esta sesión.</string>
+    <string name="ad_unlock_dismissed_message">Cerraste el anuncio antes de terminar, así que no se desbloqueó nada.</string>
+    <string name="ad_unlock_unavailable_message">No hay anuncios disponibles en este momento. Probá de nuevo más tarde.</string>
     <string name="paywall_title">Afirmity Pro</string>
     <string name="paywall_description">Desbloqueá todos los grupos temáticos con una suscripción Pro.</string>
     <string name="paywall_monthly_cta">Mensual — %1$s</string>

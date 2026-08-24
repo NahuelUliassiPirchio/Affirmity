@@ -51,5 +51,30 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false;
     }
+
+    // Client-writable by design, unlike the entitlement doc above: the CLIENT observes rewarded-ad
+    // completion, so there is no server signal to write from. Deliberate, recorded weakening
+    // (Spec 1 design, Q7) -- a modified client can self-grant an ad unlock, which is accepted for
+    // low-value content. What rules DO enforce: owner-only, a closed field set, a doc id that
+    // agrees with its own fields, and CREATE-ONLY, so a consumed ONE_TIME_TRIAL can never be
+    // erased or back-dated by the client.
+    match /users/{uid}/adUnlocks/{contentKey} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(
+             ['contentType', 'contentId', 'grantedAtMillis', 'expiresAtMillis'])
+        && request.resource.data.keys().hasAll(
+             ['contentType', 'contentId', 'grantedAtMillis'])
+        && request.resource.data.contentType is string
+        && request.resource.data.contentId is string
+        && contentKey == request.resource.data.contentType + '_' + request.resource.data.contentId
+        && request.resource.data.grantedAtMillis is int
+        && (!('expiresAtMillis' in request.resource.data.keys())
+            || request.resource.data.expiresAtMillis == null
+            || request.resource.data.expiresAtMillis is int);
+
+      allow update, delete: if false;
+    }
   }
 }

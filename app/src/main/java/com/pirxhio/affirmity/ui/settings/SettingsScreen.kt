@@ -39,11 +39,11 @@ import androidx.compose.ui.window.Dialog
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import com.pirxhio.affirmity.R
+import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.auth.AuthState
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DaySegment
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
-import com.pirxhio.affirmity.data.repository.EntitlementTier
 
 /** Follow-system default plus the two supported explicit languages (spec: `In-App Language
  * Selection`). Maps to/from a BCP-47 language tag rather than [LocaleListCompat] directly so the
@@ -86,8 +86,10 @@ fun SettingsScreen(
     onQuietHoursEnabledChanged: (Boolean) -> Unit,
     onQuietHoursWindowChanged: (startMinute: Int, endMinute: Int) -> Unit,
     onOpenNotificationDebug: () -> Unit,
+    onOpenOnboardingGuide: () -> Unit,
+    onSignInClicked: () -> Unit,
     onSignOutClicked: () -> Unit,
-    tier: EntitlementTier,
+    tier: AccessTier,
     onUpgradeClick: () -> Unit,
     onManageSubscriptionClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -159,19 +161,71 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    Text(text = stringResource(id = R.string.settings_onboarding_guide_title), style = MaterialTheme.typography.titleMedium)
+                    TextButton(onClick = onOpenOnboardingGuide) { Text(stringResource(id = R.string.settings_onboarding_guide_open_button)) }
+                }
+            }
+        }
+
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(text = stringResource(id = R.string.settings_notification_debug_title), style = MaterialTheme.typography.titleMedium)
                     TextButton(onClick = onOpenNotificationDebug) { Text(stringResource(id = R.string.settings_notification_debug_view_history_button)) }
                 }
             }
         }
 
-        if (authState is AuthState.SignedIn) {
-            item {
+        when (settingsAccountSectionMode(authState)) {
+            SettingsAccountSectionMode.SIGNED_IN -> item {
                 SignOutSection(
-                    authState = authState,
+                    authState = authState as AuthState.SignedIn,
                     onSignOutClicked = onSignOutClicked,
                     syncError = syncError,
                 )
+            }
+
+            SettingsAccountSectionMode.SIGNED_OUT -> item {
+                SignInRow(onSignInClicked = onSignInClicked)
+            }
+        }
+    }
+}
+
+/**
+ * Bug 1 fix: guests who finished onboarding via "continue without account" (`AuthState.SignedOut`
+ * survives onboarding) previously had no way back into an account -- this section only ever
+ * rendered [SignOutSection], gated on `authState is AuthState.SignedIn`, with no `else` branch.
+ * [settingsAccountSectionMode] is the pure branch-selection logic, extracted so it's JVM-testable
+ * without composing (see `SettingsAccountSectionModeTest`).
+ */
+enum class SettingsAccountSectionMode { SIGNED_IN, SIGNED_OUT }
+
+fun settingsAccountSectionMode(authState: AuthState): SettingsAccountSectionMode =
+    if (authState is AuthState.SignedIn) {
+        SettingsAccountSectionMode.SIGNED_IN
+    } else {
+        SettingsAccountSectionMode.SIGNED_OUT
+    }
+
+@Composable
+private fun SignInRow(onSignInClicked: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Button(onClick = onSignInClicked) {
+                Text(stringResource(id = R.string.settings_account_sign_in_button))
             }
         }
     }

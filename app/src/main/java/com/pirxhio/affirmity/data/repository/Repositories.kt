@@ -1,5 +1,7 @@
 package com.pirxhio.affirmity.data.repository
 
+import com.pirxhio.affirmity.access.AccessTier
+import com.pirxhio.affirmity.access.AdUnlockRecord
 import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
@@ -73,19 +75,15 @@ interface NotificationSettingsRepository {
     suspend fun setTimeZone(zoneId: String)
 }
 
-/** Free/Pro gating tier, resolved client-side from the server-written entitlement doc — see
- * `EntitlementResolution.resolveTier` (design.md D5). */
-enum class EntitlementTier { FREE, PRO }
-
 /** Client-facing entitlement snapshot. [expiryTimeMillis] is `null` for a Free tier or a
  * non-expiring grant. */
 data class Entitlement(
-    val tier: EntitlementTier,
+    val tier: AccessTier,
     val expiryTimeMillis: Long? = null,
     val productId: String? = null,
 ) {
     companion object {
-        val Free = Entitlement(tier = EntitlementTier.FREE)
+        val Free = Entitlement(tier = AccessTier.FREE)
     }
 }
 
@@ -96,4 +94,23 @@ data class Entitlement(
  */
 interface EntitlementRepository {
     fun observe(): Flow<Entitlement>
+}
+
+/**
+ * Store-agnostic contract for per-item ad-unlock grants. **Durable grants only** —
+ * [com.pirxhio.affirmity.access.AdUnlockPolicy.PER_USE] is process-scoped by product definition
+ * (design §0) and never reaches this interface.
+ *
+ * Unlike [EntitlementRepository] this IS client-writable: the client is what observes a rewarded-ad
+ * completion, so there is no server signal to write from. Deliberate, recorded weakening (design
+ * §8). Writes are **create-if-absent**: a granted trial can never be re-granted, back-dated, or
+ * erased.
+ */
+interface AdUnlockRepository {
+    fun observeDurableUnlocks(): Flow<List<AdUnlockRecord>>
+    suspend fun getDurableUnlocks(): List<AdUnlockRecord>
+
+    /** Idempotent. A second call for an existing [AdUnlockRecord.key] is a silent no-op, not an
+     *  overwrite. */
+    suspend fun grantDurableUnlock(record: AdUnlockRecord)
 }

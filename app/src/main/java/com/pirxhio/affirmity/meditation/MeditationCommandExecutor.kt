@@ -63,6 +63,7 @@ class TimerCommandExecutor(
             }
             is PauseTimer -> clock.pause()
             is ResumeTimer -> clock.resume()
+            is EndSession -> clock.stop()
             else -> Unit
         }
     }

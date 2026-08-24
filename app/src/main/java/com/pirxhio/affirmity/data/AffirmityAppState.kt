@@ -8,14 +8,42 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringArrayResource
 import androidx.credentials.CredentialManager
+import com.pirxhio.affirmity.BuildConfig
 import com.pirxhio.affirmity.R
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.messaging.FirebaseMessaging
+import com.pirxhio.affirmity.access.AccessDecision
+import com.pirxhio.affirmity.access.AccessTier
+import com.pirxhio.affirmity.access.AdUnitIds
+import com.pirxhio.affirmity.access.AdUnlockOutcome
+import com.pirxhio.affirmity.access.AdUnlockPolicy
+import com.pirxhio.affirmity.access.AdUnlockRecord
+import com.pirxhio.affirmity.access.AdUnlockSource
+import com.pirxhio.affirmity.access.AdUnlockState
+import com.pirxhio.affirmity.access.ContentKey
+import com.pirxhio.affirmity.access.ContentType
+import com.pirxhio.affirmity.access.NoAdUnlockSource
+import com.pirxhio.affirmity.access.RewardedAdUnlockSource
+import com.google.firebase.analytics.FirebaseAnalytics
+import com.pirxhio.affirmity.analytics.AnalyticsConsentState
+import com.pirxhio.affirmity.analytics.AnalyticsEvent
+import com.pirxhio.affirmity.analytics.AnalyticsId
+import com.pirxhio.affirmity.analytics.AnalyticsLogger
+import com.pirxhio.affirmity.analytics.ConsentGatedAnalyticsLogger
+import com.pirxhio.affirmity.analytics.CreationMethod
+import com.pirxhio.affirmity.analytics.DailyGoal
+import com.pirxhio.affirmity.analytics.FirebaseAnalyticsLogger
+import com.pirxhio.affirmity.analytics.NoOpAnalyticsLogger
+import com.pirxhio.affirmity.analytics.firebase.AndroidFirebaseAnalyticsSink
+import com.pirxhio.affirmity.analytics.toAdFailureReason
+import com.pirxhio.affirmity.ads.GoogleRewardedAdGateway
+import com.pirxhio.affirmity.ads.findActivity
 import com.pirxhio.affirmity.auth.AuthError
 import com.pirxhio.affirmity.auth.AuthException
 import com.pirxhio.affirmity.auth.AuthProviderId
@@ -36,11 +64,13 @@ import com.pirxhio.affirmity.data.local.GroupSelectionPreferences
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.NotificationLogEntry
 import com.pirxhio.affirmity.data.local.NotificationPreferences
+import com.pirxhio.affirmity.data.local.OnboardingGuidePreferences
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
 import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.FcmTokenRepository
+import com.pirxhio.affirmity.data.remote.FirestoreAdUnlockRepository
 import com.pirxhio.affirmity.data.remote.FirestoreAffirmationRepository
 import com.pirxhio.affirmity.data.remote.FirestoreDailyCompletionRepository
 import com.pirxhio.affirmity.data.remote.FirestoreDailyMoodRepository
@@ -51,19 +81,22 @@ import com.pirxhio.affirmity.data.remote.FirestoreNotificationSettingsRepository
 import com.pirxhio.affirmity.data.remote.FirestoreOnboardingRepository
 import com.pirxhio.affirmity.data.remote.FirestoreStreakHealerRepository
 import com.pirxhio.affirmity.data.remote.MigrationSnapshot
+import com.pirxhio.affirmity.data.repository.AdUnlockRepository
 import com.pirxhio.affirmity.data.repository.DataSession
-import com.pirxhio.affirmity.data.repository.EntitlementTier
+import com.pirxhio.affirmity.data.repository.RoomAdUnlockRepository
 import com.pirxhio.affirmity.data.repository.RoomAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomDailyCompletionRepository
 import com.pirxhio.affirmity.data.repository.RoomDailyMoodRepository
 import com.pirxhio.affirmity.data.repository.RoomMeditationPreferencesRepository
 import com.pirxhio.affirmity.data.repository.RoomNotificationSettingsRepository
 import com.pirxhio.affirmity.data.repository.RoomStreakHealerRepository
+import com.pirxhio.affirmity.meditation.SessionEndReason
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
-import com.pirxhio.affirmity.ui.groups.AffirmationGroupAccess
 import com.pirxhio.affirmity.ui.groups.defaultAffirmationGroups
 import com.pirxhio.affirmity.ui.groups.selectableAffirmationGroups
+import com.pirxhio.affirmity.access.isUnlocked
+import com.pirxhio.affirmity.ui.myaffirmations.customAffirmationAccessDecision
 import com.pirxhio.affirmity.widget.WeeklyTrackerWidget
 import androidx.glance.appwidget.updateAll
 import java.util.TimeZone
@@ -164,6 +197,56 @@ fun resolveSelectedGroupIds(
     return resolved + PERSONALIZADAS_GROUP_ID
 }
 
+/**
+ * Pure migration-default resolution for the onboarding guide's tri-state "seen" flag (spec R1.3,
+ * design D2), extracted so the legacy-install backfill is testable without DataStore.
+ *
+ * [guideSeen] is the raw DataStore read: `null` = key never written, `false` = armed (owed),
+ * `true` = seen. [hasCompletedOnboarding] is the survey's own completion flag.
+ *
+ * - `guideSeen != null` (armed or already seen): passed through unchanged -- an explicit write
+ *   always wins, regardless of [hasCompletedOnboarding].
+ * - `guideSeen == null && hasCompletedOnboarding == true`: a pre-existing install from before this
+ *   change shipped -- backfills to `true` (seen) so the auto-show gate can never retroactively
+ *   fire for it (R1.3's locked decision).
+ * - `guideSeen == null && hasCompletedOnboarding != true` (`false` or still-unresolved `null`):
+ *   either onboarding is genuinely mid-flow or not yet resolved -- stays `null` (unresolved); the
+ *   auto-show flag only ever gets armed explicitly by [AffirmityAppState.completeOnboarding]'s
+ *   `arm()` call, never by this backfill.
+ */
+fun resolveGuideBackfill(guideSeen: Boolean?, hasCompletedOnboarding: Boolean?): Boolean? =
+    when {
+        guideSeen != null -> guideSeen
+        hasCompletedOnboarding == true -> true
+        else -> null
+    }
+
+/** Derives the auto-show boolean from the resolved tri-state (spec R1.2): shown only when the
+ * resolved state is explicitly armed (`false`). `null` (unresolved) and `true` (seen) both mean
+ * "don't show". */
+fun shouldShowGuide(resolvedGuideSeen: Boolean?): Boolean = resolvedGuideSeen == false
+
+/**
+ * Gate-precedence helper (spec R6.2, design D3), extracted so [MainActivity]'s ordering can be
+ * driven by a plain JUnit test. The auto-show guide gate MUST take precedence over
+ * `healerJustGranted` whenever both are true on the same composition -- the guide renders first,
+ * and the healer celebration stays un-consumed (its own state is untouched by this function) so it
+ * still fires on the next composition after the guide is dismissed (covers the theoretical
+ * collision in spec E4).
+ */
+enum class GuideGateResolution { AUTO_GUIDE, MANUAL_GUIDE, HEALER_GRANTED, NONE }
+
+fun resolveGuideGate(
+    autoShow: Boolean,
+    manualShow: Boolean,
+    healerJustGranted: Boolean,
+): GuideGateResolution = when {
+    autoShow -> GuideGateResolution.AUTO_GUIDE
+    manualShow -> GuideGateResolution.MANUAL_GUIDE
+    healerJustGranted -> GuideGateResolution.HEALER_GRANTED
+    else -> GuideGateResolution.NONE
+}
+
 /** Default for tests/previews that don't care about group selection: never emits a persisted
  * value, so callers always resolve to the first-launch default. */
 private object NoOpGroupSelectionPreferences : GroupSelectionPreferences {
@@ -171,6 +254,11 @@ private object NoOpGroupSelectionPreferences : GroupSelectionPreferences {
         kotlinx.coroutines.flow.flowOf(null)
     override suspend fun saveSelectedGroupIds(ids: Set<String>) = Unit
 }
+
+/** One-shot ad-request outcome, mapped from [AdUnlockOutcome] for display (design D7). `Failed`
+ *  and `Unavailable` collapse to the same [UNAVAILABLE] notice -- an SDK error string is not user
+ *  copy -- while [DISMISSED] stays distinct, matching "you closed it early" vs "no ad available". */
+enum class AdRequestNotice { EARNED, DISMISSED, UNAVAILABLE }
 
 /**
  * Shared in-memory state for the whole app, backed by Room (affirmations) and DataStore
@@ -184,6 +272,7 @@ class AffirmityAppState(
     private val migrator: FirestoreMigrator,
     private val trackerPreferences: TrackerPreferences,
     private val onboardingPreferences: OnboardingPreferences,
+    private val onboardingGuidePreferences: OnboardingGuidePreferences,
     private val imageStore: AffirmationImageStore,
     private val notificationDebugLog: NotificationDebugLog,
     private val notifier: Notifier,
@@ -205,10 +294,19 @@ class AffirmityAppState(
     /** First-launch default thematic selection (unlocked thematic groups), also resolved by the
      * caller for the same D9 reason. */
     private val defaultThematicGroupIds: Set<String> = emptySet(),
-    /** Every group id that requires Pro entitlement (`PREMIUM`/`AD_SUPPORTED` access, excluding
-     * `alwaysSelected`), resolved by the caller for the same D9 reason. Consumed by the
-     * downgrade-auto-deselect collector ([deselectLockedGroups] call site). */
+    /** Every group id whose `access.requiredTier == AccessTier.PRO`, excluding `alwaysSelected`,
+     * resolved by the caller for the same D9 reason. Consumed by the downgrade-auto-deselect
+     * collector ([deselectLockedGroups] call site). */
     private val proOnlyGroupIds: Set<String> = emptySet(),
+    /** The seam Spec 5 replaces (design §9): the only way an ad unlock is ever created.
+     *  Defaulted to [NoAdUnlockSource] -- the same injection convention as [deviceTimeZoneId] /
+     *  [groupPreferences] / [knownGroupIds] -- so Spec 5's entire integration into this class is
+     *  one changed argument at the `rememberAffirmityAppState` call site. */
+    private val adUnlockSource: AdUnlockSource = NoAdUnlockSource,
+    /** Spec 6's one frozen seam (design D1) -- defaulted to [NoOpAnalyticsLogger], the same
+     *  injection convention as [adUnlockSource]. The composition root swaps this once for the
+     *  real, consent-gated instance ([ConsentGatedAnalyticsLogger]) -- the one-line kill switch. */
+    private val analytics: AnalyticsLogger = NoOpAnalyticsLogger,
 ) {
     val affirmations = mutableStateListOf<Affirmation>()
 
@@ -291,7 +389,7 @@ class AffirmityAppState(
 
     /** Current Free/Pro gating tier, resolved from the live entitlement repository (design.md
      * D5/D8). Read by [rememberAffirmityAppState]'s callers to drive `GroupAccessPolicy`. */
-    var entitlementTier = mutableStateOf(EntitlementTier.FREE)
+    var entitlementTier = mutableStateOf(AccessTier.FREE)
         private set
 
     /** True right after a live entitlement transition from Pro to Free is observed (design.md D8,
@@ -306,7 +404,49 @@ class AffirmityAppState(
         proLapseNotice.value = false
     }
 
+    /** The ONE ad request allowed in flight app-wide (REQ-4.8/6.1). Non-null = that key's CTA is
+     *  busy and every ad CTA anywhere -- meditation catalog and affirmation groups alike -- is
+     *  inert. UI-level half of the single-flight rule; [RewardedAdUnlockSource] holds the
+     *  authoritative half so a non-UI caller cannot bypass it. */
+    var adRequestInFlight = mutableStateOf<ContentKey?>(null)
+        private set
+
+    /** One-shot user-visible result of the last ad request (design D7). Mirrors [proLapseNotice] /
+     *  [acknowledgeProLapse]'s snackbar consumption pattern exactly. */
+    var adRequestNotice = mutableStateOf<AdRequestNotice?>(null)
+        private set
+
+    /** Dismisses [adRequestNotice] once the user has seen the snackbar (design D7). */
+    fun acknowledgeAdRequestNotice() {
+        adRequestNotice.value = null
+    }
+
     private var entitlementFlowInitialized = false
+
+    /** PER_USE ad unlocks earned in THIS process for THIS identity. Deliberately NOT in Room or
+     *  Firestore: a PER_USE grant dies with the process by product definition (design §0/§4b).
+     *  Cleared whenever the session identity changes (uid `null` <-> uid, see [session]) and on a
+     *  live PRO->FREE transition (design §10 Q4(i)) -- at that instant it can only contain stale
+     *  entries, since a PRO user can never acquire one by construction ([resolveAccess] returns
+     *  `Unlocked` before ever reading grants). */
+    var sessionAdUnlocks = mutableStateOf<Set<ContentKey>>(emptySet())
+        private set
+
+    /** Durable ONE_TIME_TRIAL grants, mirrored from the active session's `adUnlocks` repository
+     *  (design §4b) -- same collector shape as [entitlementTier]. */
+    var durableAdUnlocks = mutableStateOf<Map<ContentKey, AdUnlockRecord>>(emptyMap())
+        private set
+
+    /** The complete grant state fed to `groupAccessDecision`/`resolveAccess` (design §9). */
+    val adUnlockState: AdUnlockState
+        get() = AdUnlockState(sessionAdUnlocks.value, durableAdUnlocks.value)
+
+    /** Creation-time gate for the 4 custom-affirmation mutation surfaces (Spec 4, REQ-5.1/5.3).
+     *  Derived on every read from [entitlementTier]/[adUnlockState] -- no polling, no recomposition
+     *  logic beyond `collectAsState`. Count-independent: existing affirmations are never inspected
+     *  (grandfathering, spec §0 Q3). */
+    val customAffirmationCreateDecision: AccessDecision
+        get() = customAffirmationAccessDecision(entitlementTier.value, adUnlockState, System.currentTimeMillis())
 
     /** Rolling [STREAK_LOOKBACK_DAYS]-day window of mood check-ins, oldest first — the calendar
      * and "Resumen" stats derive everything else (average/distribution/trend) from this list. */
@@ -342,6 +482,21 @@ class AffirmityAppState(
     var hasCompletedOnboarding = mutableStateOf<Boolean?>(null)
         private set
 
+    /** True only when the post-survey onboarding guide is armed and not yet seen (spec R1.2, R1.3;
+     * design D2/D3) -- drives [MainActivity]'s auto-show gate, positioned before every other
+     * overlay gate. Resolved via [resolveGuideBackfill]/[shouldShowGuide] from the raw tri-state
+     * DataStore read, never re-evaluated once true (see [markOnboardingGuideSeen]). */
+    var shouldShowOnboardingGuide = mutableStateOf(false)
+        private set
+
+    /** Commits the guide as seen (spec R2.3, R4.2/R4.3) -- called by both the auto and manual
+     * dismiss paths. Never re-arms the auto flag (R5.3/R5.4: the manual gate is a separate state
+     * variable owned by [MainActivity]). */
+    fun markOnboardingGuideSeen() {
+        shouldShowOnboardingGuide.value = false
+        scope.launch { onboardingGuidePreferences.markSeen() }
+    }
+
     private var affirmationsViewedToday = DailyViewCount(epochDay = -1L, count = 0)
 
     /**
@@ -355,6 +510,9 @@ class AffirmityAppState(
         .map { (it as? AuthState.SignedIn)?.uid }
         .distinctUntilChanged()
         .transformLatest { uid ->
+            // A PER_USE grant belongs to a user, not a process (design §4b): every identity change
+            // -- uid `null` <-> uid, including the very first emission at cold start -- clears it.
+            sessionAdUnlocks.value = emptySet()
             if (uid == null || !useRemoteSession) {
                 emit(local)
                 return@transformLatest
@@ -363,7 +521,13 @@ class AffirmityAppState(
             try {
                 migrator.ensureMigrated(migrationSnapshotFor(uid))
                 syncError.value = null
-                emit(remoteSessionFactory(uid))
+                val remote = remoteSessionFactory(uid)
+                // EC-1/Q3 reconciliation: replay every local durable ad-unlock into the remote
+                // repository on EVERY promotion to Remote (not only the one-time migration), so
+                // sign-out -> consume a trial locally -> sign-in-again still merges. The local
+                // Room copy is never deleted (design §10).
+                replayDurableAdUnlocks(local.adUnlocks.getDurableUnlocks(), remote.adUnlocks)
+                emit(remote)
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (failure: Exception) {
@@ -397,6 +561,18 @@ class AffirmityAppState(
             quietHours = local.notifications.observeQuietHours().first(),
             migratedAt = System.currentTimeMillis(),
         )
+    }
+
+    /** EC-1/Q3 reconciliation: an additive union, never an overwrite (design §10). Idempotent —
+     * [AdUnlockRepository.grantDurableUnlock] is create-if-absent, so replaying an
+     * already-present [AdUnlockRecord] costs at most one denied write and never mutates the
+     * remote record. Extracted as its own function so this replay step is independently testable
+     * and readable at the call site. */
+    private suspend fun replayDurableAdUnlocks(
+        localRecords: List<AdUnlockRecord>,
+        remoteAdUnlocks: AdUnlockRepository,
+    ) {
+        localRecords.forEach { remoteAdUnlocks.grantDurableUnlock(it) }
     }
 
     init {
@@ -535,6 +711,22 @@ class AffirmityAppState(
             onboardingPreferences.observeHasCompletedOnboarding().collect { hasCompletedOnboarding.value = it }
         }
         scope.launch {
+            // D2 migration default: combines the raw tri-state guide-seen read with the survey's
+            // already-held completion state (via `combine`, not a one-shot read of `.value`) so
+            // ordering between the guide DataStore flow and completion-state updates can never
+            // leave a legacy install
+            // (guide-seen key absent, onboarding already complete) stuck unresolved -- see
+            // resolveGuideBackfill's KDoc for the full truth table.
+            combine(
+                onboardingGuidePreferences.observeHasSeenGuide(),
+                snapshotFlow { hasCompletedOnboarding.value },
+            ) { rawGuideSeen, completedOnboarding -> rawGuideSeen to completedOnboarding }
+                .collect { (rawGuideSeen, completedOnboarding) ->
+                    val resolved = resolveGuideBackfill(rawGuideSeen, completedOnboarding)
+                    shouldShowOnboardingGuide.value = shouldShowGuide(resolved)
+                }
+        }
+        scope.launch {
             groupPreferences.observeSelectedGroupIds().collect { persisted ->
                 val resolved = resolveSelectedGroupIds(persisted, knownGroupIds, defaultThematicGroupIds)
                 selectedGroupIds.value = resolved
@@ -543,6 +735,14 @@ class AffirmityAppState(
                     draftInitialized = true
                 }
             }
+        }
+        scope.launch {
+            // Durable ONE_TIME_TRIAL grants (design §4b) -- same flatMapLatest-per-swap shape as
+            // every other session-scoped collector above, so a stale Firestore/Room subscription
+            // can never survive a sign-in/sign-out swap.
+            session.flatMapLatest { it.adUnlocks.observeDurableUnlocks() }
+                .catch { error -> Log.e(TAG, "durable ad-unlock flow failed", error) }
+                .collect { records -> durableAdUnlocks.value = records.associateBy(AdUnlockRecord::key) }
         }
         scope.launch {
             // Same class of problem as the healer-grant collector above (design.md D8): reset the
@@ -556,17 +756,35 @@ class AffirmityAppState(
                 .collect { entitlement ->
                     // Compared against the repository-emitted value only, never a client-side
                     // optimistic purchase overlay (design.md D7/D8) -- an expiring optimistic
-                    // window can never masquerade as a real lapse.
+                    // window can never masquerade as a real lapse. proLapseNotice stays scoped to
+                    // a LIVE Pro->Free transition only (design §10 Q4(iv)) -- it is a one-time
+                    // snackbar, not a general "you are Free" indicator.
                     if (entitlementFlowInitialized &&
-                        entitlementTier.value == EntitlementTier.PRO &&
-                        entitlement.tier == EntitlementTier.FREE
+                        entitlementTier.value == AccessTier.PRO &&
+                        entitlement.tier == AccessTier.FREE
                     ) {
                         proLapseNotice.value = true
+                        // design §10 Q4(i): enforced, not just argued -- a PRO user can never
+                        // acquire a PER_USE grant by construction, so at the instant of a live
+                        // downgrade this set can only hold stale entries.
+                        sessionAdUnlocks.value = emptySet()
+                    }
+                    // Q4(iv) fix: run the deselect sweep on EVERY FREE-resolved emission, not only
+                    // a live transition -- otherwise a stale Pro-only group left in a persisted
+                    // selection (a lapse that happened while the app was closed, or a dead PER_USE
+                    // grant) would silently survive forever. Re-persist only when the result
+                    // actually differs, so a steady-state Free user causes no redundant DataStore
+                    // write on every emission. Living inside this collector (not the
+                    // group-preferences collector) guarantees it never fires before the tier has
+                    // resolved, so a cold start can never strip a Pro user's groups.
+                    if (entitlement.tier == AccessTier.FREE) {
                         selectedGroupIds.value?.let { committed ->
                             val updated = deselectLockedGroups(committed, proOnlyGroupIds, defaultThematicGroupIds)
-                            selectedGroupIds.value = updated
-                            draftGroupIds.value = updated
-                            scope.launch { groupPreferences.saveSelectedGroupIds(updated) }
+                            if (updated != committed) {
+                                selectedGroupIds.value = updated
+                                draftGroupIds.value = updated
+                                scope.launch { groupPreferences.saveSelectedGroupIds(updated) }
+                            }
                         }
                     }
                     entitlementFlowInitialized = true
@@ -584,6 +802,10 @@ class AffirmityAppState(
                 runCatching { onboardingRepository.markCompleted(uid) }
             }
         }
+        // R1.1/R7.1: arms the guide auto-show flag as one atomic addition to survey completion --
+        // the ONLY code path allowed to arm it (spec R1.1). Fire-and-forget like the other writes
+        // in this method; the collector above picks up the write once it lands.
+        scope.launch { onboardingGuidePreferences.arm() }
     }
 
     /** Used by the onboarding flow's "I already have an account" shortcut, right after sign-in,
@@ -671,6 +893,7 @@ class AffirmityAppState(
     }
 
     fun addAffirmationWithColor(title: String, subtitle: String, colorHex: String) {
+        if (!customAffirmationCreateDecision.isUnlocked) return
         addImageError.value = null
         scope.launch {
             ready().affirmations.insert(
@@ -680,30 +903,39 @@ class AffirmityAppState(
                     background = AffirmationBackground.Color(colorHex),
                 ).toEntity()
             )
+            // REQ-5.5/17: emitted after insert() succeeds -- creation_method is the entire
+            // payload, never affirmation text (REQ-4.8).
+            analytics.log(AnalyticsEvent.CustomAffirmationCreated(CreationMethod.COLOR))
         }
     }
 
     fun addAffirmationWithImage(title: String, subtitle: String, imageUrl: String) {
+        if (!customAffirmationCreateDecision.isUnlocked) return
         addImageError.value = null
         scope.launch {
             val localPath = runCatching { imageStore.download(imageUrl) }
                 .onFailure { addImageError.value = "No se pudo descargar la imagen: ${it.message}" }
                 .getOrNull() ?: return@launch
-            insertImageAffirmation(title, subtitle, localPath)
+            // D10.4: emit only after the download guard above -- a failed download must never
+            // report a creation that never happened.
+            insertImageAffirmation(title, subtitle, localPath, CreationMethod.IMAGE_URL)
         }
     }
 
     fun addAffirmationWithGalleryImage(title: String, subtitle: String, imageUri: Uri) {
+        if (!customAffirmationCreateDecision.isUnlocked) return
         addImageError.value = null
         scope.launch {
             val localPath = runCatching { imageStore.importFromGallery(imageUri) }
                 .onFailure { addImageError.value = "No se pudo importar la imagen: ${it.message}" }
                 .getOrNull() ?: return@launch
-            insertImageAffirmation(title, subtitle, localPath)
+            // D10.4: emit only after the import guard above -- a failed import must never report
+            // a creation that never happened.
+            insertImageAffirmation(title, subtitle, localPath, CreationMethod.GALLERY)
         }
     }
 
-    private suspend fun insertImageAffirmation(title: String, subtitle: String, localPath: String) {
+    private suspend fun insertImageAffirmation(title: String, subtitle: String, localPath: String, method: CreationMethod) {
         ready().affirmations.insert(
             Affirmation(
                 title = title,
@@ -711,9 +943,18 @@ class AffirmityAppState(
                 background = AffirmationBackground.Image(localPath),
             ).toEntity()
         )
+        analytics.log(AnalyticsEvent.CustomAffirmationCreated(method))
     }
 
     fun importAffirmationsFromJson(json: String, replaceExisting: Boolean) {
+        // CRITICAL (D4): this guard MUST be the first statement -- strictly before deleteAll() is
+        // ever reached below. A guard placed inside the forEach/after the replaceExisting wipe
+        // would delete a Free user's entire table and then import nothing: data loss caused by the
+        // gate itself. Blocked = zero side effects of any kind (no parse, no deleteAll, no insert).
+        if (!customAffirmationCreateDecision.isUnlocked) {
+            importAffirmationsError.value = "Importar afirmaciones requiere una suscripción Pro."
+            return
+        }
         importAffirmationsError.value = null
         val parsed = try {
             parseAffirmationsJson(json)
@@ -756,7 +997,10 @@ class AffirmityAppState(
     }
 
     fun removeAffirmation(id: String) {
-        scope.launch { ready().affirmations.deleteById(id) }
+        scope.launch {
+            ready().affirmations.deleteById(id)
+            analytics.log(AnalyticsEvent.CustomAffirmationDeleted)
+        }
     }
 
     /** Call once per affirmation the user settles on while swiping the feed. */
@@ -774,16 +1018,46 @@ class AffirmityAppState(
             if (updated.count >= AFFIRMATIONS_GOAL_PER_DAY) {
                 ready().completions.markAffirmation(today)
                 widgetUpdater.refresh()
+                // D9: emit on the exact crossing (==), not on every subsequent >= call this day --
+                // recordAffirmationViewed is idempotent-repeat-called, the >= branch above is
+                // unchanged, this is a nested, additional condition.
+                if (updated.count == AFFIRMATIONS_GOAL_PER_DAY) {
+                    analytics.log(AnalyticsEvent.DailyGoalReached(DailyGoal.AFFIRMATION))
+                }
             }
         }
     }
 
-    /** Call when a meditation session finishes its full countdown. */
-    fun recordMeditationCompleted() {
+    /** In-memory per-process day guard (D9) -- recordMeditationCompleted has no counter to test a
+     *  crossing against, so this bounds `daily_goal_reached(MEDITATION)` to at most once per
+     *  process launch per day. Accepted limitation: a process restart plus a second completion the
+     *  same day can double-count -- bounded, denominator-only, cheaper than a schema change. */
+    private var meditationGoalEmittedEpochDay: Long? = null
+
+    /**
+     * Call when a meditation session finishes its full countdown. [startMillis]/[endMillis] are
+     * wall-clock timestamps (`System.currentTimeMillis()`, not the monotonic clock the session
+     * timer itself runs on) so a session crossing local midnight is archived on the day it mostly
+     * ran on, via [DayClock.attributedEpochDay] -- not always the day it happened to finish on.
+     */
+    fun recordMeditationCompleted(startMillis: Long, endMillis: Long = System.currentTimeMillis()) {
         scope.launch {
-            ready().completions.markMeditation(DayClock.epochDay())
+            val day = DayClock.attributedEpochDay(startMillis, endMillis)
+            ready().completions.markMeditation(day)
             widgetUpdater.refresh()
+            if (day != meditationGoalEmittedEpochDay) {
+                meditationGoalEmittedEpochDay = day
+                analytics.log(AnalyticsEvent.DailyGoalReached(DailyGoal.MEDITATION))
+            }
         }
+    }
+
+    /** UI-originated emit surface (design D1) for interaction events this class does not already
+     *  own emitting itself (taps, screen renders) -- routes through the same injected [analytics]
+     *  instance so the composition-root kill switch covers every event, not only this class's own
+     *  emit points. */
+    fun logAnalyticsEvent(event: AnalyticsEvent) {
+        analytics.log(event)
     }
 
     /** Call from the day-detail sheet, for today or any past day the user is backfilling. */
@@ -818,6 +1092,68 @@ class AffirmityAppState(
         scope.launch { ready().meditation.saveMeditationDurationSeconds(seconds) }
     }
 
+    /**
+     * The single outcome -> persistence orchestration for the ad-unlock seam (design §9). Calls
+     * [adUnlockSource]; on [AdUnlockOutcome.Earned] only, routes [AdUnlockPolicy.PER_USE] into the
+     * in-memory [sessionAdUnlocks] and [AdUnlockPolicy.ONE_TIME_TRIAL] into the active session's
+     * durable `adUnlocks` repository. Any other outcome (Dismissed/Failed/Unavailable) is a no-op.
+     */
+    fun requestAdUnlock(key: ContentKey, policy: AdUnlockPolicy) {
+        if (adRequestInFlight.value != null) {
+            analytics.log(AnalyticsEvent.AdUnlockTapIgnored(AnalyticsId.of(key)))
+            return // taps are IGNORED, never queued (REQ-4.8)
+        }
+        adRequestInFlight.value = key
+        analytics.log(AnalyticsEvent.AdUnlockRequested(AnalyticsId.of(key), policy))
+        scope.launch {
+            try {
+                when (val outcome = adUnlockSource.requestUnlock(key, policy)) {
+                    AdUnlockOutcome.Earned -> {
+                        when (policy) {
+                            AdUnlockPolicy.PER_USE -> sessionAdUnlocks.value = sessionAdUnlocks.value + key
+                            AdUnlockPolicy.ONE_TIME_TRIAL -> ready().adUnlocks.grantDurableUnlock(
+                                AdUnlockRecord(key, System.currentTimeMillis(), expiresAtMillis = null),
+                            )
+                            AdUnlockPolicy.NONE -> Unit
+                        }
+                        analytics.log(AnalyticsEvent.AdUnlockEarned(AnalyticsId.of(key), policy))
+                        adRequestNotice.value = AdRequestNotice.EARNED
+                    }
+                    AdUnlockOutcome.Dismissed -> {
+                        analytics.log(AnalyticsEvent.AdUnlockDismissed(AnalyticsId.of(key), policy))
+                        adRequestNotice.value = AdRequestNotice.DISMISSED
+                    }
+                    is AdUnlockOutcome.Failed -> {
+                        Log.w(TAG, "ad unlock failed for $key: ${outcome.reason}")
+                        analytics.log(
+                            AnalyticsEvent.AdUnlockFailed(AnalyticsId.of(key), policy, outcome.reason.toAdFailureReason()),
+                        )
+                        adRequestNotice.value = AdRequestNotice.UNAVAILABLE
+                    }
+                    AdUnlockOutcome.Unavailable -> {
+                        analytics.log(AnalyticsEvent.AdUnlockUnavailable(AnalyticsId.of(key), policy))
+                        adRequestNotice.value = AdRequestNotice.UNAVAILABLE
+                    }
+                }
+            } finally {
+                adRequestInFlight.value = null // `finally`: cancellation must not wedge the CTA
+            }
+        }
+    }
+
+    /**
+     * Consumes a meditation playback-scoped unlock when its session reaches a terminal state
+     * (design §5.5, REQ-5.5). Synchronous, no coroutine -- mutates in-memory [sessionAdUnlocks]
+     * only, matching [toggleGroup]/`applyGroupSelection`'s pattern. Nothing is persisted here:
+     * `PER_USE` is never persisted (design §4.2), and a durable `ONE_TIME_TRIAL` grant is untouched
+     * by [consumePlaybackScopedUnlock] (it only ever touches [sessionAdUnlocks]) -- see EC-3.
+     */
+    fun consumeMeditationPlaybackUnlock(entryId: String, reason: SessionEndReason) {
+        sessionAdUnlocks.value = consumePlaybackScopedUnlock(
+            sessionAdUnlocks.value, ContentKey(ContentType.MEDITATION, entryId), reason,
+        )
+    }
+
     /** Flips [groupId]'s membership in [draftGroupIds]. No-op for `alwaysSelected`/locked groups —
      * the UI also disables them; this is defense in depth. */
     fun toggleGroup(groupId: String, toggleable: Boolean) {
@@ -836,6 +1172,9 @@ class AffirmityAppState(
         if (!isDraftSelectionValid) return false
         val committed = draftGroupIds.value
         selectedGroupIds.value = committed
+        // design §0/§4b: a PER_USE unlock on an affirmation group is spent the moment its group
+        // leaves the committed selection.
+        sessionAdUnlocks.value = retainSelectionScopedUnlocks(sessionAdUnlocks.value, committed)
         scope.launch { groupPreferences.saveSelectedGroupIds(committed) }
         return true
     }
@@ -879,12 +1218,13 @@ fun rememberAffirmityAppState(): AffirmityAppState {
     // `ui.groups` (design D9) — only this composable wiring function does, mirroring [dayLetters].
     val knownGroupIds = selectableAffirmationGroups().map { it.id }.toSet()
     val defaultThematicGroupIds = defaultAffirmationGroups()
-        .filter { it.access == AffirmationGroupAccess.FREE }
+        .filter { it.access.requiredTier == AccessTier.FREE }
         .map { it.id }.toSet()
     // Every group that requires Pro to unlock -- mirrors GroupAccessPolicy.isLocked's condition
-    // (access != FREE && !alwaysSelected) without importing ui.groups' policy file itself (D9).
+    // (access.requiredTier == PRO && !alwaysSelected) without importing ui.groups' policy file
+    // itself (D9).
     val proOnlyGroupIds = defaultAffirmationGroups()
-        .filter { it.access != AffirmationGroupAccess.FREE }
+        .filter { it.access.requiredTier != AccessTier.FREE }
         .map { it.id }.toSet()
     return remember {
         val database = AffirmityDatabase.getInstance(context)
@@ -893,6 +1233,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
         val googleIdAuthProvider = GoogleIdAuthProvider(CredentialManager.create(context.applicationContext))
         val trackerPreferences = TrackerPreferences(context)
         val onboardingPreferences = OnboardingPreferences(context)
+        val onboardingGuidePreferences = OnboardingGuidePreferences(context)
         val firestore = FirebaseFirestore.getInstance()
         val local = DataSession.Local(
             affirmations = RoomAffirmationRepository(database.affirmationDao()),
@@ -901,6 +1242,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             healerUses = RoomStreakHealerRepository(database.streakHealerUseDao()),
             meditation = RoomMeditationPreferencesRepository(trackerPreferences),
             notifications = RoomNotificationSettingsRepository(notificationPreferences),
+            adUnlocks = RoomAdUnlockRepository(database.adUnlockDao()),
         )
         AffirmityAppState(
             scope = scope,
@@ -915,11 +1257,13 @@ fun rememberAffirmityAppState(): AffirmityAppState {
                     meditation = FirestoreMeditationPreferencesRepository(firestore, uid),
                     notifications = FirestoreNotificationSettingsRepository(firestore, uid),
                     entitlements = FirestoreEntitlementRepository(firestore, uid),
+                    adUnlocks = FirestoreAdUnlockRepository(firestore, uid),
                 )
             },
             migrator = FirestoreMigrator(firestore),
             trackerPreferences = trackerPreferences,
             onboardingPreferences = onboardingPreferences,
+            onboardingGuidePreferences = onboardingGuidePreferences,
             imageStore = AffirmationImageStore(context.applicationContext),
             notificationDebugLog = notificationDebugLog,
             notifier = Notifier(context.applicationContext, notificationDebugLog),
@@ -936,6 +1280,34 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             knownGroupIds = knownGroupIds,
             defaultThematicGroupIds = defaultThematicGroupIds,
             proOnlyGroupIds = proOnlyGroupIds,
+            adUnlockSource = RewardedAdUnlockSource(
+                gateway = GoogleRewardedAdGateway(
+                    // Re-resolved per call from the composable's own captured `context`, never
+                    // retained past this composition (design D1) -- a locale switch/Activity
+                    // recreation re-runs this whole composable, so `remember` closes over the
+                    // NEW context on the next recomposition.
+                    activityProvider = { context.findActivity() },
+                    testDeviceHash = BuildConfig.ADMOB_TEST_DEVICE_HASH,
+                    isDebug = BuildConfig.DEBUG,
+                ),
+                adUnitIds = AdUnitIds(
+                    perUse = BuildConfig.ADMOB_REWARDED_UNIT_PER_USE,
+                    oneTimeTrial = BuildConfig.ADMOB_REWARDED_UNIT_ONE_TIME_TRIAL,
+                ),
+            ),
+            analytics = ConsentGatedAnalyticsLogger(
+                // Real delegate as of PR7 -- delivers nothing end-to-end until spec §9.1 item 4
+                // (Firebase console Analytics enablement + a regenerated google-services.json) is
+                // done; until then this is exactly as inert as NoOpAnalyticsLogger was.
+                delegate = FirebaseAnalyticsLogger(
+                    AndroidFirebaseAnalyticsSink(FirebaseAnalytics.getInstance(context.applicationContext)),
+                ),
+                // PD-1: default-DENY, globally. UNKNOWN and DENIED both suppress fully. This
+                // lambda is the ONE place a future consent surface (spec §9.1 item 3) plugs in
+                // (design D5) -- swapping this whole `analytics` argument for NoOpAnalyticsLogger
+                // is the one-line kill switch (design D1/REQ-4.6).
+                consentState = { AnalyticsConsentState.UNKNOWN },
+            ),
         )
     }
 }

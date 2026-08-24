@@ -197,6 +197,26 @@
     <string name="healer_granted_confirm_button">Got it</string>
     <string name="healer_granted_icon_content_description">Streak healer icon</string>
     <string name="progress_weekly_streak_format">Streak: %1$d days</string>
+
+    <!-- Post-survey onboarding guide (spec R3, design D6) -->
+    <string name="onboarding_guide_slide1_title">Affirmations, your way</string>
+    <string name="onboarding_guide_slide1_body">Your affirmations show up as swipeable cards, organized into themed groups like Wellbeing or Willpower, plus a Personalized group where you write your own. Some groups require Pro.</string>
+    <string name="onboarding_guide_slide1_icon_content_description">Affirmations icon</string>
+    <string name="onboarding_guide_slide2_title">Meditations for every moment</string>
+    <string name="onboarding_guide_slide2_body">Guided sessions are organized by category —sleep, calm, focus— and show an approximate duration. There\'s also a free timer to meditate at your own pace. Some sessions are Pro or unlock by watching an ad.</string>
+    <string name="onboarding_guide_slide2_icon_content_description">Meditation icon</string>
+    <string name="onboarding_guide_slide3_title">Track your mood</string>
+    <string name="onboarding_guide_slide3_body">Log your mood once a day and add a note if you want. If you missed a day, you can fill it in later — your history is always available.</string>
+    <string name="onboarding_guide_slide3_icon_content_description">Mood tracker icon</string>
+    <string name="onboarding_guide_slide4_title">Your streak and the healer</string>
+    <string name="onboarding_guide_slide4_body">You have ONE single overall streak, which advances when you complete an affirmation and a meditation the same day. Two complete days in a row earn you a saved healer: if you miss the next day, you can activate it to repair that day within the SAME streak — it\'s not a separate streak. You can hold at most 1 healer at a time.</string>
+    <string name="onboarding_guide_slide4_icon_content_description">Streak and healer icon</string>
+    <string name="onboarding_guide_skip_button">Skip</string>
+    <string name="onboarding_guide_next_button">Next</string>
+    <string name="onboarding_guide_get_started_button">Get Started</string>
+    <string name="onboarding_guide_progress_content_description">Slide %1$d of %2$d</string>
+    <string name="settings_onboarding_guide_title">How Affirmity works</string>
+    <string name="settings_onboarding_guide_open_button">View again</string>
     <string name="progress_affirmations_section_title">My Affirmations</string>
     <string name="progress_title_field_label">Title</string>
     <string name="progress_title_field_error">Title is missing</string>
@@ -216,6 +236,9 @@
     <string name="progress_save_button">Save</string>
     <string name="progress_import_button">Import</string>
     <string name="progress_delete_content_description">Delete</string>
+    <string name="my_affirmations_locked_headline">Creating custom affirmations requires Pro</string>
+    <string name="my_affirmations_locked_body">Your existing affirmations are still available and you can delete them anytime. Creating new ones requires a Pro subscription.</string>
+    <string name="my_affirmations_locked_cta">Upgrade to Pro</string>
 
     <string name="settings_notification_debug_title">Notification debug</string>
     <string name="settings_notification_debug_view_history_button">View history</string>
@@ -232,16 +255,8 @@
     <string name="meditation_preset_relax">Relax</string>
     <string name="meditation_preset_focus">Focus</string>
     <string name="meditation_preset_sleep">Sleep</string>
-    <string name="meditation_guided_demo_button">Guided meditation (demo)</string>
     <string name="meditation_discover_header">Discover more sessions</string>
-    <string name="meditation_discover_track_1_title">Calm Waves</string>
-    <string name="meditation_discover_track_1_meta">10 min • Relaxation</string>
-    <string name="meditation_discover_track_2_title">Night Sky</string>
-    <string name="meditation_discover_track_2_meta">20 min • Sleep</string>
-    <string name="meditation_discover_track_3_title">Serene Horizon</string>
-    <string name="meditation_discover_track_3_meta">15 min • Focus</string>
 
-    <string name="guided_meditation_title">Guided breathing</string>
     <string name="guided_meditation_round_label">Round %1$d of %2$d</string>
     <string name="guided_meditation_breath_label">Breath %1$d of %2$d</string>
     <string name="guided_meditation_inhale">Breathe in</string>
@@ -254,6 +269,58 @@
     <string name="guided_meditation_pause_content_description">Pause</string>
     <string name="guided_meditation_resume_content_description">Resume</string>
     <string name="guided_meditation_skip_content_description">Advance phase</string>
+
+    <string name="meditation_catalog_reset_rapido_title">Quick reset</string>
+    <string name="meditation_catalog_reset_rapido_description">A brief 2-minute pause to recover your center.</string>
+    <string name="meditation_catalog_calma_title">Calm</string>
+    <string name="meditation_catalog_calma_description">A guided 5-minute breathing exercise to ease anxiety.</string>
+    <string name="meditation_catalog_enfoque_title">Focus</string>
+    <string name="meditation_catalog_enfoque_description">A 10-minute box-breathing exercise to help you concentrate.</string>
+    <string name="meditation_catalog_dormir_title">Sleep</string>
+    <string name="meditation_catalog_dormir_description">A 10-minute guide to help you get ready for sleep.</string>
+    <string name="meditation_catalog_body_scan_title">Body Scan</string>
+    <string name="meditation_catalog_body_scan_description">Scan your body with full attention for 10 minutes.</string>
+    <string name="meditation_catalog_autocompasion_5_title">Self-Compassion 5</string>
+    <string name="meditation_catalog_autocompasion_5_description">Practice self-compassion in 5 minutes.</string>
+    <string name="meditation_catalog_autocompasion_10_title">Self-Compassion 10</string>
+    <string name="meditation_catalog_autocompasion_10_description">An extended 10-minute self-compassion practice.</string>
+
+    <string name="meditation_catalog_category_relajacion">Relaxation</string>
+    <string name="meditation_catalog_category_calma">Calm</string>
+    <string name="meditation_catalog_category_enfoque">Focus</string>
+    <string name="meditation_catalog_category_sueno">Sleep</string>
+    <string name="meditation_catalog_category_cuerpo">Body</string>
+    <string name="meditation_catalog_category_autocompasion">Self-Compassion</string>
+
+    <string name="meditation_quickreset_intro">Find a comfortable posture and let your shoulders drop.</string>
+    <string name="meditation_quickreset_closing">Return to your day carrying this calm.</string>
+    <string name="meditation_calm_intro">Let your breathing slow down.</string>
+    <string name="meditation_calm_hold">Hold gently.</string>
+    <string name="meditation_calm_rest">Notice how your breathing feels now.</string>
+    <string name="meditation_calm_closing">Carry this calm with you.</string>
+    <string name="meditation_focus_intro">Get ready to focus your attention.</string>
+    <string name="meditation_focus_hold">Hold firmly.</string>
+    <string name="meditation_focus_anchor">Keep your attention on the present.</string>
+    <string name="meditation_focus_closing">Your focus is ready.</string>
+    <string name="meditation_sleep_settle">Settle in and let your body sink down.</string>
+    <string name="meditation_sleep_guidance">Let go of the day behind you.</string>
+    <string name="meditation_sleep_rest_1">Let yourself be carried by the sound.</string>
+    <string name="meditation_sleep_release">Release any tension that remains.</string>
+    <string name="meditation_sleep_rest_2">Each breath brings you closer to sleep.</string>
+    <string name="meditation_sleep_closing">Rest well.</string>
+    <string name="meditation_bodyscan_intro">Scan your body with attention, without judging.</string>
+    <string name="meditation_bodyscan_feet">Bring your attention to your feet.</string>
+    <string name="meditation_bodyscan_legs">Bring your attention to your legs.</string>
+    <string name="meditation_bodyscan_torso">Bring your attention to your torso.</string>
+    <string name="meditation_bodyscan_arms">Bring your attention to your arms.</string>
+    <string name="meditation_bodyscan_head">Bring your attention to your head.</string>
+    <string name="meditation_bodyscan_whole">Feel your whole body as one.</string>
+    <string name="meditation_bodyscan_closing">Return to the space around you.</string>
+    <string name="meditation_selfcompassion_intro">Gently place a hand on your chest.</string>
+    <string name="meditation_selfcompassion_phrase_1">May I be kind to myself.</string>
+    <string name="meditation_selfcompassion_phrase_2">May I accept this moment as it is.</string>
+    <string name="meditation_selfcompassion_phrase_3">May I give myself the compassion I need.</string>
+    <string name="meditation_selfcompassion_closing">Carry this kindness with you.</string>
 
     <string name="widget_empty_state_label">Start today</string>
     <string name="widget_action_affirm_label">Affirm</string>
@@ -278,6 +345,11 @@
     <string name="affirmation_group_locked_a11y">%1$s (locked)</string>
     <string name="affirmation_group_always_on_a11y">Always selected</string>
     <string name="affirmation_group_upgrade_cta">Upgrade to Pro</string>
+    <string name="ad_unlock_cta_a11y">Watch an ad to unlock %1$s</string>
+    <string name="ad_unlock_loading_a11y">Loading ad…</string>
+    <string name="ad_unlock_earned_message">Done! You can now use this session.</string>
+    <string name="ad_unlock_dismissed_message">You closed the ad before it finished, so nothing was unlocked.</string>
+    <string name="ad_unlock_unavailable_message">No ads are available right now. Try again later.</string>
     <string name="paywall_title">Affirmity Pro</string>
     <string name="paywall_description">Unlock every thematic group with a Pro subscription.</string>
     <string name="paywall_monthly_cta">Monthly — %1$s</string>

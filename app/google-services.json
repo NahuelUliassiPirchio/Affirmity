@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "1005740395113-ttovuo36lusrh21juub7q2sglg1v58ia.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.pirxhio.affirmity",
+            "certificate_hash": "82631a6f61b046953a98093491c98e1ffde37047"
+          }
+        },
+        {
           "client_id": "1005740395113-dtm6v46a672efq5hcirc4b0kedn8cas8.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -37,6 +45,13 @@
             {
               "client_id": "1005740395113-dtm6v46a672efq5hcirc4b0kedn8cas8.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "1005740395113-fmossht1cc14a8ec92recoa9ot0g5m65.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.pirxhio.affirmity"
+              }
             }
           ]
         }

@@ -22,16 +22,43 @@ val OnSurfaceVariantLight = Color(0xFF3E494A)
 val OutlineLight = Color(0xFF6E797A)
 val OutlineVariantLight = Color(0xFFBDC9C9)
 val SecondaryLight = Color(0xFF5E5E5E)
-val SecondaryContainerLight = Color(0xFFE2E2E2)
+
+// Bug 2b fix: 0xFFE2E2E2 (the old value) sits only ~1.12:1 against SurfaceContainerLight
+// (0xFFEEEEEE) -- WCAG's non-text UI-component minimum is 3:1 -- so the selected-nav-tab pill was
+// nearly invisible. This teal-tinted tone (between TealPrimaryLight 0x00696F and
+// TealPrimaryContainerLight 0x5BBCC3 on the brand ramp) clears 4.61:1 against SurfaceContainerLight,
+// and pairs with white text/icons (OnSecondaryContainerLight) at 5.35:1 -- both verified in
+// ContrastRatioTest via [wcagContrastRatio].
+val SecondaryContainerLightArgb: Long = 0xFF18767D
+val SecondaryContainerLight = Color(SecondaryContainerLightArgb)
+val OnSecondaryContainerLightArgb: Long = 0xFFFFFFFF
+val OnSecondaryContainerLight = Color(OnSecondaryContainerLightArgb)
+val SurfaceContainerLightArgb: Long = 0xFFEEEEEE
 val ErrorLight = Color(0xFFBA1A1A)
 
 // Dark theme tokens (afirmaciones.html full-bleed feed uses a near-black theme)
 val TealPrimaryDark = Color(0xFF5BBCC3)
-val BackgroundDark = Color(0xFF000000)
+val BackgroundDarkArgb: Long = 0xFF000000
+val BackgroundDark = Color(BackgroundDarkArgb)
 val SurfaceDark = Color(0xFF000000)
 val SurfaceContainerLowDark = Color(0xFF111111)
-val SurfaceContainerDark = Color(0xFF111111)
+val SurfaceContainerDarkArgb: Long = 0xFF111111
+val SurfaceContainerDark = Color(SurfaceContainerDarkArgb)
 val OnSurfaceDark = Color(0xFFFFFFFF)
 val OnPrimaryDark = Color(0xFFFFFFFF)
 val SecondaryDark = Color(0xFF5E5E5E)
 val ErrorDark = Color(0xFFBA1A1A)
+
+// Bug 2b fix: DarkColorScheme previously left secondaryContainer/onSecondaryContainer/
+// onSurfaceVariant/outline unset, falling back to Material's default purple baseline -- mismatched
+// from the app's teal brand. Reusing TealPrimaryDark as the container tone keeps the selected-tab
+// pill on-brand and gives 8.48:1 against SurfaceContainerDark; the near-black teal text on it holds
+// 7.26:1. onSurfaceVariant/outline are muted teal-greys with enough contrast against the near-black
+// background for body text (10.97:1) and outlines/borders (3.78:1, the non-text minimum).
+val SecondaryContainerDarkArgb: Long = 0xFF5BBCC3
+val SecondaryContainerDark = Color(SecondaryContainerDarkArgb)
+val OnSecondaryContainerDarkArgb: Long = 0xFF00252A
+val OnSecondaryContainerDark = Color(OnSecondaryContainerDarkArgb)
+val OnSurfaceVariantDark = Color(0xFFB0BEC0)
+val OutlineDarkArgb: Long = 0xFF5C6B6D
+val OutlineDark = Color(OutlineDarkArgb)
