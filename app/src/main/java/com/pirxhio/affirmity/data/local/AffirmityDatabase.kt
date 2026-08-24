@@ -86,6 +86,16 @@ val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
     }
 }
 
+/** Additive, mirrors MIGRATION_4_5 exactly. The NOT NULL DEFAULT '{}' backfills every
+ * pre-existing row with an empty override map in one statement, so no affirmation can become
+ * unreadable by the new TypeConverter (which would otherwise see NULL). No content is inserted
+ * or altered. */
+val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `affirmations` ADD COLUMN `overrides` TEXT NOT NULL DEFAULT '{}'")
+    }
+}
+
 @Database(
     entities = [
         AffirmationEntity::class,
@@ -94,9 +104,10 @@ val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
         StreakHealerUseEntity::class,
         AdUnlockEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
+@androidx.room.TypeConverters(OverridesConverters::class)
 abstract class AffirmityDatabase : RoomDatabase() {
     abstract fun affirmationDao(): AffirmationDao
     abstract fun dailyCompletionDao(): DailyCompletionDao
@@ -114,7 +125,9 @@ abstract class AffirmityDatabase : RoomDatabase() {
                     context.applicationContext,
                     AffirmityDatabase::class.java,
                     "affirmity.db",
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build().also { instance = it }
+                ).addMigrations(
+                    MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+                ).build().also { instance = it }
             }
     }
 }

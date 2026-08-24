@@ -21,4 +21,7 @@ interface AffirmationDao {
 
     @Query("DELETE FROM affirmations")
     suspend fun deleteAll()
+
+    @Query("UPDATE affirmations SET overrides = :overrides WHERE id = :id")
+    suspend fun updateOverrides(id: String, overrides: Map<String, String>)
 }

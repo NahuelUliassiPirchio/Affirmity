@@ -13,4 +13,6 @@ data class AffirmationEntity(
     val backgroundValue: String,
     @ColumnInfo(defaultValue = PERSONALIZADAS_GROUP_ID)
     val groupId: String = PERSONALIZADAS_GROUP_ID,
+    @ColumnInfo(defaultValue = "{}")
+    val overrides: Map<String, String> = emptyMap(),
 )

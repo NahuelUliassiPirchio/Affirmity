@@ -43,6 +43,33 @@ class AffirmityDatabaseMigrationTest {
     }
 
     @Test
+    fun migrate6To7_addsOverridesColumnAndBackfillsExistingRowsToEmptyMap() {
+        helper.createDatabase(TEST_DB, 6).apply {
+            execSQL(
+                "INSERT INTO affirmations (id, title, subtitle, backgroundType, backgroundValue, groupId) " +
+                    "VALUES ('id-1', 'Title', 'Subtitle', 'color', '#000000', 'personalizadas')",
+            )
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(TEST_DB, 7, true, MIGRATION_6_7)
+
+        val cursor = migrated.query(
+            "SELECT title, subtitle, backgroundType, backgroundValue, groupId, overrides " +
+                "FROM affirmations WHERE id = 'id-1'",
+        )
+        assertTrue(cursor.moveToFirst())
+        assertEquals("Title", cursor.getString(0))
+        assertEquals("Subtitle", cursor.getString(1))
+        assertEquals("color", cursor.getString(2))
+        assertEquals("#000000", cursor.getString(3))
+        assertEquals("personalizadas", cursor.getString(4))
+        assertEquals("{}", cursor.getString(5))
+        assertFalse(cursor.isNull(5))
+        cursor.close()
+    }
+
+    @Test
     fun migrate1To2_preservesAffirmationsAndCreatesEmptyDailyCompletionTable() {
         helper.createDatabase(TEST_DB, 1).apply {
             execSQL(
