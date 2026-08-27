@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.ui.affirmations
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -37,6 +39,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.data.Affirmation
@@ -66,6 +69,9 @@ fun AffirmationsScreen(
     affirmations: List<Affirmation>,
     onAffirmationViewed: () -> Unit,
     onOverrideCommitted: (affirmationId: String, tokenKey: String, value: String) -> Unit = { _, _, _ -> },
+    favoriteIds: Set<String> = emptySet(),
+    onToggleFavorite: (affirmationId: String) -> Unit = {},
+    favoriteGesture: FavoriteGesture = FavoriteGesture.DOUBLE_TAP,
 ) {
     if (affirmations.isEmpty()) {
         Box(
@@ -111,7 +117,10 @@ fun AffirmationsScreen(
         val affirmation = affirmations[page % affirmations.size]
         AffirmationCard(
             affirmation = affirmation,
+            isFavorite = affirmation.id in favoriteIds,
+            onToggleFavorite = { onToggleFavorite(affirmation.id) },
             onOverrideCommitted = { tokenKey, value -> onOverrideCommitted(affirmation.id, tokenKey, value) },
+            favoriteGesture = favoriteGesture,
         )
     }
 }
@@ -119,12 +128,18 @@ fun AffirmationsScreen(
 @Composable
 private fun AffirmationCard(
     affirmation: Affirmation,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
     onOverrideCommitted: (tokenKey: String, value: String) -> Unit,
+    favoriteGesture: FavoriteGesture,
 ) {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(affirmation.backgroundColor())
+            .pointerInput(affirmation.id, favoriteGesture) {
+                detectTapGestures(onDoubleTap = { onToggleFavorite() })
+            }
     ) {
         val background = affirmation.background
         if (background is AffirmationBackground.Image) {
@@ -173,6 +188,8 @@ private fun AffirmationCard(
                     tokenStyle = tokenStyle,
                     editable = true,
                     onOverrideCommitted = onOverrideCommitted,
+                    favoriteTapEnabled = true,
+                    onFavoriteToggleFromToken = onToggleFavorite,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 8.dp)
                 )
@@ -192,11 +209,21 @@ private fun AffirmationCard(
                         tokenStyle = tokenStyle,
                         editable = true,
                         onOverrideCommitted = onOverrideCommitted,
+                        favoriteTapEnabled = true,
+                        onFavoriteToggleFromToken = onToggleFavorite,
                         textAlign = TextAlign.Center,
                     )
                 }
             }
         }
+        Icon(
+            imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(24.dp),
+        )
     }
 }
 

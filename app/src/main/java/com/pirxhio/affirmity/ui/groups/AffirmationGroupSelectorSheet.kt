@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.WorkspacePremium
@@ -67,6 +68,7 @@ fun AffirmationGroupSelectorSheet(
     onToggle: (AffirmationGroup) -> Unit,
     onApply: () -> Unit,
     onPeekClick: () -> Unit,
+    onFavoritesClick: () -> Unit,
     onAddCustomClick: () -> Unit,
     onUpgradeClick: () -> Unit,
     onWatchAd: (AffirmationGroup, AdUnlockPolicy) -> Unit = { _, _ -> },
@@ -107,6 +109,12 @@ fun AffirmationGroupSelectorSheet(
                         adInFlight = adInFlightFor(group),
                         anyAdInFlight = anyAdInFlight,
                         onEvent = onEvent,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                    )
+                }
+                item {
+                    FavoritesEntryCard(
+                        onClick = onFavoritesClick,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                     )
                 }
@@ -319,6 +327,38 @@ private fun AffirmationGroupSelectableRow(
                     tint = MaterialTheme.colorScheme.outlineVariant,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun FavoritesEntryCard(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Favorite,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = stringResource(R.string.affirmation_group_open_favorites),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 8.dp),
+            )
         }
     }
 }

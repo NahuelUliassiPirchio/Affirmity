@@ -11,6 +11,7 @@ import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 
 /**
  * Store-agnostic contract for affirmation persistence. Implementations exist for Room
@@ -29,6 +30,25 @@ interface AffirmationRepository {
      * desired map (design.md D8). A blank value is never persisted.
      */
     suspend fun setOverrides(id: String, overrides: Map<String, String>)
+}
+
+/** Device-local favorites contract. Deliberately outside [DataSession] until remote sync exists. */
+interface FavoriteAffirmationRepository {
+    /** Favorite ids ordered most recently favorited first. */
+    fun observeFavoriteIds(): Flow<List<String>>
+
+    suspend fun isFavorite(id: String): Boolean
+    suspend fun add(id: String, favoritedAtMillis: Long)
+    suspend fun remove(id: String)
+    suspend fun clear()
+}
+
+object NoOpFavoriteAffirmationRepository : FavoriteAffirmationRepository {
+    override fun observeFavoriteIds(): Flow<List<String>> = flowOf(emptyList())
+    override suspend fun isFavorite(id: String): Boolean = false
+    override suspend fun add(id: String, favoritedAtMillis: Long) = Unit
+    override suspend fun remove(id: String) = Unit
+    override suspend fun clear() = Unit
 }
 
 /** Store-agnostic contract for the daily habit-completion tracker (streak source of truth). */

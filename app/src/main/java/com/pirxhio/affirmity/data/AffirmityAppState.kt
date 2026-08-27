@@ -83,10 +83,13 @@ import com.pirxhio.affirmity.data.remote.FirestoreStreakHealerRepository
 import com.pirxhio.affirmity.data.remote.MigrationSnapshot
 import com.pirxhio.affirmity.data.repository.AdUnlockRepository
 import com.pirxhio.affirmity.data.repository.DataSession
+import com.pirxhio.affirmity.data.repository.FavoriteAffirmationRepository
+import com.pirxhio.affirmity.data.repository.NoOpFavoriteAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomAdUnlockRepository
 import com.pirxhio.affirmity.data.repository.RoomAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomDailyCompletionRepository
 import com.pirxhio.affirmity.data.repository.RoomDailyMoodRepository
+import com.pirxhio.affirmity.data.repository.RoomFavoriteAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomMeditationPreferencesRepository
 import com.pirxhio.affirmity.data.repository.RoomNotificationSettingsRepository
 import com.pirxhio.affirmity.data.repository.RoomStreakHealerRepository
@@ -116,6 +119,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 
 /** Background for an affirmation card: a solid color, or a locally-cached downloaded image. */
@@ -306,12 +311,19 @@ class AffirmityAppState(
      *  [groupPreferences] / [knownGroupIds] -- so Spec 5's entire integration into this class is
      *  one changed argument at the `rememberAffirmityAppState` call site. */
     private val adUnlockSource: AdUnlockSource = NoAdUnlockSource,
+    private val favorites: FavoriteAffirmationRepository = NoOpFavoriteAffirmationRepository,
     /** Spec 6's one frozen seam (design D1) -- defaulted to [NoOpAnalyticsLogger], the same
      *  injection convention as [adUnlockSource]. The composition root swaps this once for the
      *  real, consent-gated instance ([ConsentGatedAnalyticsLogger]) -- the one-line kill switch. */
     private val analytics: AnalyticsLogger = NoOpAnalyticsLogger,
 ) {
     val affirmations = mutableStateListOf<Affirmation>()
+
+    var favoriteAffirmationIds = mutableStateOf<Set<String>>(emptySet())
+        private set
+
+    private var favoriteOrderedIds = mutableStateOf<List<String>>(emptyList())
+    private val favoriteToggleMutex = Mutex()
 
     /** Group ids the user has committed. Null until DataStore's first read resolves; the UI shows
      * nothing group-dependent until then. Always contains [PERSONALIZADAS_GROUP_ID] once resolved. */
@@ -339,6 +351,12 @@ class AffirmityAppState(
     val filteredAffirmations: List<Affirmation>
         get() = selectedGroupIds.value?.let { ids -> affirmations.filter { it.groupId in ids } }
             ?: affirmations
+
+    val favoriteAffirmations: List<Affirmation>
+        get() {
+            val affirmationsById = affirmations.associateBy { it.id }
+            return favoriteOrderedIds.value.mapNotNull(affirmationsById::get)
+        }
 
     /** Provider-neutral sign-in state; see `auth/AuthState.kt`. Settings-only, never gates a screen. */
     var authState = mutableStateOf<AuthState>(AuthState.SignedOut)
@@ -579,6 +597,14 @@ class AffirmityAppState(
     }
 
     init {
+        scope.launch {
+            favorites.observeFavoriteIds()
+                .catch { error -> Log.e(TAG, "favorites flow failed", error) }
+                .collect { ids ->
+                    favoriteOrderedIds.value = ids
+                    favoriteAffirmationIds.value = ids.toSet()
+                }
+        }
         scope.launch {
             session.flatMapLatest { it.affirmations.observeAll() }
                 .catch { error -> Log.e(TAG, "affirmations flow failed", error) }
@@ -970,6 +996,7 @@ class AffirmityAppState(
             val affirmationsRepo = ready().affirmations
             if (replaceExisting) {
                 affirmationsRepo.deleteAll()
+                favorites.clear()
             }
 
             var failedCount = 0
@@ -1002,8 +1029,26 @@ class AffirmityAppState(
     fun removeAffirmation(id: String) {
         scope.launch {
             ready().affirmations.deleteById(id)
+            favorites.remove(id)
             analytics.log(AnalyticsEvent.CustomAffirmationDeleted)
         }
+    }
+
+    fun toggleFavorite(id: String) {
+        scope.launch {
+            favoriteToggleMutex.withLock {
+                if (favorites.isFavorite(id)) {
+                    favorites.remove(id)
+                } else {
+                    favorites.add(id, System.currentTimeMillis())
+                }
+            }
+        }
+    }
+
+    /** Remove-only action for the Favorites screen. Repeated or stale callbacks stay idempotent. */
+    fun removeFavorite(id: String) {
+        scope.launch { favorites.remove(id) }
     }
 
     /**
@@ -1294,6 +1339,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             widgetUpdater = widgetUpdater(context.applicationContext),
             fcmTokenRepository = FcmTokenRepository(firestore),
             onboardingRepository = FirestoreOnboardingRepository(firestore),
+            favorites = RoomFavoriteAffirmationRepository(database.favoriteAffirmationDao()),
             dayLetters = dayLetters,
             authRepository = FirebaseAuthRepository(
                 auth = FirebaseAuth.getInstance(),

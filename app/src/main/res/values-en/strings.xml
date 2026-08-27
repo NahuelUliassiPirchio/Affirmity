@@ -339,6 +339,10 @@
     <string name="affirmation_group_selector_title">Select your groups</string>
     <string name="affirmation_group_selector_apply">Apply</string>
     <string name="affirmation_group_add_custom">Add custom affirmations</string>
+    <string name="affirmation_group_open_favorites">View favorites</string>
+    <string name="favorites_title">Favorites</string>
+    <string name="favorites_empty_state">You haven’t favorited any affirmations yet.</string>
+    <string name="favorites_unlike_content_description">Remove from favorites</string>
     <string name="affirmation_group_selector_expand">Expand group selector</string>
     <string name="affirmation_group_selector_collapse">Hide group selector</string>
     <string name="affirmation_group_selector_min_selection_error">Select at least one thematic group.</string>

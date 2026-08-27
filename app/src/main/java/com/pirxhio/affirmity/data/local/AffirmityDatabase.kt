@@ -96,6 +96,21 @@ val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
     }
 }
 
+/** Additive: creates `favorite_affirmations` empty. Existing tables and rows are untouched. */
+val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `favorite_affirmations` (
+                `affirmationId` TEXT NOT NULL,
+                `favoritedAtMillis` INTEGER NOT NULL,
+                PRIMARY KEY(`affirmationId`)
+            )
+            """.trimIndent(),
+        )
+    }
+}
+
 @Database(
     entities = [
         AffirmationEntity::class,
@@ -103,8 +118,9 @@ val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
         DailyMoodEntity::class,
         StreakHealerUseEntity::class,
         AdUnlockEntity::class,
+        FavoriteAffirmationEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 @androidx.room.TypeConverters(OverridesConverters::class)
@@ -114,6 +130,7 @@ abstract class AffirmityDatabase : RoomDatabase() {
     abstract fun dailyMoodDao(): DailyMoodDao
     abstract fun streakHealerUseDao(): StreakHealerUseDao
     abstract fun adUnlockDao(): AdUnlockDao
+    abstract fun favoriteAffirmationDao(): FavoriteAffirmationDao
 
     companion object {
         @Volatile
@@ -126,7 +143,13 @@ abstract class AffirmityDatabase : RoomDatabase() {
                     AffirmityDatabase::class.java,
                     "affirmity.db",
                 ).addMigrations(
-                    MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+                    MIGRATION_1_2,
+                    MIGRATION_2_3,
+                    MIGRATION_3_4,
+                    MIGRATION_4_5,
+                    MIGRATION_5_6,
+                    MIGRATION_6_7,
+                    MIGRATION_7_8,
                 ).build().also { instance = it }
             }
     }

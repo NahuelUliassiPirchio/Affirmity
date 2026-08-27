@@ -70,6 +70,56 @@ class AffirmityDatabaseMigrationTest {
     }
 
     @Test
+    fun migrate7To8_createsEmptyFavoriteAffirmationsTableAndPreservesAffirmations() {
+        helper.createDatabase(TEST_DB, 7).apply {
+            execSQL(
+                "INSERT INTO affirmations " +
+                    "(id, title, subtitle, backgroundType, backgroundValue, groupId, overrides) " +
+                    "VALUES ('id-1', 'Title', 'Subtitle', 'color', '#000000', " +
+                    "'personalizadas', '{\"title:0:name\":\"Alex\"}')",
+            )
+            execSQL(
+                "INSERT INTO daily_completion " +
+                    "(epochDay, meditationDone, affirmationDone) VALUES (123, 1, 0)",
+            )
+            execSQL(
+                "INSERT INTO ad_unlock " +
+                    "(contentKey, contentType, contentId, grantedAtMillis, expiresAtMillis) " +
+                    "VALUES ('key', 'affirmationGroup', 'group', 1000, NULL)",
+            )
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(TEST_DB, 8, true, MIGRATION_7_8)
+
+        migrated.query(
+            "SELECT title, subtitle, backgroundType, backgroundValue, groupId, overrides " +
+                "FROM affirmations WHERE id = 'id-1'",
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("Title", cursor.getString(0))
+            assertEquals("Subtitle", cursor.getString(1))
+            assertEquals("color", cursor.getString(2))
+            assertEquals("#000000", cursor.getString(3))
+            assertEquals("personalizadas", cursor.getString(4))
+            assertEquals("{\"title:0:name\":\"Alex\"}", cursor.getString(5))
+        }
+        migrated.query("SELECT meditationDone, affirmationDone FROM daily_completion WHERE epochDay = 123")
+            .use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals(1, cursor.getInt(0))
+                assertEquals(0, cursor.getInt(1))
+            }
+        migrated.query("SELECT contentKey FROM ad_unlock WHERE contentKey = 'key'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("key", cursor.getString(0))
+        }
+        migrated.query("SELECT * FROM favorite_affirmations").use { cursor ->
+            assertFalse(cursor.moveToFirst())
+        }
+    }
+
+    @Test
     fun migrate1To2_preservesAffirmationsAndCreatesEmptyDailyCompletionTable() {
         helper.createDatabase(TEST_DB, 1).apply {
             execSQL(
