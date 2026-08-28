@@ -25,6 +25,13 @@ sealed interface DataSession {
     // bug class this comment on `entitlements` warns against, reused deliberately (design §4a).
     val adUnlocks: AdUnlockRepository
 
+    /** Per-user overrides on shared catalog rows (design D9, revised). Defaulted to
+     *  [NoOpCatalogOverrideRepository] on both [Local] and [Remote] -- unlike [adUnlocks], an
+     *  empty override map is a safe, forward-compatible default: the bundled v1.0.0 catalog has
+     *  no bracket tokens to override (D11), so no test fixture that omits this argument silently
+     *  loses meaningful data. */
+    val catalogOverrides: CatalogOverrideRepository
+
     class Local(
         override val affirmations: AffirmationRepository,
         override val completions: DailyCompletionRepository,
@@ -34,6 +41,7 @@ sealed interface DataSession {
         override val notifications: NotificationSettingsRepository,
         override val entitlements: EntitlementRepository = LocalFreeEntitlementRepository(),
         override val adUnlocks: AdUnlockRepository,
+        override val catalogOverrides: CatalogOverrideRepository = NoOpCatalogOverrideRepository,
     ) : DataSession
 
     class Migrating(
@@ -48,6 +56,7 @@ sealed interface DataSession {
         override val notifications: NotificationSettingsRepository get() = local.notifications
         override val entitlements: EntitlementRepository get() = local.entitlements
         override val adUnlocks: AdUnlockRepository get() = local.adUnlocks
+        override val catalogOverrides: CatalogOverrideRepository get() = local.catalogOverrides
     }
 
     class Remote(
@@ -63,5 +72,6 @@ sealed interface DataSession {
         // call site (unlike Local, where "signed-out = Free" is the correct, intentional default).
         override val entitlements: EntitlementRepository,
         override val adUnlocks: AdUnlockRepository,
+        override val catalogOverrides: CatalogOverrideRepository = NoOpCatalogOverrideRepository,
     ) : DataSession
 }

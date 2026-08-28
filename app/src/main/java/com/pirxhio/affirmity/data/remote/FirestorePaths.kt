@@ -50,4 +50,27 @@ object FirestorePaths {
 
     fun timedUnlockDoc(uid: String, key: ContentKey): String =
         "${timedUnlocksCollection(uid)}/${key.storageKey}"
+
+    // --- Shared, non-per-user catalog (design D1). Flat by design: depth costs a
+    // collectionGroup query and buys zero read savings -- see design D1's full argument. ---
+
+    fun catalogAffirmationsCollection(): String = "catalogAffirmations"
+    fun catalogAffirmationDoc(id: String): String = "${catalogAffirmationsCollection()}/$id"
+
+    fun catalogUniversesCollection(): String = "catalogUniverses"
+    fun catalogUniverseDoc(universeId: String): String = "${catalogUniversesCollection()}/$universeId"
+
+    fun catalogThemesCollection(): String = "catalogThemes"
+    fun catalogThemeDoc(themeId: String): String = "${catalogThemesCollection()}/$themeId"
+
+    fun catalogCollectionsCollection(): String = "catalogCollections"
+    fun catalogCollectionDoc(collectionId: String): String = "${catalogCollectionsCollection()}/$collectionId"
+
+    /** Written LAST by the seeder (design D12) -- its presence/value is the "seeded through" signal. */
+    fun catalogVersionDoc(): String = "catalogMeta/version"
+
+    // --- Per-user override surface on shared catalog rows (design D9, revised). ---
+    fun catalogOverridesCollection(uid: String): String = "users/$uid/catalogOverrides"
+    fun catalogOverrideDoc(uid: String, catalogAffirmationId: String): String =
+        "${catalogOverridesCollection(uid)}/$catalogAffirmationId"
 }

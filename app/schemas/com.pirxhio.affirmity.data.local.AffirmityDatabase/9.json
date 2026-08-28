@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 9,
-    "identityHash": "10e7629d851fc188365a561c09161a6e",
+    "identityHash": "697d234b232b9b17d839f37cd0a956c7",
     "entities": [
       {
         "tableName": "affirmations",
@@ -316,11 +316,36 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_catalog_affirmations_collectionId` ON `${TABLE_NAME}` (`collectionId`)"
           }
         ]
+      },
+      {
+        "tableName": "catalog_affirmation_overrides",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`catalogAffirmationId` TEXT NOT NULL, `overrides` TEXT NOT NULL DEFAULT '{}', PRIMARY KEY(`catalogAffirmationId`))",
+        "fields": [
+          {
+            "fieldPath": "catalogAffirmationId",
+            "columnName": "catalogAffirmationId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "overrides",
+            "columnName": "overrides",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'{}'"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "catalogAffirmationId"
+          ]
+        }
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '10e7629d851fc188365a561c09161a6e')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '697d234b232b9b17d839f37cd0a956c7')"
     ]
   }
 }
