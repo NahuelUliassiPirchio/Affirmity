@@ -319,11 +319,12 @@ private fun AffirmationGroupSelectableRow(
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 }
-                group.alwaysSelected -> Icon(
-                    imageVector = Icons.Filled.CheckCircle,
-                    contentDescription = stringResource(R.string.affirmation_group_always_on_a11y),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
+                // TEMPORARY: this branch used to force a static, non-interactive "always on" icon
+                // for `alwaysSelected` groups regardless of the real `checked` value -- which made
+                // PERSONALIZADAS_GROUP look permanently checked even after the toggle relaxation
+                // above made it genuinely toggleable. Removed so the icon reflects real state; the
+                // R.string.affirmation_group_always_on_a11y resource is now unused. To revert,
+                // reinstate this branch ahead of `checked ->`.
                 checked -> Icon(
                     imageVector = Icons.Filled.CheckCircle,
                     contentDescription = null,
