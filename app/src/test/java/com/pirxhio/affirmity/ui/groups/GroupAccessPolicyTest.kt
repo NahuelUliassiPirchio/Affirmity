@@ -1,9 +1,13 @@
 package com.pirxhio.affirmity.ui.groups
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.AccessDecision
 import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.access.AdUnlockPolicy
 import com.pirxhio.affirmity.access.AdUnlockState
+import com.pirxhio.affirmity.access.ContentAccess
 import com.pirxhio.affirmity.access.ContentKey
 import com.pirxhio.affirmity.access.ContentType
 import com.pirxhio.affirmity.access.isUnlocked
@@ -15,12 +19,37 @@ import org.junit.Test
 
 /** Covers [groupAccessDecision]/[isLocked]/[isToggleable]/[deriveBadge] (design §6/§7, spec §0)
  * across the full tier x policy x grant-state matrix, with explicit regression guards for
- * `PERSONALIZADAS_GROUP`'s `alwaysSelected` short-circuit and both spec §0 badge decisions. */
+ * `PERSONALIZADAS_GROUP`'s `alwaysSelected` short-circuit and both spec §0 badge decisions.
+ *
+ * Fixtures below are LOCALLY constructed (design D17/task 4.6.1), not sourced from
+ * `defaultAffirmationGroups()` by literal id -- the 3 legacy placeholder groups this suite
+ * originally borrowed (`bienestar`/`autocuidado`/`fuerza_de_voluntad`) were deleted by the catalog
+ * change. This suite only needs one representative of each access shape (Free / Pro-only /
+ * Pro-or-ad-PER_USE), so it builds its own, decoupled from production group wiring. `titleRes`/
+ * `descriptionRes` are placeholders -- irrelevant to these pure decision-resolution tests. */
 class GroupAccessPolicyTest {
 
-    private val bienestar = defaultAffirmationGroups().first { it.id == "bienestar" } // Free
-    private val autocuidado = defaultAffirmationGroups().first { it.id == "autocuidado" } // Pro-only
-    private val fuerzaDeVoluntad = defaultAffirmationGroups().first { it.id == "fuerza_de_voluntad" } // Pro or ad (PER_USE)
+    private val bienestar = AffirmationGroup( // Free
+        id = "test_free_group",
+        titleRes = R.string.app_name,
+        descriptionRes = R.string.app_name,
+        icon = Icons.Filled.Favorite,
+        access = ContentAccess.Free,
+    )
+    private val autocuidado = AffirmationGroup( // Pro-only
+        id = "test_pro_only_group",
+        titleRes = R.string.app_name,
+        descriptionRes = R.string.app_name,
+        icon = Icons.Filled.Favorite,
+        access = ContentAccess.Pro,
+    )
+    private val fuerzaDeVoluntad = AffirmationGroup( // Pro or ad (PER_USE)
+        id = "test_pro_or_ad_group",
+        titleRes = R.string.app_name,
+        descriptionRes = R.string.app_name,
+        icon = Icons.Filled.Favorite,
+        access = ContentAccess.ProOrAdPerUse,
+    )
 
     private val noGrants = AdUnlockState()
     private val now = 1_000_000L

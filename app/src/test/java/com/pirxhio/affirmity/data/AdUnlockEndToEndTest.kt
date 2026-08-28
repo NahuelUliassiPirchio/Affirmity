@@ -1,5 +1,8 @@
 package com.pirxhio.affirmity.data
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FitnessCenter
+import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.AccessDecision
 import com.pirxhio.affirmity.access.AdUnlockOutcome
 import com.pirxhio.affirmity.access.AdUnlockPolicy
@@ -43,7 +46,7 @@ import com.pirxhio.affirmity.data.repository.StreakHealerRepository
 import com.pirxhio.affirmity.meditation.SessionEndReason
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
-import com.pirxhio.affirmity.ui.groups.defaultAffirmationGroups
+import com.pirxhio.affirmity.ui.groups.AffirmationGroup
 import com.pirxhio.affirmity.ui.groups.groupAccessDecision
 import com.pirxhio.affirmity.ui.groups.isToggleable
 import com.pirxhio.affirmity.ui.meditation.catalog.findMeditationCatalogEntry
@@ -217,7 +220,18 @@ private fun buildState(
  */
 class AdUnlockEndToEndTest {
 
-    private val fuerzaDeVoluntad = defaultAffirmationGroups().first { it.id == "fuerza_de_voluntad" }
+    // Locally-constructed fixture (design D17/task 4.6.2) -- the legacy `fuerza_de_voluntad`
+    // group this suite originally sourced from `defaultAffirmationGroups()` was deleted by the
+    // catalog change. Only a Pro-or-ad-PER_USE group shape is needed here; the id is kept as a
+    // literal string (not sourced from production wiring) purely to match `buildState`'s existing
+    // `knownGroupIds`/`proOnlyGroupIds` fixture sets below.
+    private val fuerzaDeVoluntad = AffirmationGroup(
+        id = "fuerza_de_voluntad",
+        titleRes = R.string.app_name,
+        descriptionRes = R.string.app_name,
+        icon = Icons.Filled.FitnessCenter,
+        access = ContentAccess.ProOrAdPerUse,
+    )
     private val fuerzaKey = ContentKey(ContentType.AFFIRMATION_GROUP, fuerzaDeVoluntad.id)
 
     // 1. FREE tier, no grant -> LockedAdUnlockable(PER_USE), not toggleable.

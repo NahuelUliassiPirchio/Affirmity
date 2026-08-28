@@ -3,9 +3,6 @@ package com.pirxhio.affirmity.ui.groups
 import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FitnessCenter
-import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.ContentAccess
@@ -63,26 +60,8 @@ val PERSONALIZADAS_GROUP = AffirmationGroup(
 fun selectableAffirmationGroups(): List<AffirmationGroup> =
     listOf(PERSONALIZADAS_GROUP) + defaultAffirmationGroups()
 
-fun defaultAffirmationGroups(): List<AffirmationGroup> = listOf(
-    AffirmationGroup(
-        id = "bienestar",
-        titleRes = R.string.affirmation_group_bienestar_title,
-        descriptionRes = R.string.affirmation_group_bienestar_description,
-        icon = Icons.Filled.Favorite,
-        access = ContentAccess.Free,
-    ),
-    AffirmationGroup(
-        id = "autocuidado",
-        titleRes = R.string.affirmation_group_autocuidado_title,
-        descriptionRes = R.string.affirmation_group_autocuidado_description,
-        icon = Icons.Filled.SelfImprovement,
-        access = ContentAccess.Pro,
-    ),
-    AffirmationGroup(
-        id = "fuerza_de_voluntad",
-        titleRes = R.string.affirmation_group_fuerza_title,
-        descriptionRes = R.string.affirmation_group_fuerza_description,
-        icon = Icons.Filled.FitnessCenter,
-        access = ContentAccess.ProOrAdPerUse,
-    ),
-)
+/** The 14 curated-catalog universes (design D17) -- the 3 legacy placeholder groups
+ * (`bienestar`/`autocuidado`/`fuerza_de_voluntad`) are DELETED outright, no alias/fallback,
+ * per the explicit user decision recorded in design D17: they held no real content and no
+ * live user data referenced them. */
+fun defaultAffirmationGroups(): List<AffirmationGroup> = catalogUniverseGroups()

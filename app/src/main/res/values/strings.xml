@@ -331,12 +331,6 @@
 
     <string name="affirmation_group_badge_premium">Premium</string>
     <string name="affirmation_group_badge_ad">Solo Pro</string>
-    <string name="affirmation_group_bienestar_title">Bienestar</string>
-    <string name="affirmation_group_bienestar_description">Afirmaciones diarias para cultivar la paz interior y el equilibrio físico y mental.</string>
-    <string name="affirmation_group_autocuidado_title">Autocuidado</string>
-    <string name="affirmation_group_autocuidado_description">Nutre tu autoestima y aprende a priorizar tus necesidades con compasión.</string>
-    <string name="affirmation_group_fuerza_title">Fuerza de Voluntad</string>
-    <string name="affirmation_group_fuerza_description">Fortalece tu determinación y supera los obstáculos con una mentalidad resiliente.</string>
     <string name="affirmation_group_personalizadas_title">Personalizadas</string>
     <string name="affirmation_group_personalizadas_description">Tus propias afirmaciones, siempre incluidas en el feed.</string>
     <string name="affirmation_group_self_worth_title">Amor propio y autoestima</string>
