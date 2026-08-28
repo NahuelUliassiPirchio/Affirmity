@@ -232,7 +232,14 @@ private fun Affirmation.toEntity(): AffirmationEntity = AffirmationEntity(
  * Pure resolution of the committed group-id selection, extracted so it is testable without
  * Android/DataStore (design §4, §6, D18). [persisted] is `null` on the very first-ever launch (no
  * selection ever saved). Unknown ids (e.g. a group removed in a later release, such as the 3
- * legacy groups deleted by design D17) are dropped. `personalizadas` is always force-included.
+ * legacy groups deleted by design D17) are dropped. `personalizadas` is included in every FALLBACK
+ * result (first launch, or a persisted selection with nothing thematic surviving) as the sensible
+ * default -- but, as of a TEMPORARY dogfooding change, is no longer force-re-added to an otherwise
+ * healthy persisted selection that explicitly excludes it. This pairs with
+ * `GroupAccessPolicy.isToggleable`'s matching relaxation: without both changes together, a user
+ * could uncheck `personalizadas` in the selector, hit Aplicar, and have it silently reappear on the
+ * next read of this collector. To restore the old permanent-inclusion behavior, change the final
+ * `return` back to `resolved + PERSONALIZADAS_GROUP_ID` unconditionally.
  *
  * The minimum-selection invariant lives HERE, tier-independent (design D18) -- moved out of
  * `EntitlementResolution.deselectLockedGroups`'s call site, which is guarded by
@@ -247,9 +254,12 @@ fun resolveSelectedGroupIds(
     knownIds: Set<String>,
     defaultThematicIds: Set<String>,
 ): Set<String> {
-    val filtered = persisted?.filter { it in knownIds }?.toSet() ?: defaultThematicIds
-    val resolved = if (filtered.none { it != PERSONALIZADAS_GROUP_ID }) defaultThematicIds else filtered
-    return resolved + PERSONALIZADAS_GROUP_ID
+    val filtered = persisted?.filter { it in knownIds }?.toSet()
+    return if (filtered == null || filtered.none { it != PERSONALIZADAS_GROUP_ID }) {
+        defaultThematicIds + PERSONALIZADAS_GROUP_ID
+    } else {
+        filtered
+    }
 }
 
 /**

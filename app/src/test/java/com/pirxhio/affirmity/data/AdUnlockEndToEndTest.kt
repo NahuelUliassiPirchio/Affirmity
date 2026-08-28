@@ -289,8 +289,11 @@ class AdUnlockEndToEndTest {
         val committed = state.applyGroupSelection()
 
         assertTrue("commit must succeed", committed)
+        // "personalizadas" absent from `initial` and TEMPORARILY no longer force-re-added to an
+        // otherwise-healthy persisted selection (see resolveSelectedGroupIds's KDoc) -- this test
+        // predates that relaxation and previously asserted force-inclusion.
         assertEquals(
-            setOf("personalizadas", "bienestar", fuerzaDeVoluntad.id),
+            setOf("bienestar", fuerzaDeVoluntad.id),
             state.selectedGroupIds.value,
         )
 

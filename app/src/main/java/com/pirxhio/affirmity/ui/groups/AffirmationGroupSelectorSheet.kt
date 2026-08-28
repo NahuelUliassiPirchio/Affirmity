@@ -209,8 +209,10 @@ private fun AffirmationGroupSelectableRow(
     onEvent: (AnalyticsEvent) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    // Single source of lock/toggle truth (design §6) -- `alwaysSelected` short-circuits first,
-    // so `PERSONALIZADAS_GROUP` is never locked/toggleable at either tier.
+    // Single source of lock/toggle truth (design §6) -- `alwaysSelected` short-circuits lock
+    // status first, so `PERSONALIZADAS_GROUP` is never locked at either tier. It IS toggleable
+    // (TEMPORARY dogfooding relaxation of the old "never toggleable" behavior -- see
+    // GroupAccessPolicy.isToggleable's KDoc).
     val toggleable = isToggleable(group, decision)
     val locked = isLocked(decision)
     // MUST be checked before `locked` below -- LockedAdUnlockable satisfies both `locked` and

@@ -76,13 +76,13 @@ class GroupAccessPolicyTest {
     }
 
     @Test
-    fun `PERSONALIZADAS_GROUP is never toggleable for a Free user`() {
-        assertFalse(isToggleable(PERSONALIZADAS_GROUP, decisionFor(PERSONALIZADAS_GROUP, AccessTier.FREE)))
+    fun `PERSONALIZADAS_GROUP is toggleable for a Free user (TEMPORARY dogfooding relaxation)`() {
+        assertTrue(isToggleable(PERSONALIZADAS_GROUP, decisionFor(PERSONALIZADAS_GROUP, AccessTier.FREE)))
     }
 
     @Test
-    fun `PERSONALIZADAS_GROUP is never toggleable for a Pro user`() {
-        assertFalse(isToggleable(PERSONALIZADAS_GROUP, decisionFor(PERSONALIZADAS_GROUP, AccessTier.PRO)))
+    fun `PERSONALIZADAS_GROUP is toggleable for a Pro user (TEMPORARY dogfooding relaxation)`() {
+        assertTrue(isToggleable(PERSONALIZADAS_GROUP, decisionFor(PERSONALIZADAS_GROUP, AccessTier.PRO)))
     }
 
     // --- FREE-access group (bienestar): unlocked/toggleable at both tiers -------------------

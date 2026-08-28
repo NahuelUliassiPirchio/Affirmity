@@ -6,8 +6,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /** Covers the pure selection-resolution logic extracted from `AffirmityAppState`'s init collector
- * (design §4/§6, D17/D18): first-launch default, unknown-id filtering, personalizadas
- * force-inclusion, and the tier-independent thematic-emptiness fallback (D18's Pro-tier bug fix). */
+ * (design §4/§6, D17/D18): first-launch default, unknown-id filtering, personalizadas's presence
+ * in every FALLBACK default (not force-included into an otherwise-healthy selection -- TEMPORARY
+ * dogfooding relaxation, see the function's KDoc), and the tier-independent thematic-emptiness
+ * fallback (D18's Pro-tier bug fix). */
 class ResolveSelectedGroupIdsTest {
 
     // Post-D17: 14 curated-catalog universes + personalizadas. `self_worth` stands in as "a
@@ -85,18 +87,22 @@ class ResolveSelectedGroupIdsTest {
             defaultThematicIds = defaultThematicIds,
         )
 
-        assertEquals(setOf("self_worth", "personalizadas"), resolved)
+        assertEquals(setOf("self_worth"), resolved)
     }
 
     @Test
-    fun `personalizadas is force-included even if absent from the persisted selection`() {
+    fun `a healthy persisted selection without personalizadas is respected verbatim (TEMPORARY dogfooding relaxation)`() {
+        // Was "personalizadas is force-included even if absent" before this change. Reversed
+        // deliberately: this is what actually lets a user uncheck personalizadas in the selector
+        // and have it stay unchecked across a restart, instead of snapping back on the next
+        // observeSelectedGroupIds emission. See resolveSelectedGroupIds's KDoc to revert.
         val resolved = resolveSelectedGroupIds(
             persisted = setOf("self_worth"),
             knownIds = knownIds,
             defaultThematicIds = defaultThematicIds,
         )
 
-        assertEquals(setOf("self_worth", "personalizadas"), resolved)
+        assertEquals(setOf("self_worth"), resolved)
     }
 
     // --- Wiring assertion (design D18): the production default is a DECLARATION, not a
