@@ -55,6 +55,7 @@ android {
             manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713"
             buildConfigField("String", "ADMOB_REWARDED_UNIT_PER_USE", "\"ca-app-pub-3940256099942544/5224354917\"")
             buildConfigField("String", "ADMOB_REWARDED_UNIT_ONE_TIME_TRIAL", "\"ca-app-pub-3940256099942544/5224354917\"")
+            buildConfigField("String", "ADMOB_REWARDED_UNIT_TIMED_REPEATABLE", "\"ca-app-pub-3940256099942544/5224354917\"")
             buildConfigField(
                 "String",
                 "ADMOB_TEST_DEVICE_HASH",
@@ -75,6 +76,18 @@ android {
                 "String",
                 "ADMOB_REWARDED_UNIT_ONE_TIME_TRIAL",
                 "\"${requiredAdSecret("admob.rewardedUnit.oneTimeTrial", "ADMOB_REWARDED_UNIT_ONE_TIME_TRIAL")}\"",
+            )
+            // Deliberately OPTIONAL, unlike the two units above (design D16): a third
+            // requiredAdSecret would fail every release build until a new AdMob unit is
+            // provisioned. Falls back to the one-time-trial unit id so release builds are never
+            // blocked on this specific unit existing.
+            buildConfigField(
+                "String",
+                "ADMOB_REWARDED_UNIT_TIMED_REPEATABLE",
+                "\"${
+                    adSecret("admob.rewardedUnit.timedRepeatable", "ADMOB_REWARDED_UNIT_TIMED_REPEATABLE")
+                        ?: requiredAdSecret("admob.rewardedUnit.oneTimeTrial", "ADMOB_REWARDED_UNIT_ONE_TIME_TRIAL")
+                }\"",
             )
             buildConfigField("String", "ADMOB_TEST_DEVICE_HASH", "\"\"")
         }

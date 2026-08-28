@@ -111,6 +111,28 @@ val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
     }
 }
 
+/** Additive: creates `timed_ad_unlock` empty (design D16). A SIBLING table of `ad_unlock`, never
+ * an ALTER of it -- the existing table's create-only guarantee (`insertIfAbsent`) must stay
+ * unweakened for [com.pirxhio.affirmity.access.AdUnlockPolicy.ONE_TIME_TRIAL]. Catalog tables
+ * (Phase 2 of this change) are added to this same migration later; this version only ships the
+ * ad-unlock policy slice. */
+val MIGRATION_8_9 = object : androidx.room.migration.Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `timed_ad_unlock` (
+                `contentKey` TEXT NOT NULL,
+                `contentType` TEXT NOT NULL,
+                `contentId` TEXT NOT NULL,
+                `grantedAtMillis` INTEGER NOT NULL,
+                `expiresAtMillis` INTEGER,
+                PRIMARY KEY(`contentKey`)
+            )
+            """.trimIndent(),
+        )
+    }
+}
+
 @Database(
     entities = [
         AffirmationEntity::class,
@@ -119,8 +141,9 @@ val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
         StreakHealerUseEntity::class,
         AdUnlockEntity::class,
         FavoriteAffirmationEntity::class,
+        TimedAdUnlockEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 @androidx.room.TypeConverters(OverridesConverters::class)
@@ -131,6 +154,7 @@ abstract class AffirmityDatabase : RoomDatabase() {
     abstract fun streakHealerUseDao(): StreakHealerUseDao
     abstract fun adUnlockDao(): AdUnlockDao
     abstract fun favoriteAffirmationDao(): FavoriteAffirmationDao
+    abstract fun timedAdUnlockDao(): TimedAdUnlockDao
 
     companion object {
         @Volatile
@@ -150,6 +174,7 @@ abstract class AffirmityDatabase : RoomDatabase() {
                     MIGRATION_5_6,
                     MIGRATION_6_7,
                     MIGRATION_7_8,
+                    MIGRATION_8_9,
                 ).build().also { instance = it }
             }
     }

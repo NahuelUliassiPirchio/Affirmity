@@ -34,7 +34,8 @@ private class FakeRewardedAdGateway(
 
 private val PER_USE_UNIT = "per-use-unit"
 private val TRIAL_UNIT = "trial-unit"
-private val ids = AdUnitIds(perUse = PER_USE_UNIT, oneTimeTrial = TRIAL_UNIT)
+private val TIMED_UNIT = "timed-unit"
+private val ids = AdUnitIds(perUse = PER_USE_UNIT, oneTimeTrial = TRIAL_UNIT, timedRepeatable = TIMED_UNIT)
 private val key = ContentKey(ContentType.MEDITATION, "enfoque")
 
 class RewardedAdUnlockSourceTest {
@@ -128,7 +129,10 @@ class RewardedAdUnlockSourceTest {
     @Test
     fun `blank ad unit id maps to Unavailable without calling the gateway`() = runTest {
         val gateway = FakeRewardedAdGateway()
-        val source = RewardedAdUnlockSource(gateway, AdUnitIds(perUse = "", oneTimeTrial = TRIAL_UNIT))
+        val source = RewardedAdUnlockSource(
+            gateway,
+            AdUnitIds(perUse = "", oneTimeTrial = TRIAL_UNIT, timedRepeatable = TIMED_UNIT),
+        )
 
         val outcome = source.requestUnlock(key, AdUnlockPolicy.PER_USE)
 
@@ -144,7 +148,18 @@ class RewardedAdUnlockSourceTest {
 
         assertEquals(PER_USE_UNIT, source.adUnitIdFor(AdUnlockPolicy.PER_USE))
         assertEquals(TRIAL_UNIT, source.adUnitIdFor(AdUnlockPolicy.ONE_TIME_TRIAL))
+        assertEquals(TIMED_UNIT, source.adUnitIdFor(AdUnlockPolicy.TIMED_REPEATABLE))
         assertNull(source.adUnitIdFor(AdUnlockPolicy.NONE))
+    }
+
+    @Test
+    fun `adUnitIdFor TIMED_REPEATABLE with a blank unit id returns null`() {
+        val source = RewardedAdUnlockSource(
+            FakeRewardedAdGateway(),
+            AdUnitIds(perUse = PER_USE_UNIT, oneTimeTrial = TRIAL_UNIT, timedRepeatable = ""),
+        )
+
+        assertNull(source.adUnitIdFor(AdUnlockPolicy.TIMED_REPEATABLE))
     }
 
     // Single-flight (REQ-4.8) ---------------------------------------------------------------

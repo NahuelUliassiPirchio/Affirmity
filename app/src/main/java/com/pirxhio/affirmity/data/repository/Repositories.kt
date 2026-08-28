@@ -140,4 +140,12 @@ interface AdUnlockRepository {
     /** Idempotent. A second call for an existing [AdUnlockRecord.key] is a silent no-op, not an
      *  overwrite. */
     suspend fun grantDurableUnlock(record: AdUnlockRecord)
+
+    /** [com.pirxhio.affirmity.access.AdUnlockPolicy.TIMED_REPEATABLE] grants, mirrored into a
+     *  SEPARATE store from [observeDurableUnlocks]/[grantDurableUnlock] (design D16). */
+    fun observeTimedUnlocks(): Flow<List<AdUnlockRecord>>
+
+    /** UPSERT, unlike [grantDurableUnlock]: re-earning after expiry replaces
+     *  `grantedAt`/`expiresAt`. */
+    suspend fun grantTimedUnlock(record: AdUnlockRecord)
 }

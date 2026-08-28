@@ -140,6 +140,36 @@ class AffirmityDatabaseMigrationTest {
         dailyCompletionCursor.close()
     }
 
+    @Test
+    fun migrate8To9_createsEmptyTimedAdUnlockTableAndLeavesAdUnlockUntouched() {
+        helper.createDatabase(TEST_DB, 8).apply {
+            execSQL(
+                "INSERT INTO ad_unlock " +
+                    "(contentKey, contentType, contentId, grantedAtMillis, expiresAtMillis) " +
+                    "VALUES ('key', 'affirmationGroup', 'group', 1000, NULL)",
+            )
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(TEST_DB, 9, true, MIGRATION_8_9)
+
+        // `timed_ad_unlock` (design D16) is created EMPTY -- no backfill from `ad_unlock`, they are
+        // two SEPARATE stores from day one.
+        migrated.query("SELECT * FROM timed_ad_unlock").use { cursor ->
+            assertFalse(cursor.moveToFirst())
+        }
+        // Pre-existing `ad_unlock` row is byte-for-byte untouched by this migration.
+        migrated.query(
+            "SELECT contentType, contentId, grantedAtMillis, expiresAtMillis FROM ad_unlock WHERE contentKey = 'key'",
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("affirmationGroup", cursor.getString(0))
+            assertEquals("group", cursor.getString(1))
+            assertEquals(1000L, cursor.getLong(2))
+            assertTrue(cursor.isNull(3))
+        }
+    }
+
     private companion object {
         const val TEST_DB = "migration-test"
     }
