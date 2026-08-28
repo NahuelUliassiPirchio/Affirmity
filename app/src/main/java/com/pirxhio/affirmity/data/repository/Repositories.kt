@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.data.repository
 import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.access.AdUnlockRecord
 import com.pirxhio.affirmity.data.local.AffirmationEntity
+import com.pirxhio.affirmity.data.local.CatalogAffirmationEntity
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
@@ -148,4 +149,21 @@ interface AdUnlockRepository {
     /** UPSERT, unlike [grantDurableUnlock]: re-earning after expiry replaces
      *  `grantedAt`/`expiresAt`. */
     suspend fun grantTimedUnlock(record: AdUnlockRecord)
+}
+
+/**
+ * Read-only contract for the shared catalog cache (design D9). Deliberately OUTSIDE
+ * [DataSession]: the catalog is not per-user -- it is byte-identical signed-in and signed-out --
+ * so it has no sign-in/sign-out swap semantics to participate in, and `DataSession.Remote`'s
+ * "backed exclusively by Firestore" contract would be a lie. There is no write method: seeding
+ * goes through `CatalogSeeder` against the DAO directly, never through this interface.
+ */
+interface CatalogAffirmationRepository {
+    fun observeByGroupIds(groupIds: Set<String>): Flow<List<CatalogAffirmationEntity>>
+    suspend fun getByIds(ids: List<String>): List<CatalogAffirmationEntity>
+}
+
+object NoOpCatalogAffirmationRepository : CatalogAffirmationRepository {
+    override fun observeByGroupIds(groupIds: Set<String>): Flow<List<CatalogAffirmationEntity>> = flowOf(emptyList())
+    override suspend fun getByIds(ids: List<String>): List<CatalogAffirmationEntity> = emptyList()
 }
