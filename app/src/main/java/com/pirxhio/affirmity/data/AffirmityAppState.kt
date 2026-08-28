@@ -72,6 +72,7 @@ import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.FcmTokenRepository
 import com.pirxhio.affirmity.data.remote.FirestoreAdUnlockRepository
 import com.pirxhio.affirmity.data.remote.FirestoreAffirmationRepository
+import com.pirxhio.affirmity.data.remote.FirestoreCatalogOverrideRepository
 import com.pirxhio.affirmity.data.remote.FirestoreDailyCompletionRepository
 import com.pirxhio.affirmity.data.remote.FirestoreDailyMoodRepository
 import com.pirxhio.affirmity.data.remote.FirestoreEntitlementRepository
@@ -82,11 +83,15 @@ import com.pirxhio.affirmity.data.remote.FirestoreOnboardingRepository
 import com.pirxhio.affirmity.data.remote.FirestoreStreakHealerRepository
 import com.pirxhio.affirmity.data.remote.MigrationSnapshot
 import com.pirxhio.affirmity.data.repository.AdUnlockRepository
+import com.pirxhio.affirmity.data.repository.CatalogAffirmationRepository
 import com.pirxhio.affirmity.data.repository.DataSession
 import com.pirxhio.affirmity.data.repository.FavoriteAffirmationRepository
+import com.pirxhio.affirmity.data.repository.NoOpCatalogAffirmationRepository
 import com.pirxhio.affirmity.data.repository.NoOpFavoriteAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomAdUnlockRepository
 import com.pirxhio.affirmity.data.repository.RoomAffirmationRepository
+import com.pirxhio.affirmity.data.repository.RoomCatalogAffirmationRepository
+import com.pirxhio.affirmity.data.repository.RoomCatalogOverrideRepository
 import com.pirxhio.affirmity.data.repository.RoomDailyCompletionRepository
 import com.pirxhio.affirmity.data.repository.RoomDailyMoodRepository
 import com.pirxhio.affirmity.data.repository.RoomFavoriteAffirmationRepository
@@ -96,6 +101,10 @@ import com.pirxhio.affirmity.data.repository.RoomStreakHealerRepository
 import com.pirxhio.affirmity.meditation.SessionEndReason
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
+import com.pirxhio.affirmity.data.catalog.CATALOG_ID_PREFIX
+import com.pirxhio.affirmity.ui.groups.catalogAccessDecision
+import com.pirxhio.affirmity.ui.groups.catalogCollectionsById
+import com.pirxhio.affirmity.ui.groups.catalogUniverseGroups
 import com.pirxhio.affirmity.ui.groups.defaultAffirmationGroups
 import com.pirxhio.affirmity.ui.groups.selectableAffirmationGroups
 import com.pirxhio.affirmity.access.isUnlocked
@@ -136,7 +145,16 @@ data class Affirmation(
     val background: AffirmationBackground,
     val groupId: String = PERSONALIZADAS_GROUP_ID,
     val overrides: Map<String, String> = emptyMap(),
+    /** Presentation-level provenance (design D14). The UI reads THIS to decide what to render
+     *  (e.g. hide the delete affordance); write routing reads the id prefix instead, which is the
+     *  storage-level ground truth and cannot drift from the row's real home. */
+    val source: AffirmationSource = AffirmationSource.OWNED,
+    /** The access unit for CATALOG rows (design D5/D6). Always null for OWNED rows. */
+    val collectionId: String? = null,
 )
+
+/** See [Affirmation.source] (design D14). */
+enum class AffirmationSource { OWNED, CATALOG }
 
 /** Rolling last-7-days completion flags (oldest first, today last) for a habit tracker.
  * [healedDays] holds the same-indexed offsets that were saved by the streak healer instead of
@@ -169,6 +187,22 @@ private fun AffirmationEntity.toAffirmation(): Affirmation = Affirmation(
     },
     groupId = groupId,
     overrides = overrides,
+)
+
+/** Catalog row -> read-model [Affirmation] (design D8/D14): `text` maps to `title`, `subtitle` is
+ *  empty (one authored string per affirmation, no split); the background is DERIVED, never stored
+ *  (design D4); [overrides] comes from the per-user override map, keyed off the row's own id. */
+private fun com.pirxhio.affirmity.data.local.CatalogAffirmationEntity.toAffirmation(
+    overrides: Map<String, String>,
+): Affirmation = Affirmation(
+    id = id,
+    title = text,
+    subtitle = "",
+    background = com.pirxhio.affirmity.ui.affirmations.forCatalogAffirmation(groupId, id),
+    groupId = groupId,
+    overrides = overrides,
+    source = AffirmationSource.CATALOG,
+    collectionId = collectionId,
 )
 
 private fun Affirmation.toEntity(): AffirmationEntity = AffirmationEntity(
@@ -312,12 +346,23 @@ class AffirmityAppState(
      *  one changed argument at the `rememberAffirmityAppState` call site. */
     private val adUnlockSource: AdUnlockSource = NoAdUnlockSource,
     private val favorites: FavoriteAffirmationRepository = NoOpFavoriteAffirmationRepository,
+    /** Read-only shared catalog cache (design D9). Deliberately OUTSIDE [DataSession] -- it is
+     *  byte-identical signed-in and signed-out, so it has no sign-in/sign-out swap semantics. */
+    private val catalog: CatalogAffirmationRepository = NoOpCatalogAffirmationRepository,
     /** Spec 6's one frozen seam (design D1) -- defaulted to [NoOpAnalyticsLogger], the same
      *  injection convention as [adUnlockSource]. The composition root swaps this once for the
      *  real, consent-gated instance ([ConsentGatedAnalyticsLogger]) -- the one-line kill switch. */
     private val analytics: AnalyticsLogger = NoOpAnalyticsLogger,
 ) {
     val affirmations = mutableStateListOf<Affirmation>()
+
+    /** Shared, read-only catalog rows currently in scope for the committed group selection
+     *  (design D9/D10), with per-user overrides already applied. */
+    private val catalogAffirmations = mutableStateListOf<Affirmation>()
+
+    /** Both ID spaces, for favorites resolution (design D10). Concatenation, never a SQL union --
+     *  when the session is Remote, [affirmations] is not in Room at all. */
+    private val allAffirmations: List<Affirmation> get() = affirmations + catalogAffirmations
 
     var favoriteAffirmationIds = mutableStateOf<Set<String>>(emptySet())
         private set
@@ -349,13 +394,34 @@ class AffirmityAppState(
      * ProgressScreen (that keeps reading [affirmations] unfiltered). Falls back to the full list
      * while [selectedGroupIds] is still null. */
     val filteredAffirmations: List<Affirmation>
-        get() = selectedGroupIds.value?.let { ids -> affirmations.filter { it.groupId in ids } }
-            ?: affirmations
+        get() {
+            val ids = selectedGroupIds.value ?: return affirmations
+            val collectionsById = catalogCollectionsById()
+            val groupsById = catalogUniverseGroups().associateBy { it.id }
+            val now = System.currentTimeMillis()
+            val tier = entitlementTier.value
+            val grants = adUnlockState
+            return affirmations.filter { it.groupId in ids } +
+                catalogAffirmations.filter { affirmation ->
+                    affirmation.groupId in ids &&
+                        groupsById[affirmation.groupId]?.let { group ->
+                            catalogAccessDecision(
+                                group = group,
+                                collection = collectionsById[affirmation.collectionId],
+                                tier = tier,
+                                grants = grants,
+                                nowMillis = now,
+                            ).isUnlocked
+                        } == true
+                }
+        }
 
+    /** Unchanged in shape; now resolves across BOTH id spaces (design D10). Access-unfiltered on
+     *  purpose: a favorite made while Pro stays visible after a downgrade. */
     val favoriteAffirmations: List<Affirmation>
         get() {
-            val affirmationsById = affirmations.associateBy { it.id }
-            return favoriteOrderedIds.value.mapNotNull(affirmationsById::get)
+            val byId = allAffirmations.associateBy { it.id }
+            return favoriteOrderedIds.value.mapNotNull(byId::get)
         }
 
     /** Provider-neutral sign-in state; see `auth/AuthState.kt`. Settings-only, never gates a screen. */
@@ -617,6 +683,22 @@ class AffirmityAppState(
                 .collect { entities ->
                     affirmations.clear()
                     affirmations.addAll(entities.map { it.toAffirmation() })
+                }
+        }
+        scope.launch {
+            // Two subscriptions with DELIBERATELY different lifetimes (design D9, revised): the
+            // catalog rows survive an auth swap (byte-identical signed-in and signed-out); the
+            // overrides half is session.flatMapLatest, matching every other per-user collector, so
+            // signing out drops the previous user's overrides atomically.
+            combine(
+                snapshotFlow { selectedGroupIds.value.orEmpty() }
+                    .flatMapLatest { catalog.observeByGroupIds(it) },
+                session.flatMapLatest { it.catalogOverrides.observeAll() },
+            ) { rows, overrides -> rows to overrides }
+                .catch { error -> Log.e(TAG, "catalog flow failed", error) }
+                .collect { (rows, overrides) ->
+                    catalogAffirmations.clear()
+                    catalogAffirmations.addAll(rows.map { it.toAffirmation(overrides[it.id].orEmpty()) })
                 }
         }
         scope.launch {
@@ -1040,6 +1122,11 @@ class AffirmityAppState(
     }
 
     fun removeAffirmation(id: String) {
+        // Load-bearing guard (design D14): without it, a catalog id would reach
+        // `ready().affirmations.deleteById`, a silent no-op on Room but a REAL per-user Firestore
+        // write when the session is Remote -- a tombstone in a collection that must never contain
+        // catalog ids. Catalog rows have no delete affordance in the UI; this is a hard backstop.
+        if (id.startsWith(CATALOG_ID_PREFIX)) return
         scope.launch {
             ready().affirmations.deleteById(id)
             favorites.remove(id)
@@ -1071,17 +1158,22 @@ class AffirmityAppState(
      */
     fun setTokenOverride(affirmationId: String, tokenKey: String, rawValue: String) {
         scope.launch {
-            val current = affirmations.firstOrNull { it.id == affirmationId } ?: return@launch
+            // Prefix routing (design D14): the id decides WHICH store, not a presentation flag --
+            // a flag could drift from the row's actual home and send a catalog write into
+            // `users/{uid}/affirmations`.
+            val current = allAffirmations.firstOrNull { it.id == affirmationId } ?: return@launch
             val next = current.overrides.toMutableMap().apply {
                 when (val normalized = AffirmationTemplateParser.normalizeOverrideValue(rawValue)) {
                     null -> remove(tokenKey) // empty input == revert to the authored original
                     else -> put(tokenKey, normalized)
                 }
             }
-            ready().affirmations.setOverrides(
-                affirmationId,
-                AffirmationTemplateParser.pruneOverrides(current.title, current.subtitle, next),
-            )
+            val pruned = AffirmationTemplateParser.pruneOverrides(current.title, current.subtitle, next)
+            if (affirmationId.startsWith(CATALOG_ID_PREFIX)) {
+                ready().catalogOverrides.setOverrides(affirmationId, pruned)
+            } else {
+                ready().affirmations.setOverrides(affirmationId, pruned)
+            }
         }
     }
 
@@ -1338,6 +1430,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             meditation = RoomMeditationPreferencesRepository(trackerPreferences),
             notifications = RoomNotificationSettingsRepository(notificationPreferences),
             adUnlocks = RoomAdUnlockRepository(database.adUnlockDao(), database.timedAdUnlockDao()),
+            catalogOverrides = RoomCatalogOverrideRepository(database.catalogOverrideDao()),
         )
         AffirmityAppState(
             scope = scope,
@@ -1353,6 +1446,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
                     notifications = FirestoreNotificationSettingsRepository(firestore, uid),
                     entitlements = FirestoreEntitlementRepository(firestore, uid),
                     adUnlocks = FirestoreAdUnlockRepository(firestore, uid),
+                    catalogOverrides = FirestoreCatalogOverrideRepository(firestore, uid),
                 )
             },
             migrator = FirestoreMigrator(firestore),
@@ -1366,6 +1460,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             fcmTokenRepository = FcmTokenRepository(firestore),
             onboardingRepository = FirestoreOnboardingRepository(firestore),
             favorites = RoomFavoriteAffirmationRepository(database.favoriteAffirmationDao()),
+            catalog = RoomCatalogAffirmationRepository(database.catalogAffirmationDao()),
             dayLetters = dayLetters,
             authRepository = FirebaseAuthRepository(
                 auth = FirebaseAuth.getInstance(),
