@@ -101,7 +101,10 @@ import com.pirxhio.affirmity.data.repository.RoomStreakHealerRepository
 import com.pirxhio.affirmity.meditation.SessionEndReason
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
+import com.pirxhio.affirmity.data.catalog.AndroidCatalogAssetReader
 import com.pirxhio.affirmity.data.catalog.CATALOG_ID_PREFIX
+import com.pirxhio.affirmity.data.catalog.CatalogSeeder
+import com.pirxhio.affirmity.data.local.AndroidCatalogPreferences
 import com.pirxhio.affirmity.ui.groups.catalogAccessDecision
 import com.pirxhio.affirmity.ui.groups.catalogCollectionsById
 import com.pirxhio.affirmity.ui.groups.catalogUniverseGroups
@@ -115,6 +118,7 @@ import java.util.TimeZone
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
@@ -358,6 +362,11 @@ class AffirmityAppState(
     /** Read-only shared catalog cache (design D9). Deliberately OUTSIDE [DataSession] -- it is
      *  byte-identical signed-in and signed-out, so it has no sign-in/sign-out swap semantics. */
     private val catalog: CatalogAffirmationRepository = NoOpCatalogAffirmationRepository,
+    /** Bundled-asset-first seeder (design D2/D13, task 5.10). `null` (the default) means "no
+     *  seeding" -- every existing JVM unit test that constructs this class directly never touches
+     *  Android assets/DataStore. The real composition root ([rememberAffirmityAppState]) always
+     *  provides one. Invoked once, off the main thread, in [init]. */
+    private val catalogSeeder: CatalogSeeder? = null,
     /** Spec 6's one frozen seam (design D1) -- defaulted to [NoOpAnalyticsLogger], the same
      *  injection convention as [adUnlockSource]. The composition root swaps this once for the
      *  real, consent-gated instance ([ConsentGatedAnalyticsLogger]) -- the one-line kill switch. */
@@ -678,6 +687,13 @@ class AffirmityAppState(
     }
 
     init {
+        scope.launch(Dispatchers.IO) {
+            // Bundled-asset-first seeding (design D2/D13, task 5.10). Fired once, off the main
+            // thread, so a cold start's 2712-row seed never blocks first paint. Idempotent via
+            // CatalogPreferences.seededCatalogVersion, so safe to call on every launch. `null`
+            // (the default) means no seeding -- every existing JVM unit test never touches assets.
+            catalogSeeder?.seedIfNeeded()
+        }
         scope.launch {
             favorites.observeFavoriteIds()
                 .catch { error -> Log.e(TAG, "favorites flow failed", error) }
@@ -1479,6 +1495,11 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             onboardingRepository = FirestoreOnboardingRepository(firestore),
             favorites = RoomFavoriteAffirmationRepository(database.favoriteAffirmationDao()),
             catalog = RoomCatalogAffirmationRepository(database.catalogAffirmationDao()),
+            catalogSeeder = CatalogSeeder(
+                assetReader = AndroidCatalogAssetReader(context.applicationContext),
+                dao = database.catalogAffirmationDao(),
+                prefs = AndroidCatalogPreferences(context.applicationContext),
+            ),
             dayLetters = dayLetters,
             authRepository = FirebaseAuthRepository(
                 auth = FirebaseAuth.getInstance(),

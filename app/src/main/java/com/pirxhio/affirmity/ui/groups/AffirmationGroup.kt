@@ -13,7 +13,16 @@ import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
  * a purely decorative badge must never be able to re-enter the access decision — the exact
  * FREE/PREMIUM/AD_SUPPORTED coupling this refactor removed (design §7).
  */
-enum class GroupBadge { PREMIUM, AD_UNLOCK }
+enum class GroupBadge {
+    PREMIUM,
+    AD_UNLOCK,
+
+    /** The group itself is UNLOCKED and selectable, but at least one collection under it is not
+     * (design D19). Distinct from [PREMIUM] on purpose: a PREMIUM row is `isLocked` and
+     * non-toggleable, a PARTIALLY_LOCKED row is neither. Reusing PREMIUM here would tell the user
+     * "you cannot have this" about content they can select right now. */
+    PARTIALLY_LOCKED,
+}
 
 data class AffirmationGroup(
     val id: String,

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material.icons.outlined.Circle
@@ -76,6 +77,9 @@ fun AffirmationGroupSelectorSheet(
     anyAdInFlight: Boolean = false,
     /** Spec 6 emit surface (REQ-5.4) -- fires `content_locked_tapped` from a locked row's CTA. */
     onEvent: (AnalyticsEvent) -> Unit = {},
+    /** Which universes read as partially locked FOR THIS USER (design D19). Defaulted so previews
+     * and existing tests compile untouched. */
+    partiallyLockedIds: Set<String> = emptySet(),
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxHeight(0.85f)) {
@@ -103,6 +107,7 @@ fun AffirmationGroupSelectorSheet(
                         group = group,
                         checked = group.id in selectedIds,
                         decision = accessDecisionFor(group),
+                        isPartiallyLocked = group.id in partiallyLockedIds,
                         onToggle = { onToggle(group) },
                         onUpgradeClick = onUpgradeClick,
                         onWatchAd = onWatchAd,
@@ -195,6 +200,7 @@ private fun AffirmationGroupSelectableRow(
     group: AffirmationGroup,
     checked: Boolean,
     decision: AccessDecision,
+    isPartiallyLocked: Boolean = false,
     onToggle: () -> Unit,
     onUpgradeClick: () -> Unit,
     onWatchAd: (AffirmationGroup, AdUnlockPolicy) -> Unit = { _, _ -> },
@@ -210,7 +216,7 @@ private fun AffirmationGroupSelectableRow(
     // MUST be checked before `locked` below -- LockedAdUnlockable satisfies both `locked` and
     // `adUnlockable` (hard constraint, §6.2): an ad-unlockable row is not just "any locked row".
     val adUnlockable = canWatchAdToUnlock(decision)
-    val badge = deriveBadge(group, decision)
+    val badge = deriveCatalogBadge(group, decision, isPartiallyLocked)
     val rowModifier = modifier
         .fillMaxWidth()
         .then(
@@ -413,6 +419,13 @@ fun AffirmationGroupAccessBadge(badge: GroupBadge) {
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+        )
+        GroupBadge.PARTIALLY_LOCKED -> AccessBadge(
+            icon = Icons.Filled.LockOpen,
+            label = stringResource(R.string.affirmation_group_badge_partial),
+            containerColor = PremiumBadgeColor.copy(alpha = 0.08f),
+            contentColor = PremiumBadgeColor,
+            borderColor = PremiumBadgeColor.copy(alpha = 0.3f),
         )
     }
 }
