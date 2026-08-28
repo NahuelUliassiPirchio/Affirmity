@@ -118,17 +118,19 @@ Chain strategy: feature-branch-chain
 - [ ] 5.7 **Badge-uniformity acceptance check (blocking, pre-merge):** inspect the generator's emitted `CATALOG_GATED_GROUP_IDS` value directly — confirm it is the *measured* set from `generate-catalog.mjs`, not hardcoded/assumed to be all-14. Record the actual set size in the PR description even if it is 14/14.
 - [ ] 5.8 GREEN `functions/tools/seedCatalog.ts` (new): Admin SDK, chunk at <=450 ops/batch, taxonomy first then affirmations, `catalogMeta/version` written last, idempotent `set(merge:true)`.
 - [ ] 5.9 RED/GREEN `functions/test/seedCatalog.test.ts` (vitest + Firestore emulator): chunk boundaries respected; marker is the last op of the last chunk; second run is a no-op-equivalent; mid-run abort leaves no marker.
-- [ ] 5.10 Manual/on-device acceptance (blocking, before merge, not provable by unit suite):
-  - [ ] 5.10.1 D8: catalog card with empty subtitle renders with no layout gap.
-  - [ ] 5.10.2 Cold-start seed of 2712 rows does not visibly block first paint.
-  - [ ] 5.10.3 15-row selector navigable, Aplicar reachable.
-  - [ ] 5.10.4 D19: partially-locked row shows badge, remains checkable, not dimmed.
-  - [ ] 5.10.5 D18: fresh install (cleared app data) opens with all 14 universes checked.
-  - [ ] 5.10.6 D16: watch ad on a `TIMED_REPEATABLE` collection -> unlocks; advance device clock past window -> re-locks and re-offers ad (not `LockedNeedsPro`); watch again -> second grant persists.
+- [ ] 5.10 **Gap found in PR3 review, unassigned until now:** `CatalogSeeder` (built in PR2) is never invoked anywhere in the app-startup path — the local `catalog_affirmations` Room table stays empty on a real device without this. RED: a startup-path test asserting `CatalogSeeder.seedIfNeeded()` (or equivalent) is invoked once, idempotently, on `AffirmityAppState` construction (or the earliest reasonable hook — e.g. `MainActivity.onCreate`/app `Application` class, verify the existing pattern for other one-time-on-launch work such as `FirestoreMigrator.ensureMigrated` and follow it). GREEN: wire the call. Must not block first paint (fire on a background coroutine, matching D2's cold-start requirement) and must be safe to call on every launch (idempotent via `CatalogPreferences.seededCatalogVersion`, per D13).
+- [ ] 5.11 Manual/on-device acceptance (blocking, before merge, not provable by unit suite):
+  - [ ] 5.11.1 D8: catalog card with empty subtitle renders with no layout gap.
+  - [ ] 5.11.2 Cold-start seed of 2712 rows does not visibly block first paint.
+  - [ ] 5.11.3 15-row selector navigable, Aplicar reachable.
+  - [ ] 5.11.4 D19: partially-locked row shows badge, remains checkable, not dimmed.
+  - [ ] 5.11.5 D18: fresh install (cleared app data) opens with all 14 universes checked.
+  - [ ] 5.11.6 D16: watch ad on a `TIMED_REPEATABLE` collection -> unlocks; advance device clock past window -> re-locks and re-offers ad (not `LockedNeedsPro`); watch again -> second grant persists.
+  - [ ] 5.11.7 5.10's seeder wiring actually populates `catalog_affirmations` on a real first launch (confirms 5.11.2/5.11.3/5.11.5 have real data behind them, not an empty table).
 
 ## Phase 6: Cross-cutting close-out (part of PR5)
 
 - [ ] 6.1 Confirm `AffirmationsScreen` received no new parameter (D9) — read-only verification, no code change expected.
 - [ ] 6.2 Confirm `FavoriteAffirmationDao`/`FavoriteAffirmationEntity`/`FavoriteAffirmationRepository` unmodified (D10) — read-only verification.
 - [ ] 6.3 Confirm no `MIGRATION_9_8` was added and `fallbackToDestructiveMigrationOnDowngrade` stays disabled (D15).
-- [ ] 6.4 Update proposal/spec reconciliation note: catalog ID scheme in `specs/affirmation-catalog/spec.md` still reads `cat_{universeSlug}_{themeSlug}_{nnn}`; implementation follows design D3 (`cat_` + verbatim dotted id). Flag for `sdd-archive` to reconcile the spec text with the shipped scheme.
+- [x] 6.4 Spec/design reconciliation — DONE during PR2/PR3 review, not deferred to archive: `specs/affirmation-catalog/spec.md`'s ID-scheme requirement corrected to `cat_` + verbatim dotted id (matches D3), and its access-resolution requirement corrected from theme-level to collection-level (matches D5, corrected after the PR2 fresh review found the drift).
