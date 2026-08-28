@@ -32,23 +32,23 @@ Chain strategy: feature-branch-chain
 
 ## Phase 1: PR1 — TIMED_REPEATABLE ad-unlock policy (standalone, first)
 
-- [ ] 1.1 RED `access/ContentAccessTest.kt`: `ContentAccess(TIMED_REPEATABLE, unlockWindowHours=null)` throws; any other policy with non-null hours throws; `ProOrAdTimed(24)` constructs. (Spec: Repeating Time-Limited Ad Unlock)
-- [ ] 1.2 GREEN `access/ContentAccess.kt`: add `AdUnlockPolicy.TIMED_REPEATABLE`, `unlockWindowHours: Int?`, `init` invariant, `ProOrAdTimed(hours)`.
-- [ ] 1.3 RED `access/AccessResolutionTest.kt`: no record -> `LockedAdUnlockable(TIMED_REPEATABLE)`; live record -> `UnlockedByAd`; **expired record -> `LockedAdUnlockable` again** (re-earnable, not spent); boundary `now == expiresAtMillis` is expired. Regression: full existing `ONE_TIME_TRIAL` table still passes byte-for-byte.
-- [ ] 1.4 GREEN `access/AccessResolution.kt`: add `TIMED_REPEATABLE` branch reading `grants.timedUnlocks[key]`; `ONE_TIME_TRIAL` branch untouched.
-- [ ] 1.5 GREEN `access/AdUnlockGrant.kt`: add `AdUnlockState.timedUnlocks: Map<ContentKey, AdUnlockRecord>`. `AdUnlockRecord` unchanged.
-- [ ] 1.6 GREEN `data/local/TimedAdUnlockEntity.kt` (new) + `data/local/TimedAdUnlockDao.kt` (new, `@Insert(REPLACE)`, `observeAll`).
-- [ ] 1.7 GREEN `data/local/AffirmityDatabase.kt`: `version = 9`, add `TimedAdUnlockEntity` + `MIGRATION_8_9` creating only `timed_ad_unlock` (catalog tables added in Phase 2). Generate `app/schemas/.../9.json`.
-- [ ] 1.8 RED `AffirmityDatabaseMigrationTest`: `migrate8To9` creates `timed_ad_unlock` empty; pre-existing `ad_unlock` row untouched. GREEN via 1.7's migration (androidTest).
-- [ ] 1.9 RED `AdUnlockDaoTest`/`TimedAdUnlockDaoTest`: second insert for same `contentKey` **REPLACES** — the exact inverse of `AdUnlockDao.insertIfAbsent`. Assert both DAOs in one suite (androidTest).
-- [ ] 1.10 GREEN `data/repository/Repositories.kt`: `AdUnlockRepository.observeTimedUnlocks()` / `grantTimedUnlock(record)`.
-- [ ] 1.11 GREEN `data/repository/RoomAdUnlockRepository.kt`, `data/remote/FirestoreAdUnlockRepository.kt`: implement the two new members.
-- [ ] 1.12 GREEN `data/remote/FirestorePaths.kt`: `timedUnlocksCollection(uid)`, `timedUnlockDoc(uid, key)`.
-- [ ] 1.13 RED `RewardedAdUnlockSourceTest`: `requestAdUnlock(key, TIMED_REPEATABLE, 24)` on `Earned` calls `grantTimedUnlock` with `expiresAtMillis == grantedAt + 86_400_000` and never `grantDurableUnlock`; null window grants nothing; `adUnitIdFor(TIMED_REPEATABLE)` returns timed unit, blank -> null.
-- [ ] 1.14 GREEN `data/AffirmityAppState.kt` (`requestAdUnlock` 3rd param, `TIMED_REPEATABLE` branch), `access/RewardedAdGateway.kt` (`AdUnitIds.timedRepeatable`), `access/RewardedAdUnlockSource.kt` (3rd `when` branch).
-- [ ] 1.15 GREEN `app/build.gradle.kts`: `admob.rewardedUnit.timedRepeatable` optional secret, falls back to `oneTimeTrial` unit id (not `requiredAdSecret`).
-- [ ] 1.16 GREEN `firestore.rules`: new `users/{uid}/timedUnlocks/{contentKey}` block (create+update allowed, delete denied, closed field set, id-identity check). `adUnlocks` block byte-identical.
-- [ ] 1.17 RED (`npm run test:rules`): owner create+update succeeds, delete fails, id-mismatch fails, `expiresAtMillis<=grantedAtMillis` fails, cross-uid denied. Regression: existing `adUnlocks` update/delete-denied suite still passes.
+- [x] 1.1 RED `access/ContentAccessTest.kt`: `ContentAccess(TIMED_REPEATABLE, unlockWindowHours=null)` throws; any other policy with non-null hours throws; `ProOrAdTimed(24)` constructs. (Spec: Repeating Time-Limited Ad Unlock)
+- [x] 1.2 GREEN `access/ContentAccess.kt`: add `AdUnlockPolicy.TIMED_REPEATABLE`, `unlockWindowHours: Int?`, `init` invariant, `ProOrAdTimed(hours)`.
+- [x] 1.3 RED `access/AccessResolutionTest.kt`: no record -> `LockedAdUnlockable(TIMED_REPEATABLE)`; live record -> `UnlockedByAd`; **expired record -> `LockedAdUnlockable` again** (re-earnable, not spent); boundary `now == expiresAtMillis` is expired. Regression: full existing `ONE_TIME_TRIAL` table still passes byte-for-byte.
+- [x] 1.4 GREEN `access/AccessResolution.kt`: add `TIMED_REPEATABLE` branch reading `grants.timedUnlocks[key]`; `ONE_TIME_TRIAL` branch untouched.
+- [x] 1.5 GREEN `access/AdUnlockGrant.kt`: add `AdUnlockState.timedUnlocks: Map<ContentKey, AdUnlockRecord>`. `AdUnlockRecord` unchanged.
+- [x] 1.6 GREEN `data/local/TimedAdUnlockEntity.kt` (new) + `data/local/TimedAdUnlockDao.kt` (new, `@Insert(REPLACE)`, `observeAll`).
+- [x] 1.7 GREEN `data/local/AffirmityDatabase.kt`: `version = 9`, add `TimedAdUnlockEntity` + `MIGRATION_8_9` creating only `timed_ad_unlock` (catalog tables added in Phase 2). Generate `app/schemas/.../9.json`.
+- [x] 1.8 RED `AffirmityDatabaseMigrationTest`: `migrate8To9` creates `timed_ad_unlock` empty; pre-existing `ad_unlock` row untouched. GREEN via 1.7's migration (androidTest).
+- [x] 1.9 RED `AdUnlockDaoTest`/`TimedAdUnlockDaoTest`: second insert for same `contentKey` **REPLACES** — the exact inverse of `AdUnlockDao.insertIfAbsent`. Assert both DAOs in one suite (androidTest).
+- [x] 1.10 GREEN `data/repository/Repositories.kt`: `AdUnlockRepository.observeTimedUnlocks()` / `grantTimedUnlock(record)`.
+- [x] 1.11 GREEN `data/repository/RoomAdUnlockRepository.kt`, `data/remote/FirestoreAdUnlockRepository.kt`: implement the two new members.
+- [x] 1.12 GREEN `data/remote/FirestorePaths.kt`: `timedUnlocksCollection(uid)`, `timedUnlockDoc(uid, key)`.
+- [x] 1.13 RED `RewardedAdUnlockSourceTest`: `requestAdUnlock(key, TIMED_REPEATABLE, 24)` on `Earned` calls `grantTimedUnlock` with `expiresAtMillis == grantedAt + 86_400_000` and never `grantDurableUnlock`; null window grants nothing; `adUnitIdFor(TIMED_REPEATABLE)` returns timed unit, blank -> null.
+- [x] 1.14 GREEN `data/AffirmityAppState.kt` (`requestAdUnlock` 3rd param, `TIMED_REPEATABLE` branch), `access/RewardedAdGateway.kt` (`AdUnitIds.timedRepeatable`), `access/RewardedAdUnlockSource.kt` (3rd `when` branch).
+- [x] 1.15 GREEN `app/build.gradle.kts`: `admob.rewardedUnit.timedRepeatable` optional secret, falls back to `oneTimeTrial` unit id (not `requiredAdSecret`).
+- [x] 1.16 GREEN `firestore.rules`: new `users/{uid}/timedUnlocks/{contentKey}` block (create+update allowed, delete denied, closed field set, id-identity check). `adUnlocks` block byte-identical.
+- [x] 1.17 RED (`npm run test:rules`): owner create+update succeeds, delete fails, id-mismatch fails, `expiresAtMillis<=grantedAtMillis` fails, cross-uid denied. Regression: existing `adUnlocks` update/delete-denied suite still passes.
 
 ## Phase 2: PR2 — Catalog foundation (transform, cache, access combinator)
 
