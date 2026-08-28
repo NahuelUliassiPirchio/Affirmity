@@ -4,7 +4,7 @@
 
 Shared, read-only, 2,712-item Spanish affirmation catalog: Firestore storage,
 Room offline cache, a stable ID scheme, 14 new Universe-derived groups
-replacing the 3 removed legacy groups in the selector, theme-level access
+replacing the 3 removed legacy groups in the selector, collection-level access
 gating including a repeating time-limited ad-unlock policy, a pre-import
 sanitization gate, and an idempotent seeding mechanism. Catalog rows are not
 user-owned, not editable, not deletable.
@@ -15,8 +15,8 @@ user-owned, not editable, not deletable.
 
 The system SHALL store catalog affirmations at a shared, flat top-level
 Firestore path `catalogAffirmations/{catalogAffirmationId}`, each document
-carrying `groupId` and `themeId` fields for querying, world-readable and
-client-write-denied.
+carrying `groupId`, `themeId`, and `collectionId` fields for querying,
+world-readable and client-write-denied.
 
 #### Scenario: Any signed-in or signed-out user can read the catalog
 
@@ -125,12 +125,15 @@ custom-affirmation group) is NOT affected by this removal.
 - THEN `personalizadas` MUST still appear, always-selected, exactly as
   before the removal
 
-### Requirement: ContentType Extension for Theme-Level Access
+### Requirement: ContentType Extension for Collection-Level Access
 
-The system SHALL add a new `ContentType` enum constant for theme-level
-gating, with a `wireName` that MUST NOT contain an underscore character,
-preserving the `ContentKey.storageKey`/`ContentKey.parse` invariant that
-splits on the first underscore.
+The system SHALL add a new `ContentType` enum constant,
+`AFFIRMATION_COLLECTION`, for collection-level gating — the source catalog
+declares `access{tier, rewardedUnlockHours}` on collections only, never on
+themes, so gating resolves at the collection, not the theme. The constant's
+`wireName` MUST NOT contain an underscore character, preserving the
+`ContentKey.storageKey`/`ContentKey.parse` invariant that splits on the first
+underscore.
 
 #### Scenario: New wireName contains no underscore
 
@@ -140,27 +143,30 @@ splits on the first underscore.
 
 #### Scenario: storageKey and parse round-trip for the new type
 
-- GIVEN a `ContentKey` built with the new `ContentType` and an id containing
-  underscores (e.g. `fuerza_de_voluntad`)
+- GIVEN a `ContentKey` built with the new `ContentType` and a dotted
+  collection id containing underscores (e.g.
+  `self_worth.feeling_enough.intrinsic_worth`)
 - WHEN `storageKey` is computed and then passed to `ContentKey.parse`
 - THEN `parse` MUST return a `ContentKey` equal to the original
 - AND the recovered `type` and `id` MUST exactly match the originals
 
-### Requirement: Effective Access Resolution — Theme Falls Back to Group
+### Requirement: Effective Access Resolution — Collection Falls Back to Group
 
-The system SHALL resolve a catalog affirmation's effective access as its
-theme's own `ContentAccess` when declared, otherwise the parent group's
-`ContentAccess`.
+The system SHALL resolve a catalog affirmation's effective access as the
+most-restrictive of its parent group's `ContentAccess` and its own
+collection's `ContentAccess` when declared. A collection with no declared
+`ContentAccess` contributes pure inheritance from the group.
 
-#### Scenario: Theme with its own tier gates independently
+#### Scenario: Collection with its own tier gates independently
 
-- GIVEN a theme with a declared Pro `ContentAccess` inside a Free group
-- WHEN a free-tier user attempts to access that theme's content
-- THEN access MUST be denied per the theme's own tier, ignoring the group's
+- GIVEN a collection with a declared Pro `ContentAccess` inside a Free group
+- WHEN a free-tier user attempts to access that collection's content
+- THEN access MUST be denied per the collection's own tier, even though the
+  group itself is Free
 
-#### Scenario: Theme without a declared tier inherits the group's
+#### Scenario: Collection without a declared tier inherits the group's
 
-- GIVEN a theme with no declared `ContentAccess`
+- GIVEN a collection with no declared `ContentAccess`
 - WHEN effective access is resolved
 - THEN it MUST equal the parent group's `ContentAccess`
 
