@@ -97,5 +97,24 @@ service cloud.firestore {
 
       allow delete: if false;
     }
+
+    // Shared, read-only curated catalog (design D1/D12). World-readable so an unauthenticated
+    // first launch can refresh the version marker; client writes are unconditionally denied.
+    // Written exclusively by `functions/tools/seedCatalog.ts` via the Admin SDK, which bypasses
+    // rules. The blast radius of `allow read: if true` is "someone copies content that is already
+    // in every downloaded APK" (design D2) -- there is no user data in any of these collections.
+    match /catalogAffirmations/{id}   { allow read: if true; allow write: if false; }
+    match /catalogUniverses/{id}      { allow read: if true; allow write: if false; }
+    match /catalogThemes/{id}         { allow read: if true; allow write: if false; }
+    match /catalogCollections/{id}    { allow read: if true; allow write: if false; }
+    match /catalogMeta/{doc}          { allow read: if true; allow write: if false; }
+
+    // Per-user placeholder overrides on shared catalog rows (spec: catalog-token-overrides).
+    // Owner-only, same posture as users/{uid}/affirmations above. Deliberately NOT covered by the
+    // recursive-wildcard-avoidance comment at the top of this file -- this block IS the specific
+    // rule for this sub-collection.
+    match /users/{uid}/catalogOverrides/{catalogAffirmationId} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
   }
 }
