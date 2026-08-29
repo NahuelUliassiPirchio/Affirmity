@@ -66,10 +66,10 @@ class ResolveSelectedGroupIdsTest {
     @Test
     fun `an explicitly empty persisted selection also triggers the fallback (D18 -- was previously respected as empty)`() {
         // Deliberate behavior change from the pre-D18 resolver: a persisted thematic-empty set is
-        // unreachable through the UI (`isDraftSelectionValid` requires >=1 non-personalizadas id),
-        // so treating it as "respected, not first-launch" only ever protected a state a user could
-        // never have chosen deliberately. Falling back here makes the fresh-install path and the
-        // stale/thematic-empty-selection path the SAME code path (design D18).
+        // unreachable through the UI because a genuinely empty draft is invalid. A
+        // personalizadas-only draft can still be valid when custom affirmations exist, but that
+        // is distinct from persisting an empty set. Falling back here makes the fresh-install path
+        // and the stale/empty-selection path the SAME code path (design D18).
         val resolved = resolveSelectedGroupIds(
             persisted = emptySet(),
             knownIds = knownIds,
@@ -77,6 +77,16 @@ class ResolveSelectedGroupIdsTest {
         )
 
         assertEquals(universeIds + "personalizadas", resolved)
+    }
+
+    @Test
+    fun `an empty draft cannot be applied even when custom affirmations exist`() {
+        val valid = isDraftSelectionValid(
+            draftGroupIds = emptySet(),
+            hasPersonalAffirmations = true,
+        )
+
+        assertEquals(false, valid)
     }
 
     @Test

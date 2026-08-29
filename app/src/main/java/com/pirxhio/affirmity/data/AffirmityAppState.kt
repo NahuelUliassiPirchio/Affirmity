@@ -262,6 +262,13 @@ fun resolveSelectedGroupIds(
     }
 }
 
+/** Minimum-selection rule used by the group picker before it commits a draft. */
+internal fun isDraftSelectionValid(
+    draftGroupIds: Set<String>,
+    hasPersonalAffirmations: Boolean,
+): Boolean = draftGroupIds.any { it != PERSONALIZADAS_GROUP_ID } ||
+    (PERSONALIZADAS_GROUP_ID in draftGroupIds && hasPersonalAffirmations)
+
 /**
  * Pure migration-default resolution for the onboarding guide's tri-state "seen" flag (spec R1.3,
  * design D2), extracted so the legacy-install backfill is testable without DataStore.
@@ -399,7 +406,8 @@ class AffirmityAppState(
     private val favoriteToggleMutex = Mutex()
 
     /** Group ids the user has committed. Null until DataStore's first read resolves; the UI shows
-     * nothing group-dependent until then. Always contains [PERSONALIZADAS_GROUP_ID] once resolved. */
+     * nothing group-dependent until then. Always non-empty once resolved; the temporary
+     * dogfooding relaxation allows [PERSONALIZADAS_GROUP_ID] to be absent. */
     var selectedGroupIds = mutableStateOf<Set<String>?>(null)
         private set
 
@@ -415,8 +423,10 @@ class AffirmityAppState(
      * can never satisfy the invariant by itself, since selecting it alone would otherwise commit
      * to a guaranteed-empty feed. */
     val isDraftSelectionValid: Boolean
-        get() = draftGroupIds.value.any { id -> id != PERSONALIZADAS_GROUP_ID } ||
-            affirmations.any { it.groupId == PERSONALIZADAS_GROUP_ID }
+        get() = isDraftSelectionValid(
+            draftGroupIds = draftGroupIds.value,
+            hasPersonalAffirmations = affirmations.any { it.groupId == PERSONALIZADAS_GROUP_ID },
+        )
 
     /** The feed's list: affirmations whose groupId is in the committed selection. NEVER used by
      * ProgressScreen (that keeps reading [affirmations] unfiltered). Falls back to the full list
