@@ -23,25 +23,38 @@ import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.graphicsLayer
 import com.pirxhio.affirmity.data.Affirmation
 import com.pirxhio.affirmity.data.AffirmationBackground
 import com.pirxhio.affirmity.data.AffirmationTemplateParser
@@ -50,6 +63,7 @@ import com.pirxhio.affirmity.data.backgroundColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -63,6 +77,11 @@ import kotlinx.coroutines.withContext
  * a strict non-looping pager.
  */
 private const val LOOP_MULTIPLIER = 10_000
+
+private data class FavoriteToggleIntent(
+    val origin: Offset,
+    val targetFavorite: Boolean,
+)
 
 @Composable
 fun AffirmationsScreen(
@@ -133,12 +152,73 @@ private fun AffirmationCard(
     onOverrideCommitted: (tokenKey: String, value: String) -> Unit,
     favoriteGesture: FavoriteGesture,
 ) {
+    var cardPositionInRoot by remember(affirmation.id) { mutableStateOf(Offset.Zero) }
+    var cardSize by remember(affirmation.id) { mutableStateOf(IntSize.Zero) }
+    var favoritePositionInRoot by remember(affirmation.id) { mutableStateOf(Offset.Zero) }
+    var favoriteSize by remember(affirmation.id) { mutableStateOf(IntSize.Zero) }
+    var previousIsFavorite by remember(affirmation.id) { mutableStateOf(isFavorite) }
+    var pendingToggleIntent by remember(affirmation.id) { mutableStateOf<FavoriteToggleIntent?>(null) }
+    val bursts = remember(affirmation.id) { mutableStateListOf<LikeBurst>() }
+    val favoriteScale = remember(affirmation.id) { Animatable(1f) }
+    val coroutineScope = rememberCoroutineScope()
+
+    suspend fun playLikeBurst(origin: Offset) {
+        bursts += createLikeBurst(origin)
+        favoriteScale.snapTo(1f)
+        favoriteScale.animateTo(
+            targetValue = 1.3f,
+            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        )
+        favoriteScale.animateTo(
+            targetValue = 1f,
+            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        )
+    }
+
+    LaunchedEffect(isFavorite) {
+        val favoriteChanged = previousIsFavorite != isFavorite
+        previousIsFavorite = isFavorite
+        if (!isFavorite) {
+            if (pendingToggleIntent?.targetFavorite == false) {
+                pendingToggleIntent = null
+            }
+            favoriteScale.snapTo(1f)
+            return@LaunchedEffect
+        }
+        val intent = pendingToggleIntent
+        if (favoriteChanged && intent?.targetFavorite == true) {
+            pendingToggleIntent = null
+            playLikeBurst(intent.origin)
+        }
+    }
+
+    fun requestFavoriteToggle(origin: Offset) {
+        val targetFavorite = pendingToggleIntent?.targetFavorite?.not() ?: !isFavorite
+        pendingToggleIntent = FavoriteToggleIntent(origin = origin, targetFavorite = targetFavorite)
+        onToggleFavorite()
+    }
+
+    /** Instagram-style double-tap: always shows the burst and never unlikes an already-liked card. */
+    fun requestLikeBurst(origin: Offset) {
+        if (isFavorite) {
+            coroutineScope.launch { playLikeBurst(origin) }
+        } else {
+            requestFavoriteToggle(origin)
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(affirmation.backgroundColor())
+            .onGloballyPositioned { coordinates ->
+                cardPositionInRoot = coordinates.positionInRoot()
+                cardSize = coordinates.size
+            }
             .pointerInput(affirmation.id, favoriteGesture) {
-                detectTapGestures(onDoubleTap = { onToggleFavorite() })
+                detectTapGestures(onDoubleTap = { offset ->
+                    requestLikeBurst(offset)
+                })
             }
     ) {
         val background = affirmation.background
@@ -189,7 +269,9 @@ private fun AffirmationCard(
                     editable = true,
                     onOverrideCommitted = onOverrideCommitted,
                     favoriteTapEnabled = true,
-                    onFavoriteToggleFromToken = onToggleFavorite,
+                    onFavoriteToggleFromToken = {
+                        requestLikeBurst(Offset(cardSize.width / 2f, cardSize.height / 2f))
+                    },
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 8.dp)
                 )
@@ -210,20 +292,46 @@ private fun AffirmationCard(
                         editable = true,
                         onOverrideCommitted = onOverrideCommitted,
                         favoriteTapEnabled = true,
-                        onFavoriteToggleFromToken = onToggleFavorite,
+                        onFavoriteToggleFromToken = {
+                            requestFavoriteToggle(Offset(cardSize.width / 2f, cardSize.height / 2f))
+                        },
                         textAlign = TextAlign.Center,
                     )
                 }
             }
         }
-        Icon(
-            imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(24.dp),
+        LikeBurstOverlay(
+            bursts = bursts,
+            onBurstFinished = { burstId -> bursts.removeAll { it.id == burstId } },
+            modifier = Modifier.fillMaxSize(),
         )
+        IconButton(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(24.dp)
+                .onGloballyPositioned { coordinates ->
+                    favoritePositionInRoot = coordinates.positionInRoot()
+                    favoriteSize = coordinates.size
+                }
+                .graphicsLayer {
+                    scaleX = favoriteScale.value
+                    scaleY = favoriteScale.value
+                },
+            onClick = {
+                requestFavoriteToggle(
+                    favoritePositionInRoot - cardPositionInRoot + Offset(
+                        favoriteSize.width / 2f,
+                        favoriteSize.height / 2f,
+                    )
+                )
+            },
+        ) {
+            Icon(
+                imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                tint = Color.White,
+            )
+        }
     }
 }
 
