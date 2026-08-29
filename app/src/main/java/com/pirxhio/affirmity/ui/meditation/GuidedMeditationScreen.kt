@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -136,12 +137,9 @@ fun GuidedMeditationScreen(
         audio to engineRef
     }
 
-    DisposableEffect(audioExecutor) {
-        onDispose { audioExecutor.release() }
-    }
-
     val state by engine.state.collectAsState()
     val currentTextId by textExecutor.currentTextId.collectAsState()
+    var exitHandled by remember { mutableStateOf(false) }
 
     // Site A (REQ-5.2): extends the existing status-driven effect in place, fires exactly on
     // reaching Completed.
@@ -161,14 +159,31 @@ fun GuidedMeditationScreen(
     // `performGuidedSessionExit` below so it can be exercised by a plain JUnit test against a real
     // MeditationEngine (verify REQ-5.2/AC7) without a Compose test harness.
     val requestExit: () -> Unit = {
-        performGuidedSessionExit(
-            status = state.status,
-            cancel = { engine.send(MeditationEvent.Cancel) },
-            onSessionEnded = { reason ->
-                onSessionEnded(reason, elapsedSecondsSinceStart(), sessionStartWallMillis ?: System.currentTimeMillis())
-            },
-            onExit = onExit,
-        )
+        if (!exitHandled) {
+            exitHandled = true
+            performGuidedSessionExit(
+                status = engine.state.value.status,
+                cancel = { engine.send(MeditationEvent.Cancel) },
+                onSessionEnded = { reason ->
+                    onSessionEnded(reason, elapsedSecondsSinceStart(), sessionStartWallMillis ?: System.currentTimeMillis())
+                },
+                onExit = onExit,
+            )
+        }
+    }
+    val currentRequestExit = rememberUpdatedState(requestExit)
+
+    // Parent-driven route removal (including access expiry) must use the same cancellation and
+    // bookkeeping path as explicit Back before native audio resources are released. Explicit exit
+    // sets exitHandled first, so disposal cannot double-report that session.
+    DisposableEffect(audioExecutor) {
+        onDispose {
+            try {
+                currentRequestExit.value()
+            } finally {
+                audioExecutor.release()
+            }
+        }
     }
 
     // Single back path (REQ-5.4.2): this screen is the ONLY BackHandler owner for the guided

@@ -478,7 +478,9 @@ fun AffirmityApp(
         )
         if (isBlocked) {
             // Unknown/removed/newly-locked entry (REQ-5.4.3, EC-4): fall through instead of ever
-            // composing GuidedMeditationScreen for gated content.
+            // composing GuidedMeditationScreen for gated content. If this removes an already
+            // composed session, that screen's disposal invokes its shared requestExit path before
+            // releasing audio so cancellation bookkeeping is preserved.
             LaunchedEffect(selectedMeditationEntry.id) { selectedMeditationEntryId = null }
         } else {
             val backDispatcherOwner = LocalOnBackPressedDispatcherOwner.current
