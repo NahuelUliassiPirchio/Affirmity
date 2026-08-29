@@ -43,4 +43,11 @@ object FirestorePaths {
     fun adUnlocksCollection(uid: String): String = "users/$uid/adUnlocks"
 
     fun adUnlockDoc(uid: String, key: ContentKey): String = "${adUnlocksCollection(uid)}/${key.storageKey}"
+
+    /** TIMED_REPEATABLE grants (design D16). A SIBLING of [adUnlocksCollection], never a reuse of
+     *  it: this one permits overwrite and [adUnlocksCollection] must never. */
+    fun timedUnlocksCollection(uid: String): String = "users/$uid/timedUnlocks"
+
+    fun timedUnlockDoc(uid: String, key: ContentKey): String =
+        "${timedUnlocksCollection(uid)}/${key.storageKey}"
 }

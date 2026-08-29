@@ -180,9 +180,12 @@ private class FakeEntitlementRepository(
  * (task E.4) rather than duplicated. */
 class FakeAdUnlockRepository(
     initial: List<AdUnlockRecord> = emptyList(),
+    initialTimed: List<AdUnlockRecord> = emptyList(),
 ) : AdUnlockRepository {
     private val state = MutableStateFlow(initial)
+    private val timedState = MutableStateFlow(initialTimed)
     val granted = CopyOnWriteArrayList<AdUnlockRecord>()
+    val timedGranted = CopyOnWriteArrayList<AdUnlockRecord>()
     override fun observeDurableUnlocks(): Flow<List<AdUnlockRecord>> = state
     override suspend fun getDurableUnlocks(): List<AdUnlockRecord> = state.value
     override suspend fun grantDurableUnlock(record: AdUnlockRecord) {
@@ -190,6 +193,15 @@ class FakeAdUnlockRepository(
             state.value = state.value + record
             granted += record
         }
+    }
+
+    override fun observeTimedUnlocks(): Flow<List<AdUnlockRecord>> = timedState
+
+    /** UPSERT, unlike [grantDurableUnlock] -- mirrors the real repositories' TIMED_REPEATABLE
+     *  semantics (design D16). */
+    override suspend fun grantTimedUnlock(record: AdUnlockRecord) {
+        timedState.value = timedState.value.filterNot { it.key == record.key } + record
+        timedGranted += record
     }
 }
 

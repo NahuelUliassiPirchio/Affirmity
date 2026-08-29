@@ -477,4 +477,86 @@ class AdUnlockEndToEndTest {
 
         scope.cancel()
     }
+
+    // 9. requestAdUnlock(key, TIMED_REPEATABLE, 24) on Earned -> grantTimedUnlock with
+    //    expiresAtMillis == grantedAt + 86_400_000, and never grantDurableUnlock (design D16 --
+    //    the two grant stores must never be conflated).
+    @Test
+    fun `requestAdUnlock with TIMED_REPEATABLE and a 24h window grants a timed unlock, never a durable one`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val adUnlockSource = FakeAdUnlockSource(AdUnlockOutcome.Earned)
+        val sharedAdUnlocks = FakeAdUnlockRepository()
+        val state = buildState(scope, adUnlockSource = adUnlockSource, adUnlocks = sharedAdUnlocks)
+        delay(50)
+        val timedKey = ContentKey(ContentType.MEDITATION, "calma_timed")
+
+        val before = System.currentTimeMillis()
+        state.requestAdUnlock(timedKey, AdUnlockPolicy.TIMED_REPEATABLE, unlockWindowHours = 24)
+        delay(50)
+
+        assertEquals(1, sharedAdUnlocks.timedGranted.size)
+        val record = sharedAdUnlocks.timedGranted.single()
+        assertEquals(timedKey, record.key)
+        assertTrue("grantedAtMillis must be recorded at request time", record.grantedAtMillis >= before)
+        assertEquals(record.grantedAtMillis + 86_400_000L, record.expiresAtMillis)
+        assertTrue("TIMED_REPEATABLE must never write to the durable (ONE_TIME_TRIAL) store", sharedAdUnlocks.granted.isEmpty())
+
+        scope.cancel()
+    }
+
+    // 10. A null unlockWindowHours grants nothing at all -- never an unbounded window.
+    @Test
+    fun `requestAdUnlock with TIMED_REPEATABLE and a null window grants nothing`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val adUnlockSource = FakeAdUnlockSource(AdUnlockOutcome.Earned)
+        val sharedAdUnlocks = FakeAdUnlockRepository()
+        val state = buildState(scope, adUnlockSource = adUnlockSource, adUnlocks = sharedAdUnlocks)
+        delay(50)
+        val timedKey = ContentKey(ContentType.MEDITATION, "calma_timed")
+
+        state.requestAdUnlock(timedKey, AdUnlockPolicy.TIMED_REPEATABLE, unlockWindowHours = null)
+        delay(50)
+
+        assertTrue(sharedAdUnlocks.timedGranted.isEmpty())
+        assertTrue(sharedAdUnlocks.granted.isEmpty())
+
+        scope.cancel()
+    }
+
+    // 11. TIMED_REPEATABLE round trip via resolveAccess: locked -> earn -> UnlockedByAd -> expired
+    //     window re-locks to LockedAdUnlockable again (re-earnable, not spent, unlike ONE_TIME_TRIAL).
+    @Test
+    fun `TIMED_REPEATABLE round trip -- earned then re-locks (not spent) once the window elapses`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val adUnlockSource = FakeAdUnlockSource(AdUnlockOutcome.Earned)
+        val sharedAdUnlocks = FakeAdUnlockRepository()
+        val state = buildState(scope, adUnlockSource = adUnlockSource, adUnlocks = sharedAdUnlocks)
+        delay(50)
+        val timedKey = ContentKey(ContentType.MEDITATION, "calma_timed")
+        val timedContent = ContentAccess.ProOrAdTimed(24)
+
+        val beforeEarn = resolveAccess(
+            timedKey, timedContent, state.entitlementTier.value, state.adUnlockState, System.currentTimeMillis(),
+        )
+        assertEquals(AccessDecision.LockedAdUnlockable(AdUnlockPolicy.TIMED_REPEATABLE), beforeEarn)
+
+        state.requestAdUnlock(timedKey, AdUnlockPolicy.TIMED_REPEATABLE, unlockWindowHours = 24)
+        delay(50)
+        val record = sharedAdUnlocks.timedGranted.single()
+        val afterEarn = resolveAccess(
+            timedKey, timedContent, state.entitlementTier.value, state.adUnlockState, record.grantedAtMillis,
+        )
+        assertEquals(AccessDecision.UnlockedByAd(AdUnlockPolicy.TIMED_REPEATABLE), afterEarn)
+
+        val afterExpiry = resolveAccess(
+            timedKey, timedContent, state.entitlementTier.value, state.adUnlockState, record.expiresAtMillis!!,
+        )
+        assertEquals(
+            "an expired TIMED_REPEATABLE grant must re-offer the ad, never LockedNeedsPro",
+            AccessDecision.LockedAdUnlockable(AdUnlockPolicy.TIMED_REPEATABLE),
+            afterExpiry,
+        )
+
+        scope.cancel()
+    }
 }

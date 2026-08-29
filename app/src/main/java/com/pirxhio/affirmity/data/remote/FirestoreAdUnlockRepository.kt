@@ -28,6 +28,8 @@ class FirestoreAdUnlockRepository(
 
     private fun collection() = firestore.collection(FirestorePaths.adUnlocksCollection(uid))
 
+    private fun timedCollection() = firestore.collection(FirestorePaths.timedUnlocksCollection(uid))
+
     override fun observeDurableUnlocks(): Flow<List<AdUnlockRecord>> = callbackFlow {
         val registration = collection().addSnapshotListener { snapshot, error ->
             if (error != null) {
@@ -51,6 +53,25 @@ class FirestoreAdUnlockRepository(
                 throw denied
             }
         }
+    }
+
+    override fun observeTimedUnlocks(): Flow<List<AdUnlockRecord>> = callbackFlow {
+        val registration = timedCollection().addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                close(error)
+                return@addSnapshotListener
+            }
+            val records = snapshot?.documents.orEmpty().mapNotNull { doc -> doc.data?.let(::recordFromMap) }
+            trySend(records)
+        }
+        awaitClose { registration.remove() }
+    }
+
+    /** UPSERT, unlike [grantDurableUnlock]: the rules (design D16) allow `create` AND `update` on
+     *  this collection, so no `PERMISSION_DENIED`-swallow is needed here -- an overwrite for an
+     *  existing key IS the re-earn-after-expiry write, not a denied duplicate. */
+    override suspend fun grantTimedUnlock(record: AdUnlockRecord) {
+        timedCollection().document(record.key.storageKey).set(recordToMap(record)).await()
     }
 
     private fun recordFromMap(data: Map<String, Any?>): AdUnlockRecord? {

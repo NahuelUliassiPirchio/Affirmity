@@ -34,4 +34,4 @@ sealed interface RewardedAdResult {
 }
 
 /** Resolved from BuildConfig at the composition root. Blank = not configured. */
-data class AdUnitIds(val perUse: String, val oneTimeTrial: String)
+data class AdUnitIds(val perUse: String, val oneTimeTrial: String, val timedRepeatable: String)

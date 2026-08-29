@@ -76,5 +76,26 @@ service cloud.firestore {
 
       allow update, delete: if false;
     }
+
+    // TIMED_REPEATABLE grants (design D16). A SIBLING of users/{uid}/adUnlocks above, never a
+    // reuse of it: update is allowed here and ONLY here, because re-earning a window after
+    // expiry is an overwrite by definition. Delete stays denied so a client cannot erase an
+    // active window and restart it early -- the anti-back-dating property that matters for a
+    // timed grant.
+    match /users/{uid}/timedUnlocks/{contentKey} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(
+             ['contentType', 'contentId', 'grantedAtMillis', 'expiresAtMillis'])
+        && request.resource.data.keys().hasAll(
+             ['contentType', 'contentId', 'grantedAtMillis', 'expiresAtMillis'])
+        && contentKey == request.resource.data.contentType + '_' + request.resource.data.contentId
+        && request.resource.data.grantedAtMillis is int
+        && request.resource.data.expiresAtMillis is int // NON-null here, unlike adUnlocks
+        && request.resource.data.expiresAtMillis > request.resource.data.grantedAtMillis;
+
+      allow delete: if false;
+    }
   }
 }

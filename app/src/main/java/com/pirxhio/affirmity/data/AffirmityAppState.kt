@@ -458,9 +458,15 @@ class AffirmityAppState(
     var durableAdUnlocks = mutableStateOf<Map<ContentKey, AdUnlockRecord>>(emptyMap())
         private set
 
+    /** TIMED_REPEATABLE grants, mirrored from the active session's `adUnlocks` repository's
+     *  SEPARATE `observeTimedUnlocks()` stream (design D16) -- same collector shape as
+     *  [durableAdUnlocks], deliberately not merged with it. */
+    var timedAdUnlocks = mutableStateOf<Map<ContentKey, AdUnlockRecord>>(emptyMap())
+        private set
+
     /** The complete grant state fed to `groupAccessDecision`/`resolveAccess` (design §9). */
     val adUnlockState: AdUnlockState
-        get() = AdUnlockState(sessionAdUnlocks.value, durableAdUnlocks.value)
+        get() = AdUnlockState(sessionAdUnlocks.value, durableAdUnlocks.value, timedAdUnlocks.value)
 
     /** Creation-time gate for the 4 custom-affirmation mutation surfaces (Spec 4, REQ-5.1/5.3).
      *  Derived on every read from [entitlementTier]/[adUnlockState] -- no polling, no recomposition
@@ -772,6 +778,13 @@ class AffirmityAppState(
             session.flatMapLatest { it.adUnlocks.observeDurableUnlocks() }
                 .catch { error -> Log.e(TAG, "durable ad-unlock flow failed", error) }
                 .collect { records -> durableAdUnlocks.value = records.associateBy(AdUnlockRecord::key) }
+        }
+        scope.launch {
+            // TIMED_REPEATABLE grants (design D16) -- same flatMapLatest-per-swap shape as the
+            // durable collector above, but reading the SEPARATE `observeTimedUnlocks()` stream.
+            session.flatMapLatest { it.adUnlocks.observeTimedUnlocks() }
+                .catch { error -> Log.e(TAG, "timed ad-unlock flow failed", error) }
+                .collect { records -> timedAdUnlocks.value = records.associateBy(AdUnlockRecord::key) }
         }
         scope.launch {
             // Same class of problem as the healer-grant collector above (design.md D8): reset the
@@ -1164,10 +1177,16 @@ class AffirmityAppState(
     /**
      * The single outcome -> persistence orchestration for the ad-unlock seam (design §9). Calls
      * [adUnlockSource]; on [AdUnlockOutcome.Earned] only, routes [AdUnlockPolicy.PER_USE] into the
-     * in-memory [sessionAdUnlocks] and [AdUnlockPolicy.ONE_TIME_TRIAL] into the active session's
-     * durable `adUnlocks` repository. Any other outcome (Dismissed/Failed/Unavailable) is a no-op.
+     * in-memory [sessionAdUnlocks], [AdUnlockPolicy.ONE_TIME_TRIAL] into the active session's
+     * durable `adUnlocks` repository, and [AdUnlockPolicy.TIMED_REPEATABLE] into that same
+     * repository's SEPARATE `timedUnlocks` store (design D16) with an expiry computed from
+     * [unlockWindowHours]. Any other outcome (Dismissed/Failed/Unavailable) is a no-op.
+     *
+     * [unlockWindowHours] is the content's declared window (`collection.access.unlockWindowHours`
+     * for a catalog collection); trailing-default so every existing call site keeps compiling
+     * unchanged.
      */
-    fun requestAdUnlock(key: ContentKey, policy: AdUnlockPolicy) {
+    fun requestAdUnlock(key: ContentKey, policy: AdUnlockPolicy, unlockWindowHours: Int? = null) {
         if (adRequestInFlight.value != null) {
             analytics.log(AnalyticsEvent.AdUnlockTapIgnored(AnalyticsId.of(key)))
             return // taps are IGNORED, never queued (REQ-4.8)
@@ -1183,6 +1202,13 @@ class AffirmityAppState(
                             AdUnlockPolicy.ONE_TIME_TRIAL -> ready().adUnlocks.grantDurableUnlock(
                                 AdUnlockRecord(key, System.currentTimeMillis(), expiresAtMillis = null),
                             )
+                            AdUnlockPolicy.TIMED_REPEATABLE -> {
+                                val hours = unlockWindowHours ?: return@launch // never grants an unbounded window
+                                val now = System.currentTimeMillis()
+                                ready().adUnlocks.grantTimedUnlock(
+                                    AdUnlockRecord(key, now, expiresAtMillis = now + hours * 3_600_000L),
+                                )
+                            }
                             AdUnlockPolicy.NONE -> Unit
                         }
                         analytics.log(AnalyticsEvent.AdUnlockEarned(AnalyticsId.of(key), policy))
@@ -1311,7 +1337,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             healerUses = RoomStreakHealerRepository(database.streakHealerUseDao()),
             meditation = RoomMeditationPreferencesRepository(trackerPreferences),
             notifications = RoomNotificationSettingsRepository(notificationPreferences),
-            adUnlocks = RoomAdUnlockRepository(database.adUnlockDao()),
+            adUnlocks = RoomAdUnlockRepository(database.adUnlockDao(), database.timedAdUnlockDao()),
         )
         AffirmityAppState(
             scope = scope,
@@ -1363,6 +1389,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
                 adUnitIds = AdUnitIds(
                     perUse = BuildConfig.ADMOB_REWARDED_UNIT_PER_USE,
                     oneTimeTrial = BuildConfig.ADMOB_REWARDED_UNIT_ONE_TIME_TRIAL,
+                    timedRepeatable = BuildConfig.ADMOB_REWARDED_UNIT_TIMED_REPEATABLE,
                 ),
             ),
             analytics = ConsentGatedAnalyticsLogger(
