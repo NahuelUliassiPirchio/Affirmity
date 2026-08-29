@@ -226,16 +226,25 @@ private fun Affirmation.toEntity(): AffirmationEntity = AffirmationEntity(
 
 /**
  * Pure resolution of the committed group-id selection, extracted so it is testable without
- * Android/DataStore (design §4, §6). [persisted] is `null` on the very first-ever launch (no
- * selection ever saved). Unknown ids (e.g. a group removed in a later release) are dropped.
- * `personalizadas` is always force-included.
+ * Android/DataStore (design §4, §6, D18). [persisted] is `null` on the very first-ever launch (no
+ * selection ever saved). Unknown ids (e.g. a group removed in a later release, such as the 3
+ * legacy groups deleted by design D17) are dropped. `personalizadas` is always force-included.
+ *
+ * The minimum-selection invariant lives HERE, tier-independent (design D18) -- moved out of
+ * `EntitlementResolution.deselectLockedGroups`'s call site, which is guarded by
+ * `if (entitlement.tier == AccessTier.FREE)` and therefore never ran for a Pro user. Without this,
+ * a device holding a persisted selection that resolves to nothing thematic (either because every
+ * persisted id was unknown, or because the persisted selection was itself empty) would land on a
+ * `personalizadas`-only, thematically empty feed regardless of tier. Cannot touch a healthy
+ * selection: any surviving non-personalizadas id short-circuits the fallback.
  */
 fun resolveSelectedGroupIds(
     persisted: Set<String>?,
     knownIds: Set<String>,
     defaultThematicIds: Set<String>,
 ): Set<String> {
-    val resolved = persisted?.filter { it in knownIds }?.toSet() ?: defaultThematicIds
+    val filtered = persisted?.filter { it in knownIds }?.toSet() ?: defaultThematicIds
+    val resolved = if (filtered.none { it != PERSONALIZADAS_GROUP_ID }) defaultThematicIds else filtered
     return resolved + PERSONALIZADAS_GROUP_ID
 }
 
@@ -1404,12 +1413,21 @@ fun rememberAffirmityAppState(): AffirmityAppState {
     // Resolved here (not inside `remember`) so the `AffirmityAppState` class itself never imports
     // `ui.groups` (design D9) — only this composable wiring function does, mirroring [dayLetters].
     val knownGroupIds = selectableAffirmationGroups().map { it.id }.toSet()
+    // `isThematic` is the SELECTOR -- "every thematic group is on by default" is the product
+    // decision (design D18). The tier condition is retained purely as a GUARD: it keeps the
+    // invariant that the fresh-install default can never contain a group
+    // `deselectLockedGroups` would immediately strip. Post-D17 (14 Free-tier universes, no more
+    // legacy groups) this evaluates to all 14.
     val defaultThematicGroupIds = defaultAffirmationGroups()
-        .filter { it.access.requiredTier == AccessTier.FREE }
+        .filter { it.isThematic && it.access.requiredTier == AccessTier.FREE }
         .map { it.id }.toSet()
     // Every group that requires Pro to unlock -- mirrors GroupAccessPolicy.isLocked's condition
     // (access.requiredTier == PRO && !alwaysSelected) without importing ui.groups' policy file
-    // itself (D9).
+    // itself (D9). Post-D17 this evaluates EMPTY: all 14 universe groups are declared
+    // ContentAccess.Free at the group level (collection-level Pro gating moved to
+    // CatalogAccessPolicy.catalogAccessDecision, design D6/D7). deselectLockedGroups (below) is a
+    // documented no-op in that state, NOT deleted -- see task 4.7 / EntitlementResolutionTest's
+    // regression guard.
     val proOnlyGroupIds = defaultAffirmationGroups()
         .filter { it.access.requiredTier != AccessTier.FREE }
         .map { it.id }.toSet()

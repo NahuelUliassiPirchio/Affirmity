@@ -1,8 +1,6 @@
 package com.pirxhio.affirmity.data.catalog
 
 import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
-import com.pirxhio.affirmity.ui.groups.AffirmationGroup
-import com.pirxhio.affirmity.ui.groups.defaultAffirmationGroups
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -38,12 +36,20 @@ class CatalogIdSchemeTest {
     }
 
     @Test
-    fun `no catalog groupId equals personalizadas or a legacy group id`() {
-        val legacyAndPersonalizadas = (defaultAffirmationGroups().map(AffirmationGroup::id) + PERSONALIZADAS_GROUP_ID).toSet()
+    fun `no catalog groupId equals personalizadas or a deleted legacy group id`() {
+        // Post-design D17, `defaultAffirmationGroups()` IS `catalogUniverseGroups()` -- the
+        // catalog's own universe ids -- so comparing against it here would be tautological
+        // (every real groupId would "collide" with itself). The genuine invariant this test
+        // guards is unchanged: no catalog universe id may ever equal `personalizadas` (which is
+        // never a catalog-sourced group) or one of the 3 legacy placeholder ids design D17
+        // deleted (kept as a literal set, not sourced from production wiring, since they no
+        // longer exist anywhere in the app).
+        val legacyIds = setOf("bienestar", "autocuidado", "fuerza_de_voluntad")
+        val reservedIds = legacyIds + PERSONALIZADAS_GROUP_ID
         val groupIds = readCatalogGroupIds()
         assertTrue(groupIds.isNotEmpty())
         for (groupId in groupIds) {
-            assertFalse("catalog groupId $groupId collides with a legacy/personalizadas id", groupId in legacyAndPersonalizadas)
+            assertFalse("catalog groupId $groupId collides with a reserved/legacy id", groupId in reservedIds)
         }
     }
 
