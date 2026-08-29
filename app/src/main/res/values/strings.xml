@@ -331,6 +331,7 @@
 
     <string name="affirmation_group_badge_premium">Premium</string>
     <string name="affirmation_group_badge_ad">Solo Pro</string>
+    <string name="affirmation_group_badge_partial">Incluye Pro</string>
     <string name="affirmation_group_personalizadas_title">Personalizadas</string>
     <string name="affirmation_group_personalizadas_description">Tus propias afirmaciones, siempre incluidas en el feed.</string>
     <string name="affirmation_group_self_worth_title">Amor propio y autoestima</string>

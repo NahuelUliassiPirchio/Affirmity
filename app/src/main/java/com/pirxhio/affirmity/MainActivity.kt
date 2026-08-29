@@ -81,6 +81,7 @@ import com.pirxhio.affirmity.ui.favorites.FavoritesScreen
 import com.pirxhio.affirmity.ui.groups.AffirmationGroupSelectorSheet
 import com.pirxhio.affirmity.ui.groups.groupAccessDecision
 import com.pirxhio.affirmity.ui.groups.isToggleable
+import com.pirxhio.affirmity.ui.groups.partiallyLockedGroupIds
 import com.pirxhio.affirmity.ui.groups.selectableAffirmationGroups
 import com.pirxhio.affirmity.ui.healer.StreakHealerGrantedScreen
 import com.pirxhio.affirmity.ui.meditation.GuidedMeditationScreen
@@ -699,6 +700,15 @@ fun AffirmityApp(
                     )
                     val scaffoldState = rememberBottomSheetScaffoldState(bottomSheetState = sheetState)
                     val sheetScope = rememberCoroutineScope()
+                    // Recomputed ONLY when the entitlement tier or the grant state changes -- not
+                    // per recomposition, and never per row (design D19).
+                    val partiallyLockedIds = remember(appState.entitlementTier.value, appState.adUnlockState) {
+                        partiallyLockedGroupIds(
+                            appState.entitlementTier.value,
+                            appState.adUnlockState,
+                            System.currentTimeMillis(),
+                        )
+                    }
 
                     BottomSheetScaffold(
                         scaffoldState = scaffoldState,
@@ -756,6 +766,7 @@ fun AffirmityApp(
                                 },
                                 anyAdInFlight = appState.adRequestInFlight.value != null,
                                 onEvent = appState::logAnalyticsEvent,
+                                partiallyLockedIds = partiallyLockedIds,
                             )
                         },
                     ) {

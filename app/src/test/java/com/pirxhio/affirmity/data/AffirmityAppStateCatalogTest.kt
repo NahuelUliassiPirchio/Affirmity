@@ -16,6 +16,8 @@ import com.pirxhio.affirmity.data.local.GroupSelectionPreferences
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.OnboardingGuidePreferences
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
+import com.pirxhio.affirmity.data.catalog.CatalogSeeder
+import com.pirxhio.affirmity.data.local.CatalogPreferences
 import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
@@ -232,6 +234,44 @@ class AffirmityAppStateCatalogTest {
     }
 
     @Test
+    fun `a catalog favorite remains resolvable after its group is deselected`() = runTest {
+        val favorites = RecordingFavoritesRepository2()
+        val affirmations = RecordingAffirmationRepository2(initial = listOf(affirmationEntity("owned-1")))
+        val catalog = FakeCatalogAffirmationRepository(
+            listOf(catalogEntity(id = "cat_free.001", collectionId = FREE_COLLECTION_ID)),
+        )
+        val state = buildState(
+            backgroundScope,
+            affirmations = affirmations,
+            favorites = favorites,
+            catalog = catalog,
+            knownGroupIds = setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID),
+            groupPreferences = FixedGroupSelectionPreferences(setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID)),
+        )
+        runCurrent()
+        advanceUntilIdle()
+
+        state.toggleFavorite("cat_free.001")
+        runCurrent()
+        advanceUntilIdle()
+        assertTrue("cat_free.001" in state.favoriteAffirmations.map { it.id })
+
+        val stateAfterDeselection = buildState(
+            backgroundScope,
+            affirmations = affirmations,
+            favorites = favorites,
+            catalog = catalog,
+            knownGroupIds = setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID),
+            groupPreferences = FixedGroupSelectionPreferences(setOf(PERSONALIZADAS_GROUP_ID)),
+        )
+        runCurrent()
+        advanceUntilIdle()
+
+        assertTrue("cat_free.001" !in stateAfterDeselection.filteredAffirmations.map { it.id })
+        assertTrue("cat_free.001" in stateAfterDeselection.favoriteAffirmations.map { it.id })
+    }
+
+    @Test
     fun `an id in neither space drops out of favoriteAffirmations`() = runTest {
         val favorites = RecordingFavoritesRepository2(initialIds = listOf("orphan-cat-id"))
         val state = buildState(backgroundScope, favorites = favorites)
@@ -260,6 +300,66 @@ class AffirmityAppStateCatalogTest {
 
         assertTrue("cat_pro.001" !in state.filteredAffirmations.map { it.id })
         assertTrue("cat_pro.001" in state.favoriteAffirmations.map { it.id })
+    }
+
+    // --- Startup wiring (task 5.10 -- gap found in PR3 review) ------------------------------
+
+    @Test
+    fun `CatalogSeeder seedIfNeeded is invoked exactly once on AffirmityAppState construction`() = runTest {
+        val dao = RecordingSeederDao()
+        val prefs = RecordingSeederPrefs()
+        val seeder = CatalogSeeder(
+            assetReader = { """{"version":"1.0.0","affirmations":[]}""" },
+            dao = dao,
+            prefs = prefs,
+            knownCollectionIds = { emptySet() },
+        )
+        buildState(backgroundScope, catalogSeeder = seeder)
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(listOf("replaceAll"), dao.calls)
+        assertEquals("1.0.0", prefs.saved.single())
+    }
+
+    @Test
+    fun `CatalogSeeder seedIfNeeded is idempotent -- a second construction with the same marker no-ops`() = runTest {
+        val dao = RecordingSeederDao()
+        val prefs = RecordingSeederPrefs(initial = "1.0.0")
+        val seeder = CatalogSeeder(
+            assetReader = { """{"version":"1.0.0","affirmations":[]}""" },
+            dao = dao,
+            prefs = prefs,
+            knownCollectionIds = { emptySet() },
+        )
+        buildState(backgroundScope, catalogSeeder = seeder)
+        runCurrent()
+        advanceUntilIdle()
+
+        assertTrue("already-seeded marker means no dao call at all", dao.calls.isEmpty())
+    }
+}
+
+private class RecordingSeederDao : com.pirxhio.affirmity.data.local.CatalogAffirmationDao {
+    val calls = mutableListOf<String>()
+    override fun observeAll(): Flow<List<CatalogAffirmationEntity>> = flowOf(emptyList())
+    override fun observeByGroupIds(groupIds: Set<String>): Flow<List<CatalogAffirmationEntity>> = flowOf(emptyList())
+    override suspend fun getByIds(ids: List<String>): List<CatalogAffirmationEntity> = emptyList()
+    override suspend fun count(): Int = 0
+    override suspend fun replaceAll(rows: List<CatalogAffirmationEntity>) {
+        calls += "replaceAll"
+    }
+    override suspend fun insertAll(rows: List<CatalogAffirmationEntity>) = throw NotImplementedError()
+    override suspend fun deleteAll() = throw NotImplementedError()
+}
+
+private class RecordingSeederPrefs(initial: String? = null) : CatalogPreferences {
+    val saved = mutableListOf<String>()
+    private val state = MutableStateFlow(initial)
+    override fun observeSeededCatalogVersion(): Flow<String?> = state
+    override suspend fun saveSeededCatalogVersion(version: String) {
+        saved += version
+        state.value = version
     }
 }
 
@@ -362,6 +462,7 @@ private fun buildState(
     entitlements: EntitlementRepository = FakeCatalogEntitlementRepository(AccessTier.PRO),
     knownGroupIds: Set<String> = setOf(PERSONALIZADAS_GROUP_ID),
     groupPreferences: GroupSelectionPreferences = FixedGroupSelectionPreferences(setOf(PERSONALIZADAS_GROUP_ID)),
+    catalogSeeder: CatalogSeeder? = null,
 ): AffirmityAppState {
     val trackerPreferences = mock(TrackerPreferences::class.java)
     whenever(trackerPreferences.observeAffirmationsViewedToday())
@@ -404,6 +505,7 @@ private fun buildState(
         defaultThematicGroupIds = emptySet(),
         favorites = favorites,
         catalog = catalog,
+        catalogSeeder = catalogSeeder,
         useRemoteSession = false,
     )
 }

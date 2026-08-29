@@ -481,7 +481,12 @@ class AffirmityAppStateSwapTest {
         val local = fakeLocal(events, id = "local-swap")
         val authRepository = FakeAuthRepository()
         val scope = CoroutineScope(Dispatchers.Unconfined)
-        val groupPreferences = FakeGroupSelectionPreferences(initial = setOf("bienestar"))
+        // "personalizadas" included explicitly: it's no longer force-re-added to an
+        // otherwise-healthy persisted selection (see resolveSelectedGroupIds's KDoc), and both
+        // fixture affirmations below default to groupId=personalizadas -- this test verifies
+        // session-swap correctness via their presence/absence, which needs personalizadas
+        // selected regardless of that unrelated change.
+        val groupPreferences = FakeGroupSelectionPreferences(initial = setOf("bienestar", "personalizadas"))
         val state = buildState(
             local = local,
             remote = { fakeRemote("uid-5", events, id = "remote-swap") },
