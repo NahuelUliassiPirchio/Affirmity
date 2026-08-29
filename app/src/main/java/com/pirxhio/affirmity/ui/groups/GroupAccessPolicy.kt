@@ -17,8 +17,9 @@ import com.pirxhio.affirmity.access.resolveAccess
  * used to be is gone -- one [com.pirxhio.affirmity.access.ContentAccess] now serves both sides.
  *
  * [AffirmationGroup.alwaysSelected] short-circuits **first**, so `PERSONALIZADAS_GROUP` always
- * resolves [AccessDecision.Unlocked] and is never locked/toggleable at either tier (spec's
- * "PERSONALIZADAS_GROUP is never locked" regression guard -- covered by `GroupAccessPolicyTest`).
+ * resolves [AccessDecision.Unlocked] and is never locked at either tier (spec's "PERSONALIZADAS_GROUP
+ * is never locked" regression guard -- covered by `GroupAccessPolicyTest`). As of a TEMPORARY
+ * dogfooding relaxation it IS toggleable again -- see [isToggleable]'s KDoc.
  */
 fun groupAccessDecision(
     group: AffirmationGroup,
@@ -40,8 +41,15 @@ fun groupAccessDecision(
 
 fun isLocked(decision: AccessDecision): Boolean = !decision.isUnlocked
 
+/** TEMPORARY (dogfooding request): `alwaysSelected` groups used to be permanently non-toggleable
+ * here, keeping `PERSONALIZADAS_GROUP` checked forever. That's relaxed for now so it can be
+ * unchecked like any other unlocked group -- it still always resolves [AccessDecision.Unlocked]
+ * (see [groupAccessDecision]) and still always shows its badge (see [deriveBadge]), only the
+ * "cannot toggle" restriction is lifted. [resolveSelectedGroupIds] was changed to match: it no
+ * longer force-re-adds `personalizadas` into an otherwise-healthy persisted selection. To restore
+ * the old permanent-checked behavior, reinstate `!group.alwaysSelected &&` here. */
 fun isToggleable(group: AffirmationGroup, decision: AccessDecision): Boolean =
-    !group.alwaysSelected && decision.isUnlocked
+    decision.isUnlocked
 
 /** Spec 5's CTA gate -- the ONLY predicate that may show a "watch an ad" affordance. */
 fun canWatchAdToUnlock(decision: AccessDecision): Boolean = decision.offersAdUnlock

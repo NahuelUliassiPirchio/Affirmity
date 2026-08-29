@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.access
 
+import com.pirxhio.affirmity.ui.groups.catalogCollections
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -74,5 +75,38 @@ class ContentKeyTest {
     @Test
     fun `wireName must not contain underscore`() {
         assertTrue(ContentType.entries.none { it.wireName.contains('_') })
+    }
+
+    // --- AFFIRMATION_COLLECTION (design D5) --------------------------------------------------
+
+    @Test
+    fun `AFFIRMATION_COLLECTION storageKey then parse round-trips the longest real dotted-and-underscored collection id`() {
+        val id = catalogCollections().maxBy { it.id.length }.id
+        val key = ContentKey(ContentType.AFFIRMATION_COLLECTION, id)
+        assertEquals(key, ContentKey.parse(key.storageKey))
+    }
+
+    @Test
+    fun `AFFIRMATION_COLLECTION storageKey then parse round-trips for all 226 real collection ids`() {
+        val ids = catalogCollections().map { it.id }
+        assertEquals(226, ids.size)
+        for (id in ids) {
+            val key = ContentKey(ContentType.AFFIRMATION_COLLECTION, id)
+            val parsed = ContentKey.parse(key.storageKey)
+            assertEquals(key, parsed)
+            assertEquals(ContentType.AFFIRMATION_COLLECTION, parsed?.type)
+            assertEquals(id, parsed?.id)
+        }
+    }
+
+    @Test
+    fun `fromWireName affirmationGroup still resolves AFFIRMATION_GROUP, no prefix shadowing`() {
+        assertEquals(ContentType.AFFIRMATION_GROUP, ContentType.fromWireName("affirmationGroup"))
+    }
+
+    @Test
+    fun `AFFIRMATION_COLLECTION storageKey satisfies the contentType_contentId identity`() {
+        val key = ContentKey(ContentType.AFFIRMATION_COLLECTION, "self_worth.feeling_enough.intrinsic_worth")
+        assertEquals("${ContentType.AFFIRMATION_COLLECTION.wireName}_${key.id}", key.storageKey)
     }
 }

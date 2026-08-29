@@ -111,11 +111,16 @@ val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
     }
 }
 
-/** Additive: creates `timed_ad_unlock` empty (design D16). A SIBLING table of `ad_unlock`, never
- * an ALTER of it -- the existing table's create-only guarantee (`insertIfAbsent`) must stay
- * unweakened for [com.pirxhio.affirmity.access.AdUnlockPolicy.ONE_TIME_TRIAL]. Catalog tables
- * (Phase 2 of this change) are added to this same migration later; this version only ships the
- * ad-unlock policy slice. */
+/** Additive: creates `timed_ad_unlock`, `catalog_affirmations`, and
+ * `catalog_affirmation_overrides`, all empty (design D16 / Phase 2's design.md "Persistence —
+ * migration"). `timed_ad_unlock` is a SIBLING table of `ad_unlock`, never an ALTER of it -- the
+ * existing table's create-only guarantee (`insertIfAbsent`) must stay unweakened for
+ * [com.pirxhio.affirmity.access.AdUnlockPolicy.ONE_TIME_TRIAL]. The two catalog tables are created
+ * empty here; `catalog_affirmations` is populated by `CatalogSeeder` from the bundled asset on the
+ * next launch (design D2/D13), NOT here -- a migration must not parse a ~850 KB asset on the
+ * main-thread-adjacent open path. `catalog_affirmation_overrides` has no Room entity registered
+ * yet in this slice (that ships with the override sync surface, PR3) -- Room does not validate
+ * tables it has no matching `@Entity` for, so this is safe to create ahead of its consumer. */
 val MIGRATION_8_9 = object : androidx.room.migration.Migration(8, 9) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL(
@@ -127,6 +132,30 @@ val MIGRATION_8_9 = object : androidx.room.migration.Migration(8, 9) {
                 `grantedAtMillis` INTEGER NOT NULL,
                 `expiresAtMillis` INTEGER,
                 PRIMARY KEY(`contentKey`)
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `catalog_affirmations` (
+                `id` TEXT NOT NULL,
+                `text` TEXT NOT NULL,
+                `groupId` TEXT NOT NULL,
+                `themeId` TEXT NOT NULL,
+                `collectionId` TEXT NOT NULL,
+                `sortOrder` INTEGER NOT NULL,
+                PRIMARY KEY(`id`)
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_catalog_affirmations_groupId` ON `catalog_affirmations` (`groupId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_catalog_affirmations_collectionId` ON `catalog_affirmations` (`collectionId`)")
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `catalog_affirmation_overrides` (
+                `catalogAffirmationId` TEXT NOT NULL,
+                `overrides` TEXT NOT NULL DEFAULT '{}',
+                PRIMARY KEY(`catalogAffirmationId`)
             )
             """.trimIndent(),
         )
@@ -142,6 +171,8 @@ val MIGRATION_8_9 = object : androidx.room.migration.Migration(8, 9) {
         AdUnlockEntity::class,
         FavoriteAffirmationEntity::class,
         TimedAdUnlockEntity::class,
+        CatalogAffirmationEntity::class,
+        CatalogOverrideEntity::class,
     ],
     version = 9,
     exportSchema = true,
@@ -155,6 +186,8 @@ abstract class AffirmityDatabase : RoomDatabase() {
     abstract fun adUnlockDao(): AdUnlockDao
     abstract fun favoriteAffirmationDao(): FavoriteAffirmationDao
     abstract fun timedAdUnlockDao(): TimedAdUnlockDao
+    abstract fun catalogAffirmationDao(): CatalogAffirmationDao
+    abstract fun catalogOverrideDao(): CatalogOverrideDao
 
     companion object {
         @Volatile

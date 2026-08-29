@@ -170,6 +170,46 @@ class AffirmityDatabaseMigrationTest {
         }
     }
 
+    /** Extends the task-1.8 suite (task 2.11, Phase 2 of design.md's catalog foundation):
+     * `migrate8To9` now also creates BOTH catalog tables empty, both catalog indices present, and
+     * every pre-existing column -- including `overrides` -- untouched. */
+    @Test
+    fun migrate8To9_createsAllThreeNewTablesEmptyWithCatalogIndicesAndLeavesExistingColumnsUntouched() {
+        helper.createDatabase(TEST_DB, 8).apply {
+            execSQL(
+                "INSERT INTO affirmations " +
+                    "(id, title, subtitle, backgroundType, backgroundValue, groupId, overrides) " +
+                    "VALUES ('id-1', 'Title', 'Subtitle', 'color', '#000000', 'personalizadas', '{\"k\":\"v\"}')",
+            )
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(TEST_DB, 9, true, MIGRATION_8_9)
+
+        migrated.query("SELECT * FROM timed_ad_unlock").use { cursor -> assertFalse(cursor.moveToFirst()) }
+        migrated.query("SELECT * FROM catalog_affirmations").use { cursor -> assertFalse(cursor.moveToFirst()) }
+        migrated.query("SELECT * FROM catalog_affirmation_overrides").use { cursor -> assertFalse(cursor.moveToFirst()) }
+
+        migrated.query("PRAGMA index_list(`catalog_affirmations`)").use { cursor ->
+            val indexNames = generateSequence { if (cursor.moveToNext()) cursor.getString(1) else null }.toList()
+            assertTrue(indexNames.contains("index_catalog_affirmations_groupId"))
+            assertTrue(indexNames.contains("index_catalog_affirmations_collectionId"))
+        }
+
+        migrated.query(
+            "SELECT title, subtitle, backgroundType, backgroundValue, groupId, overrides " +
+                "FROM affirmations WHERE id = 'id-1'",
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("Title", cursor.getString(0))
+            assertEquals("Subtitle", cursor.getString(1))
+            assertEquals("color", cursor.getString(2))
+            assertEquals("#000000", cursor.getString(3))
+            assertEquals("personalizadas", cursor.getString(4))
+            assertEquals("{\"k\":\"v\"}", cursor.getString(5))
+        }
+    }
+
     private companion object {
         const val TEST_DB = "migration-test"
     }

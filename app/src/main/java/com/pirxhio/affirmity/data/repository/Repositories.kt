@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.data.repository
 import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.access.AdUnlockRecord
 import com.pirxhio.affirmity.data.local.AffirmationEntity
+import com.pirxhio.affirmity.data.local.CatalogAffirmationEntity
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
@@ -148,4 +149,41 @@ interface AdUnlockRepository {
     /** UPSERT, unlike [grantDurableUnlock]: re-earning after expiry replaces
      *  `grantedAt`/`expiresAt`. */
     suspend fun grantTimedUnlock(record: AdUnlockRecord)
+}
+
+/**
+ * Read-only contract for the shared catalog cache (design D9). Deliberately OUTSIDE
+ * [DataSession]: the catalog is not per-user -- it is byte-identical signed-in and signed-out --
+ * so it has no sign-in/sign-out swap semantics to participate in, and `DataSession.Remote`'s
+ * "backed exclusively by Firestore" contract would be a lie. There is no write method: seeding
+ * goes through `CatalogSeeder` against the DAO directly, never through this interface.
+ */
+interface CatalogAffirmationRepository {
+    fun observeByGroupIds(groupIds: Set<String>): Flow<List<CatalogAffirmationEntity>>
+    suspend fun getByIds(ids: List<String>): List<CatalogAffirmationEntity>
+}
+
+object NoOpCatalogAffirmationRepository : CatalogAffirmationRepository {
+    override fun observeByGroupIds(groupIds: Set<String>): Flow<List<CatalogAffirmationEntity>> = flowOf(emptyList())
+    override suspend fun getByIds(ids: List<String>): List<CatalogAffirmationEntity> = emptyList()
+}
+
+/**
+ * Per-user overrides on shared catalog rows (design D9, revised). Unlike
+ * [CatalogAffirmationRepository] this IS a [DataSession] member: overrides are per-user, so they
+ * DO have sign-in/sign-out swap semantics, selected the same way [AffirmationRepository] is
+ * (Room for [DataSession.Local], Firestore for [DataSession.Remote]).
+ */
+interface CatalogOverrideRepository {
+    /** Keyed by `catalogAffirmationId`. Absent key == no overrides for that row. */
+    fun observeAll(): Flow<Map<String, Map<String, String>>>
+
+    /** Whole-map replacement, matching [AffirmationRepository.setOverrides]. An empty map deletes
+     *  the stored row rather than persisting `{}` (design.md "Persistence -- DAOs"). */
+    suspend fun setOverrides(catalogAffirmationId: String, overrides: Map<String, String>)
+}
+
+object NoOpCatalogOverrideRepository : CatalogOverrideRepository {
+    override fun observeAll(): Flow<Map<String, Map<String, String>>> = flowOf(emptyMap())
+    override suspend fun setOverrides(catalogAffirmationId: String, overrides: Map<String, String>) = Unit
 }

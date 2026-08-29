@@ -72,6 +72,7 @@ import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.FcmTokenRepository
 import com.pirxhio.affirmity.data.remote.FirestoreAdUnlockRepository
 import com.pirxhio.affirmity.data.remote.FirestoreAffirmationRepository
+import com.pirxhio.affirmity.data.remote.FirestoreCatalogOverrideRepository
 import com.pirxhio.affirmity.data.remote.FirestoreDailyCompletionRepository
 import com.pirxhio.affirmity.data.remote.FirestoreDailyMoodRepository
 import com.pirxhio.affirmity.data.remote.FirestoreEntitlementRepository
@@ -82,11 +83,15 @@ import com.pirxhio.affirmity.data.remote.FirestoreOnboardingRepository
 import com.pirxhio.affirmity.data.remote.FirestoreStreakHealerRepository
 import com.pirxhio.affirmity.data.remote.MigrationSnapshot
 import com.pirxhio.affirmity.data.repository.AdUnlockRepository
+import com.pirxhio.affirmity.data.repository.CatalogAffirmationRepository
 import com.pirxhio.affirmity.data.repository.DataSession
 import com.pirxhio.affirmity.data.repository.FavoriteAffirmationRepository
+import com.pirxhio.affirmity.data.repository.NoOpCatalogAffirmationRepository
 import com.pirxhio.affirmity.data.repository.NoOpFavoriteAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomAdUnlockRepository
 import com.pirxhio.affirmity.data.repository.RoomAffirmationRepository
+import com.pirxhio.affirmity.data.repository.RoomCatalogAffirmationRepository
+import com.pirxhio.affirmity.data.repository.RoomCatalogOverrideRepository
 import com.pirxhio.affirmity.data.repository.RoomDailyCompletionRepository
 import com.pirxhio.affirmity.data.repository.RoomDailyMoodRepository
 import com.pirxhio.affirmity.data.repository.RoomFavoriteAffirmationRepository
@@ -96,6 +101,13 @@ import com.pirxhio.affirmity.data.repository.RoomStreakHealerRepository
 import com.pirxhio.affirmity.meditation.SessionEndReason
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
+import com.pirxhio.affirmity.data.catalog.AndroidCatalogAssetReader
+import com.pirxhio.affirmity.data.catalog.CATALOG_ID_PREFIX
+import com.pirxhio.affirmity.data.catalog.CatalogSeeder
+import com.pirxhio.affirmity.data.local.AndroidCatalogPreferences
+import com.pirxhio.affirmity.ui.groups.catalogAccessDecision
+import com.pirxhio.affirmity.ui.groups.catalogCollectionsById
+import com.pirxhio.affirmity.ui.groups.catalogUniverseGroups
 import com.pirxhio.affirmity.ui.groups.defaultAffirmationGroups
 import com.pirxhio.affirmity.ui.groups.selectableAffirmationGroups
 import com.pirxhio.affirmity.access.isUnlocked
@@ -106,6 +118,7 @@ import java.util.TimeZone
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
@@ -136,7 +149,16 @@ data class Affirmation(
     val background: AffirmationBackground,
     val groupId: String = PERSONALIZADAS_GROUP_ID,
     val overrides: Map<String, String> = emptyMap(),
+    /** Presentation-level provenance (design D14). The UI reads THIS to decide what to render
+     *  (e.g. hide the delete affordance); write routing reads the id prefix instead, which is the
+     *  storage-level ground truth and cannot drift from the row's real home. */
+    val source: AffirmationSource = AffirmationSource.OWNED,
+    /** The access unit for CATALOG rows (design D5/D6). Always null for OWNED rows. */
+    val collectionId: String? = null,
 )
+
+/** See [Affirmation.source] (design D14). */
+enum class AffirmationSource { OWNED, CATALOG }
 
 /** Rolling last-7-days completion flags (oldest first, today last) for a habit tracker.
  * [healedDays] holds the same-indexed offsets that were saved by the streak healer instead of
@@ -171,6 +193,22 @@ private fun AffirmationEntity.toAffirmation(): Affirmation = Affirmation(
     overrides = overrides,
 )
 
+/** Catalog row -> read-model [Affirmation] (design D8/D14): `text` maps to `title`, `subtitle` is
+ *  empty (one authored string per affirmation, no split); the background is DERIVED, never stored
+ *  (design D4); [overrides] comes from the per-user override map, keyed off the row's own id. */
+private fun com.pirxhio.affirmity.data.local.CatalogAffirmationEntity.toAffirmation(
+    overrides: Map<String, String>,
+): Affirmation = Affirmation(
+    id = id,
+    title = text,
+    subtitle = "",
+    background = com.pirxhio.affirmity.ui.affirmations.forCatalogAffirmation(groupId, id),
+    groupId = groupId,
+    overrides = overrides,
+    source = AffirmationSource.CATALOG,
+    collectionId = collectionId,
+)
+
 private fun Affirmation.toEntity(): AffirmationEntity = AffirmationEntity(
     id = id,
     title = title,
@@ -192,18 +230,57 @@ private fun Affirmation.toEntity(): AffirmationEntity = AffirmationEntity(
 
 /**
  * Pure resolution of the committed group-id selection, extracted so it is testable without
- * Android/DataStore (design §4, §6). [persisted] is `null` on the very first-ever launch (no
- * selection ever saved). Unknown ids (e.g. a group removed in a later release) are dropped.
- * `personalizadas` is always force-included.
+ * Android/DataStore (design §4, §6, D18). [persisted] is `null` on the very first-ever launch (no
+ * selection ever saved). Unknown ids (e.g. a group removed in a later release, such as the 3
+ * legacy groups deleted by design D17) are dropped. `personalizadas` is included in every FALLBACK
+ * result (first launch, a persisted selection that resolves to genuinely empty, or a persisted
+ * selection whose thematic ids were all dropped by the unknown-id filter -- e.g. stale legacy ids)
+ * as the sensible default -- but, as of a TEMPORARY dogfooding change, is no longer force-re-added
+ * to an otherwise healthy persisted selection that explicitly excludes it. A *deliberate*
+ * `personalizadas`-only selection -- one where `persisted` was already exactly
+ * `{personalizadas}`, nothing dropped by filtering -- is distinguished from the stale-legacy-ids
+ * case above and preserved verbatim, since `isDraftSelectionValid` now allows committing it when
+ * the user has custom affirmations. This pairs with `GroupAccessPolicy.isToggleable`'s matching
+ * relaxation: without both changes together, a user could uncheck `personalizadas` in the
+ * selector, hit Aplicar, and have it silently reappear on the next read of this collector. To
+ * restore the old permanent-inclusion behavior, change the final `return` back to
+ * `resolved + PERSONALIZADAS_GROUP_ID` unconditionally.
+ *
+ * The minimum-selection invariant lives HERE, tier-independent (design D18) -- moved out of
+ * `EntitlementResolution.deselectLockedGroups`'s call site, which is guarded by
+ * `if (entitlement.tier == AccessTier.FREE)` and therefore never ran for a Pro user. Without this,
+ * a device holding a persisted selection that resolves to genuinely empty (either because every
+ * persisted id was unknown, or because the persisted selection was itself empty) would land on a
+ * fully empty feed regardless of tier. Cannot touch a healthy selection: any surviving
+ * non-personalizadas id, or a deliberate `personalizadas`-only selection, short-circuits the
+ * fallback.
  */
 fun resolveSelectedGroupIds(
     persisted: Set<String>?,
     knownIds: Set<String>,
     defaultThematicIds: Set<String>,
 ): Set<String> {
-    val resolved = persisted?.filter { it in knownIds }?.toSet() ?: defaultThematicIds
-    return resolved + PERSONALIZADAS_GROUP_ID
+    val filtered = persisted?.filter { it in knownIds }?.toSet()
+    // A personalizadas-only *filtered* result is ambiguous on its own: it's either a deliberate
+    // commit (persisted was already exactly {personalizadas}, nothing dropped) or stale data whose
+    // thematic ids all got dropped by the knownIds filter (persisted != filtered) -- e.g. legacy ids
+    // removed by design D17. Only the latter should recover via the fallback; the former must be
+    // preserved verbatim (TEMPORARY dogfooding relaxation).
+    val droppedUnknownIds = filtered != null && filtered != persisted
+    val isPersonalizadasOnly = filtered != null && filtered.none { it != PERSONALIZADAS_GROUP_ID }
+    return if (filtered == null || filtered.isEmpty() || (isPersonalizadasOnly && droppedUnknownIds)) {
+        defaultThematicIds + PERSONALIZADAS_GROUP_ID
+    } else {
+        filtered
+    }
 }
+
+/** Minimum-selection rule used by the group picker before it commits a draft. */
+internal fun isDraftSelectionValid(
+    draftGroupIds: Set<String>,
+    hasPersonalAffirmations: Boolean,
+): Boolean = draftGroupIds.any { it != PERSONALIZADAS_GROUP_ID } ||
+    (PERSONALIZADAS_GROUP_ID in draftGroupIds && hasPersonalAffirmations)
 
 /**
  * Pure migration-default resolution for the onboarding guide's tri-state "seen" flag (spec R1.3,
@@ -312,12 +389,29 @@ class AffirmityAppState(
      *  one changed argument at the `rememberAffirmityAppState` call site. */
     private val adUnlockSource: AdUnlockSource = NoAdUnlockSource,
     private val favorites: FavoriteAffirmationRepository = NoOpFavoriteAffirmationRepository,
+    /** Read-only shared catalog cache (design D9). Deliberately OUTSIDE [DataSession] -- it is
+     *  byte-identical signed-in and signed-out, so it has no sign-in/sign-out swap semantics. */
+    private val catalog: CatalogAffirmationRepository = NoOpCatalogAffirmationRepository,
+    /** Bundled-asset-first seeder (design D2/D13, task 5.10). `null` (the default) means "no
+     *  seeding" -- every existing JVM unit test that constructs this class directly never touches
+     *  Android assets/DataStore. The real composition root ([rememberAffirmityAppState]) always
+     *  provides one. Invoked once, off the main thread, in [init]. */
+    private val catalogSeeder: CatalogSeeder? = null,
     /** Spec 6's one frozen seam (design D1) -- defaulted to [NoOpAnalyticsLogger], the same
      *  injection convention as [adUnlockSource]. The composition root swaps this once for the
      *  real, consent-gated instance ([ConsentGatedAnalyticsLogger]) -- the one-line kill switch. */
     private val analytics: AnalyticsLogger = NoOpAnalyticsLogger,
 ) {
     val affirmations = mutableStateListOf<Affirmation>()
+
+    /** Shared, read-only catalog rows across every known group (design D9/D10), with per-user
+     *  overrides already applied. The main feed applies committed-group scoping separately;
+     *  keeping this lookup unscoped lets favorites survive group deselection. */
+    private val catalogAffirmations = mutableStateListOf<Affirmation>()
+
+    /** Both ID spaces, for favorites resolution (design D10). Concatenation, never a SQL union --
+     *  when the session is Remote, [affirmations] is not in Room at all. */
+    private val allAffirmations: List<Affirmation> get() = affirmations + catalogAffirmations
 
     var favoriteAffirmationIds = mutableStateOf<Set<String>>(emptySet())
         private set
@@ -326,7 +420,8 @@ class AffirmityAppState(
     private val favoriteToggleMutex = Mutex()
 
     /** Group ids the user has committed. Null until DataStore's first read resolves; the UI shows
-     * nothing group-dependent until then. Always contains [PERSONALIZADAS_GROUP_ID] once resolved. */
+     * nothing group-dependent until then. Always non-empty once resolved; the temporary
+     * dogfooding relaxation allows [PERSONALIZADAS_GROUP_ID] to be absent. */
     var selectedGroupIds = mutableStateOf<Set<String>?>(null)
         private set
 
@@ -342,20 +437,43 @@ class AffirmityAppState(
      * can never satisfy the invariant by itself, since selecting it alone would otherwise commit
      * to a guaranteed-empty feed. */
     val isDraftSelectionValid: Boolean
-        get() = draftGroupIds.value.any { id -> id != PERSONALIZADAS_GROUP_ID } ||
-            affirmations.any { it.groupId == PERSONALIZADAS_GROUP_ID }
+        get() = isDraftSelectionValid(
+            draftGroupIds = draftGroupIds.value,
+            hasPersonalAffirmations = affirmations.any { it.groupId == PERSONALIZADAS_GROUP_ID },
+        )
 
     /** The feed's list: affirmations whose groupId is in the committed selection. NEVER used by
      * ProgressScreen (that keeps reading [affirmations] unfiltered). Falls back to the full list
      * while [selectedGroupIds] is still null. */
     val filteredAffirmations: List<Affirmation>
-        get() = selectedGroupIds.value?.let { ids -> affirmations.filter { it.groupId in ids } }
-            ?: affirmations
+        get() {
+            val ids = selectedGroupIds.value ?: return affirmations
+            val collectionsById = catalogCollectionsById()
+            val groupsById = catalogUniverseGroups().associateBy { it.id }
+            val now = System.currentTimeMillis()
+            val tier = entitlementTier.value
+            val grants = adUnlockState
+            return affirmations.filter { it.groupId in ids } +
+                catalogAffirmations.filter { affirmation ->
+                    affirmation.groupId in ids &&
+                        groupsById[affirmation.groupId]?.let { group ->
+                            catalogAccessDecision(
+                                group = group,
+                                collection = collectionsById[affirmation.collectionId],
+                                tier = tier,
+                                grants = grants,
+                                nowMillis = now,
+                            ).isUnlocked
+                        } == true
+                }
+        }
 
+    /** Unchanged in shape; now resolves across BOTH id spaces (design D10). Access-unfiltered on
+     *  purpose: a favorite made while Pro stays visible after a downgrade. */
     val favoriteAffirmations: List<Affirmation>
         get() {
-            val affirmationsById = affirmations.associateBy { it.id }
-            return favoriteOrderedIds.value.mapNotNull(affirmationsById::get)
+            val byId = allAffirmations.associateBy { it.id }
+            return favoriteOrderedIds.value.mapNotNull(byId::get)
         }
 
     /** Provider-neutral sign-in state; see `auth/AuthState.kt`. Settings-only, never gates a screen. */
@@ -603,6 +721,19 @@ class AffirmityAppState(
     }
 
     init {
+        scope.launch(Dispatchers.IO) {
+            // Bundled-asset-first seeding (design D2/D13, task 5.10). Fired once, off the main
+            // thread, so a cold start's 2712-row seed never blocks first paint. Idempotent via
+            // CatalogPreferences.seededCatalogVersion, so safe to call on every launch. `null`
+            // (the default) means no seeding -- every existing JVM unit test never touches assets.
+            try {
+                catalogSeeder?.seedIfNeeded()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Log.e(TAG, "catalog seed failed", error)
+            }
+        }
         scope.launch {
             favorites.observeFavoriteIds()
                 .catch { error -> Log.e(TAG, "favorites flow failed", error) }
@@ -617,6 +748,23 @@ class AffirmityAppState(
                 .collect { entities ->
                     affirmations.clear()
                     affirmations.addAll(entities.map { it.toAffirmation() })
+                }
+        }
+        scope.launch {
+            // Two subscriptions with DELIBERATELY different lifetimes (design D9, revised): the
+            // catalog rows survive an auth swap (byte-identical signed-in and signed-out); the
+            // overrides half is session.flatMapLatest, matching every other per-user collector, so
+            // signing out drops the previous user's overrides atomically. Catalog observation is
+            // deliberately unscoped so favorite resolution is independent of the feed selection;
+            // filteredAffirmations applies the committed group ids to the main feed.
+            combine(
+                catalog.observeByGroupIds(knownGroupIds),
+                session.flatMapLatest { it.catalogOverrides.observeAll() },
+            ) { rows, overrides -> rows to overrides }
+                .catch { error -> Log.e(TAG, "catalog flow failed", error) }
+                .collect { (rows, overrides) ->
+                    catalogAffirmations.clear()
+                    catalogAffirmations.addAll(rows.map { it.toAffirmation(overrides[it.id].orEmpty()) })
                 }
         }
         scope.launch {
@@ -1040,6 +1188,11 @@ class AffirmityAppState(
     }
 
     fun removeAffirmation(id: String) {
+        // Load-bearing guard (design D14): without it, a catalog id would reach
+        // `ready().affirmations.deleteById`, a silent no-op on Room but a REAL per-user Firestore
+        // write when the session is Remote -- a tombstone in a collection that must never contain
+        // catalog ids. Catalog rows have no delete affordance in the UI; this is a hard backstop.
+        if (id.startsWith(CATALOG_ID_PREFIX)) return
         scope.launch {
             ready().affirmations.deleteById(id)
             favorites.remove(id)
@@ -1071,17 +1224,22 @@ class AffirmityAppState(
      */
     fun setTokenOverride(affirmationId: String, tokenKey: String, rawValue: String) {
         scope.launch {
-            val current = affirmations.firstOrNull { it.id == affirmationId } ?: return@launch
+            // Prefix routing (design D14): the id decides WHICH store, not a presentation flag --
+            // a flag could drift from the row's actual home and send a catalog write into
+            // `users/{uid}/affirmations`.
+            val current = allAffirmations.firstOrNull { it.id == affirmationId } ?: return@launch
             val next = current.overrides.toMutableMap().apply {
                 when (val normalized = AffirmationTemplateParser.normalizeOverrideValue(rawValue)) {
                     null -> remove(tokenKey) // empty input == revert to the authored original
                     else -> put(tokenKey, normalized)
                 }
             }
-            ready().affirmations.setOverrides(
-                affirmationId,
-                AffirmationTemplateParser.pruneOverrides(current.title, current.subtitle, next),
-            )
+            val pruned = AffirmationTemplateParser.pruneOverrides(current.title, current.subtitle, next)
+            if (affirmationId.startsWith(CATALOG_ID_PREFIX)) {
+                ready().catalogOverrides.setOverrides(affirmationId, pruned)
+            } else {
+                ready().affirmations.setOverrides(affirmationId, pruned)
+            }
         }
     }
 
@@ -1249,8 +1407,11 @@ class AffirmityAppState(
         )
     }
 
-    /** Flips [groupId]'s membership in [draftGroupIds]. No-op for `alwaysSelected`/locked groups —
-     * the UI also disables them; this is defense in depth. */
+    /** Flips [groupId]'s membership in [draftGroupIds]. No-op for locked groups — the UI also
+     * disables them; this is defense in depth. `alwaysSelected` groups are toggleable as of a
+     * TEMPORARY dogfooding relaxation (see `GroupAccessPolicy.isToggleable`'s KDoc) -- this was
+     * previously "No-op for alwaysSelected/locked groups" and should read that way again if the
+     * relaxation is reverted. */
     fun toggleGroup(groupId: String, toggleable: Boolean) {
         if (!toggleable) return
         draftGroupIds.value = if (groupId in draftGroupIds.value) {
@@ -1312,12 +1473,21 @@ fun rememberAffirmityAppState(): AffirmityAppState {
     // Resolved here (not inside `remember`) so the `AffirmityAppState` class itself never imports
     // `ui.groups` (design D9) — only this composable wiring function does, mirroring [dayLetters].
     val knownGroupIds = selectableAffirmationGroups().map { it.id }.toSet()
+    // `isThematic` is the SELECTOR -- "every thematic group is on by default" is the product
+    // decision (design D18). The tier condition is retained purely as a GUARD: it keeps the
+    // invariant that the fresh-install default can never contain a group
+    // `deselectLockedGroups` would immediately strip. Post-D17 (14 Free-tier universes, no more
+    // legacy groups) this evaluates to all 14.
     val defaultThematicGroupIds = defaultAffirmationGroups()
-        .filter { it.access.requiredTier == AccessTier.FREE }
+        .filter { it.isThematic && it.access.requiredTier == AccessTier.FREE }
         .map { it.id }.toSet()
     // Every group that requires Pro to unlock -- mirrors GroupAccessPolicy.isLocked's condition
     // (access.requiredTier == PRO && !alwaysSelected) without importing ui.groups' policy file
-    // itself (D9).
+    // itself (D9). Post-D17 this evaluates EMPTY: all 14 universe groups are declared
+    // ContentAccess.Free at the group level (collection-level Pro gating moved to
+    // CatalogAccessPolicy.catalogAccessDecision, design D6/D7). deselectLockedGroups (below) is a
+    // documented no-op in that state, NOT deleted -- see task 4.7 / EntitlementResolutionTest's
+    // regression guard.
     val proOnlyGroupIds = defaultAffirmationGroups()
         .filter { it.access.requiredTier != AccessTier.FREE }
         .map { it.id }.toSet()
@@ -1338,6 +1508,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             meditation = RoomMeditationPreferencesRepository(trackerPreferences),
             notifications = RoomNotificationSettingsRepository(notificationPreferences),
             adUnlocks = RoomAdUnlockRepository(database.adUnlockDao(), database.timedAdUnlockDao()),
+            catalogOverrides = RoomCatalogOverrideRepository(database.catalogOverrideDao()),
         )
         AffirmityAppState(
             scope = scope,
@@ -1353,6 +1524,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
                     notifications = FirestoreNotificationSettingsRepository(firestore, uid),
                     entitlements = FirestoreEntitlementRepository(firestore, uid),
                     adUnlocks = FirestoreAdUnlockRepository(firestore, uid),
+                    catalogOverrides = FirestoreCatalogOverrideRepository(firestore, uid),
                 )
             },
             migrator = FirestoreMigrator(firestore),
@@ -1366,6 +1538,12 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             fcmTokenRepository = FcmTokenRepository(firestore),
             onboardingRepository = FirestoreOnboardingRepository(firestore),
             favorites = RoomFavoriteAffirmationRepository(database.favoriteAffirmationDao()),
+            catalog = RoomCatalogAffirmationRepository(database.catalogAffirmationDao()),
+            catalogSeeder = CatalogSeeder(
+                assetReader = AndroidCatalogAssetReader(context.applicationContext),
+                dao = database.catalogAffirmationDao(),
+                prefs = AndroidCatalogPreferences(context.applicationContext),
+            ),
             dayLetters = dayLetters,
             authRepository = FirebaseAuthRepository(
                 auth = FirebaseAuth.getInstance(),
