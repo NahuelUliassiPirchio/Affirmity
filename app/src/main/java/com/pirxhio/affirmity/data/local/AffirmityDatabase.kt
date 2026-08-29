@@ -172,6 +172,7 @@ val MIGRATION_8_9 = object : androidx.room.migration.Migration(8, 9) {
         FavoriteAffirmationEntity::class,
         TimedAdUnlockEntity::class,
         CatalogAffirmationEntity::class,
+        CatalogOverrideEntity::class,
     ],
     version = 9,
     exportSchema = true,
@@ -186,6 +187,7 @@ abstract class AffirmityDatabase : RoomDatabase() {
     abstract fun favoriteAffirmationDao(): FavoriteAffirmationDao
     abstract fun timedAdUnlockDao(): TimedAdUnlockDao
     abstract fun catalogAffirmationDao(): CatalogAffirmationDao
+    abstract fun catalogOverrideDao(): CatalogOverrideDao
 
     companion object {
         @Volatile

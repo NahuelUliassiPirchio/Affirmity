@@ -73,20 +73,24 @@ Chain strategy: feature-branch-chain
 
 ## Phase 3: PR3 — Override sync surface + read-model integration
 
-- [ ] 3.1 GREEN `data/local/CatalogOverrideEntity.kt`, `data/local/CatalogOverrideDao.kt` (`observeAll`, `upsert`, `deleteById`; empty map deletes row).
-- [ ] 3.2 GREEN `data/repository/Repositories.kt`: `CatalogOverrideRepository` + `NoOp`. `data/repository/RoomCatalogOverrideRepository.kt` (new).
-- [ ] 3.3 GREEN `data/remote/FirestoreCatalogOverrideRepository.kt` (new): mirrors `users/{uid}/catalogOverrides`; empty map deletes doc.
-- [ ] 3.4 GREEN `data/remote/FirestorePaths.kt`: `catalogAffirmationsCollection/Doc`, `catalogUniversesCollection/Doc`, `catalogThemesCollection/Doc`, `catalogCollectionsCollection/Doc`, `catalogVersionDoc`, `catalogOverridesCollection/Doc`.
-- [ ] 3.5 GREEN `data/repository/DataSession.kt`: add `catalogOverrides` as a per-user sealed-interface member (Room vs Firestore impl on auth swap, D9 revised). Update both session constructions and every `AffirmityAppState` test that builds a session.
-- [ ] 3.6 RED `AffirmityAppStateTest` (write routing, D14): `setTokenOverride("cat_…")` hits `catalogOverrides`, never `ready().affirmations`; `setTokenOverride(uuid)` unchanged; `removeAffirmation("cat_…")` performs **zero** repository calls (Remote-write-tombstone guard). Recording fakes, assert absence not just presence.
-- [ ] 3.7 GREEN `data/AffirmityAppState.kt`: `Affirmation.source`/`collectionId`, `AffirmationSource` enum, `setTokenOverride` prefix routing, `removeAffirmation` early-return guard.
-- [ ] 3.8 RED `AffirmityAppState` `filteredAffirmations` test (D7): owned-row filter verbatim (regression); locked-collection catalog row absent; same row present for Pro tier; deselecting a group removes its catalog rows.
-- [ ] 3.9 RED `favoriteAffirmations` cross-space test (D10): personal + catalog id favorited together resolve in recency order; id in neither space drops out; **favorited catalog row whose collection is locked STILL appears** (pinned decision, Open Question 4).
-- [ ] 3.10 GREEN `data/AffirmityAppState.kt`: `allAffirmations` concatenation, catalog collector (`catalog.observeByGroupIds` + `session.flatMapLatest { catalogOverrides.observeAll() }`), `filteredAffirmations` access filter, `favoriteAffirmations` merge.
-- [ ] 3.11 RED `CatalogBackgroundsTest` (D4): deterministic per id across calls; ids within a universe span the palette; every universe id resolves.
-- [ ] 3.12 GREEN `ui/affirmations/CatalogBackgrounds.kt`.
-- [ ] 3.13 GREEN `firestore.rules`: 5 read-only catalog blocks (`catalogAffirmations`/`catalogUniverses`/`catalogThemes`/`catalogCollections`/`catalogMeta`, `allow read: if true; allow write: if false`) + owner-only `catalogOverrides` block.
-- [ ] 3.14 RED (`npm run test:rules`): unauthenticated read of `catalogAffirmations` succeeds; any client write fails; `catalogOverrides` unreadable/unwritable cross-uid, owner read/write succeeds. (Spec: Shared Catalog Storage Path, Per-User Override Sync Surface)
+- [x] 3.1 GREEN `data/local/CatalogOverrideEntity.kt`, `data/local/CatalogOverrideDao.kt` (`observeAll`, `upsert`, `deleteById`; empty map deletes row).
+- [x] 3.2 GREEN `data/repository/Repositories.kt`: `CatalogOverrideRepository` + `NoOp`. `data/repository/RoomCatalogOverrideRepository.kt` (new).
+- [x] 3.3 GREEN `data/remote/FirestoreCatalogOverrideRepository.kt` (new): mirrors `users/{uid}/catalogOverrides`; empty map deletes doc.
+- [x] 3.4 GREEN `data/remote/FirestorePaths.kt`: `catalogAffirmationsCollection/Doc`, `catalogUniversesCollection/Doc`, `catalogThemesCollection/Doc`, `catalogCollectionsCollection/Doc`, `catalogVersionDoc`, `catalogOverridesCollection/Doc`.
+- [x] 3.5 GREEN `data/repository/DataSession.kt`: add `catalogOverrides` as a per-user sealed-interface member (Room vs Firestore impl on auth swap, D9 revised). Update both session constructions and every `AffirmityAppState` test that builds a session. **Deviation**: given a NoOp `CatalogOverrideRepository` default on both `Local`/`Remote` instead of touching all 7 existing test-file `DataSession.Local(`/`.Remote(` call sites -- unlike `adUnlocks` (no default, would silently drop durable grant data), an empty override map is a safe default: v1.0.0's catalog is measured bracket-free (D11), so no existing fixture that omits this argument loses meaningful data. Documented on the `catalogOverrides` property itself. The two REAL production session constructions in `AffirmityAppState.kt` and the new catalog test file both wire real/recording repositories explicitly.
+- [x] 3.6 RED `AffirmityAppStateCatalogTest` (write routing, D14): `setTokenOverride("cat_…")` hits `catalogOverrides`, never `ready().affirmations`; `setTokenOverride(uuid)` unchanged; `removeAffirmation("cat_…")` performs **zero** repository calls (Remote-write-tombstone guard). Recording fakes, assert absence not just presence.
+- [x] 3.7 GREEN `data/AffirmityAppState.kt`: `Affirmation.source`/`collectionId`, `AffirmationSource` enum, `setTokenOverride` prefix routing, `removeAffirmation` early-return guard.
+- [x] 3.8 RED `AffirmityAppStateCatalogTest` `filteredAffirmations` test (D7): owned-row filter verbatim (regression, covered by existing `AffirmityAppStateFavoritesTest`); locked-collection catalog row absent; same row present for Pro tier; deselecting a group removes its catalog rows.
+- [x] 3.9 RED `AffirmityAppStateCatalogTest` `favoriteAffirmations` cross-space test (D10): personal + catalog id favorited together resolve in recency order; id in neither space drops out; **favorited catalog row whose collection is locked STILL appears** (pinned decision, Open Question 4).
+- [x] 3.10 GREEN `data/AffirmityAppState.kt`: `allAffirmations` concatenation, catalog collector (`catalog.observeByGroupIds` + `session.flatMapLatest { catalogOverrides.observeAll() }`), `filteredAffirmations` access filter, `favoriteAffirmations` merge.
+- [x] 3.11 RED `CatalogBackgroundsTest` (D4): deterministic per id across calls; ids within a universe span the palette; every universe id resolves.
+- [x] 3.12 GREEN `ui/affirmations/CatalogBackgrounds.kt`.
+- [x] 3.13 GREEN `firestore.rules`: 5 read-only catalog blocks (`catalogAffirmations`/`catalogUniverses`/`catalogThemes`/`catalogCollections`/`catalogMeta`, `allow read: if true; allow write: if false`) + owner-only `catalogOverrides` block.
+- [x] 3.14 RED (`npm run test:rules`): unauthenticated read of `catalogAffirmations` succeeds; any client write fails; `catalogOverrides` unreadable/unwritable cross-uid, owner read/write succeeds. (Spec: Shared Catalog Storage Path, Per-User Override Sync Surface). **Written, not executed** -- `firebase` CLI is not installed in this sandbox (`sh: firebase: command not found`), same class of environment blocker as PR1's 1.17/task-C.12 suites in `functions/test/firestore.rules.test.ts`.
+
+**PR3 carry-forward notes (recorded here, not silently fixed):**
+- `CatalogSeeder` (built in PR2) is still never invoked from app startup anywhere in `main/`. No task in Phase 1-3 assigns wiring it into `rememberAffirmityAppState`/`MainActivity`'s init path, so the bundled catalog will not actually populate `catalog_affirmations` on a real device yet. Flagged for whoever owns Phase 4/5 or a dedicated follow-up task -- this is NOT a PR3 regression, the gap pre-dates PR3.
+- Design D8's UI verification item ("`AffirmationCard` must render a blank subtitle without a layout gap") was inspected, not modified: `AffirmationsScreen.kt`'s `AffirmationCard` already guards the divider + subtitle `TokenizedAffirmationText` behind `if (affirmation.subtitle.isNotBlank())`, so an empty catalog subtitle already renders with zero layout gap. No code change needed. The formal on-device acceptance check remains task 5.10.1 in Phase 5.
 
 ## Phase 4: PR4 — Legacy group removal + default-selection fix + fixture repair
 
@@ -114,17 +118,19 @@ Chain strategy: feature-branch-chain
 - [ ] 5.7 **Badge-uniformity acceptance check (blocking, pre-merge):** inspect the generator's emitted `CATALOG_GATED_GROUP_IDS` value directly — confirm it is the *measured* set from `generate-catalog.mjs`, not hardcoded/assumed to be all-14. Record the actual set size in the PR description even if it is 14/14.
 - [ ] 5.8 GREEN `functions/tools/seedCatalog.ts` (new): Admin SDK, chunk at <=450 ops/batch, taxonomy first then affirmations, `catalogMeta/version` written last, idempotent `set(merge:true)`.
 - [ ] 5.9 RED/GREEN `functions/test/seedCatalog.test.ts` (vitest + Firestore emulator): chunk boundaries respected; marker is the last op of the last chunk; second run is a no-op-equivalent; mid-run abort leaves no marker.
-- [ ] 5.10 Manual/on-device acceptance (blocking, before merge, not provable by unit suite):
-  - [ ] 5.10.1 D8: catalog card with empty subtitle renders with no layout gap.
-  - [ ] 5.10.2 Cold-start seed of 2712 rows does not visibly block first paint.
-  - [ ] 5.10.3 15-row selector navigable, Aplicar reachable.
-  - [ ] 5.10.4 D19: partially-locked row shows badge, remains checkable, not dimmed.
-  - [ ] 5.10.5 D18: fresh install (cleared app data) opens with all 14 universes checked.
-  - [ ] 5.10.6 D16: watch ad on a `TIMED_REPEATABLE` collection -> unlocks; advance device clock past window -> re-locks and re-offers ad (not `LockedNeedsPro`); watch again -> second grant persists.
+- [ ] 5.10 **Gap found in PR3 review, unassigned until now:** `CatalogSeeder` (built in PR2) is never invoked anywhere in the app-startup path — the local `catalog_affirmations` Room table stays empty on a real device without this. RED: a startup-path test asserting `CatalogSeeder.seedIfNeeded()` (or equivalent) is invoked once, idempotently, on `AffirmityAppState` construction (or the earliest reasonable hook — e.g. `MainActivity.onCreate`/app `Application` class, verify the existing pattern for other one-time-on-launch work such as `FirestoreMigrator.ensureMigrated` and follow it). GREEN: wire the call. Must not block first paint (fire on a background coroutine, matching D2's cold-start requirement) and must be safe to call on every launch (idempotent via `CatalogPreferences.seededCatalogVersion`, per D13).
+- [ ] 5.11 Manual/on-device acceptance (blocking, before merge, not provable by unit suite):
+  - [ ] 5.11.1 D8: catalog card with empty subtitle renders with no layout gap.
+  - [ ] 5.11.2 Cold-start seed of 2712 rows does not visibly block first paint.
+  - [ ] 5.11.3 15-row selector navigable, Aplicar reachable.
+  - [ ] 5.11.4 D19: partially-locked row shows badge, remains checkable, not dimmed.
+  - [ ] 5.11.5 D18: fresh install (cleared app data) opens with all 14 universes checked.
+  - [ ] 5.11.6 D16: watch ad on a `TIMED_REPEATABLE` collection -> unlocks; advance device clock past window -> re-locks and re-offers ad (not `LockedNeedsPro`); watch again -> second grant persists.
+  - [ ] 5.11.7 5.10's seeder wiring actually populates `catalog_affirmations` on a real first launch (confirms 5.11.2/5.11.3/5.11.5 have real data behind them, not an empty table).
 
 ## Phase 6: Cross-cutting close-out (part of PR5)
 
 - [ ] 6.1 Confirm `AffirmationsScreen` received no new parameter (D9) — read-only verification, no code change expected.
 - [ ] 6.2 Confirm `FavoriteAffirmationDao`/`FavoriteAffirmationEntity`/`FavoriteAffirmationRepository` unmodified (D10) — read-only verification.
 - [ ] 6.3 Confirm no `MIGRATION_9_8` was added and `fallbackToDestructiveMigrationOnDowngrade` stays disabled (D15).
-- [ ] 6.4 Update proposal/spec reconciliation note: catalog ID scheme in `specs/affirmation-catalog/spec.md` still reads `cat_{universeSlug}_{themeSlug}_{nnn}`; implementation follows design D3 (`cat_` + verbatim dotted id). Flag for `sdd-archive` to reconcile the spec text with the shipped scheme.
+- [x] 6.4 Spec/design reconciliation — DONE during PR2/PR3 review, not deferred to archive: `specs/affirmation-catalog/spec.md`'s ID-scheme requirement corrected to `cat_` + verbatim dotted id (matches D3), and its access-resolution requirement corrected from theme-level to collection-level (matches D5, corrected after the PR2 fresh review found the drift).
