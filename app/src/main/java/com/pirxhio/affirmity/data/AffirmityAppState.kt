@@ -1376,8 +1376,11 @@ class AffirmityAppState(
         )
     }
 
-    /** Flips [groupId]'s membership in [draftGroupIds]. No-op for `alwaysSelected`/locked groups —
-     * the UI also disables them; this is defense in depth. */
+    /** Flips [groupId]'s membership in [draftGroupIds]. No-op for locked groups — the UI also
+     * disables them; this is defense in depth. `alwaysSelected` groups are toggleable as of a
+     * TEMPORARY dogfooding relaxation (see `GroupAccessPolicy.isToggleable`'s KDoc) -- this was
+     * previously "No-op for alwaysSelected/locked groups" and should read that way again if the
+     * relaxation is reverted. */
     fun toggleGroup(groupId: String, toggleable: Boolean) {
         if (!toggleable) return
         draftGroupIds.value = if (groupId in draftGroupIds.value) {
