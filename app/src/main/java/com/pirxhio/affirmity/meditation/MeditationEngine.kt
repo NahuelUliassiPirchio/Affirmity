@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.meditation
 
+import java.util.ArrayDeque
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -10,17 +11,19 @@ import kotlinx.coroutines.flow.asStateFlow
  * each transition. It never depends on a clock, on audio, or on any concrete meditation type —
  * see [SessionClock]/[TimerCommandExecutor] for how timing is bridged in as "just another command".
  *
- * [send] is synchronous and serialized with a plain monitor lock rather than a coroutine
- * channel/actor: every transition is a pure, non-suspending computation, so a lock is enough to
- * make concurrent callers (a UI click and a background timer tick arriving at the same time)
- * deterministic, and it keeps the engine testable with plain JUnit — no coroutine test dispatcher
- * needed (see MeditationEngineTest).
+ * [send] is synchronous and serialized with a monitor-protected event queue rather than a
+ * coroutine channel/actor: every transition is a pure, non-suspending computation. The queue also
+ * defers events emitted reentrantly by command executors until the current transition has finished,
+ * while keeping the engine testable with plain JUnit — no coroutine test dispatcher needed (see
+ * MeditationEngineTest).
  */
 class MeditationEngine(
     private val definition: MeditationDefinition,
     private val commandExecutor: MeditationCommandExecutor,
 ) {
     private val lock = Any()
+    private val pendingEvents = ArrayDeque<MeditationEvent>()
+    private var isProcessingEvents = false
 
     /** Root-to-parent path of the active [Phase]; null id path segments never happen because
      * [descend] always terminates at a [Phase]. Empty when no session is in flight. */
@@ -31,7 +34,19 @@ class MeditationEngine(
     val state: StateFlow<MeditationRuntimeState> = _state.asStateFlow()
 
     fun send(event: MeditationEvent) {
-        synchronized(lock) { processEvent(event) }
+        synchronized(lock) {
+            pendingEvents.addLast(event)
+            if (isProcessingEvents) return
+
+            isProcessingEvents = true
+            try {
+                while (pendingEvents.isNotEmpty()) {
+                    processEvent(pendingEvents.removeFirst())
+                }
+            } finally {
+                isProcessingEvents = false
+            }
+        }
     }
 
     private fun processEvent(event: MeditationEvent) {
