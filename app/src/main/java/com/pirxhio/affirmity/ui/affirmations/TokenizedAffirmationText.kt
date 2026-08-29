@@ -201,12 +201,18 @@ fun TokenizedAffirmationText(
             awaitEachGesture {
                 val down = awaitFirstDown(
                     requireUnconsumed = false,
-                    pass = PointerEventPass.Initial,
+                    pass = PointerEventPass.Main,
                 )
-                val offset = textLayoutResult?.getOffsetForPosition(down.position)
-                    ?: return@awaitEachGesture
+                val layout = textLayoutResult ?: return@awaitEachGesture
+                val offset = layout.getOffsetForPosition(down.position)
                 val token = clickableTokenRanges.firstOrNull { offset in it.start until it.end }
                     ?: return@awaitEachGesture
+                if (!layout.getBoundingBox(offset).contains(down.position)) {
+                    return@awaitEachGesture
+                }
+                // Run after the link handler, then stop the enclosing card's detector from
+                // treating this token gesture as another favorite double tap.
+                down.consume()
                 if (favoriteTapCoordinator.onPointerDown(token.key, down.uptimeMillis)) {
                     pendingEditKey = null
                 }

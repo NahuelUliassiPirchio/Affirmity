@@ -75,6 +75,24 @@ class FavoriteTapArbiterTest {
     }
 
     @Test
+    fun `cancelled second pointer down does not make the next token click a favorite toggle`() {
+        val coordinator = FavoriteTokenTapCoordinator()
+
+        coordinator.onPointerDown("k", 1_000L)
+        assertEquals(
+            TokenTapDecision.Wait("k", 300L),
+            coordinator.onTokenClick("k", callbackAtMillis = 1_050L),
+        )
+        coordinator.onPointerDown("k", 1_299L)
+        // The second gesture is cancelled, so its token click callback never arrives.
+        coordinator.onPointerDown("k", 1_600L)
+        assertEquals(
+            TokenTapDecision.Wait("k", 300L),
+            coordinator.onTokenClick("k", callbackAtMillis = 1_650L),
+        )
+    }
+
+    @Test
     fun `disabled favorite arbitration starts editing immediately on every token click`() {
         val coordinator = FavoriteTokenTapCoordinator(favoriteTapEnabled = false)
 
