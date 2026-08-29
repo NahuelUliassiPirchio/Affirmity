@@ -234,6 +234,44 @@ class AffirmityAppStateCatalogTest {
     }
 
     @Test
+    fun `a catalog favorite remains resolvable after its group is deselected`() = runTest {
+        val favorites = RecordingFavoritesRepository2()
+        val affirmations = RecordingAffirmationRepository2(initial = listOf(affirmationEntity("owned-1")))
+        val catalog = FakeCatalogAffirmationRepository(
+            listOf(catalogEntity(id = "cat_free.001", collectionId = FREE_COLLECTION_ID)),
+        )
+        val state = buildState(
+            backgroundScope,
+            affirmations = affirmations,
+            favorites = favorites,
+            catalog = catalog,
+            knownGroupIds = setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID),
+            groupPreferences = FixedGroupSelectionPreferences(setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID)),
+        )
+        runCurrent()
+        advanceUntilIdle()
+
+        state.toggleFavorite("cat_free.001")
+        runCurrent()
+        advanceUntilIdle()
+        assertTrue("cat_free.001" in state.favoriteAffirmations.map { it.id })
+
+        val stateAfterDeselection = buildState(
+            backgroundScope,
+            affirmations = affirmations,
+            favorites = favorites,
+            catalog = catalog,
+            knownGroupIds = setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID),
+            groupPreferences = FixedGroupSelectionPreferences(setOf(PERSONALIZADAS_GROUP_ID)),
+        )
+        runCurrent()
+        advanceUntilIdle()
+
+        assertTrue("cat_free.001" !in stateAfterDeselection.filteredAffirmations.map { it.id })
+        assertTrue("cat_free.001" in stateAfterDeselection.favoriteAffirmations.map { it.id })
+    }
+
+    @Test
     fun `an id in neither space drops out of favoriteAffirmations`() = runTest {
         val favorites = RecordingFavoritesRepository2(initialIds = listOf("orphan-cat-id"))
         val state = buildState(backgroundScope, favorites = favorites)

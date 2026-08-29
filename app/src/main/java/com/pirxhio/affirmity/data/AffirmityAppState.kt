@@ -391,8 +391,9 @@ class AffirmityAppState(
 ) {
     val affirmations = mutableStateListOf<Affirmation>()
 
-    /** Shared, read-only catalog rows currently in scope for the committed group selection
-     *  (design D9/D10), with per-user overrides already applied. */
+    /** Shared, read-only catalog rows across every known group (design D9/D10), with per-user
+     *  overrides already applied. The main feed applies committed-group scoping separately;
+     *  keeping this lookup unscoped lets favorites survive group deselection. */
     private val catalogAffirmations = mutableStateListOf<Affirmation>()
 
     /** Both ID spaces, for favorites resolution (design D10). Concatenation, never a SQL union --
@@ -740,10 +741,11 @@ class AffirmityAppState(
             // Two subscriptions with DELIBERATELY different lifetimes (design D9, revised): the
             // catalog rows survive an auth swap (byte-identical signed-in and signed-out); the
             // overrides half is session.flatMapLatest, matching every other per-user collector, so
-            // signing out drops the previous user's overrides atomically.
+            // signing out drops the previous user's overrides atomically. Catalog observation is
+            // deliberately unscoped so favorite resolution is independent of the feed selection;
+            // filteredAffirmations applies the committed group ids to the main feed.
             combine(
-                snapshotFlow { selectedGroupIds.value.orEmpty() }
-                    .flatMapLatest { catalog.observeByGroupIds(it) },
+                catalog.observeByGroupIds(knownGroupIds),
                 session.flatMapLatest { it.catalogOverrides.observeAll() },
             ) { rows, overrides -> rows to overrides }
                 .catch { error -> Log.e(TAG, "catalog flow failed", error) }
