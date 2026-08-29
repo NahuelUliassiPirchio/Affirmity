@@ -142,8 +142,8 @@ internal class GoogleRewardedAdGateway(
         )
     }
 
-    /** Resumes on DISMISS, never on the reward callback -- this is what guarantees the app never
-     *  resumes underneath a still-visible full-screen ad. */
+    /** Resumes on a terminal full-screen callback, never on the reward callback -- this is what
+     *  guarantees the app never resumes underneath a still-visible full-screen ad. */
     private suspend fun show(ad: RewardedAd, activity: Activity): RewardedAdResult =
         suspendCancellableCoroutine { continuation ->
             var earned = false
@@ -164,6 +164,9 @@ internal class GoogleRewardedAdGateway(
 
                 override fun onAdFailedToShowFullScreenContent(error: AdError) {
                     showFailure = error.message
+                    if (continuation.isActive) {
+                        continuation.resume(RewardedAdResult.ShowFailed(error.message))
+                    }
                 }
             }
 

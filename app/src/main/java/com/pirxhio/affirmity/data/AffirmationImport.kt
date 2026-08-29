@@ -18,6 +18,11 @@ data class ParsedAffirmation(
  * Pure/JVM-testable: no Android Context or DAO dependency. Throws
  * [IllegalArgumentException] with a user-presentable message on any structural problem; an empty
  * array is valid and yields an empty list.
+ *
+ * Authors MAY embed `[token]` bracket syntax in `title`/`subtitle` to mark a placeholder the user
+ * can tap and override (see [com.pirxhio.affirmity.data.AffirmationTemplateParser]). Brackets are
+ * NOT interpreted here — [ParsedAffirmation] carries the raw authored text unchanged; parsing into
+ * segments/tokens happens downstream, at render/save time, never during import.
  */
 fun parseAffirmationsJson(json: String): List<ParsedAffirmation> {
     val root = try {

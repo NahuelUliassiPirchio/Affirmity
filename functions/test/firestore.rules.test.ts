@@ -168,3 +168,231 @@ describe('firestore.rules: users/{uid}/adUnlocks/{contentKey}', () => {
     await assertFails(getDoc(doc(anonDb, `users/uid-owner/adUnlocks/${docId}`)));
   });
 });
+
+// [ENVIRONMENT-BLOCKED, written but not executed in this sandbox -- same JDK-21 blocker as the
+// adUnlocks suite above, task 1.17] Spec: "Repeating Time-Limited Ad Unlock" -- owner-only
+// read/create/UPDATE (unlike adUnlocks, which is create-only), closed field set, doc-id/field
+// agreement, expiresAtMillis strictly greater than grantedAtMillis, and no delete, ever
+// (design.md D16). Requires the Firestore emulator.
+describe('firestore.rules: users/{uid}/timedUnlocks/{contentKey}', () => {
+  let testEnv: RulesTestEnvironment;
+
+  beforeAll(async () => {
+    testEnv = await initializeTestEnvironment({
+      projectId: 'demo-affirmity-rules-test',
+      firestore: {
+        rules: readFileSync(resolve(__dirname, '../../firestore.rules'), 'utf8'),
+        host: '127.0.0.1',
+        port: 8080,
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await testEnv?.cleanup();
+  });
+
+  const wellShapedGrant = {
+    contentType: 'affirmationGroup',
+    contentId: 'fuerza_de_voluntad',
+    grantedAtMillis: 1_755_216_000_000,
+    expiresAtMillis: 1_755_302_400_000,
+  };
+  const docId = 'affirmationGroup_fuerza_de_voluntad';
+
+  it('1. owner creates a well-shaped grant -> succeeds', async () => {
+    const ownerDb = testEnv.authenticatedContext('uid-owner').firestore();
+    await assertSucceeds(
+      setDoc(doc(ownerDb, `users/uid-owner/timedUnlocks/${docId}`), wellShapedGrant),
+    );
+  });
+
+  it('2. owner UPDATING an existing grant (re-earning after expiry) -> succeeds, unlike adUnlocks', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `users/uid-owner/timedUnlocks/${docId}`), wellShapedGrant);
+    });
+
+    const ownerDb = testEnv.authenticatedContext('uid-owner').firestore();
+    await assertSucceeds(
+      setDoc(doc(ownerDb, `users/uid-owner/timedUnlocks/${docId}`), {
+        ...wellShapedGrant,
+        grantedAtMillis: 9_000_000_000_000,
+        expiresAtMillis: 9_086_400_000_000,
+      }),
+    );
+  });
+
+  it('3. doc id disagreeing with contentType/contentId -> fails', async () => {
+    const ownerDb = testEnv.authenticatedContext('uid-owner').firestore();
+    await assertFails(
+      setDoc(doc(ownerDb, 'users/uid-owner/timedUnlocks/meditation_calma'), wellShapedGrant),
+    );
+  });
+
+  it('4. unknown extra field -> fails', async () => {
+    const ownerDb = testEnv.authenticatedContext('uid-owner').firestore();
+    await assertFails(
+      setDoc(doc(ownerDb, `users/uid-owner/timedUnlocks/${docId}`), {
+        ...wellShapedGrant,
+        extra: 'nope',
+      }),
+    );
+  });
+
+  it('5. missing expiresAtMillis -> fails (non-null here, unlike adUnlocks)', async () => {
+    const ownerDb = testEnv.authenticatedContext('uid-owner').firestore();
+    const { expiresAtMillis: _omit, ...withoutExpiry } = wellShapedGrant;
+    await assertFails(
+      setDoc(doc(ownerDb, `users/uid-owner/timedUnlocks/${docId}`), withoutExpiry),
+    );
+  });
+
+  it('6. expiresAtMillis <= grantedAtMillis -> fails', async () => {
+    const ownerDb = testEnv.authenticatedContext('uid-owner').firestore();
+    await assertFails(
+      setDoc(doc(ownerDb, `users/uid-owner/timedUnlocks/${docId}`), {
+        ...wellShapedGrant,
+        expiresAtMillis: wellShapedGrant.grantedAtMillis,
+      }),
+    );
+  });
+
+  it('7. owner deleting an existing grant -> fails', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `users/uid-owner/timedUnlocks/${docId}`), wellShapedGrant);
+    });
+
+    const ownerDb = testEnv.authenticatedContext('uid-owner').firestore();
+    await assertFails(deleteDoc(doc(ownerDb, `users/uid-owner/timedUnlocks/${docId}`)));
+  });
+
+  it('8. a different uid create/read under this uid -> fails', async () => {
+    const otherDb = testEnv.authenticatedContext('uid-other').firestore();
+    await assertFails(
+      setDoc(doc(otherDb, `users/uid-owner/timedUnlocks/${docId}`), wellShapedGrant),
+    );
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `users/uid-owner/timedUnlocks/${docId}`), wellShapedGrant);
+    });
+    await assertFails(getDoc(doc(otherDb, `users/uid-owner/timedUnlocks/${docId}`)));
+  });
+
+  it('9. unauthenticated create/read -> fails', async () => {
+    const anonDb = testEnv.unauthenticatedContext().firestore();
+    await assertFails(
+      setDoc(doc(anonDb, `users/uid-owner/timedUnlocks/${docId}`), wellShapedGrant),
+    );
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `users/uid-owner/timedUnlocks/${docId}`), wellShapedGrant);
+    });
+    await assertFails(getDoc(doc(anonDb, `users/uid-owner/timedUnlocks/${docId}`)));
+  });
+});
+
+// Regression guard (task 1.17): the existing adUnlocks suite above must still pass byte-for-byte
+// -- this new timedUnlocks block must not weaken users/{uid}/adUnlocks' update/delete-denied
+// guarantee. No new assertions needed here: the `firestore.rules: users/{uid}/adUnlocks/{contentKey}`
+// describe block above is untouched and re-runs unchanged.
+
+// [ENVIRONMENT-BLOCKED, written but not executed in this sandbox -- the `firebase` CLI is not
+// installed here, so `npm run test:rules` cannot start the emulator] Spec: "Shared Catalog
+// Storage Path" -- world-readable, client-write-denied on all 5 shared catalog collections
+// (design D1/D2/D12/task 3.13).
+describe('firestore.rules: shared catalog collections', () => {
+  let testEnv: RulesTestEnvironment;
+
+  beforeAll(async () => {
+    testEnv = await initializeTestEnvironment({
+      projectId: 'demo-affirmity-rules-test',
+      firestore: {
+        rules: readFileSync(resolve(__dirname, '../../firestore.rules'), 'utf8'),
+        host: '127.0.0.1',
+        port: 8080,
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await testEnv?.cleanup();
+  });
+
+  const collections = [
+    'catalogAffirmations',
+    'catalogUniverses',
+    'catalogThemes',
+    'catalogCollections',
+  ];
+
+  for (const collection of collections) {
+    it(`allows an unauthenticated read of ${collection}`, async () => {
+      const anonDb = testEnv.unauthenticatedContext().firestore();
+      await assertSucceeds(getDoc(doc(anonDb, `${collection}/some-id`)));
+    });
+
+    it(`denies any client write to ${collection}, even by an authenticated user`, async () => {
+      const ownerDb = testEnv.authenticatedContext('uid-owner').firestore();
+      await assertFails(setDoc(doc(ownerDb, `${collection}/some-id`), { text: 'hacked' }));
+    });
+  }
+
+  it('allows an unauthenticated read of the catalogMeta version marker', async () => {
+    const anonDb = testEnv.unauthenticatedContext().firestore();
+    await assertSucceeds(getDoc(doc(anonDb, 'catalogMeta/version')));
+  });
+
+  it('denies a client write to the catalogMeta version marker', async () => {
+    const ownerDb = testEnv.authenticatedContext('uid-owner').firestore();
+    await assertFails(setDoc(doc(ownerDb, 'catalogMeta/version'), { version: '9.9.9' }));
+  });
+});
+
+// [ENVIRONMENT-BLOCKED, written but not executed in this sandbox -- same missing-`firebase`-CLI
+// blocker as the suite above] Spec: "Per-User Override Sync Surface" -- owner-only read/write, cross-uid
+// and unauthenticated access denied (design D9/task 3.13).
+describe('firestore.rules: users/{uid}/catalogOverrides/{catalogAffirmationId}', () => {
+  let testEnv: RulesTestEnvironment;
+
+  beforeAll(async () => {
+    testEnv = await initializeTestEnvironment({
+      projectId: 'demo-affirmity-rules-test',
+      firestore: {
+        rules: readFileSync(resolve(__dirname, '../../firestore.rules'), 'utf8'),
+        host: '127.0.0.1',
+        port: 8080,
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await testEnv?.cleanup();
+  });
+
+  const docId = 'cat_self_worth.feeling_enough.intrinsic_worth.001';
+  const overridePayload = { overrides: { name: 'Alex' } };
+
+  it('owner can read and write their own override doc', async () => {
+    const ownerDb = testEnv.authenticatedContext('uid-owner').firestore();
+    await assertSucceeds(
+      setDoc(doc(ownerDb, `users/uid-owner/catalogOverrides/${docId}`), overridePayload),
+    );
+    await assertSucceeds(getDoc(doc(ownerDb, `users/uid-owner/catalogOverrides/${docId}`)));
+  });
+
+  it('a different uid cannot read or write another owner\'s override doc', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `users/uid-owner/catalogOverrides/${docId}`), overridePayload);
+    });
+
+    const otherDb = testEnv.authenticatedContext('uid-other').firestore();
+    await assertFails(getDoc(doc(otherDb, `users/uid-owner/catalogOverrides/${docId}`)));
+    await assertFails(setDoc(doc(otherDb, `users/uid-owner/catalogOverrides/${docId}`), overridePayload));
+  });
+
+  it('an unauthenticated client cannot read or write an override doc', async () => {
+    const anonDb = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(anonDb, `users/uid-owner/catalogOverrides/${docId}`)));
+    await assertFails(setDoc(doc(anonDb, `users/uid-owner/catalogOverrides/${docId}`), overridePayload));
+  });
+});

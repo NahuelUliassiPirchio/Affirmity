@@ -22,6 +22,13 @@ private const val FIELD_SUBTITLE = "subtitle"
 private const val FIELD_BACKGROUND_TYPE = "backgroundType"
 private const val FIELD_BACKGROUND_VALUE = "backgroundValue"
 private const val FIELD_GROUP_ID = "groupId"
+const val FIELD_OVERRIDES = "overrides"
+
+/** Every known field on an affirmation doc — the mergeFields allow-list for writes (design.md D5). */
+val AFFIRMATION_FIELDS = arrayOf(
+    FIELD_ID, FIELD_TITLE, FIELD_SUBTITLE, FIELD_BACKGROUND_TYPE,
+    FIELD_BACKGROUND_VALUE, FIELD_GROUP_ID, FIELD_OVERRIDES,
+)
 
 fun affirmationToMap(entity: AffirmationEntity): Map<String, Any> = mapOf(
     FIELD_ID to entity.id,
@@ -30,6 +37,7 @@ fun affirmationToMap(entity: AffirmationEntity): Map<String, Any> = mapOf(
     FIELD_BACKGROUND_TYPE to entity.backgroundType,
     FIELD_BACKGROUND_VALUE to entity.backgroundValue,
     FIELD_GROUP_ID to entity.groupId,
+    FIELD_OVERRIDES to sanitizedOverrides(entity.overrides),
 )
 
 fun affirmationFromMap(map: Map<String, Any?>): AffirmationEntity = AffirmationEntity(
@@ -39,7 +47,26 @@ fun affirmationFromMap(map: Map<String, Any?>): AffirmationEntity = AffirmationE
     backgroundType = map[FIELD_BACKGROUND_TYPE] as String,
     backgroundValue = map[FIELD_BACKGROUND_VALUE] as String,
     groupId = map[FIELD_GROUP_ID] as? String ?: PERSONALIZADAS_GROUP_ID,
+    // Legacy docs written before this change have no `overrides` field -> empty map, never null.
+    overrides = (map[FIELD_OVERRIDES] as? Map<*, *>)
+        ?.mapNotNull { (k, v) -> (k as? String)?.let { key -> (v as? String)?.takeIf(String::isNotBlank)?.let { key to it } } }
+        ?.toMap()
+        .orEmpty(),
 )
+
+/** Never persists a blank value (spec: "no empty override MUST be persisted"). */
+private fun sanitizedOverrides(overrides: Map<String, String>): Map<String, String> =
+    overrides.filterValues { it.isNotBlank() }
+
+/**
+ * Whole-field replacement payload for the overrides map. MUST be written with
+ * `SetOptions.mergeFields(FIELD_OVERRIDES)` — plain `SetOptions.merge()` deep-merges nested maps
+ * and would silently resurrect a deleted override key (design.md D4). The field is always
+ * PRESENT (possibly as an empty map), never omitted, so "delete every override" is an explicit,
+ * testable write.
+ */
+fun overridesWritePayload(overrides: Map<String, String>): Map<String, Any> =
+    mapOf(FIELD_OVERRIDES to sanitizedOverrides(overrides))
 
 private const val FIELD_EPOCH_DAY = "epochDay"
 private const val FIELD_MEDITATION_DONE = "meditationDone"

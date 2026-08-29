@@ -6,7 +6,13 @@ package com.pirxhio.affirmity.access
 enum class ContentType(val wireName: String) {
     AFFIRMATION_GROUP("affirmationGroup"),
     MEDITATION("meditation"),
-    CUSTOM_AFFIRMATION_SLOT("customAffirmationSlot");
+    CUSTOM_AFFIRMATION_SLOT("customAffirmationSlot"),
+
+    /** Collection-level gating for the curated catalog (design D5). The source declares
+     *  `access { tier, rewardedUnlockHours }` on COLLECTIONS, never on themes. `wireName` has no
+     *  `_` -- the class invariant above is load-bearing here because catalog collection ids are
+     *  dotted AND underscored (`self_worth.feeling_enough.intrinsic_worth`). */
+    AFFIRMATION_COLLECTION("affirmationCollection");
 
     companion object {
         fun fromWireName(wireName: String): ContentType? = entries.firstOrNull { it.wireName == wireName }

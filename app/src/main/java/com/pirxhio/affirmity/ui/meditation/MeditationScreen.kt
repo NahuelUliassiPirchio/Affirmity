@@ -96,18 +96,15 @@ fun MeditationScreen(
      *  `content_locked_tapped` from the Discover list. */
     onEvent: (AnalyticsEvent) -> Unit = {},
 ) {
-    // Keyed on initialDurationSeconds so that when the persisted value arrives asynchronously
-    // (DataStore's first read completes after this composable's initial composition), the
-    // screen picks it up instead of being stuck on the fallback default.
-    var durationSeconds by remember(initialDurationSeconds) { mutableIntStateOf(initialDurationSeconds) }
-    var secondsRemaining by remember(initialDurationSeconds) { mutableIntStateOf(durationSeconds) }
+    var durationSeconds by remember { mutableIntStateOf(initialDurationSeconds) }
+    var secondsRemaining by remember { mutableIntStateOf(initialDurationSeconds) }
     var isRunning by remember { mutableStateOf(false) }
     // Tracks first-start vs. resume-from-pause, since RealSessionClock.start() resets the
     // accumulated elapsed time while resume() continues it.
-    var hasStarted by remember(initialDurationSeconds) { mutableStateOf(false) }
+    var hasStarted by remember { mutableStateOf(false) }
     // Wall-clock instant of the first Start press, for DayClock.attributedEpochDay -- not touched
     // on resume, only on a fresh start (mirrors hasStarted).
-    var sessionStartWallMillis by remember(initialDurationSeconds) { mutableStateOf<Long?>(null) }
+    var sessionStartWallMillis by remember { mutableStateOf<Long?>(null) }
     var selectedPreset by remember { mutableStateOf<String?>(null) }
     val presets = listOf(
         stringResource(R.string.meditation_preset_relax) to 5 * 60,
@@ -123,6 +120,16 @@ fun MeditationScreen(
 
     val scope = rememberCoroutineScope()
     val clock = remember { RealSessionClock(scope = scope, timeSource = AndroidMonotonicTimeSource) }
+
+    // Pick up the asynchronously hydrated DataStore value only while no session is active. Once
+    // Start has been pressed, the duration and all state tied to this clock must remain one
+    // coherent session, including while paused.
+    LaunchedEffect(initialDurationSeconds) {
+        if (!hasStarted) {
+            durationSeconds = initialDurationSeconds
+            secondsRemaining = initialDurationSeconds
+        }
+    }
 
     // Timestamp-based, not tick-counted: while the phone is locked, Android throttles this
     // coroutine's scheduling (Doze, no wake lock held), so a "delay(1000); secondsRemaining -= 1"
@@ -429,7 +436,7 @@ private fun MeditationDiscoverCard(
                     color = MaterialTheme.colorScheme.outline,
                 )
             } else if (locked) {
-                IconButton(onClick = onLockedTap) {
+                IconButton(onClick = onRowClick) {
                     Icon(
                         imageVector = Icons.Filled.Lock,
                         contentDescription = stringResource(

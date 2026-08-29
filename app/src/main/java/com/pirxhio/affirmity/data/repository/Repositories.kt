@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.data.repository
 import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.access.AdUnlockRecord
 import com.pirxhio.affirmity.data.local.AffirmationEntity
+import com.pirxhio.affirmity.data.local.CatalogAffirmationEntity
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
@@ -11,6 +12,7 @@ import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 
 /**
  * Store-agnostic contract for affirmation persistence. Implementations exist for Room
@@ -22,6 +24,32 @@ interface AffirmationRepository {
     suspend fun insert(entity: AffirmationEntity)
     suspend fun deleteById(id: String)
     suspend fun deleteAll()
+
+    /**
+     * Replaces the ENTIRE override map for [id] with [overrides]. Whole-map replacement, not a
+     * patch: a key absent from [overrides] is deleted from the store. Callers pass the complete
+     * desired map (design.md D8). A blank value is never persisted.
+     */
+    suspend fun setOverrides(id: String, overrides: Map<String, String>)
+}
+
+/** Device-local favorites contract. Deliberately outside [DataSession] until remote sync exists. */
+interface FavoriteAffirmationRepository {
+    /** Favorite ids ordered most recently favorited first. */
+    fun observeFavoriteIds(): Flow<List<String>>
+
+    suspend fun isFavorite(id: String): Boolean
+    suspend fun add(id: String, favoritedAtMillis: Long)
+    suspend fun remove(id: String)
+    suspend fun clear()
+}
+
+object NoOpFavoriteAffirmationRepository : FavoriteAffirmationRepository {
+    override fun observeFavoriteIds(): Flow<List<String>> = flowOf(emptyList())
+    override suspend fun isFavorite(id: String): Boolean = false
+    override suspend fun add(id: String, favoritedAtMillis: Long) = Unit
+    override suspend fun remove(id: String) = Unit
+    override suspend fun clear() = Unit
 }
 
 /** Store-agnostic contract for the daily habit-completion tracker (streak source of truth). */
@@ -113,4 +141,49 @@ interface AdUnlockRepository {
     /** Idempotent. A second call for an existing [AdUnlockRecord.key] is a silent no-op, not an
      *  overwrite. */
     suspend fun grantDurableUnlock(record: AdUnlockRecord)
+
+    /** [com.pirxhio.affirmity.access.AdUnlockPolicy.TIMED_REPEATABLE] grants, mirrored into a
+     *  SEPARATE store from [observeDurableUnlocks]/[grantDurableUnlock] (design D16). */
+    fun observeTimedUnlocks(): Flow<List<AdUnlockRecord>>
+
+    /** UPSERT, unlike [grantDurableUnlock]: re-earning after expiry replaces
+     *  `grantedAt`/`expiresAt`. */
+    suspend fun grantTimedUnlock(record: AdUnlockRecord)
+}
+
+/**
+ * Read-only contract for the shared catalog cache (design D9). Deliberately OUTSIDE
+ * [DataSession]: the catalog is not per-user -- it is byte-identical signed-in and signed-out --
+ * so it has no sign-in/sign-out swap semantics to participate in, and `DataSession.Remote`'s
+ * "backed exclusively by Firestore" contract would be a lie. There is no write method: seeding
+ * goes through `CatalogSeeder` against the DAO directly, never through this interface.
+ */
+interface CatalogAffirmationRepository {
+    fun observeByGroupIds(groupIds: Set<String>): Flow<List<CatalogAffirmationEntity>>
+    suspend fun getByIds(ids: List<String>): List<CatalogAffirmationEntity>
+}
+
+object NoOpCatalogAffirmationRepository : CatalogAffirmationRepository {
+    override fun observeByGroupIds(groupIds: Set<String>): Flow<List<CatalogAffirmationEntity>> = flowOf(emptyList())
+    override suspend fun getByIds(ids: List<String>): List<CatalogAffirmationEntity> = emptyList()
+}
+
+/**
+ * Per-user overrides on shared catalog rows (design D9, revised). Unlike
+ * [CatalogAffirmationRepository] this IS a [DataSession] member: overrides are per-user, so they
+ * DO have sign-in/sign-out swap semantics, selected the same way [AffirmationRepository] is
+ * (Room for [DataSession.Local], Firestore for [DataSession.Remote]).
+ */
+interface CatalogOverrideRepository {
+    /** Keyed by `catalogAffirmationId`. Absent key == no overrides for that row. */
+    fun observeAll(): Flow<Map<String, Map<String, String>>>
+
+    /** Whole-map replacement, matching [AffirmationRepository.setOverrides]. An empty map deletes
+     *  the stored row rather than persisting `{}` (design.md "Persistence -- DAOs"). */
+    suspend fun setOverrides(catalogAffirmationId: String, overrides: Map<String, String>)
+}
+
+object NoOpCatalogOverrideRepository : CatalogOverrideRepository {
+    override fun observeAll(): Flow<Map<String, Map<String, String>>> = flowOf(emptyMap())
+    override suspend fun setOverrides(catalogAffirmationId: String, overrides: Map<String, String>) = Unit
 }

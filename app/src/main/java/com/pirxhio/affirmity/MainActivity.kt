@@ -68,6 +68,7 @@ import com.pirxhio.affirmity.analytics.PaywallPlan
 import com.pirxhio.affirmity.analytics.PaywallSource
 import com.pirxhio.affirmity.analytics.provenance
 import com.pirxhio.affirmity.data.AdRequestNotice
+import com.pirxhio.affirmity.data.Affirmation
 import com.pirxhio.affirmity.data.GuideGateResolution
 import com.pirxhio.affirmity.data.MOOD_MAX
 import com.pirxhio.affirmity.data.rememberAffirmityAppState
@@ -76,9 +77,11 @@ import com.pirxhio.affirmity.meditation.SessionEndReason
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
 import com.pirxhio.affirmity.ui.components.FloatingStatusOverlay
+import com.pirxhio.affirmity.ui.favorites.FavoritesScreen
 import com.pirxhio.affirmity.ui.groups.AffirmationGroupSelectorSheet
 import com.pirxhio.affirmity.ui.groups.groupAccessDecision
 import com.pirxhio.affirmity.ui.groups.isToggleable
+import com.pirxhio.affirmity.ui.groups.partiallyLockedGroupIds
 import com.pirxhio.affirmity.ui.groups.selectableAffirmationGroups
 import com.pirxhio.affirmity.ui.healer.StreakHealerGrantedScreen
 import com.pirxhio.affirmity.ui.meditation.GuidedMeditationScreen
@@ -237,6 +240,7 @@ fun AffirmityApp(
     var showOnboardingGuide by rememberSaveable { mutableStateOf(false) }
     var showNotificationDebug by rememberSaveable { mutableStateOf(false) }
     var showMyAffirmations by rememberSaveable { mutableStateOf(false) }
+    var showFavorites by rememberSaveable { mutableStateOf(false) }
     // REQ-5.4: replaces the old single-demo boolean. Holds a MeditationCatalogEntry.id so the
     // guided session route is parameterized on which entry to play, not just whether to show one.
     var selectedMeditationEntryId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -429,10 +433,26 @@ fun AffirmityApp(
                     appState.importAffirmationsFromJson(json, replace)
                 },
                 onDeleteAffirmation = { id -> appState.removeAffirmation(id) },
+                onOverrideCommitted = appState::setTokenOverride,
                 onUpgradeClick = { onUpgradeClick(PaywallSource.MY_AFFIRMATIONS) },
                 onEvent = appState::logAnalyticsEvent,
             )
         }
+        PaywallHost(
+            source = paywallSource,
+            onDismiss = { paywallSource = null },
+            snackbarScope = snackbarScope,
+            emit = appState::logAnalyticsEvent,
+        )
+        return
+    }
+
+    if (showFavorites) {
+        FavoritesOverlay(
+            favorites = appState.favoriteAffirmations,
+            onUnfavorite = appState::removeFavorite,
+            onDismiss = { showFavorites = false },
+        )
         PaywallHost(
             source = paywallSource,
             onDismiss = { paywallSource = null },
@@ -458,7 +478,9 @@ fun AffirmityApp(
         )
         if (isBlocked) {
             // Unknown/removed/newly-locked entry (REQ-5.4.3, EC-4): fall through instead of ever
-            // composing GuidedMeditationScreen for gated content.
+            // composing GuidedMeditationScreen for gated content. If this removes an already
+            // composed session, that screen's disposal invokes its shared requestExit path before
+            // releasing audio so cancellation bookkeeping is preserved.
             LaunchedEffect(selectedMeditationEntry.id) { selectedMeditationEntryId = null }
         } else {
             val backDispatcherOwner = LocalOnBackPressedDispatcherOwner.current
@@ -491,12 +513,15 @@ fun AffirmityApp(
                 GuidedMeditationScreen(
                     entry = selectedMeditationEntry,
                     modifier = Modifier.padding(innerPadding),
-                    access = meditationAccessDecision(
-                        selectedMeditationEntry,
-                        appState.entitlementTier.value,
-                        appState.adUnlockState,
-                        System.currentTimeMillis(),
-                    ),
+                    accessAtStart = {
+                        meditationAccessDecision(
+                            selectedMeditationEntry,
+                            appState.entitlementTier.value,
+                            appState.adUnlockState,
+                            System.currentTimeMillis(),
+                        )
+                    },
+                    onAccessBlocked = { selectedMeditationEntryId = null },
                     // The streak-bug fix (REQ-5.6): guided completion now calls the same
                     // recordMeditationCompleted() the free timer already calls at its own call
                     // site. consumeMeditationPlaybackUnlock runs for BOTH terminal reasons (an ad
@@ -680,6 +705,15 @@ fun AffirmityApp(
                     )
                     val scaffoldState = rememberBottomSheetScaffoldState(bottomSheetState = sheetState)
                     val sheetScope = rememberCoroutineScope()
+                    // Recomputed ONLY when the entitlement tier or the grant state changes -- not
+                    // per recomposition, and never per row (design D19).
+                    val partiallyLockedIds = remember(appState.entitlementTier.value, appState.adUnlockState) {
+                        partiallyLockedGroupIds(
+                            appState.entitlementTier.value,
+                            appState.adUnlockState,
+                            System.currentTimeMillis(),
+                        )
+                    }
 
                     BottomSheetScaffold(
                         scaffoldState = scaffoldState,
@@ -723,6 +757,7 @@ fun AffirmityApp(
                                         sheetState.expand()
                                     }
                                 },
+                                onFavoritesClick = { showFavorites = true },
                                 onAddCustomClick = { showMyAffirmations = true },
                                 onWatchAd = { group, policy ->
                                     appState.requestAdUnlock(
@@ -736,12 +771,16 @@ fun AffirmityApp(
                                 },
                                 anyAdInFlight = appState.adRequestInFlight.value != null,
                                 onEvent = appState::logAnalyticsEvent,
+                                partiallyLockedIds = partiallyLockedIds,
                             )
                         },
                     ) {
                         AffirmationsScreen(
                             affirmations = appState.filteredAffirmations,
-                            onAffirmationViewed = { appState.recordAffirmationViewed() }
+                            onAffirmationViewed = { appState.recordAffirmationViewed() },
+                            onOverrideCommitted = appState::setTokenOverride,
+                            favoriteIds = appState.favoriteAffirmationIds.value,
+                            onToggleFavorite = appState::toggleFavorite,
                         )
                     }
                 }
@@ -817,6 +856,39 @@ fun AffirmityApp(
         snackbarScope = snackbarScope,
         emit = appState::logAnalyticsEvent,
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FavoritesOverlay(
+    favorites: List<Affirmation>,
+    onUnfavorite: (affirmationId: String) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    BackHandler(onBack = onDismiss)
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.favorites_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.nav_back_content_description),
+                        )
+                    }
+                },
+            )
+        },
+    ) { innerPadding ->
+        FavoritesScreen(
+            favorites = favorites,
+            onUnfavorite = onUnfavorite,
+            modifier = Modifier.padding(innerPadding),
+        )
+    }
 }
 
 /** Extracted from the bottom of [AffirmityApp] (D5): the original `if (showPaywall)` block lived

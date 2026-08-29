@@ -38,5 +38,15 @@ fun resolveAccess(
                 else -> AccessDecision.LockedNeedsPro
             }
         }
+
+        AdUnlockPolicy.TIMED_REPEATABLE -> {
+            val record = grants.timedUnlocks[key] // separate map, separate store (design D16)
+            when {
+                record == null -> AccessDecision.LockedAdUnlockable(AdUnlockPolicy.TIMED_REPEATABLE)
+                !record.hasExpired(nowMillis) -> AccessDecision.UnlockedByAd(AdUnlockPolicy.TIMED_REPEATABLE)
+                // THE ONE LINE that differs from ONE_TIME_TRIAL: expired means re-earnable, not spent.
+                else -> AccessDecision.LockedAdUnlockable(AdUnlockPolicy.TIMED_REPEATABLE)
+            }
+        }
     }
 }

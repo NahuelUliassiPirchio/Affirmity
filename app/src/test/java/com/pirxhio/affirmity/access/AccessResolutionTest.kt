@@ -245,6 +245,64 @@ class AccessResolutionTest {
     // (key, content, userTier, grants, nowMillis) tuple is identical. Covered by this file's
     // purity/no-side-effect posture; no dedicated test needed beyond what's already asserted above.
 
+    // --- not entitled, adUnlock = TIMED_REPEATABLE (design D16) ------------------------------
+
+    @Test
+    fun `FREE user, TIMED_REPEATABLE content, no record yields LockedAdUnlockable`() {
+        val decision = resolveAccess(
+            key = key,
+            content = ContentAccess.ProOrAdTimed(24),
+            userTier = AccessTier.FREE,
+            grants = AdUnlockState(),
+            nowMillis = 1_000L,
+        )
+        assertEquals(AccessDecision.LockedAdUnlockable(AdUnlockPolicy.TIMED_REPEATABLE), decision)
+    }
+
+    @Test
+    fun `FREE user, TIMED_REPEATABLE content, live record yields UnlockedByAd`() {
+        val record = AdUnlockRecord(key, grantedAtMillis = 500L, expiresAtMillis = 10_000L)
+        val decision = resolveAccess(
+            key = key,
+            content = ContentAccess.ProOrAdTimed(24),
+            userTier = AccessTier.FREE,
+            grants = AdUnlockState(timedUnlocks = mapOf(key to record)),
+            nowMillis = 1_000L,
+        )
+        assertEquals(AccessDecision.UnlockedByAd(AdUnlockPolicy.TIMED_REPEATABLE), decision)
+    }
+
+    @Test
+    fun `FREE user, TIMED_REPEATABLE content, expired record yields LockedAdUnlockable again -- re-earnable, not spent`() {
+        val record = AdUnlockRecord(key, grantedAtMillis = 0L, expiresAtMillis = 5_000L)
+        val decision = resolveAccess(
+            key = key,
+            content = ContentAccess.ProOrAdTimed(24),
+            userTier = AccessTier.FREE,
+            grants = AdUnlockState(timedUnlocks = mapOf(key to record)),
+            nowMillis = 5_000L, // exactly at expiry
+        )
+        assertEquals(
+            "an expired TIMED_REPEATABLE grant must re-offer the ad, unlike a spent ONE_TIME_TRIAL",
+            AccessDecision.LockedAdUnlockable(AdUnlockPolicy.TIMED_REPEATABLE),
+            decision,
+        )
+        assertTrue(decision.offersAdUnlock)
+    }
+
+    @Test
+    fun `TIMED_REPEATABLE boundary -- now equal to expiresAtMillis is expired`() {
+        val record = AdUnlockRecord(key, grantedAtMillis = 0L, expiresAtMillis = 5_000L)
+        val decision = resolveAccess(
+            key = key,
+            content = ContentAccess.ProOrAdTimed(24),
+            userTier = AccessTier.FREE,
+            grants = AdUnlockState(timedUnlocks = mapOf(key to record)),
+            nowMillis = 4_999L,
+        )
+        assertEquals(AccessDecision.UnlockedByAd(AdUnlockPolicy.TIMED_REPEATABLE), decision)
+    }
+
     // --- ContentAccess companions sanity (used throughout this file) --------------------------
 
     @Test

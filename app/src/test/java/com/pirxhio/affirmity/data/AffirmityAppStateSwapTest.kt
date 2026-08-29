@@ -97,6 +97,7 @@ private class FakeAffirmationRepository(
     override suspend fun deleteAll() {
         deleteAllCallCount++
     }
+    override suspend fun setOverrides(id: String, overrides: Map<String, String>) = Unit
 }
 
 private class FakeDailyCompletionRepository(
@@ -179,9 +180,12 @@ private class FakeEntitlementRepository(
  * (task E.4) rather than duplicated. */
 class FakeAdUnlockRepository(
     initial: List<AdUnlockRecord> = emptyList(),
+    initialTimed: List<AdUnlockRecord> = emptyList(),
 ) : AdUnlockRepository {
     private val state = MutableStateFlow(initial)
+    private val timedState = MutableStateFlow(initialTimed)
     val granted = CopyOnWriteArrayList<AdUnlockRecord>()
+    val timedGranted = CopyOnWriteArrayList<AdUnlockRecord>()
     override fun observeDurableUnlocks(): Flow<List<AdUnlockRecord>> = state
     override suspend fun getDurableUnlocks(): List<AdUnlockRecord> = state.value
     override suspend fun grantDurableUnlock(record: AdUnlockRecord) {
@@ -189,6 +193,15 @@ class FakeAdUnlockRepository(
             state.value = state.value + record
             granted += record
         }
+    }
+
+    override fun observeTimedUnlocks(): Flow<List<AdUnlockRecord>> = timedState
+
+    /** UPSERT, unlike [grantDurableUnlock] -- mirrors the real repositories' TIMED_REPEATABLE
+     *  semantics (design D16). */
+    override suspend fun grantTimedUnlock(record: AdUnlockRecord) {
+        timedState.value = timedState.value.filterNot { it.key == record.key } + record
+        timedGranted += record
     }
 }
 
@@ -468,7 +481,12 @@ class AffirmityAppStateSwapTest {
         val local = fakeLocal(events, id = "local-swap")
         val authRepository = FakeAuthRepository()
         val scope = CoroutineScope(Dispatchers.Unconfined)
-        val groupPreferences = FakeGroupSelectionPreferences(initial = setOf("bienestar"))
+        // "personalizadas" included explicitly: it's no longer force-re-added to an
+        // otherwise-healthy persisted selection (see resolveSelectedGroupIds's KDoc), and both
+        // fixture affirmations below default to groupId=personalizadas -- this test verifies
+        // session-swap correctness via their presence/absence, which needs personalizadas
+        // selected regardless of that unrelated change.
+        val groupPreferences = FakeGroupSelectionPreferences(initial = setOf("bienestar", "personalizadas"))
         val state = buildState(
             local = local,
             remote = { fakeRemote("uid-5", events, id = "remote-swap") },

@@ -76,5 +76,45 @@ service cloud.firestore {
 
       allow update, delete: if false;
     }
+
+    // TIMED_REPEATABLE grants (design D16). A SIBLING of users/{uid}/adUnlocks above, never a
+    // reuse of it: update is allowed here and ONLY here, because re-earning a window after
+    // expiry is an overwrite by definition. Delete stays denied so a client cannot erase an
+    // active window and restart it early -- the anti-back-dating property that matters for a
+    // timed grant.
+    match /users/{uid}/timedUnlocks/{contentKey} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(
+             ['contentType', 'contentId', 'grantedAtMillis', 'expiresAtMillis'])
+        && request.resource.data.keys().hasAll(
+             ['contentType', 'contentId', 'grantedAtMillis', 'expiresAtMillis'])
+        && contentKey == request.resource.data.contentType + '_' + request.resource.data.contentId
+        && request.resource.data.grantedAtMillis is int
+        && request.resource.data.expiresAtMillis is int // NON-null here, unlike adUnlocks
+        && request.resource.data.expiresAtMillis > request.resource.data.grantedAtMillis;
+
+      allow delete: if false;
+    }
+
+    // Shared, read-only curated catalog (design D1/D12). World-readable so an unauthenticated
+    // first launch can refresh the version marker; client writes are unconditionally denied.
+    // Written exclusively by `functions/tools/seedCatalog.ts` via the Admin SDK, which bypasses
+    // rules. The blast radius of `allow read: if true` is "someone copies content that is already
+    // in every downloaded APK" (design D2) -- there is no user data in any of these collections.
+    match /catalogAffirmations/{id}   { allow read: if true; allow write: if false; }
+    match /catalogUniverses/{id}      { allow read: if true; allow write: if false; }
+    match /catalogThemes/{id}         { allow read: if true; allow write: if false; }
+    match /catalogCollections/{id}    { allow read: if true; allow write: if false; }
+    match /catalogMeta/{doc}          { allow read: if true; allow write: if false; }
+
+    // Per-user placeholder overrides on shared catalog rows (spec: catalog-token-overrides).
+    // Owner-only, same posture as users/{uid}/affirmations above. Deliberately NOT covered by the
+    // recursive-wildcard-avoidance comment at the top of this file -- this block IS the specific
+    // rule for this sub-collection.
+    match /users/{uid}/catalogOverrides/{catalogAffirmationId} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
   }
 }

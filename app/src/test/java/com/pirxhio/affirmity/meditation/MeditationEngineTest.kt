@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.meditation
 import com.pirxhio.affirmity.meditation.breathing.BreathingConfig
 import com.pirxhio.affirmity.meditation.breathing.BreathingText
 import com.pirxhio.affirmity.meditation.breathing.breathingMeditationDefinition
+import com.pirxhio.affirmity.meditation.winddown.windDownMeditationDefinition
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -322,6 +323,31 @@ class MeditationEngineTest {
             listOf<MeditationCommand>(StopAmbient(5_000L), EndSession(SessionEndReason.Completed)),
             fadeExecutor.commands.takeLast(2),
         )
+    }
+
+    @Test
+    fun `synchronous audio completion cannot replace the next phase timer with a stale timer`() {
+        lateinit var reentrantEngine: MeditationEngine
+        val reentrantExecutor = object : MeditationCommandExecutor {
+            val commands = mutableListOf<MeditationCommand>()
+
+            override fun execute(command: MeditationCommand) {
+                commands += command
+                if (command is PlayVoice) {
+                    reentrantEngine.send(MeditationEvent.AudioCompleted(command.audioId))
+                }
+            }
+        }
+        reentrantEngine = MeditationEngine(windDownMeditationDefinition(), reentrantExecutor)
+
+        reentrantEngine.send(MeditationEvent.Start)
+        val settleGeneration =
+            (reentrantExecutor.commands.last { it is StartTimer } as StartTimer).generation
+        reentrantEngine.send(MeditationEvent.TimerCompleted(settleGeneration))
+
+        val current = reentrantEngine.state.value
+        assertEquals("rest", current.currentPhaseId)
+        assertEquals(StartTimer(45_000L, current.timerGeneration), reentrantExecutor.commands.last())
     }
 
     private class RecordingCommandExecutor : MeditationCommandExecutor {

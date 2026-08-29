@@ -86,6 +86,82 @@ val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
     }
 }
 
+/** Additive, mirrors MIGRATION_4_5 exactly. The NOT NULL DEFAULT '{}' backfills every
+ * pre-existing row with an empty override map in one statement, so no affirmation can become
+ * unreadable by the new TypeConverter (which would otherwise see NULL). No content is inserted
+ * or altered. */
+val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `affirmations` ADD COLUMN `overrides` TEXT NOT NULL DEFAULT '{}'")
+    }
+}
+
+/** Additive: creates `favorite_affirmations` empty. Existing tables and rows are untouched. */
+val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `favorite_affirmations` (
+                `affirmationId` TEXT NOT NULL,
+                `favoritedAtMillis` INTEGER NOT NULL,
+                PRIMARY KEY(`affirmationId`)
+            )
+            """.trimIndent(),
+        )
+    }
+}
+
+/** Additive: creates `timed_ad_unlock`, `catalog_affirmations`, and
+ * `catalog_affirmation_overrides`, all empty (design D16 / Phase 2's design.md "Persistence —
+ * migration"). `timed_ad_unlock` is a SIBLING table of `ad_unlock`, never an ALTER of it -- the
+ * existing table's create-only guarantee (`insertIfAbsent`) must stay unweakened for
+ * [com.pirxhio.affirmity.access.AdUnlockPolicy.ONE_TIME_TRIAL]. The two catalog tables are created
+ * empty here; `catalog_affirmations` is populated by `CatalogSeeder` from the bundled asset on the
+ * next launch (design D2/D13), NOT here -- a migration must not parse a ~850 KB asset on the
+ * main-thread-adjacent open path. `catalog_affirmation_overrides` has no Room entity registered
+ * yet in this slice (that ships with the override sync surface, PR3) -- Room does not validate
+ * tables it has no matching `@Entity` for, so this is safe to create ahead of its consumer. */
+val MIGRATION_8_9 = object : androidx.room.migration.Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `timed_ad_unlock` (
+                `contentKey` TEXT NOT NULL,
+                `contentType` TEXT NOT NULL,
+                `contentId` TEXT NOT NULL,
+                `grantedAtMillis` INTEGER NOT NULL,
+                `expiresAtMillis` INTEGER,
+                PRIMARY KEY(`contentKey`)
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `catalog_affirmations` (
+                `id` TEXT NOT NULL,
+                `text` TEXT NOT NULL,
+                `groupId` TEXT NOT NULL,
+                `themeId` TEXT NOT NULL,
+                `collectionId` TEXT NOT NULL,
+                `sortOrder` INTEGER NOT NULL,
+                PRIMARY KEY(`id`)
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_catalog_affirmations_groupId` ON `catalog_affirmations` (`groupId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_catalog_affirmations_collectionId` ON `catalog_affirmations` (`collectionId`)")
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `catalog_affirmation_overrides` (
+                `catalogAffirmationId` TEXT NOT NULL,
+                `overrides` TEXT NOT NULL DEFAULT '{}',
+                PRIMARY KEY(`catalogAffirmationId`)
+            )
+            """.trimIndent(),
+        )
+    }
+}
+
 @Database(
     entities = [
         AffirmationEntity::class,
@@ -93,16 +169,25 @@ val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
         DailyMoodEntity::class,
         StreakHealerUseEntity::class,
         AdUnlockEntity::class,
+        FavoriteAffirmationEntity::class,
+        TimedAdUnlockEntity::class,
+        CatalogAffirmationEntity::class,
+        CatalogOverrideEntity::class,
     ],
-    version = 6,
+    version = 9,
     exportSchema = true,
 )
+@androidx.room.TypeConverters(OverridesConverters::class)
 abstract class AffirmityDatabase : RoomDatabase() {
     abstract fun affirmationDao(): AffirmationDao
     abstract fun dailyCompletionDao(): DailyCompletionDao
     abstract fun dailyMoodDao(): DailyMoodDao
     abstract fun streakHealerUseDao(): StreakHealerUseDao
     abstract fun adUnlockDao(): AdUnlockDao
+    abstract fun favoriteAffirmationDao(): FavoriteAffirmationDao
+    abstract fun timedAdUnlockDao(): TimedAdUnlockDao
+    abstract fun catalogAffirmationDao(): CatalogAffirmationDao
+    abstract fun catalogOverrideDao(): CatalogOverrideDao
 
     companion object {
         @Volatile
@@ -114,7 +199,16 @@ abstract class AffirmityDatabase : RoomDatabase() {
                     context.applicationContext,
                     AffirmityDatabase::class.java,
                     "affirmity.db",
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build().also { instance = it }
+                ).addMigrations(
+                    MIGRATION_1_2,
+                    MIGRATION_2_3,
+                    MIGRATION_3_4,
+                    MIGRATION_4_5,
+                    MIGRATION_5_6,
+                    MIGRATION_6_7,
+                    MIGRATION_7_8,
+                    MIGRATION_8_9,
+                ).build().also { instance = it }
             }
     }
 }

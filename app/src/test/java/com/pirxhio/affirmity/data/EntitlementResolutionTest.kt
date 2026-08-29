@@ -84,6 +84,23 @@ class EntitlementResolutionTest {
     }
 
     @Test
+    fun `is a documented no-op once proOnlyIds is empty -- the post-catalog wiring (design D17, task 4_7)`() {
+        // All 14 curated-catalog universes are declared Free at the group level (design's own
+        // "Two consequences" note under CatalogTaxonomy), so `proOnlyGroupIds` evaluates empty in
+        // production after this change. `deselectLockedGroups` is NOT deleted -- Pro gating moved
+        // from "strip the selection on downgrade" to "filter per collection at read time"
+        // (design D7), which is strictly more precise. This asserts the function itself stays a
+        // provable no-op in that state rather than being silently removed.
+        val selection = setOf(PERSONALIZADAS_GROUP_ID, "self_worth", "confidence_courage")
+        val result = deselectLockedGroups(
+            selected = selection,
+            proOnlyIds = emptySet(),
+            defaultThematicIds = setOf("self_worth"),
+        )
+        assertEquals(selection, result)
+    }
+
+    @Test
     fun `a pro-only group covered by a durable ad grant survives the downgrade sweep`() {
         // design §10 Q4(ii): a ONE_TIME_TRIAL grant legitimately survives a downgrade -- only
         // this carve-out id is exempted, "autocuidado" is still stripped normally.

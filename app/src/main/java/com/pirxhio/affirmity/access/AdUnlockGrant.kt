@@ -23,4 +23,9 @@ data class AdUnlockState(
 
     /** ONE_TIME_TRIAL grants, mirrored from `AdUnlockRepository.observeDurableUnlocks()`. */
     val durableUnlocks: Map<ContentKey, AdUnlockRecord> = emptyMap(),
+
+    /** TIMED_REPEATABLE grants, mirrored from `AdUnlockRepository.observeTimedUnlocks()`.
+     *  Separate from [durableUnlocks] because its store permits overwrite and [durableUnlocks]'
+     *  store must never (design D16). */
+    val timedUnlocks: Map<ContentKey, AdUnlockRecord> = emptyMap(),
 )

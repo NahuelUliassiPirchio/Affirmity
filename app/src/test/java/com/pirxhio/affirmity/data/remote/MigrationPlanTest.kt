@@ -95,6 +95,28 @@ class MigrationPlanTest {
     }
 
     @Test
+    fun `an affirmation with overrides produces a DocWrite carrying them`() {
+        val affirmations = listOf(
+            AffirmationEntity(
+                id = "aff-1",
+                title = "Gano [10k]",
+                subtitle = "al mes",
+                backgroundType = "color",
+                backgroundValue = "#000000",
+                overrides = mapOf("title:0:10k" to "20k"),
+            ),
+        )
+        val snapshot = snapshotWith(affirmations)
+
+        val allWrites = MigrationPlan.build(snapshot).flatten()
+
+        val write = allWrites.single { it.path == FirestorePaths.affirmationDoc(snapshot.uid, "aff-1") }
+        @Suppress("UNCHECKED_CAST")
+        val overrides = write.fields["overrides"] as Map<String, Any>
+        assertEquals(mapOf("title:0:10k" to "20k"), overrides)
+    }
+
+    @Test
     fun `plan covers every healer use exactly once, at the streak healer uses doc path`() {
         val healerUses = listOf(
             StreakHealerUseEntity(healedEpochDay = 10L, activatedAtMillis = 1_000L),

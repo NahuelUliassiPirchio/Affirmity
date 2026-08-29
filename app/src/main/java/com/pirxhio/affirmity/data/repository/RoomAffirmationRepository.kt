@@ -10,4 +10,6 @@ class RoomAffirmationRepository(private val dao: AffirmationDao) : AffirmationRe
     override suspend fun insert(entity: AffirmationEntity) = dao.insert(entity)
     override suspend fun deleteById(id: String) = dao.deleteById(id)
     override suspend fun deleteAll() = dao.deleteAll()
+    override suspend fun setOverrides(id: String, overrides: Map<String, String>) =
+        dao.updateOverrides(id, overrides.filterValues { it.isNotBlank() })
 }

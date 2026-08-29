@@ -3,11 +3,13 @@ package com.pirxhio.affirmity.ui.affirmations
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.PagerState
@@ -19,6 +21,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.SelfImprovement
 import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,11 +39,13 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.data.Affirmation
 import com.pirxhio.affirmity.data.AffirmationBackground
+import com.pirxhio.affirmity.data.AffirmationTemplateParser
+import com.pirxhio.affirmity.data.TemplateField
 import com.pirxhio.affirmity.data.backgroundColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -59,7 +65,14 @@ import kotlinx.coroutines.withContext
 private const val LOOP_MULTIPLIER = 10_000
 
 @Composable
-fun AffirmationsScreen(affirmations: List<Affirmation>, onAffirmationViewed: () -> Unit) {
+fun AffirmationsScreen(
+    affirmations: List<Affirmation>,
+    onAffirmationViewed: () -> Unit,
+    onOverrideCommitted: (affirmationId: String, tokenKey: String, value: String) -> Unit = { _, _, _ -> },
+    favoriteIds: Set<String> = emptySet(),
+    onToggleFavorite: (affirmationId: String) -> Unit = {},
+    favoriteGesture: FavoriteGesture = FavoriteGesture.DOUBLE_TAP,
+) {
     if (affirmations.isEmpty()) {
         Box(
             modifier = Modifier
@@ -102,16 +115,31 @@ fun AffirmationsScreen(affirmations: List<Affirmation>, onAffirmationViewed: () 
         modifier = Modifier.fillMaxSize()
     ) { page ->
         val affirmation = affirmations[page % affirmations.size]
-        AffirmationCard(affirmation)
+        AffirmationCard(
+            affirmation = affirmation,
+            isFavorite = affirmation.id in favoriteIds,
+            onToggleFavorite = { onToggleFavorite(affirmation.id) },
+            onOverrideCommitted = { tokenKey, value -> onOverrideCommitted(affirmation.id, tokenKey, value) },
+            favoriteGesture = favoriteGesture,
+        )
     }
 }
 
 @Composable
-private fun AffirmationCard(affirmation: Affirmation) {
+private fun AffirmationCard(
+    affirmation: Affirmation,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
+    onOverrideCommitted: (tokenKey: String, value: String) -> Unit,
+    favoriteGesture: FavoriteGesture,
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(affirmation.backgroundColor())
+            .pointerInput(affirmation.id, favoriteGesture) {
+                detectTapGestures(onDoubleTap = { onToggleFavorite() })
+            }
     ) {
         val background = affirmation.background
         if (background is AffirmationBackground.Image) {
@@ -131,11 +159,19 @@ private fun AffirmationCard(affirmation: Affirmation) {
                 ),
             contentAlignment = Alignment.Center
         ) {
+            val tokenStyle = defaultTokenStyle
+            val titleTemplate = remember(affirmation.title) {
+                AffirmationTemplateParser.parse(TemplateField.TITLE, affirmation.title)
+            }
+            val subtitleTemplate = remember(affirmation.subtitle) {
+                AffirmationTemplateParser.parse(TemplateField.SUBTITLE, affirmation.subtitle)
+            }
             Column(
                 modifier = Modifier
                     .padding(24.dp)
                     .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
-                    .padding(24.dp),
+                    .padding(24.dp)
+                    .imePadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Icon(
@@ -144,10 +180,16 @@ private fun AffirmationCard(affirmation: Affirmation) {
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.height(32.dp)
                 )
-                Text(
-                    text = affirmation.title,
+                TokenizedAffirmationText(
+                    template = titleTemplate,
+                    overrides = affirmation.overrides,
                     style = MaterialTheme.typography.headlineLarge,
                     color = Color.White,
+                    tokenStyle = tokenStyle,
+                    editable = true,
+                    onOverrideCommitted = onOverrideCommitted,
+                    favoriteTapEnabled = true,
+                    onFavoriteToggleFromToken = onToggleFavorite,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 8.dp)
                 )
@@ -159,15 +201,29 @@ private fun AffirmationCard(affirmation: Affirmation) {
                             .height(1.dp)
                             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
                     )
-                    Text(
-                        text = affirmation.subtitle,
+                    TokenizedAffirmationText(
+                        template = subtitleTemplate,
+                        overrides = affirmation.overrides,
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color(0xFFCCCCCC),
-                        textAlign = TextAlign.Center
+                        tokenStyle = tokenStyle,
+                        editable = true,
+                        onOverrideCommitted = onOverrideCommitted,
+                        favoriteTapEnabled = true,
+                        onFavoriteToggleFromToken = onToggleFavorite,
+                        textAlign = TextAlign.Center,
                     )
                 }
             }
         }
+        Icon(
+            imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(24.dp),
+        )
     }
 }
 

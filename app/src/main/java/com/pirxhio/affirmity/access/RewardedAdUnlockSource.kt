@@ -48,6 +48,7 @@ class RewardedAdUnlockSource(
     internal fun adUnitIdFor(policy: AdUnlockPolicy): String? = when (policy) {
         AdUnlockPolicy.PER_USE -> adUnitIds.perUse.ifBlank { null }
         AdUnlockPolicy.ONE_TIME_TRIAL -> adUnitIds.oneTimeTrial.ifBlank { null }
+        AdUnlockPolicy.TIMED_REPEATABLE -> adUnitIds.timedRepeatable.ifBlank { null }
         AdUnlockPolicy.NONE -> null
     }
 }

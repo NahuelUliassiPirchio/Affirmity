@@ -42,7 +42,6 @@ import com.pirxhio.affirmity.data.repository.NotificationSettingsRepository
 import com.pirxhio.affirmity.data.repository.StreakHealerRepository
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
-import com.pirxhio.affirmity.ui.groups.defaultAffirmationGroups
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -63,6 +62,7 @@ private class NoopAffirmationRepository2 : AffirmationRepository {
     override suspend fun insert(entity: AffirmationEntity) = Unit
     override suspend fun deleteById(id: String) = Unit
     override suspend fun deleteAll() = Unit
+    override suspend fun setOverrides(id: String, overrides: Map<String, String>) = Unit
 }
 
 private class NoopDailyCompletionRepository2 : DailyCompletionRepository {
@@ -180,8 +180,11 @@ private fun buildAnalyticsState(
 /** REQ-6.2 (events 6-11) + REQ-6.3.1 (funnel-closure invariant). */
 class AffirmityAppStateAdFunnelAnalyticsTest {
 
-    private val fuerzaDeVoluntad = defaultAffirmationGroups().first { it.id == "fuerza_de_voluntad" }
-    private val fuerzaKey = ContentKey(ContentType.AFFIRMATION_GROUP, fuerzaDeVoluntad.id)
+    // Literal id (design D17/task 4.6.3) -- only `.id` was ever used from the deleted legacy
+    // `fuerza_de_voluntad` group this suite previously sourced from `defaultAffirmationGroups()`;
+    // matches `knownGroupIds = setOf("personalizadas", "fuerza_de_voluntad")` above.
+    private val fuerzaDeVoluntadId = "fuerza_de_voluntad"
+    private val fuerzaKey = ContentKey(ContentType.AFFIRMATION_GROUP, fuerzaDeVoluntadId)
 
     @Test
     fun `Earned outcome emits ad_unlock_requested then ad_unlock_earned`() = runBlocking {

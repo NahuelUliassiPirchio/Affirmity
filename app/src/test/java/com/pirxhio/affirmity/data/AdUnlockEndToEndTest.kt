@@ -1,5 +1,8 @@
 package com.pirxhio.affirmity.data
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FitnessCenter
+import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.AccessDecision
 import com.pirxhio.affirmity.access.AdUnlockOutcome
 import com.pirxhio.affirmity.access.AdUnlockPolicy
@@ -43,7 +46,7 @@ import com.pirxhio.affirmity.data.repository.StreakHealerRepository
 import com.pirxhio.affirmity.meditation.SessionEndReason
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
-import com.pirxhio.affirmity.ui.groups.defaultAffirmationGroups
+import com.pirxhio.affirmity.ui.groups.AffirmationGroup
 import com.pirxhio.affirmity.ui.groups.groupAccessDecision
 import com.pirxhio.affirmity.ui.groups.isToggleable
 import com.pirxhio.affirmity.ui.meditation.catalog.findMeditationCatalogEntry
@@ -77,6 +80,7 @@ private class NoopAffirmationRepository : AffirmationRepository {
     override suspend fun insert(entity: AffirmationEntity) = Unit
     override suspend fun deleteById(id: String) = Unit
     override suspend fun deleteAll() = Unit
+    override suspend fun setOverrides(id: String, overrides: Map<String, String>) = Unit
 }
 
 private class NoopDailyCompletionRepository : DailyCompletionRepository {
@@ -216,7 +220,18 @@ private fun buildState(
  */
 class AdUnlockEndToEndTest {
 
-    private val fuerzaDeVoluntad = defaultAffirmationGroups().first { it.id == "fuerza_de_voluntad" }
+    // Locally-constructed fixture (design D17/task 4.6.2) -- the legacy `fuerza_de_voluntad`
+    // group this suite originally sourced from `defaultAffirmationGroups()` was deleted by the
+    // catalog change. Only a Pro-or-ad-PER_USE group shape is needed here; the id is kept as a
+    // literal string (not sourced from production wiring) purely to match `buildState`'s existing
+    // `knownGroupIds`/`proOnlyGroupIds` fixture sets below.
+    private val fuerzaDeVoluntad = AffirmationGroup(
+        id = "fuerza_de_voluntad",
+        titleRes = R.string.app_name,
+        descriptionRes = R.string.app_name,
+        icon = Icons.Filled.FitnessCenter,
+        access = ContentAccess.ProOrAdPerUse,
+    )
     private val fuerzaKey = ContentKey(ContentType.AFFIRMATION_GROUP, fuerzaDeVoluntad.id)
 
     // 1. FREE tier, no grant -> LockedAdUnlockable(PER_USE), not toggleable.
@@ -274,8 +289,11 @@ class AdUnlockEndToEndTest {
         val committed = state.applyGroupSelection()
 
         assertTrue("commit must succeed", committed)
+        // "personalizadas" absent from `initial` and TEMPORARILY no longer force-re-added to an
+        // otherwise-healthy persisted selection (see resolveSelectedGroupIds's KDoc) -- this test
+        // predates that relaxation and previously asserted force-inclusion.
         assertEquals(
-            setOf("personalizadas", "bienestar", fuerzaDeVoluntad.id),
+            setOf("bienestar", fuerzaDeVoluntad.id),
             state.selectedGroupIds.value,
         )
 
@@ -472,6 +490,88 @@ class AdUnlockEndToEndTest {
                 "spent once, ever, not once per session",
             AccessDecision.UnlockedByAd(AdUnlockPolicy.ONE_TIME_TRIAL),
             afterConsume,
+        )
+
+        scope.cancel()
+    }
+
+    // 9. requestAdUnlock(key, TIMED_REPEATABLE, 24) on Earned -> grantTimedUnlock with
+    //    expiresAtMillis == grantedAt + 86_400_000, and never grantDurableUnlock (design D16 --
+    //    the two grant stores must never be conflated).
+    @Test
+    fun `requestAdUnlock with TIMED_REPEATABLE and a 24h window grants a timed unlock, never a durable one`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val adUnlockSource = FakeAdUnlockSource(AdUnlockOutcome.Earned)
+        val sharedAdUnlocks = FakeAdUnlockRepository()
+        val state = buildState(scope, adUnlockSource = adUnlockSource, adUnlocks = sharedAdUnlocks)
+        delay(50)
+        val timedKey = ContentKey(ContentType.MEDITATION, "calma_timed")
+
+        val before = System.currentTimeMillis()
+        state.requestAdUnlock(timedKey, AdUnlockPolicy.TIMED_REPEATABLE, unlockWindowHours = 24)
+        delay(50)
+
+        assertEquals(1, sharedAdUnlocks.timedGranted.size)
+        val record = sharedAdUnlocks.timedGranted.single()
+        assertEquals(timedKey, record.key)
+        assertTrue("grantedAtMillis must be recorded at request time", record.grantedAtMillis >= before)
+        assertEquals(record.grantedAtMillis + 86_400_000L, record.expiresAtMillis)
+        assertTrue("TIMED_REPEATABLE must never write to the durable (ONE_TIME_TRIAL) store", sharedAdUnlocks.granted.isEmpty())
+
+        scope.cancel()
+    }
+
+    // 10. A null unlockWindowHours grants nothing at all -- never an unbounded window.
+    @Test
+    fun `requestAdUnlock with TIMED_REPEATABLE and a null window grants nothing`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val adUnlockSource = FakeAdUnlockSource(AdUnlockOutcome.Earned)
+        val sharedAdUnlocks = FakeAdUnlockRepository()
+        val state = buildState(scope, adUnlockSource = adUnlockSource, adUnlocks = sharedAdUnlocks)
+        delay(50)
+        val timedKey = ContentKey(ContentType.MEDITATION, "calma_timed")
+
+        state.requestAdUnlock(timedKey, AdUnlockPolicy.TIMED_REPEATABLE, unlockWindowHours = null)
+        delay(50)
+
+        assertTrue(sharedAdUnlocks.timedGranted.isEmpty())
+        assertTrue(sharedAdUnlocks.granted.isEmpty())
+
+        scope.cancel()
+    }
+
+    // 11. TIMED_REPEATABLE round trip via resolveAccess: locked -> earn -> UnlockedByAd -> expired
+    //     window re-locks to LockedAdUnlockable again (re-earnable, not spent, unlike ONE_TIME_TRIAL).
+    @Test
+    fun `TIMED_REPEATABLE round trip -- earned then re-locks (not spent) once the window elapses`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val adUnlockSource = FakeAdUnlockSource(AdUnlockOutcome.Earned)
+        val sharedAdUnlocks = FakeAdUnlockRepository()
+        val state = buildState(scope, adUnlockSource = adUnlockSource, adUnlocks = sharedAdUnlocks)
+        delay(50)
+        val timedKey = ContentKey(ContentType.MEDITATION, "calma_timed")
+        val timedContent = ContentAccess.ProOrAdTimed(24)
+
+        val beforeEarn = resolveAccess(
+            timedKey, timedContent, state.entitlementTier.value, state.adUnlockState, System.currentTimeMillis(),
+        )
+        assertEquals(AccessDecision.LockedAdUnlockable(AdUnlockPolicy.TIMED_REPEATABLE), beforeEarn)
+
+        state.requestAdUnlock(timedKey, AdUnlockPolicy.TIMED_REPEATABLE, unlockWindowHours = 24)
+        delay(50)
+        val record = sharedAdUnlocks.timedGranted.single()
+        val afterEarn = resolveAccess(
+            timedKey, timedContent, state.entitlementTier.value, state.adUnlockState, record.grantedAtMillis,
+        )
+        assertEquals(AccessDecision.UnlockedByAd(AdUnlockPolicy.TIMED_REPEATABLE), afterEarn)
+
+        val afterExpiry = resolveAccess(
+            timedKey, timedContent, state.entitlementTier.value, state.adUnlockState, record.expiresAtMillis!!,
+        )
+        assertEquals(
+            "an expired TIMED_REPEATABLE grant must re-offer the ad, never LockedNeedsPro",
+            AccessDecision.LockedAdUnlockable(AdUnlockPolicy.TIMED_REPEATABLE),
+            afterExpiry,
         )
 
         scope.cancel()
