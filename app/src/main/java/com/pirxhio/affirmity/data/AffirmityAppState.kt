@@ -233,21 +233,27 @@ private fun Affirmation.toEntity(): AffirmationEntity = AffirmationEntity(
  * Android/DataStore (design §4, §6, D18). [persisted] is `null` on the very first-ever launch (no
  * selection ever saved). Unknown ids (e.g. a group removed in a later release, such as the 3
  * legacy groups deleted by design D17) are dropped. `personalizadas` is included in every FALLBACK
- * result (first launch, or a persisted selection with nothing thematic surviving) as the sensible
- * default -- but, as of a TEMPORARY dogfooding change, is no longer force-re-added to an otherwise
- * healthy persisted selection that explicitly excludes it. This pairs with
- * `GroupAccessPolicy.isToggleable`'s matching relaxation: without both changes together, a user
- * could uncheck `personalizadas` in the selector, hit Aplicar, and have it silently reappear on the
- * next read of this collector. To restore the old permanent-inclusion behavior, change the final
- * `return` back to `resolved + PERSONALIZADAS_GROUP_ID` unconditionally.
+ * result (first launch, a persisted selection that resolves to genuinely empty, or a persisted
+ * selection whose thematic ids were all dropped by the unknown-id filter -- e.g. stale legacy ids)
+ * as the sensible default -- but, as of a TEMPORARY dogfooding change, is no longer force-re-added
+ * to an otherwise healthy persisted selection that explicitly excludes it. A *deliberate*
+ * `personalizadas`-only selection -- one where `persisted` was already exactly
+ * `{personalizadas}`, nothing dropped by filtering -- is distinguished from the stale-legacy-ids
+ * case above and preserved verbatim, since `isDraftSelectionValid` now allows committing it when
+ * the user has custom affirmations. This pairs with `GroupAccessPolicy.isToggleable`'s matching
+ * relaxation: without both changes together, a user could uncheck `personalizadas` in the
+ * selector, hit Aplicar, and have it silently reappear on the next read of this collector. To
+ * restore the old permanent-inclusion behavior, change the final `return` back to
+ * `resolved + PERSONALIZADAS_GROUP_ID` unconditionally.
  *
  * The minimum-selection invariant lives HERE, tier-independent (design D18) -- moved out of
  * `EntitlementResolution.deselectLockedGroups`'s call site, which is guarded by
  * `if (entitlement.tier == AccessTier.FREE)` and therefore never ran for a Pro user. Without this,
- * a device holding a persisted selection that resolves to nothing thematic (either because every
+ * a device holding a persisted selection that resolves to genuinely empty (either because every
  * persisted id was unknown, or because the persisted selection was itself empty) would land on a
- * `personalizadas`-only, thematically empty feed regardless of tier. Cannot touch a healthy
- * selection: any surviving non-personalizadas id short-circuits the fallback.
+ * fully empty feed regardless of tier. Cannot touch a healthy selection: any surviving
+ * non-personalizadas id, or a deliberate `personalizadas`-only selection, short-circuits the
+ * fallback.
  */
 fun resolveSelectedGroupIds(
     persisted: Set<String>?,
@@ -255,7 +261,14 @@ fun resolveSelectedGroupIds(
     defaultThematicIds: Set<String>,
 ): Set<String> {
     val filtered = persisted?.filter { it in knownIds }?.toSet()
-    return if (filtered == null || filtered.none { it != PERSONALIZADAS_GROUP_ID }) {
+    // A personalizadas-only *filtered* result is ambiguous on its own: it's either a deliberate
+    // commit (persisted was already exactly {personalizadas}, nothing dropped) or stale data whose
+    // thematic ids all got dropped by the knownIds filter (persisted != filtered) -- e.g. legacy ids
+    // removed by design D17. Only the latter should recover via the fallback; the former must be
+    // preserved verbatim (TEMPORARY dogfooding relaxation).
+    val droppedUnknownIds = filtered != null && filtered != persisted
+    val isPersonalizadasOnly = filtered != null && filtered.none { it != PERSONALIZADAS_GROUP_ID }
+    return if (filtered == null || filtered.isEmpty() || (isPersonalizadasOnly && droppedUnknownIds)) {
         defaultThematicIds + PERSONALIZADAS_GROUP_ID
     } else {
         filtered

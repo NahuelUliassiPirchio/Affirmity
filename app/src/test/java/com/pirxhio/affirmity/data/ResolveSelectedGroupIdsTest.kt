@@ -90,6 +90,21 @@ class ResolveSelectedGroupIdsTest {
     }
 
     @Test
+    fun `a deliberate personalizadas-only persisted selection is preserved verbatim, not reset to defaults`() {
+        // Distinct from the legacy-ids case above: here persisted was ALREADY exactly
+        // {personalizadas} -- nothing got dropped by the unknown-id filter. isDraftSelectionValid
+        // now allows committing this state when the user has custom affirmations, so it must
+        // survive a restart instead of snapping back to the 14 default thematic ids.
+        val resolved = resolveSelectedGroupIds(
+            persisted = setOf("personalizadas"),
+            knownIds = knownIds,
+            defaultThematicIds = defaultThematicIds,
+        )
+
+        assertEquals(setOf("personalizadas"), resolved)
+    }
+
+    @Test
     fun `a persisted selection with one unknown id among otherwise-healthy ids drops only that id`() {
         val resolved = resolveSelectedGroupIds(
             persisted = setOf("self_worth", "some_removed_group"),
