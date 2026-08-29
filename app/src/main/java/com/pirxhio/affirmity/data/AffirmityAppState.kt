@@ -712,7 +712,13 @@ class AffirmityAppState(
             // thread, so a cold start's 2712-row seed never blocks first paint. Idempotent via
             // CatalogPreferences.seededCatalogVersion, so safe to call on every launch. `null`
             // (the default) means no seeding -- every existing JVM unit test never touches assets.
-            catalogSeeder?.seedIfNeeded()
+            try {
+                catalogSeeder?.seedIfNeeded()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Log.e(TAG, "catalog seed failed", error)
+            }
         }
         scope.launch {
             favorites.observeFavoriteIds()
