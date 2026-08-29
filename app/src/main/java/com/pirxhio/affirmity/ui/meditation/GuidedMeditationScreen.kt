@@ -55,6 +55,7 @@ import com.pirxhio.affirmity.meditation.TimerCommandExecutor
 import com.pirxhio.affirmity.ui.meditation.catalog.CounterEmphasis
 import com.pirxhio.affirmity.ui.meditation.catalog.MeditationCatalogEntry
 import com.pirxhio.affirmity.ui.meditation.catalog.fixedPhaseDurationsById
+import com.pirxhio.affirmity.ui.meditation.catalog.isMeditationLocked
 
 /**
  * First screen built on the guided-meditation engine (`com.pirxhio.affirmity.meditation`) — wires
@@ -71,9 +72,12 @@ import com.pirxhio.affirmity.ui.meditation.catalog.fixedPhaseDurationsById
 fun GuidedMeditationScreen(
     entry: MeditationCatalogEntry,
     modifier: Modifier = Modifier,
-    /** Re-resolved by the caller at composition time (D7/REQ-5.2) — never a stale tap-time value.
-     *  Used only to tag [AnalyticsEvent.MeditationStarted]'s `access_decision` parameter. */
-    access: AccessDecision = AccessDecision.Unlocked,
+    /** Re-resolved by the caller when Start is pressed, so time-bound access cannot expire while
+     * this screen sits idle and still start gated content. The returned decision also tags
+     * [AnalyticsEvent.MeditationStarted]'s `access_decision` parameter. */
+    accessAtStart: () -> AccessDecision = { AccessDecision.Unlocked },
+    /** Routes an action-time denial through the caller's existing blocked-screen path. */
+    onAccessBlocked: () -> Unit = {},
     /** Fired exactly once per playback session that reaches a terminal state, carrying the
      * UI-local wall-clock elapsed duration (design D7 -- the engine tracks no session-wide
      * elapsed) and the wall-clock instant the session started (for day-of-completion attribution
@@ -181,10 +185,15 @@ fun GuidedMeditationScreen(
         entry = entry,
         phaseDurations = phaseDurations,
         onStart = {
-            sessionStartMillis = AndroidMonotonicTimeSource.nowMillis()
-            sessionStartWallMillis = System.currentTimeMillis()
-            onEvent(AnalyticsEvent.MeditationStarted(AnalyticsId.of(entry), access.provenance()))
-            engine.send(MeditationEvent.Start)
+            val currentAccess = accessAtStart()
+            if (isMeditationLocked(currentAccess)) {
+                onAccessBlocked()
+            } else {
+                sessionStartMillis = AndroidMonotonicTimeSource.nowMillis()
+                sessionStartWallMillis = System.currentTimeMillis()
+                onEvent(AnalyticsEvent.MeditationStarted(AnalyticsId.of(entry), currentAccess.provenance()))
+                engine.send(MeditationEvent.Start)
+            }
         },
         onPause = { engine.send(MeditationEvent.Pause) },
         onResume = { engine.send(MeditationEvent.Resume) },

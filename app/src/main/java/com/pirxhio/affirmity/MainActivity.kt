@@ -511,12 +511,15 @@ fun AffirmityApp(
                 GuidedMeditationScreen(
                     entry = selectedMeditationEntry,
                     modifier = Modifier.padding(innerPadding),
-                    access = meditationAccessDecision(
-                        selectedMeditationEntry,
-                        appState.entitlementTier.value,
-                        appState.adUnlockState,
-                        System.currentTimeMillis(),
-                    ),
+                    accessAtStart = {
+                        meditationAccessDecision(
+                            selectedMeditationEntry,
+                            appState.entitlementTier.value,
+                            appState.adUnlockState,
+                            System.currentTimeMillis(),
+                        )
+                    },
+                    onAccessBlocked = { selectedMeditationEntryId = null },
                     // The streak-bug fix (REQ-5.6): guided completion now calls the same
                     // recordMeditationCompleted() the free timer already calls at its own call
                     // site. consumeMeditationPlaybackUnlock runs for BOTH terminal reasons (an ad
