@@ -52,24 +52,24 @@ Chain strategy: feature-branch-chain
 
 ## Phase 2: PR2 — Catalog foundation (transform, cache, access combinator)
 
-- [ ] 2.1 GREEN `tools/catalog/generate-catalog.mjs`: source JSON -> `catalog.v1.json` + `CatalogTaxonomy.kt`. Fails on literal `[`/`]`, dup id, unknown ref, `free`+non-null-hours, non-positive hours. Emits `CATALOG_GATED_GROUP_IDS`. **Run manually and commit output.**
-- [ ] 2.2 RED `CatalogTextSanitizerTest`: `[`,`]`,`[]`,nested,unicode-adjacent -> correct offsets; clean text -> empty; **smoke assertion over the committed `catalog.v1.json`: zero illegal brackets across all 2712 texts**. (Spec: Pre-Import Bracket Sanitization Gate)
-- [ ] 2.3 GREEN `data/catalog/CatalogTextSanitizer.kt`: `findIllegalBrackets` (pure, no rewrite logic per D11).
-- [ ] 2.4 **Verification step (blocking, pre-merge):** run the sanitizer's smoke test against the generated `catalog.v1.json` and confirm 0 hits before any further slice depends on the asset. Record the run in the PR description.
-- [ ] 2.5 RED ID-scheme test: every id matches `^cat_[a-z0-9_]+(\.[a-z0-9_]+)+$`; all 2712 unique; none is a valid `UUID`; no `groupId` equals `personalizadas` or a legacy group id. Data-driven over committed asset.
-- [ ] 2.6 GREEN `data/catalog/CatalogAssetParser.kt`: parse + validate (dup id, unknown collectionId, bracket, free+non-null-hours each throw naming the offending id). RED first with 3-row JSON fixtures, then GREEN.
-- [ ] 2.7 GREEN `data/local/CatalogAffirmationEntity.kt` (id/text/groupId/themeId/collectionId/sortOrder + 2 indices), `data/local/CatalogAffirmationDao.kt` (`observeAll`, `observeByGroupIds`, `getByIds`, `count`, `replaceAll`).
-- [ ] 2.8 RED `CatalogSeederTest`: seeds when marker absent/stale; no-ops when current; throwing `saveSeededCatalogVersion` still leaves rows committed, re-seeds cleanly next call; marker written **after** DAO call (call-order assertion on recording fake).
-- [ ] 2.9 GREEN `data/catalog/CatalogSeeder.kt`, `data/local/CatalogPreferences.kt` (DataStore marker).
-- [ ] 2.10 GREEN `data/local/AffirmityDatabase.kt`: extend `MIGRATION_8_9` with `catalog_affirmations` + `catalog_affirmation_overrides` `CREATE TABLE IF NOT EXISTS` + 2 indices (index names must match Room's generated names exactly). Update `app/schemas/.../9.json`.
-- [ ] 2.11 RED `AffirmityDatabaseMigrationTest` (extend 1.8's suite): `migrate8To9` now creates **all three** new tables empty, both catalog indices present, every pre-existing column untouched (incl. `overrides`). GREEN via 2.10.
-- [ ] 2.12 RED `ContentKeyTest`: `AFFIRMATION_COLLECTION.wireName` contains no `_` (asserted over `ContentType.entries`); `parse(storageKey)` round-trips for **all 226** real collection ids from committed taxonomy; `fromWireName("affirmationGroup")` unaffected; `storageKey` satisfies `firestore.rules:71` identity. (Spec: ContentType Extension)
-- [ ] 2.13 GREEN `access/ContentKey.kt`: add `AFFIRMATION_COLLECTION("affirmationCollection")`.
-- [ ] 2.14 RED `AccessCombinationTest`: full 4x4 `mostRestrictive` truth table; `LockedNeedsPro` absorbing; `ONE_TIME_TRIAL` > `TIMED_REPEATABLE` > `PER_USE` strictness; `UnlockedByAd` provenance survives; commutative, associative, `Unlocked` identity.
-- [ ] 2.15 GREEN `access/AccessCombination.kt`: `mostRestrictive(a, b)`.
-- [ ] 2.16 RED `CatalogAccessPolicyTest`: `catalogAccessDecision` — `alwaysSelected` short-circuits first; free collection in Pro group -> locked (D6(a) regression guard); Pro collection in Free group -> locked; `collection == null` -> group decision unchanged.
-- [ ] 2.17 GREEN `ui/groups/CatalogAccessPolicy.kt`: `catalogAccessDecision(...)` (badge functions land in Phase 5).
-- [ ] 2.18 GREEN `data/repository/Repositories.kt`: `CatalogAffirmationRepository` + `NoOpCatalogAffirmationRepository`. `data/repository/RoomCatalogAffirmationRepository.kt` (new, 1:1 DAO delegation).
+- [x] 2.1 GREEN `tools/catalog/generate-catalog.mjs`: source JSON -> `catalog.v1.json` + `CatalogTaxonomy.kt`. Fails on literal `[`/`]`, dup id, unknown ref, `free`+non-null-hours, non-positive hours. Emits `CATALOG_GATED_GROUP_IDS`. **Run manually and commit output.**
+- [x] 2.2 RED `CatalogTextSanitizerTest`: `[`,`]`,`[]`,nested,unicode-adjacent -> correct offsets; clean text -> empty; **smoke assertion over the committed `catalog.v1.json`: zero illegal brackets across all 2712 texts**. (Spec: Pre-Import Bracket Sanitization Gate)
+- [x] 2.3 GREEN `data/catalog/CatalogTextSanitizer.kt`: `findIllegalBrackets` (pure, no rewrite logic per D11).
+- [x] 2.4 **Verification step (blocking, pre-merge):** run the sanitizer's smoke test against the generated `catalog.v1.json` and confirm 0 hits before any further slice depends on the asset. Record the run in the PR description. — **Ran, 0 hits across 2712 texts** (`CatalogTextSanitizerTest`, see apply-progress).
+- [x] 2.5 RED ID-scheme test: every id matches `^cat_[a-z0-9_]+(\.[a-z0-9_]+)+$`; all 2712 unique; none is a valid `UUID`; no `groupId` equals `personalizadas` or a legacy group id. Data-driven over committed asset.
+- [x] 2.6 GREEN `data/catalog/CatalogAssetParser.kt`: parse + validate (dup id, unknown collectionId, bracket each throw naming the offending id). RED first with 3-row JSON fixtures, then GREEN. **Deviation**: `free`+non-null-hours is validated in the generator only (2.1), not duplicated here — the bundled asset carries no `access` field by design, so there is nothing to re-check at this layer; see apply-progress.
+- [x] 2.7 GREEN `data/local/CatalogAffirmationEntity.kt` (id/text/groupId/themeId/collectionId/sortOrder + 2 indices), `data/local/CatalogAffirmationDao.kt` (`observeAll`, `observeByGroupIds`, `getByIds`, `count`, `replaceAll`).
+- [x] 2.8 RED `CatalogSeederTest`: seeds when marker absent/stale; no-ops when current; throwing `saveSeededCatalogVersion` still leaves rows committed, re-seeds cleanly next call; marker written **after** DAO call (call-order assertion on recording fake).
+- [x] 2.9 GREEN `data/catalog/CatalogSeeder.kt`, `data/local/CatalogPreferences.kt` (DataStore marker).
+- [x] 2.10 GREEN `data/local/AffirmityDatabase.kt`: extend `MIGRATION_8_9` with `catalog_affirmations` + `catalog_affirmation_overrides` `CREATE TABLE IF NOT EXISTS` + 2 indices (index names must match Room's generated names exactly). Update `app/schemas/.../9.json`.
+- [x] 2.11 RED `AffirmityDatabaseMigrationTest` (extend 1.8's suite): `migrate8To9` now creates **all three** new tables empty, both catalog indices present, every pre-existing column untouched (incl. `overrides`). GREEN via 2.10. (androidTest — cannot execute in this sandbox, no emulator; see apply-progress's pre-existing androidTest compile blocker.)
+- [x] 2.12 RED `ContentKeyTest`: `AFFIRMATION_COLLECTION.wireName` contains no `_` (asserted over `ContentType.entries`); `parse(storageKey)` round-trips for **all 226** real collection ids from committed taxonomy; `fromWireName("affirmationGroup")` unaffected; `storageKey` satisfies `firestore.rules:71` identity. (Spec: ContentType Extension)
+- [x] 2.13 GREEN `access/ContentKey.kt`: add `AFFIRMATION_COLLECTION("affirmationCollection")`.
+- [x] 2.14 RED `AccessCombinationTest`: full 4x4 `mostRestrictive` truth table; `LockedNeedsPro` absorbing; `ONE_TIME_TRIAL` > `TIMED_REPEATABLE` > `PER_USE` strictness; `UnlockedByAd` provenance survives; commutative, associative, `Unlocked` identity.
+- [x] 2.15 GREEN `access/AccessCombination.kt`: `mostRestrictive(a, b)`.
+- [x] 2.16 RED `CatalogAccessPolicyTest`: `catalogAccessDecision` — `alwaysSelected` short-circuits first; free collection in Pro group -> locked (D6(a) regression guard); Pro collection in Free group -> locked; `collection == null` -> group decision unchanged.
+- [x] 2.17 GREEN `ui/groups/CatalogAccessPolicy.kt`: `catalogAccessDecision(...)` (badge functions land in Phase 5).
+- [x] 2.18 GREEN `data/repository/Repositories.kt`: `CatalogAffirmationRepository` + `NoOpCatalogAffirmationRepository`. `data/repository/RoomCatalogAffirmationRepository.kt` (new, 1:1 DAO delegation).
 
 ## Phase 3: PR3 — Override sync surface + read-model integration
 
@@ -94,7 +94,7 @@ Chain strategy: feature-branch-chain
 - [ ] 4.2 GREEN `data/AffirmityAppState.kt`: `defaultThematicGroupIds` re-expressed via `isThematic`; `resolveSelectedGroupIds` gains the thematic-emptiness fallback, tier-independent (moves invariant out of the `AccessTier.FREE`-guarded `deselectLockedGroups` branch).
 - [ ] 4.3 RED legacy-removal test: `selectableAffirmationGroups()` has 15 entries, contains `personalizadas`, contains none of the 3 legacy ids; `resolveSelectedGroupIds(persisted=setOf("bienestar"),…)` drops it and lands on a valid default.
 - [ ] 4.4 GREEN `ui/groups/AffirmationGroup.kt`: delete `bienestar`/`autocuidado`/`fuerza_de_voluntad`; `defaultAffirmationGroups() = catalogUniverseGroups()` (14).
-- [ ] 4.5 GREEN `res/values/strings.xml`, `res/values-en/strings.xml`: delete the 6 legacy group strings; add 14 group titles + 14 descriptions per locale (from `universes[].title`/`coreNeed`).
+- [ ] 4.5 GREEN `res/values/strings.xml`, `res/values-en/strings.xml`: delete the 6 legacy group strings; add 14 group titles + 14 descriptions per locale (from `universes[].title`/`coreNeed`). **Note (PR2 deviation):** the 14 `values/strings.xml` (es) title/description pairs were added early, in PR2, because `CatalogTaxonomy.kt`'s `catalogUniverseGroups()` needs real `R.string` ids to compile — this task now only needs to delete the 6 legacy strings; `values-en/` still needs the 14 entries (or an explicit decision to let it fall back to `values/`, matching the "Spanish only" scope note).
 - [ ] 4.6 GREEN — **fixture repair, explicit tasks, not discovered mid-apply.** Repoint the 4 suites that source Free/Pro/PER_USE group fixtures from `defaultAffirmationGroups()` by literal legacy id to locally-constructed `AffirmationGroup` fixtures:
   - [ ] 4.6.1 `GroupAccessPolicyTest`
   - [ ] 4.6.2 `AdUnlockEndToEndTest`
