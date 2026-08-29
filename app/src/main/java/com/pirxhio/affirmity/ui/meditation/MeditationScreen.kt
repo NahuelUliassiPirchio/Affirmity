@@ -436,7 +436,7 @@ private fun MeditationDiscoverCard(
                     color = MaterialTheme.colorScheme.outline,
                 )
             } else if (locked) {
-                IconButton(onClick = onLockedTap) {
+                IconButton(onClick = onRowClick) {
                     Icon(
                         imageVector = Icons.Filled.Lock,
                         contentDescription = stringResource(
