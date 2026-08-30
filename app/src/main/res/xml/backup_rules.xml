@@ -6,8 +6,8 @@
    See https://developer.android.com/about/versions/12/backup-restore
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <!-- Room database holds free-text mood notes; excluded from Auto Backup (pre-API-31 devices). -->
+    <exclude domain="database" path="affirmity.db"/>
+    <exclude domain="database" path="affirmity.db-shm"/>
+    <exclude domain="database" path="affirmity.db-wal"/>
 </full-backup-content>

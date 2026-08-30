@@ -64,7 +64,7 @@ android {
         }
         release {
             optimization {
-                enable = false
+                enable = true
             }
             manifestPlaceholders["admobAppId"] = requiredAdSecret("admob.appId", "ADMOB_APP_ID")
             buildConfigField(

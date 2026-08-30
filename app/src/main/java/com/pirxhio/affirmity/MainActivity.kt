@@ -230,6 +230,19 @@ fun AffirmityApp(
 ) {
     var currentDestination by rememberSaveable { mutableStateOf(startDestination) }
     var pendingMoodValue by rememberSaveable { mutableStateOf<Int?>(null) }
+    // Blocks screenshots/screen-recording/recent-apps thumbnails while the mood screen (free-text
+    // personal notes) is visible (docs/security/SECURITY_AUDIT.md F-05). No-op in @Preview, where
+    // LocalContext isn't backed by an Activity.
+    val moodScreenVisible = currentDestination == AppDestinations.ANIMO
+    val activityWindow = (LocalContext.current as? Activity)?.window
+    DisposableEffect(moodScreenVisible, activityWindow) {
+        if (moodScreenVisible) {
+            activityWindow?.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        }
+        onDispose {
+            activityWindow?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        }
+    }
     LaunchedEffect(startDestination, startMoodValue) {
         currentDestination = startDestination
         if (startMoodValue != null) pendingMoodValue = startMoodValue

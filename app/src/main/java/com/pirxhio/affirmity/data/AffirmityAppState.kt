@@ -866,18 +866,24 @@ class AffirmityAppState(
                 .distinctUntilChangedBy { it.uid }
                 .collect { remoteSession ->
                     val uid = remoteSession.uid
-                    Log.d(TAG, "fcm/timezone sync: session is Remote for uid=$uid")
+                    // Firebase UID is a stable per-user identifier; only interpolated into logs in
+                    // debug builds (CWE-532 — see docs/security/SECURITY_AUDIT.md F-03).
+                    if (BuildConfig.DEBUG) Log.d(TAG, "fcm/timezone sync: session is Remote for uid=$uid")
                     runCatching {
                         val zoneId = deviceTimeZoneId()
-                        Log.d(TAG, "fcm/timezone sync: writing timeZone=$zoneId for uid=$uid")
+                        if (BuildConfig.DEBUG) Log.d(TAG, "fcm/timezone sync: writing timeZone=$zoneId for uid=$uid")
                         remoteSession.notifications.setTimeZone(zoneId)
                         Log.d(TAG, "fcm/timezone sync: timeZone write succeeded")
                         val token = FirebaseMessaging.getInstance().token.await()
-                        Log.d(TAG, "fcm/timezone sync: got FCM token, registering for uid=$uid")
+                        if (BuildConfig.DEBUG) Log.d(TAG, "fcm/timezone sync: got FCM token, registering for uid=$uid")
                         fcmTokenRepository.registerToken(uid, token)
                         Log.d(TAG, "fcm/timezone sync: token registration succeeded")
                     }.onFailure { error ->
-                        Log.e(TAG, "fcm/timezone sync: FAILED for uid=$uid", error)
+                        if (BuildConfig.DEBUG) {
+                            Log.e(TAG, "fcm/timezone sync: FAILED for uid=$uid", error)
+                        } else {
+                            Log.e(TAG, "fcm/timezone sync: FAILED", error)
+                        }
                     }
                 }
         }
