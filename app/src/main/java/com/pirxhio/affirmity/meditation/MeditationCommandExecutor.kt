@@ -69,14 +69,30 @@ class TimerCommandExecutor(
     }
 }
 
-/** Exposes the id of the last [ShowText] command as UI-observable state — the domain only ever
- * says "show this text id"; resolving it to an actual string is the UI's job. */
+/** Exposes the id of the last [ShowText] command, and the value of the last [ShowLiteralText]
+ * command, as UI-observable state — the domain only ever says "show this text id" or "show this
+ * literal string"; resolving a text id to an actual string is the UI's job. The two are mutually
+ * exclusive: whichever command fires clears the other, so a phase tree never has to worry about
+ * stale content from a previous phase's cue leaking through the command it didn't use. */
 class TextDisplayCommandExecutor : MeditationCommandExecutor {
     private val _currentTextId = MutableStateFlow<String?>(null)
     val currentTextId: StateFlow<String?> = _currentTextId.asStateFlow()
 
+    private val _currentLiteralText = MutableStateFlow<String?>(null)
+    val currentLiteralText: StateFlow<String?> = _currentLiteralText.asStateFlow()
+
     override fun execute(command: MeditationCommand) {
-        if (command is ShowText) _currentTextId.value = command.textId
+        when (command) {
+            is ShowText -> {
+                _currentTextId.value = command.textId
+                _currentLiteralText.value = null
+            }
+            is ShowLiteralText -> {
+                _currentLiteralText.value = command.value
+                _currentTextId.value = null
+            }
+            else -> Unit
+        }
     }
 }
 

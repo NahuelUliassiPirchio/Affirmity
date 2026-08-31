@@ -13,6 +13,13 @@ data class PlayAudio(val audioId: String) : MeditationCommand
 data class StopAudio(val audioId: String? = null) : MeditationCommand
 data class ShowText(val textId: String) : MeditationCommand
 
+/** Like [ShowText], but carries the string to display directly instead of an id the catalog
+ * resolves through `MeditationPresentation.textResources`. For content that only exists at
+ * runtime — e.g. an affirmation pulled from the user's own catalog — and can never be a
+ * build-time `@StringRes`. Mutually exclusive with [ShowText] in [TextDisplayCommandExecutor]:
+ * whichever fires last is what's shown. */
+data class ShowLiteralText(val value: String) : MeditationCommand
+
 /** [durationMillis] null means "no fixed duration" — the timer still runs (so elapsed time is
  * observable) but never emits [MeditationEvent.TimerCompleted]. [generation] lets the executor
  * tag the events it feeds back to the engine — see [MeditationEvent.TimerTick]. */
