@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.pirxhio.affirmity.access.ContentAccess
 import com.pirxhio.affirmity.meditation.MeditationDefinition
+import com.pirxhio.affirmity.meditation.customization.CustomizationField
 
 /**
  * One shipping guided meditation. Direct analogue of
@@ -30,8 +31,17 @@ data class MeditationCatalogEntry(
     val access: ContentAccess,
     /** Lazy by decision: built on launch, never at class-init. Deferring construction avoids
      * turning a content authoring bug (a failed `require(...)` in a definition builder) into an
-     * app-startup crash. */
-    val definition: () -> MeditationDefinition,
+     * app-startup crash.
+     *
+     * Takes the confirmed customization values (keyed by each [CustomizationField]'s `key`, string
+     * -encoded per that type's docs) collected by the pre-session customization screen. Entries
+     * with an empty [customizationFields] ignore the map — it is `emptyMap()` in that case, so
+     * behavior for every entry without fields is identical to the old no-arg factory. */
+    val definition: (config: Map<String, String>) -> MeditationDefinition,
     /** Everything the generic screen needs to render THIS entry. */
     val presentation: MeditationPresentation,
+    /** Adjustable knobs shown on the pre-session customization screen before [definition] is
+     * built. Empty (the default) means the entry launches straight into the session, exactly as
+     * before this field existed. */
+    val customizationFields: List<CustomizationField> = emptyList(),
 )

@@ -162,6 +162,23 @@ val MIGRATION_8_9 = object : androidx.room.migration.Migration(8, 9) {
     }
 }
 
+/** Additive: creates `meditation_customizations` empty (spec: meditation-customization). One row
+ * per meditation id, written the first time a user confirms the pre-session customization screen
+ * for that meditation -- nothing to backfill, no prior customization state ever existed. */
+val MIGRATION_9_10 = object : androidx.room.migration.Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `meditation_customizations` (
+                `meditationId` TEXT NOT NULL,
+                `values` TEXT NOT NULL DEFAULT '{}',
+                PRIMARY KEY(`meditationId`)
+            )
+            """.trimIndent(),
+        )
+    }
+}
+
 @Database(
     entities = [
         AffirmationEntity::class,
@@ -173,8 +190,9 @@ val MIGRATION_8_9 = object : androidx.room.migration.Migration(8, 9) {
         TimedAdUnlockEntity::class,
         CatalogAffirmationEntity::class,
         CatalogOverrideEntity::class,
+        MeditationCustomizationEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 @androidx.room.TypeConverters(OverridesConverters::class)
@@ -188,6 +206,7 @@ abstract class AffirmityDatabase : RoomDatabase() {
     abstract fun timedAdUnlockDao(): TimedAdUnlockDao
     abstract fun catalogAffirmationDao(): CatalogAffirmationDao
     abstract fun catalogOverrideDao(): CatalogOverrideDao
+    abstract fun meditationCustomizationDao(): MeditationCustomizationDao
 
     companion object {
         @Volatile
@@ -208,6 +227,7 @@ abstract class AffirmityDatabase : RoomDatabase() {
                     MIGRATION_6_7,
                     MIGRATION_7_8,
                     MIGRATION_8_9,
+                    MIGRATION_9_10,
                 ).build().also { instance = it }
             }
     }

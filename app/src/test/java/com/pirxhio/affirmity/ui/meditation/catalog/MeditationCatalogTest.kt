@@ -10,6 +10,7 @@ import com.pirxhio.affirmity.meditation.MeditationEngine
 import com.pirxhio.affirmity.meditation.MeditationEvent
 import com.pirxhio.affirmity.meditation.Phase
 import com.pirxhio.affirmity.meditation.PhaseDuration
+import com.pirxhio.affirmity.meditation.PlayAudio
 import com.pirxhio.affirmity.meditation.PlayVoice
 import com.pirxhio.affirmity.meditation.SessionStatus
 import com.pirxhio.affirmity.meditation.ShowText
@@ -77,9 +78,9 @@ class MeditationCatalogTest {
     // --- 1. Exactly 7 entries, in §4.6 order, with the exact ids and access companions ----------
 
     @Test
-    fun `1 - exactly 7 entries, in REQ-4-6 order, with the exact ids and access companions`() {
+    fun `1 - exactly 38 entries, REQ-4-6's 7 first in order, then the breathing-technique batch, then the mindfulness-silence-movement-mantra batch, then the prayer-contemplation batch, then the body-mind batch, then the visualization-and-christian-prayer batch, then the breathing-affirmations hybrid, with the exact ids and access companions`() {
         val catalog = meditationCatalog()
-        assertEquals(7, catalog.size)
+        assertEquals(38, catalog.size)
         assertEquals(
             listOf(
                 "reset_rapido" to ContentAccess.Free,
@@ -89,6 +90,37 @@ class MeditationCatalogTest {
                 "body_scan" to ContentAccess.Pro,
                 "autocompasion_5" to ContentAccess.Free,
                 "autocompasion_10" to ContentAccess.Pro,
+                "box_breathing" to ContentAccess.Free,
+                "breathing_4_7_8" to ContentAccess.Free,
+                "extended_exhale" to ContentAccess.ProOrAdPerUse,
+                "coherent_breathing" to ContentAccess.Pro,
+                "nadi_shodhana" to ContentAccess.Pro,
+                "bhramari" to ContentAccess.ProOrAdTrial,
+                "kapalabhati" to ContentAccess.Pro,
+                "breath_of_fire" to ContentAccess.ProOrAdTrial,
+                "anapanasati" to ContentAccess.Free,
+                "vipassana" to ContentAccess.Pro,
+                "metta" to ContentAccess.ProOrAdPerUse,
+                "zazen" to ContentAccess.Pro,
+                "walking_meditation" to ContentAccess.ProOrAdTrial,
+                "mantra_meditation" to ContentAccess.Free,
+                "om_meditation" to ContentAccess.ProOrAdTrial,
+                "so_hum" to ContentAccess.Pro,
+                "dhikr" to ContentAccess.Free,
+                "muraqabah" to ContentAccess.ProOrAdPerUse,
+                "hitbodedut" to ContentAccess.Pro,
+                "self_compassion_break" to ContentAccess.ProOrAdTrial,
+                "trataka" to ContentAccess.ProOrAdPerUse,
+                "yoganidra" to ContentAccess.Pro,
+                "open_awareness" to ContentAccess.Free,
+                "noting" to ContentAccess.ProOrAdTrial,
+                "progressive_muscle_relaxation" to ContentAccess.Pro,
+                "visualization" to ContentAccess.ProOrAdPerUse,
+                "gratitude_meditation" to ContentAccess.Free,
+                "centering_prayer" to ContentAccess.Pro,
+                "jesus_prayer" to ContentAccess.ProOrAdTrial,
+                "lectio_divina" to ContentAccess.Pro,
+                "breathing_affirmations" to ContentAccess.Pro,
             ),
             catalog.map { it.id to it.access },
         )
@@ -121,9 +153,19 @@ class MeditationCatalogTest {
 
     @Test
     fun `4 - every entry's definition builds without throwing and has a unique definition id`() {
-        val definitionIds = meditationCatalog().map { it.definition().id }
+        val definitionIds = meditationCatalog().map { it.definition(emptyMap()).id }
         assertEquals(
-            listOf("quickreset", "calm", "focus", "sleep", "bodyscan", "selfcompassion5", "selfcompassion10"),
+            listOf(
+                "quickreset", "calm", "focus", "sleep", "bodyscan", "selfcompassion5", "selfcompassion10",
+                "boxbreathing", "breathing478", "extendedexhale", "coherentbreathing", "nadishodhana",
+                "bhramari", "kapalabhati", "breathoffire",
+                "anapanasati", "vipassana", "metta", "zazen", "walking", "mantra",
+                "om", "sohum",
+                "dhikr", "muraqabah", "hitbodedut", "selfcompassionbreak",
+                "trataka", "yoganidra", "openawareness", "noting", "progressivemusclerelaxation",
+                "visualization", "gratitudemeditation", "centeringprayer", "jesusprayer", "lectiodivina",
+                "breathingaffirmations",
+            ),
             definitionIds,
         )
         assertEquals(definitionIds.size, definitionIds.toSet().size)
@@ -134,17 +176,38 @@ class MeditationCatalogTest {
     @Test
     fun `5 - phase ids are globally unique within each entry's own tree`() {
         meditationCatalog().forEach { entry ->
-            val phaseIds = collectPhases(entry.definition().root).map { it.id }
+            val phaseIds = collectPhases(entry.definition(emptyMap()).root).map { it.id }
             assertEquals("${entry.id}: duplicate phase ids in $phaseIds", phaseIds.size, phaseIds.toSet().size)
         }
     }
 
     // --- 6. Presentation completeness -------------------------------------------------------------
 
+    /** Entries whose reachable [ShowText] ids depend on customization choices (a config-conditional
+     * phase tree, e.g. a toggle that inserts extra phases) -- assertion 6 unions the reachable set
+     * across every config listed here on top of the `emptyMap()` baseline, instead of the single
+     * default tree every other entry is checked against. */
+    private val configVariantsForReachability: Map<String, List<Map<String, String>>> = mapOf(
+        "nadi_shodhana" to listOf(mapOf("retention" to "true")),
+        "hitbodedut" to listOf(
+            mapOf("guidedPrompts" to "false"),
+            mapOf("promptTopics" to "gratitude|concerns|requests|relationships|purpose|forgiveness"),
+        ),
+        "centering_prayer" to listOf(mapOf("openingGuidance" to "false")),
+        // breathing_affirmations: HOLD is only emitted by the box_breathing technique branch, and
+        // the affirmation-unavailable fallback (already reachable at the emptyMap() baseline, since
+        // this test never populates "affirmationText.0"..) is the only affirmation-phase cue this
+        // static check can ever exercise -- the real per-affirmation ShowLiteralText content is
+        // runtime-fetched, never a textResources-mapped id, so it's outside this assertion's scope.
+        "breathing_affirmations" to listOf(mapOf("breathingTechnique" to "box_breathing")),
+    )
+
     @Test
     fun `6 - every reachable ShowText id has a textResources mapping, and textResources has no unused keys`() {
         meditationCatalog().forEach { entry ->
-            val reachableTextIds = collectCommands(entry.definition().root)
+            val configs = listOf(emptyMap<String, String>()) + configVariantsForReachability[entry.id].orEmpty()
+            val reachableTextIds = configs
+                .flatMap { config -> collectCommands(entry.definition(config).root) }
                 .filterIsInstance<ShowText>()
                 .map { it.textId }
                 .toSet()
@@ -161,7 +224,7 @@ class MeditationCatalogTest {
     @Test
     fun `7 - each declared counter total minus 1 equals the real engine-driven max iteration for its repeat id`() {
         meditationCatalog().forEach { entry ->
-            val result = simulate(entry.definition())
+            val result = simulate(entry.definition(emptyMap()))
             entry.presentation.counters.forEach { counter ->
                 assertEquals(
                     "${entry.id}/${counter.repeatId}",
@@ -177,7 +240,7 @@ class MeditationCatalogTest {
     @Test
     fun `8 - duration tolerance plus AR-1 and AR-2 hold for every entry`() {
         meditationCatalog().forEach { entry ->
-            val result = simulate(entry.definition())
+            val result = simulate(entry.definition(emptyMap()))
             assertEquals("${entry.id}: manual phases (AR-2)", 0, result.manualPhases)
             assertEquals("${entry.id}: gated phases (AR-1)", 0, result.gatedPhases)
             val declared = entry.approxDurationMinutes * 60_000L
@@ -197,10 +260,11 @@ class MeditationCatalogTest {
     // --- 9. DC-1 guard: command-vocabulary subset -------------------------------------------------
 
     @Test
-    fun `9 - DC-1 guard - the union of all commands across all 7 entries is a subset of the whitelist`() {
-        val whitelist = setOf(ShowText::class, PlayVoice::class, StartAmbient::class, StopAmbient::class)
+    fun `9 - DC-1 guard - the union of all commands across all entries is a subset of the whitelist`() {
+        val whitelist =
+            setOf(ShowText::class, PlayVoice::class, StartAmbient::class, StopAmbient::class, PlayAudio::class)
         meditationCatalog().forEach { entry ->
-            collectCommands(entry.definition().root).forEach { command ->
+            collectCommands(entry.definition(emptyMap()).root).forEach { command ->
                 assertTrue("${entry.id}: unexpected command ${command::class}", command::class in whitelist)
             }
         }
@@ -211,7 +275,7 @@ class MeditationCatalogTest {
     @Test
     fun `10 - AR-3 guard - a terminal StopAmbient fade is at most 5s and strictly shorter than its Fixed phase`() {
         meditationCatalog().forEach { entry ->
-            val lastPhase = collectPhases(entry.definition().root).last()
+            val lastPhase = collectPhases(entry.definition(emptyMap()).root).last()
             val stopAmbient = lastPhase.onEnter.filterIsInstance<StopAmbient>().firstOrNull() ?: return@forEach
             assertTrue("${entry.id}: fade must be <= 5000ms", stopAmbient.fadeOutMillis <= 5_000L)
             val duration = lastPhase.duration
@@ -226,7 +290,7 @@ class MeditationCatalogTest {
     // --- 11. audioResources.isEmpty() tripwire ------------------------------------------------------
 
     @Test
-    fun `11 - audioResources is empty for all 7 entries`() {
+    fun `11 - audioResources is empty for all entries`() {
         meditationCatalog().forEach { entry ->
             assertTrue("${entry.id}: audioResources must be empty", entry.presentation.audioResources.isEmpty())
         }

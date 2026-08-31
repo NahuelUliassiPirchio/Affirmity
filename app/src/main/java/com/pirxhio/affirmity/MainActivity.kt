@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Mood
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.BottomSheetScaffold
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -100,6 +101,12 @@ import com.pirxhio.affirmity.ui.progress.ProgressScreen
 import com.pirxhio.affirmity.ui.settings.NotificationDebugScreen
 import com.pirxhio.affirmity.ui.settings.SettingsScreen
 import com.pirxhio.affirmity.ui.theme.AffirmityTheme
+import com.pirxhio.affirmity.data.local.AffirmityDatabase
+import com.pirxhio.affirmity.data.repository.RoomCatalogAffirmationRepository
+import com.pirxhio.affirmity.data.repository.RoomMeditationCustomizationRepository
+import com.pirxhio.affirmity.ui.meditation.customization.affirmationTextsForBreathingAffirmations
+import com.pirxhio.affirmity.meditation.customization.resolvedValues
+import com.pirxhio.affirmity.ui.meditation.customization.MeditationCustomizationScreen
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -148,6 +155,55 @@ internal fun isMeditationLaunchBlocked(
     grants: com.pirxhio.affirmity.access.AdUnlockState,
     nowMillis: Long,
 ): Boolean = isMeditationLocked(meditationAccessDecision(entry, tier, grants, nowMillis))
+
+/** The one catalog entry whose session cannot start straight from [MeditationLaunchStep.StartSession]'s
+ * `customization` map: its affirmation phase needs real content fetched from the (separate)
+ * affirmations feature first (see [affirmationTextsForBreathingAffirmations]), which is async and
+ * therefore cannot happen inside [MeditationCatalogEntry.definition] itself. Every other entry is
+ * provably unaffected by that enrichment step -- it's gated on this exact id, nowhere else. */
+private const val BREATHING_AFFIRMATIONS_ENTRY_ID = "breathing_affirmations"
+
+/**
+ * The two possible outcomes of [decideMeditationLaunchStep]: an already-unlocked entry either
+ * needs its pre-session customization screen shown first, or is ready to go straight into
+ * [com.pirxhio.affirmity.ui.meditation.GuidedMeditationScreen] with a resolved config map.
+ */
+internal sealed interface MeditationLaunchStep {
+    /** [seedValues] is what [com.pirxhio.affirmity.ui.meditation.customization.MeditationCustomizationScreen]
+     * should be initialized with -- the saved per-device values with any field the current
+     * `customizationFields` spec still declares but [savedValues] is missing filled in from that
+     * field's own default (see [resolvedValues]). */
+    data class ShowCustomization(val seedValues: Map<String, String>) : MeditationLaunchStep
+
+    /** [customization] is the exact map [com.pirxhio.affirmity.ui.meditation.GuidedMeditationScreen]
+     * passes through to `entry.definition(...)`: `emptyMap()` for a no-fields entry (skip-through,
+     * matching pre-customization behavior), or the confirmed values once the user has confirmed
+     * the customization screen. */
+    data class StartSession(val customization: Map<String, String>) : MeditationLaunchStep
+}
+
+/**
+ * Pre-session customization decision (spec: meditation-customization, REQ-5.4). Extracted out of
+ * [AffirmityApp] so a plain JUnit test can drive the exact "show customization vs skip straight to
+ * the session, and what values/config to hand each destination" branch the composable evaluates on
+ * every recomposition of an unlocked meditation entry -- without needing a Compose test
+ * harness (this repo has none; see `MeditationCustomizationDecisionTest`).
+ *
+ * Only called once [entry] has already passed the [isMeditationLaunchBlocked] access re-check, so
+ * "is this entry unlocked" is never re-decided here.
+ */
+internal fun decideMeditationLaunchStep(
+    entry: com.pirxhio.affirmity.ui.meditation.catalog.MeditationCatalogEntry,
+    confirmedCustomization: Map<String, String>?,
+    savedValues: Map<String, String>,
+): MeditationLaunchStep =
+    if (entry.customizationFields.isNotEmpty() && confirmedCustomization == null) {
+        MeditationLaunchStep.ShowCustomization(
+            seedValues = resolvedValues(entry.customizationFields, savedValues),
+        )
+    } else {
+        MeditationLaunchStep.StartSession(customization = confirmedCustomization ?: emptyMap())
+    }
 
 /**
  * Guided-completion streak bookkeeping (REQ-5.6, AC6). Extracted out of [AffirmityApp]'s
@@ -257,11 +313,29 @@ fun AffirmityApp(
     // REQ-5.4: replaces the old single-demo boolean. Holds a MeditationCatalogEntry.id so the
     // guided session route is parameterized on which entry to play, not just whether to show one.
     var selectedMeditationEntryId by rememberSaveable { mutableStateOf<String?>(null) }
+    // Confirmed pre-session customization values (spec: meditation-customization) for the
+    // currently selected entry. Keyed by selectedMeditationEntryId itself, NOT just remembered
+    // bare -- picking a different meditation (which always passes through the id going back to
+    // null first, since the catalog only re-renders once no entry is selected) must not leak a
+    // previous entry's confirmed config into an unrelated one's session.
+    var confirmedMeditationCustomization by remember(selectedMeditationEntryId) {
+        mutableStateOf<Map<String, String>?>(null)
+    }
     // D8: replaces the old showPaywall boolean -- null means hidden, and "shown without a source"
     // is unrepresentable. Every trigger surface supplies its own PaywallSource (spec §5.3).
     var paywallSource by rememberSaveable { mutableStateOf<PaywallSource?>(null) }
     val appState = rememberAffirmityAppState()
     val context = LocalContext.current
+    // Local-only, deliberately outside AffirmityAppState/DataSession (see
+    // RoomMeditationCustomizationRepository's doc) -- a per-device knob position, not account data.
+    val meditationCustomizationRepository = remember {
+        RoomMeditationCustomizationRepository(AffirmityDatabase.getInstance(context).meditationCustomizationDao())
+    }
+    // Only ever read by the "breathing_affirmations" hybrid entry's own enrichment step below --
+    // every other entry never touches this repository (see decideMeditationLaunchStep's doc).
+    val catalogAffirmationRepository = remember {
+        RoomCatalogAffirmationRepository(AffirmityDatabase.getInstance(context).catalogAffirmationDao())
+    }
 
     // Shared upgrade-CTA routing (design.md D7): signed-out taps route to sign-in, never straight
     // to the paywall -- used by both the group selector sheet's per-row CTA and any other entry
@@ -496,69 +570,143 @@ fun AffirmityApp(
             // releasing audio so cancellation bookkeeping is preserved.
             LaunchedEffect(selectedMeditationEntry.id) { selectedMeditationEntryId = null }
         } else {
-            val backDispatcherOwner = LocalOnBackPressedDispatcherOwner.current
-            Scaffold(
-                modifier = Modifier.fillMaxSize(),
-                topBar = {
-                    TopAppBar(
-                        title = { Text(stringResource(selectedMeditationEntry.titleRes)) },
-                        navigationIcon = {
-                            // Single back path (REQ-5.4.2): GuidedMeditationScreen owns the one
-                            // BackHandler for this route -- it must dispatch
-                            // MeditationEvent.Cancel and emit onSessionEnded before exiting. This
-                            // icon triggers that SAME registered callback via the system back
-                            // dispatcher instead of reimplementing the exit logic here, so there
-                            // is exactly one back path, not two.
-                            IconButton(
-                                onClick = {
-                                    backDispatcherOwner?.onBackPressedDispatcher?.onBackPressed()
-                                },
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = stringResource(R.string.nav_back_content_description)
-                                )
+            // True exactly when this entry's customization screen is actually about to be shown
+            // (mirrors decideMeditationLaunchStep's own condition) -- gates the repository read
+            // below so a no-fields entry, or one whose customization is already confirmed, never
+            // triggers an unnecessary meditationCustomizationDao query, matching pre-extraction
+            // behavior (that read used to live entirely inside this branch).
+            val needsSavedCustomizationValues =
+                selectedMeditationEntry.customizationFields.isNotEmpty() && confirmedMeditationCustomization == null
+            // Saved per-device customization values (spec: meditation-customization), fetched
+            // async -- starts empty (so decideMeditationLaunchStep resolves pure defaults for the
+            // very first frame, same as before this extraction) and is filled in once the
+            // LaunchedEffect below resolves. Compose-only timing/coroutine-launch mechanics; the
+            // actual decision of what to do with these values is decideMeditationLaunchStep.
+            var savedCustomizationValues by remember(selectedMeditationEntry.id) {
+                mutableStateOf(emptyMap<String, String>())
+            }
+            LaunchedEffect(selectedMeditationEntry.id, needsSavedCustomizationValues) {
+                if (needsSavedCustomizationValues) {
+                    savedCustomizationValues = meditationCustomizationRepository.getValues(selectedMeditationEntry.id)
+                }
+            }
+            val launchStep = decideMeditationLaunchStep(
+                entry = selectedMeditationEntry,
+                confirmedCustomization = confirmedMeditationCustomization,
+                savedValues = savedCustomizationValues,
+            )
+            when (launchStep) {
+                is MeditationLaunchStep.ShowCustomization -> {
+                    // Pre-session customization step. Sits strictly after the access re-check
+                    // above -- an entry never reaches this branch unless it's already unlocked --
+                    // and strictly before GuidedMeditationScreen ever calls entry.definition(...),
+                    // so no session can start with an unconfirmed/unsaved config.
+                    MeditationCustomizationScreen(
+                        entry = selectedMeditationEntry,
+                        initialValues = launchStep.seedValues,
+                        onStart = { values ->
+                            snackbarScope.launch {
+                                meditationCustomizationRepository.saveValues(selectedMeditationEntry.id, values)
                             }
-                        }
+                            confirmedMeditationCustomization = values
+                        },
+                        onCancel = { selectedMeditationEntryId = null },
                     )
                 }
-            ) { innerPadding ->
-                GuidedMeditationScreen(
-                    entry = selectedMeditationEntry,
-                    modifier = Modifier.padding(innerPadding),
-                    accessAtStart = {
-                        meditationAccessDecision(
-                            selectedMeditationEntry,
-                            appState.entitlementTier.value,
-                            appState.adUnlockState,
-                            System.currentTimeMillis(),
+                is MeditationLaunchStep.StartSession -> {
+                    // Special-cased async enrichment for the ONE entry whose config needs runtime
+                    // content a synchronous entry.definition(...) call can't fetch itself (see
+                    // BREATHING_AFFIRMATIONS_ENTRY_ID's doc). Every other entry: this block resolves
+                    // synchronously to launchStep.customization, unchanged, on the very first frame --
+                    // no loading state, no repository read, identical to pre-enrichment behavior.
+                    val needsAffirmationContent = selectedMeditationEntry.id == BREATHING_AFFIRMATIONS_ENTRY_ID
+                    var resolvedSessionCustomization by remember(selectedMeditationEntry.id, launchStep) {
+                        mutableStateOf(if (needsAffirmationContent) null else launchStep.customization)
+                    }
+                    LaunchedEffect(selectedMeditationEntry.id, launchStep) {
+                        if (needsAffirmationContent) {
+                            val affirmationTexts = affirmationTextsForBreathingAffirmations(
+                                universe = launchStep.customization["affirmationUniverse"] ?: "adaptive",
+                                count = launchStep.customization["affirmationCount"]?.toIntOrNull() ?: 5,
+                                affirmationRepository = catalogAffirmationRepository,
+                            )
+                            resolvedSessionCustomization = launchStep.customization +
+                                affirmationTexts.mapIndexed { index, text -> "affirmationText.$index" to text }
+                        }
+                    }
+                    val sessionCustomization = resolvedSessionCustomization
+                    if (sessionCustomization == null) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                        return
+                    }
+                    val backDispatcherOwner = LocalOnBackPressedDispatcherOwner.current
+                    Scaffold(
+                        modifier = Modifier.fillMaxSize(),
+                        topBar = {
+                            TopAppBar(
+                                title = { Text(stringResource(selectedMeditationEntry.titleRes)) },
+                                navigationIcon = {
+                                    // Single back path (REQ-5.4.2): GuidedMeditationScreen owns the
+                                    // one BackHandler for this route -- it must dispatch
+                                    // MeditationEvent.Cancel and emit onSessionEnded before exiting.
+                                    // This icon triggers that SAME registered callback via the
+                                    // system back dispatcher instead of reimplementing the exit
+                                    // logic here, so there is exactly one back path, not two.
+                                    IconButton(
+                                        onClick = {
+                                            backDispatcherOwner?.onBackPressedDispatcher?.onBackPressed()
+                                        },
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                            contentDescription = stringResource(R.string.nav_back_content_description)
+                                        )
+                                    }
+                                }
+                            )
+                        }
+                    ) { innerPadding ->
+                        GuidedMeditationScreen(
+                            entry = selectedMeditationEntry,
+                            modifier = Modifier.padding(innerPadding),
+                            customization = sessionCustomization,
+                            accessAtStart = {
+                                meditationAccessDecision(
+                                    selectedMeditationEntry,
+                                    appState.entitlementTier.value,
+                                    appState.adUnlockState,
+                                    System.currentTimeMillis(),
+                                )
+                            },
+                            onAccessBlocked = { selectedMeditationEntryId = null },
+                            // The streak-bug fix (REQ-5.6): guided completion now calls the same
+                            // recordMeditationCompleted() the free timer already calls at its own
+                            // call site. consumeMeditationPlaybackUnlock runs for BOTH terminal
+                            // reasons (an ad watched and then abandoned mid-session is still a
+                            // use); recordMeditationCompleted only for Completed.
+                            onSessionEnded = { reason, elapsedSeconds, startWallMillis ->
+                                handleGuidedMeditationSessionEnded(
+                                    entryId = selectedMeditationEntry.id,
+                                    reason = reason,
+                                    elapsedSeconds = elapsedSeconds,
+                                    accessDecision = meditationAccessDecision(
+                                        selectedMeditationEntry,
+                                        appState.entitlementTier.value,
+                                        appState.adUnlockState,
+                                        System.currentTimeMillis(),
+                                    ),
+                                    consumePlaybackUnlock = appState::consumeMeditationPlaybackUnlock,
+                                    recordMeditationCompleted = { appState.recordMeditationCompleted(startWallMillis) },
+                                    emit = appState::logAnalyticsEvent,
+                                )
+                            },
+                            onExit = { selectedMeditationEntryId = null },
+                            onEvent = appState::logAnalyticsEvent,
                         )
-                    },
-                    onAccessBlocked = { selectedMeditationEntryId = null },
-                    // The streak-bug fix (REQ-5.6): guided completion now calls the same
-                    // recordMeditationCompleted() the free timer already calls at its own call
-                    // site. consumeMeditationPlaybackUnlock runs for BOTH terminal reasons (an ad
-                    // watched and then abandoned mid-session is still a use); recordMeditationCompleted
-                    // only for Completed.
-                    onSessionEnded = { reason, elapsedSeconds, startWallMillis ->
-                        handleGuidedMeditationSessionEnded(
-                            entryId = selectedMeditationEntry.id,
-                            reason = reason,
-                            elapsedSeconds = elapsedSeconds,
-                            accessDecision = meditationAccessDecision(
-                                selectedMeditationEntry,
-                                appState.entitlementTier.value,
-                                appState.adUnlockState,
-                                System.currentTimeMillis(),
-                            ),
-                            consumePlaybackUnlock = appState::consumeMeditationPlaybackUnlock,
-                            recordMeditationCompleted = { appState.recordMeditationCompleted(startWallMillis) },
-                            emit = appState::logAnalyticsEvent,
-                        )
-                    },
-                    onExit = { selectedMeditationEntryId = null },
-                    onEvent = appState::logAnalyticsEvent,
-                )
+                    }
+                }
             }
         }
         return

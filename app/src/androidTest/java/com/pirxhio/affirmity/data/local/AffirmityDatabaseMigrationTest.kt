@@ -210,6 +210,31 @@ class AffirmityDatabaseMigrationTest {
         }
     }
 
+    /** Covers spec meditation-customization: `meditation_customizations` is created empty and
+     * every pre-existing table/row is untouched -- there is no prior customization state to
+     * backfill from, since the feature ships in this same version. */
+    @Test
+    fun migrate9To10_createsEmptyMeditationCustomizationsTableAndLeavesExistingTablesUntouched() {
+        helper.createDatabase(TEST_DB, 9).apply {
+            execSQL(
+                "INSERT INTO affirmations " +
+                    "(id, title, subtitle, backgroundType, backgroundValue, groupId, overrides) " +
+                    "VALUES ('id-1', 'Title', 'Subtitle', 'color', '#000000', 'personalizadas', '{}')",
+            )
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(TEST_DB, 10, true, MIGRATION_9_10)
+
+        migrated.query("SELECT * FROM meditation_customizations").use { cursor ->
+            assertFalse(cursor.moveToFirst())
+        }
+        migrated.query("SELECT title FROM affirmations WHERE id = 'id-1'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("Title", cursor.getString(0))
+        }
+    }
+
     private companion object {
         const val TEST_DB = "migration-test"
     }

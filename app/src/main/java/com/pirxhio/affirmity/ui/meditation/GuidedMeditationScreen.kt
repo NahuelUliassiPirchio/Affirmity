@@ -73,6 +73,10 @@ import com.pirxhio.affirmity.ui.meditation.catalog.isMeditationLocked
 fun GuidedMeditationScreen(
     entry: MeditationCatalogEntry,
     modifier: Modifier = Modifier,
+    /** Confirmed values from the pre-session customization screen, keyed by field id. Populated
+     * per-entry based on the meditation's spec-defined customizable fields; empty only for
+     * entries with no [MeditationCatalogEntry.customizationFields]. */
+    customization: Map<String, String> = emptyMap(),
     /** Re-resolved by the caller when Start is pressed, so time-bound access cannot expire while
      * this screen sits idle and still start gated content. The returned decision also tags
      * [AnalyticsEvent.MeditationStarted]'s `access_decision` parameter. */
@@ -107,7 +111,7 @@ fun GuidedMeditationScreen(
         return ((AndroidMonotonicTimeSource.nowMillis() - start) / 1000L).coerceAtLeast(0L)
     }
 
-    val definition = remember(entry) { entry.definition() }
+    val definition = remember(entry, customization) { entry.definition(customization) }
     val textExecutor = remember(definition) { TextDisplayCommandExecutor() }
     val phaseDurations = remember(definition) { fixedPhaseDurationsById(definition) }
 
@@ -139,6 +143,7 @@ fun GuidedMeditationScreen(
 
     val state by engine.state.collectAsState()
     val currentTextId by textExecutor.currentTextId.collectAsState()
+    val currentLiteralText by textExecutor.currentLiteralText.collectAsState()
     var exitHandled by remember { mutableStateOf(false) }
 
     // Site A (REQ-5.2): extends the existing status-driven effect in place, fires exactly on
@@ -197,6 +202,7 @@ fun GuidedMeditationScreen(
         modifier = modifier,
         state = state,
         currentTextId = currentTextId,
+        currentLiteralText = currentLiteralText,
         entry = entry,
         phaseDurations = phaseDurations,
         onStart = {
@@ -244,6 +250,7 @@ private fun GuidedMeditationContent(
     modifier: Modifier,
     state: MeditationRuntimeState,
     currentTextId: String?,
+    currentLiteralText: String?,
     entry: MeditationCatalogEntry,
     phaseDurations: Map<String, Long>,
     onStart: () -> Unit,
@@ -302,7 +309,7 @@ private fun GuidedMeditationContent(
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = phaseLabel(currentTextId, state.status, entry.presentation.textResources),
+                    text = phaseLabel(currentTextId, currentLiteralText, state.status, entry.presentation.textResources),
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center,
@@ -392,10 +399,12 @@ private fun RoundIconButton(
 @Composable
 private fun phaseLabel(
     currentTextId: String?,
+    currentLiteralText: String?,
     status: SessionStatus,
     textResources: Map<String, Int>,
 ): String = when {
     // Terminal copy stays global, not per-entry: it is a screen state, not content.
     status == SessionStatus.Completed -> stringResource(R.string.guided_meditation_completed)
+    currentLiteralText != null -> currentLiteralText
     else -> currentTextId?.let { textResources[it] }?.let { stringResource(it) } ?: ""
 }
