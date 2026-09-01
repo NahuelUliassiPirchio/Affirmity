@@ -27,6 +27,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarHost
@@ -35,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.rememberBottomSheetScaffoldState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -48,6 +50,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -61,8 +64,6 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.pirxhio.affirmity.auth.AuthState
 import com.pirxhio.affirmity.billing.BillingService
 import com.pirxhio.affirmity.access.AccessDecision
-import com.pirxhio.affirmity.access.ContentKey
-import com.pirxhio.affirmity.access.ContentType
 import com.pirxhio.affirmity.analytics.AnalyticsEvent
 import com.pirxhio.affirmity.analytics.AnalyticsId
 import com.pirxhio.affirmity.analytics.PaywallPlan
@@ -79,11 +80,13 @@ import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
 import com.pirxhio.affirmity.ui.components.FloatingStatusOverlay
 import com.pirxhio.affirmity.ui.favorites.FavoritesScreen
-import com.pirxhio.affirmity.ui.groups.AffirmationGroupSelectorSheet
-import com.pirxhio.affirmity.ui.groups.groupAccessDecision
-import com.pirxhio.affirmity.ui.groups.isToggleable
-import com.pirxhio.affirmity.ui.groups.partiallyLockedGroupIds
-import com.pirxhio.affirmity.ui.groups.selectableAffirmationGroups
+import com.pirxhio.affirmity.ui.feed.SeeAllThemesScreen
+import com.pirxhio.affirmity.ui.feed.SurfaceDetailBottomSheet
+import com.pirxhio.affirmity.ui.feed.YourFeedSheetContent
+import com.pirxhio.affirmity.ui.feed.defaultRecommendedSurfaces
+import com.pirxhio.affirmity.ui.groups.catalogThemesById
+import com.pirxhio.affirmity.ui.groups.isThemeToggleable
+import com.pirxhio.affirmity.ui.groups.themeAccessDecision
 import com.pirxhio.affirmity.ui.healer.StreakHealerGrantedScreen
 import com.pirxhio.affirmity.ui.meditation.GuidedMeditationScreen
 import com.pirxhio.affirmity.ui.meditation.MeditationScreen
@@ -857,82 +860,64 @@ fun AffirmityApp(
             Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
             when (currentDestination) {
                 AppDestinations.AFIRMACIONES -> {
-                    val sheetState = rememberStandardBottomSheetState(
-                        initialValue = SheetValue.Expanded,
-                        skipHiddenState = true,
-                        confirmValueChange = { target ->
-                            target != SheetValue.PartiallyExpanded || appState.isDraftSelectionValid
-                        },
-                    )
-                    val scaffoldState = rememberBottomSheetScaffoldState(bottomSheetState = sheetState)
-                    val sheetScope = rememberCoroutineScope()
-                    // Recomputed ONLY when the entitlement tier or the grant state changes -- not
-                    // per recomposition, and never per row (design D19).
-                    val partiallyLockedIds = remember(appState.entitlementTier.value, appState.adUnlockState) {
-                        partiallyLockedGroupIds(
+                    // Docked, always-visible bottom sheet (feedback: the redesign must keep this
+                    // pattern, not open via a separate entry-point icon) -- same
+                    // BottomSheetScaffold/peek-row shape as the old group-selector sheet, now
+                    // hosting YourFeedSheetContent instead of the old flat group list.
+                    var openSurfaceId by remember { mutableStateOf<String?>(null) }
+                    var showSeeAllThemes by remember { mutableStateOf(false) }
+                    val recommendedSurfaces = remember { defaultRecommendedSurfaces() }
+                    val accessDecisionFor: (String) -> AccessDecision = { themeId ->
+                        themeAccessDecision(
+                            themeId,
                             appState.entitlementTier.value,
                             appState.adUnlockState,
                             System.currentTimeMillis(),
                         )
                     }
 
+                    val yourFeedSheetState = rememberStandardBottomSheetState(
+                        initialValue = SheetValue.PartiallyExpanded,
+                        skipHiddenState = true,
+                        confirmValueChange = { target ->
+                            target != SheetValue.PartiallyExpanded || appState.isDraftThemeSelectionValid
+                        },
+                    )
+                    val yourFeedScaffoldState = rememberBottomSheetScaffoldState(bottomSheetState = yourFeedSheetState)
+                    val yourFeedScope = rememberCoroutineScope()
+
                     BottomSheetScaffold(
-                        scaffoldState = scaffoldState,
+                        scaffoldState = yourFeedScaffoldState,
                         sheetPeekHeight = 64.dp,
                         sheetDragHandle = null,
                         sheetContent = {
-                            AffirmationGroupSelectorSheet(
-                                groups = selectableAffirmationGroups(),
-                                selectedIds = appState.draftGroupIds.value,
-                                isValid = appState.isDraftSelectionValid,
-                                isExpanded = sheetState.currentValue == SheetValue.Expanded,
-                                accessDecisionFor = {
-                                    groupAccessDecision(
-                                        it,
-                                        appState.entitlementTier.value,
-                                        appState.adUnlockState,
-                                        System.currentTimeMillis(),
-                                    )
-                                },
-                                onUpgradeClick = { onUpgradeClick(PaywallSource.GROUP_SELECTOR) },
-                                onToggle = { group ->
-                                    val decision = groupAccessDecision(
-                                        group,
-                                        appState.entitlementTier.value,
-                                        appState.adUnlockState,
-                                        System.currentTimeMillis(),
-                                    )
-                                    appState.toggleGroup(
-                                        group.id,
-                                        toggleable = isToggleable(group, decision),
-                                    )
-                                },
-                                onApply = {
-                                    if (appState.applyGroupSelection()) {
-                                        sheetScope.launch { sheetState.partialExpand() }
+                            YourFeedSheetContent(
+                                isExpanded = yourFeedSheetState.currentValue == SheetValue.Expanded,
+                                draftThemeIds = appState.draftThemeIds.value,
+                                isDirty = appState.draftThemeIds.value != appState.selectedThemeIds.value,
+                                isValid = appState.isDraftThemeSelectionValid,
+                                catalogThemesById = catalogThemesById(),
+                                recommendedSurfaces = recommendedSurfaces,
+                                accessDecisionFor = accessDecisionFor,
+                                onRemoveTheme = { themeId -> appState.toggleTheme(themeId, toggleable = true) },
+                                onOpenSurface = { surfaceId -> openSurfaceId = surfaceId },
+                                onSeeAllThemes = { showSeeAllThemes = true },
+                                onUpdateFeed = {
+                                    if (appState.applyThemeSelection()) {
+                                        yourFeedScope.launch { yourFeedSheetState.partialExpand() }
                                     }
                                 },
+                                onDone = {
+                                    appState.resetThemeDraftToCommitted()
+                                    yourFeedScope.launch { yourFeedSheetState.partialExpand() }
+                                },
                                 onPeekClick = {
-                                    sheetScope.launch {
-                                        appState.resetDraftToCommitted()
-                                        sheetState.expand()
+                                    yourFeedScope.launch {
+                                        appState.resetThemeDraftToCommitted()
+                                        yourFeedSheetState.expand()
                                     }
                                 },
                                 onFavoritesClick = { showFavorites = true },
-                                onAddCustomClick = { showMyAffirmations = true },
-                                onWatchAd = { group, policy ->
-                                    appState.requestAdUnlock(
-                                        ContentKey(ContentType.AFFIRMATION_GROUP, group.id),
-                                        policy,
-                                    )
-                                },
-                                adInFlightFor = { group ->
-                                    appState.adRequestInFlight.value ==
-                                        ContentKey(ContentType.AFFIRMATION_GROUP, group.id)
-                                },
-                                anyAdInFlight = appState.adRequestInFlight.value != null,
-                                onEvent = appState::logAnalyticsEvent,
-                                partiallyLockedIds = partiallyLockedIds,
                             )
                         },
                     ) {
@@ -943,6 +928,43 @@ fun AffirmityApp(
                             favoriteIds = appState.favoriteAffirmationIds.value,
                             onToggleFavorite = appState::toggleFavorite,
                         )
+                    }
+
+                    val openSurface = openSurfaceId?.let { id -> recommendedSurfaces.firstOrNull { it.id == id } }
+                    if (openSurface != null) {
+                        val detailSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                        SurfaceDetailBottomSheet(
+                            surface = openSurface,
+                            draftThemeIds = appState.draftThemeIds.value,
+                            accessDecisionFor = accessDecisionFor,
+                            onToggleTheme = { themeId ->
+                                appState.toggleTheme(themeId, toggleable = isThemeToggleable(accessDecisionFor(themeId)))
+                            },
+                            onUpgradeClick = { onUpgradeClick(PaywallSource.GROUP_SELECTOR) },
+                            onEvent = appState::logAnalyticsEvent,
+                            onDismiss = { openSurfaceId = null },
+                            sheetState = detailSheetState,
+                        )
+                    }
+
+                    if (showSeeAllThemes) {
+                        val seeAllSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+                        ModalBottomSheet(
+                            onDismissRequest = { showSeeAllThemes = false },
+                            sheetState = seeAllSheetState,
+                        ) {
+                            SeeAllThemesScreen(
+                                draftThemeIds = appState.draftThemeIds.value,
+                                accessDecisionFor = accessDecisionFor,
+                                onToggleTheme = { themeId ->
+                                    appState.toggleTheme(themeId, toggleable = isThemeToggleable(accessDecisionFor(themeId)))
+                                },
+                                onUpgradeClick = { onUpgradeClick(PaywallSource.GROUP_SELECTOR) },
+                                onEvent = appState::logAnalyticsEvent,
+                                onAddCustomClick = { showMyAffirmations = true },
+                                onClose = { showSeeAllThemes = false },
+                            )
+                        }
                     }
                 }
 

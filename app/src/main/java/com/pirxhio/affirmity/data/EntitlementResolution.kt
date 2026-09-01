@@ -57,6 +57,23 @@ fun deselectLockedGroups(
 }
 
 /**
+ * Theme-level equivalent of [deselectLockedGroups] ("Your feed" refactor): drops every id in
+ * [proOnlyIds] from [selected] -- except one still covered by a durable ad grant
+ * ([adUnlockedIds]) -- then falls back to [defaultThemeIds] if that removal left the selection
+ * empty. Simpler than its group-level counterpart because no theme is ever `personalizadas`
+ * (scope decision #2): there is no always-selected id to exempt from the emptiness check.
+ */
+fun deselectLockedThemes(
+    selected: Set<String>,
+    proOnlyIds: Set<String>,
+    defaultThemeIds: Set<String>,
+    adUnlockedIds: Set<String> = emptySet(),
+): Set<String> {
+    val cleaned = selected - (proOnlyIds - adUnlockedIds)
+    return cleaned.ifEmpty { defaultThemeIds }
+}
+
+/**
  * A [AdUnlockPolicy.PER_USE][com.pirxhio.affirmity.access.AdUnlockPolicy.PER_USE] unlock on an
  * affirmation group is spent the moment its group leaves the committed selection (design §0's
  * "until the user changes their selection again" binding, design §4b). Other content types are

@@ -53,14 +53,15 @@ import com.pirxhio.affirmity.auth.FirebaseAuthRepository
 import com.pirxhio.affirmity.auth.GoogleIdAuthProvider
 import com.pirxhio.affirmity.auth.SignInCancelledException
 import com.pirxhio.affirmity.data.local.AffirmationEntity
-import com.pirxhio.affirmity.data.local.AffirmationGroupPreferences
+import com.pirxhio.affirmity.data.local.AffirmationThemePreferences
 import com.pirxhio.affirmity.data.local.AffirmationImageStore
 import com.pirxhio.affirmity.data.local.AffirmityDatabase
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
 import com.pirxhio.affirmity.data.local.DailyViewCount
 import com.pirxhio.affirmity.data.local.DaySegment
-import com.pirxhio.affirmity.data.local.GroupSelectionPreferences
+import com.pirxhio.affirmity.data.local.ThemeSelectionPreferences
+import com.pirxhio.affirmity.data.local.readLegacySelectedGroupIds
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.NotificationLogEntry
 import com.pirxhio.affirmity.data.local.NotificationPreferences
@@ -108,8 +109,10 @@ import com.pirxhio.affirmity.data.local.AndroidCatalogPreferences
 import com.pirxhio.affirmity.ui.groups.catalogAccessDecision
 import com.pirxhio.affirmity.ui.groups.catalogCollectionsById
 import com.pirxhio.affirmity.ui.groups.catalogUniverseGroups
-import com.pirxhio.affirmity.ui.groups.defaultAffirmationGroups
+import com.pirxhio.affirmity.ui.groups.catalogThemes
+import com.pirxhio.affirmity.ui.groups.catalogThemesById
 import com.pirxhio.affirmity.ui.groups.selectableAffirmationGroups
+import com.pirxhio.affirmity.ui.groups.themeAccessDecision
 import com.pirxhio.affirmity.access.isUnlocked
 import com.pirxhio.affirmity.ui.myaffirmations.customAffirmationAccessDecision
 import com.pirxhio.affirmity.widget.WeeklyTrackerWidget
@@ -229,58 +232,48 @@ private fun Affirmation.toEntity(): AffirmationEntity = AffirmationEntity(
 )
 
 /**
- * Pure resolution of the committed group-id selection, extracted so it is testable without
- * Android/DataStore (design §4, §6, D18). [persisted] is `null` on the very first-ever launch (no
- * selection ever saved). Unknown ids (e.g. a group removed in a later release, such as the 3
- * legacy groups deleted by design D17) are dropped. `personalizadas` is included in every FALLBACK
- * result (first launch, a persisted selection that resolves to genuinely empty, or a persisted
- * selection whose thematic ids were all dropped by the unknown-id filter -- e.g. stale legacy ids)
- * as the sensible default -- but, as of a TEMPORARY dogfooding change, is no longer force-re-added
- * to an otherwise healthy persisted selection that explicitly excludes it. A *deliberate*
- * `personalizadas`-only selection -- one where `persisted` was already exactly
- * `{personalizadas}`, nothing dropped by filtering -- is distinguished from the stale-legacy-ids
- * case above and preserved verbatim, since `isDraftSelectionValid` now allows committing it when
- * the user has custom affirmations. This pairs with `GroupAccessPolicy.isToggleable`'s matching
- * relaxation: without both changes together, a user could uncheck `personalizadas` in the
- * selector, hit Aplicar, and have it silently reappear on the next read of this collector. To
- * restore the old permanent-inclusion behavior, change the final `return` back to
- * `resolved + PERSONALIZADAS_GROUP_ID` unconditionally.
+ * Pure resolution of the committed theme-id selection ("Your feed" refactor §2/§4), extracted so
+ * it is testable without Android/DataStore -- mirrors the shape of the group-level resolver this
+ * replaces, plus the one-time legacy migration path (scope decision #4).
  *
- * The minimum-selection invariant lives HERE, tier-independent (design D18) -- moved out of
- * `EntitlementResolution.deselectLockedGroups`'s call site, which is guarded by
- * `if (entitlement.tier == AccessTier.FREE)` and therefore never ran for a Pro user. Without this,
- * a device holding a persisted selection that resolves to genuinely empty (either because every
- * persisted id was unknown, or because the persisted selection was itself empty) would land on a
- * fully empty feed regardless of tier. Cannot touch a healthy selection: any surviving
- * non-personalizadas id, or a deliberate `personalizadas`-only selection, short-circuits the
- * fallback.
+ * [persistedThemeIds] is `null` until the theme-prefs store has ever been written. Two distinct
+ * `null` scenarios both reach this function:
+ *  - a genuinely fresh install ([legacyGroupIds] is also `null`) -> falls back to
+ *    [defaultThemeIds], exactly like the old first-launch case.
+ *  - a pre-existing install that never selected theme-level prefs before, but DOES have a
+ *    persisted group-level selection ([legacyGroupIds] non-null) -> expands that group selection
+ *    into every known theme under those universes (`catalogThemes().filter { it.universeId in
+ *    legacyGroupIds }`), migrating forward once. If that expansion is empty (every legacy group id
+ *    was itself unknown/deleted), falls back to [defaultThemeIds] like any other empty-resolution
+ *    case.
+ *
+ * Once [persistedThemeIds] is non-null, the legacy path is dead: unknown ids (a theme removed in a
+ * later catalog release) are dropped, and an empty or fully-unknown result falls back to
+ * [defaultThemeIds] -- there is no `personalizadas`-only carve-out here, unlike the old group-level
+ * resolver, since no catalog theme is ever `personalizadas` (scope decision #2).
  */
-fun resolveSelectedGroupIds(
-    persisted: Set<String>?,
-    knownIds: Set<String>,
-    defaultThematicIds: Set<String>,
+fun resolveSelectedThemeIds(
+    persistedThemeIds: Set<String>?,
+    legacyGroupIds: Set<String>?,
+    knownThemeIds: Set<String>,
+    defaultThemeIds: Set<String>,
 ): Set<String> {
-    val filtered = persisted?.filter { it in knownIds }?.toSet()
-    // A personalizadas-only *filtered* result is ambiguous on its own: it's either a deliberate
-    // commit (persisted was already exactly {personalizadas}, nothing dropped) or stale data whose
-    // thematic ids all got dropped by the knownIds filter (persisted != filtered) -- e.g. legacy ids
-    // removed by design D17. Only the latter should recover via the fallback; the former must be
-    // preserved verbatim (TEMPORARY dogfooding relaxation).
-    val droppedUnknownIds = filtered != null && filtered != persisted
-    val isPersonalizadasOnly = filtered != null && filtered.none { it != PERSONALIZADAS_GROUP_ID }
-    return if (filtered == null || filtered.isEmpty() || (isPersonalizadasOnly && droppedUnknownIds)) {
-        defaultThematicIds + PERSONALIZADAS_GROUP_ID
-    } else {
-        filtered
+    if (persistedThemeIds == null && legacyGroupIds != null) {
+        val migrated = catalogThemes()
+            .filter { it.universeId in legacyGroupIds }
+            .map { it.id }
+            .filter { it in knownThemeIds }
+            .toSet()
+        return migrated.ifEmpty { defaultThemeIds }
     }
+    val filtered = persistedThemeIds?.filter { it in knownThemeIds }?.toSet()
+    return if (filtered.isNullOrEmpty()) defaultThemeIds else filtered
 }
 
-/** Minimum-selection rule used by the group picker before it commits a draft. */
-internal fun isDraftSelectionValid(
-    draftGroupIds: Set<String>,
-    hasPersonalAffirmations: Boolean,
-): Boolean = draftGroupIds.any { it != PERSONALIZADAS_GROUP_ID } ||
-    (PERSONALIZADAS_GROUP_ID in draftGroupIds && hasPersonalAffirmations)
+/** Minimum-selection rule used by the "Your feed" screen before it commits a draft: at least one
+ *  theme must be selected. `personalizadas` never factors in here (scope decision #2) -- it is no
+ *  longer part of the toggleable theme selection at all, so it can't satisfy or violate this. */
+internal fun isDraftThemeSelectionValid(draftThemeIds: Set<String>): Boolean = draftThemeIds.isNotEmpty()
 
 /**
  * Pure migration-default resolution for the onboarding guide's tri-state "seen" flag (spec R1.3,
@@ -334,10 +327,10 @@ fun resolveGuideGate(
 
 /** Default for tests/previews that don't care about group selection: never emits a persisted
  * value, so callers always resolve to the first-launch default. */
-private object NoOpGroupSelectionPreferences : GroupSelectionPreferences {
-    override fun observeSelectedGroupIds(): kotlinx.coroutines.flow.Flow<Set<String>?> =
+private object NoOpThemeSelectionPreferences : ThemeSelectionPreferences {
+    override fun observeSelectedThemeIds(): kotlinx.coroutines.flow.Flow<Set<String>?> =
         kotlinx.coroutines.flow.flowOf(null)
-    override suspend fun saveSelectedGroupIds(ids: Set<String>) = Unit
+    override suspend fun saveSelectedThemeIds(ids: Set<String>) = Unit
 }
 
 /** One-shot ad-request outcome, mapped from [AdUnlockOutcome] for display (design D7). `Failed`
@@ -372,20 +365,31 @@ class AffirmityAppState(
     private val dayLetters: List<String> = listOf("D", "L", "M", "M", "J", "V", "S"),
     private val deviceTimeZoneId: () -> String = { TimeZone.getDefault().id },
     private val useRemoteSession: Boolean = true,
-    private val groupPreferences: GroupSelectionPreferences = NoOpGroupSelectionPreferences,
-    /** Every known selectable group id, resolved in [rememberAffirmityAppState] from
-     * `selectableAffirmationGroups()` so this class never imports `ui.groups` (design D9). */
+    /** Every known selectable group id (universes + `personalizadas`), resolved in
+     * [rememberAffirmityAppState] from `selectableAffirmationGroups()` so this class never imports
+     * `ui.groups` (design D9). Used ONLY to scope [catalog]'s row observation now -- theme-level
+     * selection state has its own `known*ThemeIds` below ("Your feed" refactor). */
     private val knownGroupIds: Set<String> = setOf(PERSONALIZADAS_GROUP_ID),
-    /** First-launch default thematic selection (unlocked thematic groups), also resolved by the
-     * caller for the same D9 reason. */
-    private val defaultThematicGroupIds: Set<String> = emptySet(),
-    /** Every group id whose `access.requiredTier == AccessTier.PRO`, excluding `alwaysSelected`,
-     * resolved by the caller for the same D9 reason. Consumed by the downgrade-auto-deselect
-     * collector ([deselectLockedGroups] call site). */
-    private val proOnlyGroupIds: Set<String> = emptySet(),
+    private val themePreferences: ThemeSelectionPreferences = NoOpThemeSelectionPreferences,
+    /** Every known theme id, resolved in [rememberAffirmityAppState] from `catalogThemes()` so
+     * this class never imports `ui.groups` (design D9). */
+    private val knownThemeIds: Set<String> = emptySet(),
+    /** First-launch default thematic selection (unlocked themes), also resolved by the caller for
+     * the same D9 reason. */
+    private val defaultThematicThemeIds: Set<String> = emptySet(),
+    /** Every theme id whose [com.pirxhio.affirmity.ui.groups.themeAccessDecision] resolves locked
+     * at [com.pirxhio.affirmity.access.AccessTier.FREE], resolved by the caller for the same D9
+     * reason. Consumed by the downgrade-auto-deselect collector ([deselectLockedThemes] call site). */
+    private val proOnlyThemeIds: Set<String> = emptySet(),
+    /** One-shot read of the pre-"Your feed" `selected_group_ids` DataStore value, for
+     * [resolveSelectedThemeIds]'s one-time legacy migration (scope decision #4). `null` means
+     * "nothing to migrate" -- a fresh install, or an install whose theme-prefs store already has a
+     * value of its own by the time this is even consulted. Defaulted to `{ null }` so every
+     * existing JVM test that constructs this class directly is unaffected. */
+    private val legacyGroupIdsProvider: suspend () -> Set<String>? = { null },
     /** The seam Spec 5 replaces (design §9): the only way an ad unlock is ever created.
      *  Defaulted to [NoAdUnlockSource] -- the same injection convention as [deviceTimeZoneId] /
-     *  [groupPreferences] / [knownGroupIds] -- so Spec 5's entire integration into this class is
+     *  [themePreferences] / [knownThemeIds] -- so Spec 5's entire integration into this class is
      *  one changed argument at the `rememberAffirmityAppState` call site. */
     private val adUnlockSource: AdUnlockSource = NoAdUnlockSource,
     private val favorites: FavoriteAffirmationRepository = NoOpFavoriteAffirmationRepository,
@@ -419,47 +423,47 @@ class AffirmityAppState(
     private var favoriteOrderedIds = mutableStateOf<List<String>>(emptyList())
     private val favoriteToggleMutex = Mutex()
 
-    /** Group ids the user has committed. Null until DataStore's first read resolves; the UI shows
-     * nothing group-dependent until then. Always non-empty once resolved; the temporary
-     * dogfooding relaxation allows [PERSONALIZADAS_GROUP_ID] to be absent. */
-    var selectedGroupIds = mutableStateOf<Set<String>?>(null)
+    /** Theme ids the user has committed ("Your feed" refactor). Null until DataStore's first read
+     * resolves; the UI shows nothing theme-dependent until then. `personalizadas` is never a
+     * member -- it is unconditionally included in the feed instead (scope decision #2). */
+    var selectedThemeIds = mutableStateOf<Set<String>?>(null)
         private set
 
-    /** Pending (uncommitted) selection the sheet mutates while open. Seeded from [selectedGroupIds]
-     * when it first resolves. */
-    var draftGroupIds = mutableStateOf(setOf(PERSONALIZADAS_GROUP_ID))
+    /** Pending (uncommitted) selection "Your feed"/"See all themes" mutate while open. Seeded from
+     * [selectedThemeIds] when it first resolves. */
+    var draftThemeIds = mutableStateOf<Set<String>>(emptySet())
         private set
 
-    private var draftInitialized = false
+    private var themeDraftInitialized = false
 
-    /** True when [draftGroupIds] contains at least one thematic group, OR `personalizadas` alone
-     * is selected but already has at least one affirmation of its own — an empty `personalizadas`
-     * can never satisfy the invariant by itself, since selecting it alone would otherwise commit
-     * to a guaranteed-empty feed. */
-    val isDraftSelectionValid: Boolean
-        get() = isDraftSelectionValid(
-            draftGroupIds = draftGroupIds.value,
-            hasPersonalAffirmations = affirmations.any { it.groupId == PERSONALIZADAS_GROUP_ID },
-        )
+    /** True when [draftThemeIds] is non-empty. Unlike the old group-level rule, `personalizadas`
+     * never factors in (scope decision #2) -- there is nothing to carve out for it. */
+    val isDraftThemeSelectionValid: Boolean
+        get() = isDraftThemeSelectionValid(draftThemeIds.value)
 
-    /** The feed's list: affirmations whose groupId is in the committed selection. NEVER used by
-     * ProgressScreen (that keeps reading [affirmations] unfiltered). Falls back to the full list
-     * while [selectedGroupIds] is still null. */
+    /** The feed's list: every OWNED (`personalizadas`) affirmation unconditionally (scope decision
+     * #2), plus every CATALOG affirmation whose theme is in the committed selection AND still
+     * passes [catalogAccessDecision] (unchanged access rule, now keyed by theme instead of group).
+     * NEVER used by ProgressScreen (that keeps reading [affirmations] unfiltered). Falls back to
+     * the full owned list while [selectedThemeIds] is still null -- catalog rows stay excluded
+     * until the committed theme selection actually resolves, mirroring the old group-level
+     * behavior of returning `affirmations` unfiltered pre-resolution. */
     val filteredAffirmations: List<Affirmation>
         get() {
-            val ids = selectedGroupIds.value ?: return affirmations
+            val ids = selectedThemeIds.value ?: return affirmations
             val collectionsById = catalogCollectionsById()
             val groupsById = catalogUniverseGroups().associateBy { it.id }
             val now = System.currentTimeMillis()
             val tier = entitlementTier.value
             val grants = adUnlockState
-            return affirmations.filter { it.groupId in ids } +
+            return affirmations +
                 catalogAffirmations.filter { affirmation ->
-                    affirmation.groupId in ids &&
+                    val collection = collectionsById[affirmation.collectionId]
+                    collection?.themeId in ids &&
                         groupsById[affirmation.groupId]?.let { group ->
                             catalogAccessDecision(
                                 group = group,
-                                collection = collectionsById[affirmation.collectionId],
+                                collection = collection,
                                 tier = tier,
                                 grants = grants,
                                 nowMillis = now,
@@ -916,12 +920,27 @@ class AffirmityAppState(
                 }
         }
         scope.launch {
-            groupPreferences.observeSelectedGroupIds().collect { persisted ->
-                val resolved = resolveSelectedGroupIds(persisted, knownGroupIds, defaultThematicGroupIds)
-                selectedGroupIds.value = resolved
-                if (!draftInitialized) {
-                    draftGroupIds.value = resolved
-                    draftInitialized = true
+            // The legacy group-id read is one-shot and happens ONCE per process, outside the
+            // collector below -- resolveSelectedThemeIds only ever consults it while
+            // themePreferences' own store has never been written (scope decision #4); once the
+            // migration (or a fresh commit) lands, every later emission carries a non-null
+            // persisted value and this snapshot is never consulted again.
+            val legacyGroupIds = legacyGroupIdsProvider()
+            themePreferences.observeSelectedThemeIds()
+                .catch { error -> Log.e(TAG, "theme selection flow failed", error) }
+                .collect { persisted ->
+                val resolved = resolveSelectedThemeIds(persisted, legacyGroupIds, knownThemeIds, defaultThematicThemeIds)
+                selectedThemeIds.value = resolved
+                if (!themeDraftInitialized) {
+                    draftThemeIds.value = resolved
+                    themeDraftInitialized = true
+                }
+                // Persist the migrated (or defaulted) result immediately once, exactly when it was
+                // derived from the legacy path (scope decision #4: "written to the new store
+                // immediately") -- a fresh install with no legacy data stays unpersisted until the
+                // user actually commits a draft, matching the old group-level behavior.
+                if (persisted == null && legacyGroupIds != null) {
+                    scope.launch { themePreferences.saveSelectedThemeIds(resolved) }
                 }
             }
         }
@@ -966,20 +985,20 @@ class AffirmityAppState(
                         sessionAdUnlocks.value = emptySet()
                     }
                     // Q4(iv) fix: run the deselect sweep on EVERY FREE-resolved emission, not only
-                    // a live transition -- otherwise a stale Pro-only group left in a persisted
+                    // a live transition -- otherwise a stale Pro-only theme left in a persisted
                     // selection (a lapse that happened while the app was closed, or a dead PER_USE
                     // grant) would silently survive forever. Re-persist only when the result
                     // actually differs, so a steady-state Free user causes no redundant DataStore
                     // write on every emission. Living inside this collector (not the
-                    // group-preferences collector) guarantees it never fires before the tier has
-                    // resolved, so a cold start can never strip a Pro user's groups.
+                    // theme-preferences collector) guarantees it never fires before the tier has
+                    // resolved, so a cold start can never strip a Pro user's themes.
                     if (entitlement.tier == AccessTier.FREE) {
-                        selectedGroupIds.value?.let { committed ->
-                            val updated = deselectLockedGroups(committed, proOnlyGroupIds, defaultThematicGroupIds)
+                        selectedThemeIds.value?.let { committed ->
+                            val updated = deselectLockedThemes(committed, proOnlyThemeIds, defaultThematicThemeIds)
                             if (updated != committed) {
-                                selectedGroupIds.value = updated
-                                draftGroupIds.value = updated
-                                scope.launch { groupPreferences.saveSelectedGroupIds(updated) }
+                                selectedThemeIds.value = updated
+                                draftThemeIds.value = updated
+                                scope.launch { themePreferences.saveSelectedThemeIds(updated) }
                             }
                         }
                     }
@@ -1403,7 +1422,7 @@ class AffirmityAppState(
     /**
      * Consumes a meditation playback-scoped unlock when its session reaches a terminal state
      * (design §5.5, REQ-5.5). Synchronous, no coroutine -- mutates in-memory [sessionAdUnlocks]
-     * only, matching [toggleGroup]/`applyGroupSelection`'s pattern. Nothing is persisted here:
+     * only, matching [toggleTheme]/`applyThemeSelection`'s pattern. Nothing is persisted here:
      * `PER_USE` is never persisted (design §4.2), and a durable `ONE_TIME_TRIAL` grant is untouched
      * by [consumePlaybackScopedUnlock] (it only ever touches [sessionAdUnlocks]) -- see EC-3.
      */
@@ -1413,38 +1432,41 @@ class AffirmityAppState(
         )
     }
 
-    /** Flips [groupId]'s membership in [draftGroupIds]. No-op for locked groups — the UI also
-     * disables them; this is defense in depth. `alwaysSelected` groups are toggleable as of a
-     * TEMPORARY dogfooding relaxation (see `GroupAccessPolicy.isToggleable`'s KDoc) -- this was
-     * previously "No-op for alwaysSelected/locked groups" and should read that way again if the
-     * relaxation is reverted. */
-    fun toggleGroup(groupId: String, toggleable: Boolean) {
+    /** Flips [themeId]'s membership in [draftThemeIds] ("Your feed" refactor). No-op for locked
+     * themes -- the UI also disables them; this is defense in depth. */
+    fun toggleTheme(themeId: String, toggleable: Boolean) {
         if (!toggleable) return
-        draftGroupIds.value = if (groupId in draftGroupIds.value) {
-            draftGroupIds.value - groupId
+        draftThemeIds.value = if (themeId in draftThemeIds.value) {
+            draftThemeIds.value - themeId
         } else {
-            draftGroupIds.value + groupId
+            draftThemeIds.value + themeId
         }
     }
 
-    /** Commits [draftGroupIds] as [selectedGroupIds] and persists it, unless the draft violates
+    /** Commits [draftThemeIds] as [selectedThemeIds] and persists it, unless the draft violates
      * the minimum-selection invariant — in which case nothing is committed or persisted. Returns
-     * whether the commit happened, so the caller can decide whether to collapse the sheet. */
-    fun applyGroupSelection(): Boolean {
-        if (!isDraftSelectionValid) return false
-        val committed = draftGroupIds.value
-        selectedGroupIds.value = committed
+     * whether the commit happened, so the caller can decide whether to close "Your feed". */
+    fun applyThemeSelection(): Boolean {
+        if (!isDraftThemeSelectionValid) return false
+        val committed = draftThemeIds.value
+        selectedThemeIds.value = committed
         // design §0/§4b: a PER_USE unlock on an affirmation group is spent the moment its group
-        // leaves the committed selection.
-        sessionAdUnlocks.value = retainSelectionScopedUnlocks(sessionAdUnlocks.value, committed)
-        scope.launch { groupPreferences.saveSelectedGroupIds(committed) }
+        // leaves the committed selection -- derived from the committed THEME ids, since grants are
+        // still keyed by AFFIRMATION_GROUP (universe), not by theme (no ad-unlock CTA exists at
+        // theme grain in v1 of "Your feed" -- see `ThemeAccessPolicy.canWatchAdForTheme`'s KDoc).
+        // Resolved through CatalogTheme.universeId rather than parsing the id string, so this stays
+        // correct even if CatalogTheme's id format ever changes.
+        val themesById = catalogThemesById()
+        val selectedUniverseIds = committed.mapNotNull { themesById[it]?.universeId }.toSet()
+        sessionAdUnlocks.value = retainSelectionScopedUnlocks(sessionAdUnlocks.value, selectedUniverseIds)
+        scope.launch { themePreferences.saveSelectedThemeIds(committed) }
         return true
     }
 
-    /** Discards any uncommitted draft edits, restoring [draftGroupIds] to the last committed
-     * [selectedGroupIds] — used when the sheet re-expands. */
-    fun resetDraftToCommitted() {
-        selectedGroupIds.value?.let { draftGroupIds.value = it }
+    /** Discards any uncommitted draft edits, restoring [draftThemeIds] to the last committed
+     * [selectedThemeIds] — used when "Your feed" re-opens. */
+    fun resetThemeDraftToCommitted() {
+        selectedThemeIds.value?.let { draftThemeIds.value = it }
     }
 
     /** Floors [StreakHealerStats] evaluation at [StreakHealerStats.EPOCH_START_DAY] so completion
@@ -1478,25 +1500,24 @@ fun rememberAffirmityAppState(): AffirmityAppState {
     val dayLetters = stringArrayResource(R.array.weekday_letters).toList()
     // Resolved here (not inside `remember`) so the `AffirmityAppState` class itself never imports
     // `ui.groups` (design D9) — only this composable wiring function does, mirroring [dayLetters].
+    // Scoped ONLY to `catalog.observeByGroupIds(...)` now -- theme-level selection state below has
+    // its own `known*ThemeIds` ("Your feed" refactor).
     val knownGroupIds = selectableAffirmationGroups().map { it.id }.toSet()
-    // `isThematic` is the SELECTOR -- "every thematic group is on by default" is the product
-    // decision (design D18). The tier condition is retained purely as a GUARD: it keeps the
-    // invariant that the fresh-install default can never contain a group
-    // `deselectLockedGroups` would immediately strip. Post-D17 (14 Free-tier universes, no more
-    // legacy groups) this evaluates to all 14.
-    val defaultThematicGroupIds = defaultAffirmationGroups()
-        .filter { it.isThematic && it.access.requiredTier == AccessTier.FREE }
+    val knownThemeIds = catalogThemes().map { it.id }.toSet()
+    // "every unlocked theme is on by default" mirrors the old group-level default (design D18) at
+    // the finer theme grain -- a theme resolves FREE-unlocked via `themeAccessDecision` folding
+    // over its parent universe (always Free at group level, D6) and every collection sharing its
+    // themeId, so this naturally excludes Pro-gated themes without a separate declaration.
+    val defaultThematicThemeIds = catalogThemes()
+        .filter {
+            themeAccessDecision(
+                it.id, AccessTier.FREE, AdUnlockState(), System.currentTimeMillis(),
+            ).isUnlocked
+        }
         .map { it.id }.toSet()
-    // Every group that requires Pro to unlock -- mirrors GroupAccessPolicy.isLocked's condition
-    // (access.requiredTier == PRO && !alwaysSelected) without importing ui.groups' policy file
-    // itself (D9). Post-D17 this evaluates EMPTY: all 14 universe groups are declared
-    // ContentAccess.Free at the group level (collection-level Pro gating moved to
-    // CatalogAccessPolicy.catalogAccessDecision, design D6/D7). deselectLockedGroups (below) is a
-    // documented no-op in that state, NOT deleted -- see task 4.7 / EntitlementResolutionTest's
-    // regression guard.
-    val proOnlyGroupIds = defaultAffirmationGroups()
-        .filter { it.access.requiredTier != AccessTier.FREE }
-        .map { it.id }.toSet()
+    // Every theme id NOT in the default free set -- i.e. every theme currently locked for a FREE
+    // user with no grants. Consumed by the downgrade-auto-deselect collector.
+    val proOnlyThemeIds = knownThemeIds - defaultThematicThemeIds
     return remember {
         val database = AffirmityDatabase.getInstance(context)
         val notificationPreferences = NotificationPreferences(context)
@@ -1556,10 +1577,12 @@ fun rememberAffirmityAppState(): AffirmityAppState {
                 providers = mapOf(AuthProviderId.GOOGLE to googleIdAuthProvider),
             ),
             useRemoteSession = USE_REMOTE_SESSION,
-            groupPreferences = AffirmationGroupPreferences(context.applicationContext),
             knownGroupIds = knownGroupIds,
-            defaultThematicGroupIds = defaultThematicGroupIds,
-            proOnlyGroupIds = proOnlyGroupIds,
+            themePreferences = AffirmationThemePreferences(context.applicationContext),
+            knownThemeIds = knownThemeIds,
+            defaultThematicThemeIds = defaultThematicThemeIds,
+            proOnlyThemeIds = proOnlyThemeIds,
+            legacyGroupIdsProvider = { readLegacySelectedGroupIds(context.applicationContext) },
             adUnlockSource = RewardedAdUnlockSource(
                 gateway = GoogleRewardedAdGateway(
                     // Re-resolved per call from the composable's own captured `context`, never

@@ -12,7 +12,7 @@ import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
 import com.pirxhio.affirmity.data.local.DailyViewCount
 import com.pirxhio.affirmity.data.local.DaySegment
-import com.pirxhio.affirmity.data.local.GroupSelectionPreferences
+import com.pirxhio.affirmity.data.local.ThemeSelectionPreferences
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.OnboardingGuidePreferences
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
@@ -56,8 +56,17 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when` as whenever
 
 /** Real ids from the committed taxonomy (`ui/groups/CatalogTaxonomy.kt`), so this suite exercises
- * the actual generated data rather than an invented fixture. */
+ * the actual generated data rather than an invented fixture. [FREE_COLLECTION_ID] and
+ * [PRO_COLLECTION_ID] deliberately share [THEME_ID] ("Your feed" refactor) -- theme-level
+ * selection only gates which THEME's rows are candidates for the feed; per-row access is still
+ * resolved per COLLECTION via `catalogAccessDecision`, so two collections under the same theme can
+ * still resolve differently for the same user. [OTHER_THEME_ID] is a distinct known theme used to
+ * simulate "this theme is not in the selection" without relying on an empty persisted set (which
+ * `resolveSelectedThemeIds` treats as unresolved and falls back to defaults, not as "everything
+ * deselected"). */
 private const val UNIVERSE_ID = "body_energy_wellbeing"
+private const val THEME_ID = "body_energy_wellbeing.body_acceptance"
+private const val OTHER_THEME_ID = "body_energy_wellbeing.body_confidence"
 private const val FREE_COLLECTION_ID = "body_energy_wellbeing.body_acceptance.respect_my_body_today"
 private const val PRO_COLLECTION_ID = "body_energy_wellbeing.body_acceptance.kind_body_relationship"
 
@@ -87,8 +96,8 @@ class AffirmityAppStateCatalogTest {
             affirmations = affirmations,
             catalog = catalog,
             catalogOverrides = catalogOverrides,
-            knownGroupIds = setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID),
-            groupPreferences = FixedGroupSelectionPreferences(setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID)),
+            knownThemeIds = setOf(THEME_ID, OTHER_THEME_ID),
+            themePreferences = FixedThemeSelectionPreferences(setOf(THEME_ID)),
         )
         runCurrent()
         advanceUntilIdle()
@@ -165,8 +174,8 @@ class AffirmityAppStateCatalogTest {
             backgroundScope,
             catalog = catalog,
             entitlements = FakeCatalogEntitlementRepository(AccessTier.FREE),
-            knownGroupIds = setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID),
-            groupPreferences = FixedGroupSelectionPreferences(setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID)),
+            knownThemeIds = setOf(THEME_ID, OTHER_THEME_ID),
+            themePreferences = FixedThemeSelectionPreferences(setOf(THEME_ID)),
         )
         runCurrent()
         advanceUntilIdle()
@@ -185,8 +194,8 @@ class AffirmityAppStateCatalogTest {
             backgroundScope,
             catalog = catalog,
             entitlements = FakeCatalogEntitlementRepository(AccessTier.PRO),
-            knownGroupIds = setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID),
-            groupPreferences = FixedGroupSelectionPreferences(setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID)),
+            knownThemeIds = setOf(THEME_ID, OTHER_THEME_ID),
+            themePreferences = FixedThemeSelectionPreferences(setOf(THEME_ID)),
         )
         runCurrent()
         advanceUntilIdle()
@@ -203,8 +212,8 @@ class AffirmityAppStateCatalogTest {
             backgroundScope,
             catalog = catalog,
             entitlements = FakeCatalogEntitlementRepository(AccessTier.FREE),
-            knownGroupIds = setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID),
-            groupPreferences = FixedGroupSelectionPreferences(setOf(PERSONALIZADAS_GROUP_ID)),
+            knownThemeIds = setOf(THEME_ID, OTHER_THEME_ID),
+            themePreferences = FixedThemeSelectionPreferences(setOf(OTHER_THEME_ID)),
         )
         runCurrent()
         advanceUntilIdle()
@@ -224,8 +233,8 @@ class AffirmityAppStateCatalogTest {
             affirmations = affirmations,
             favorites = favorites,
             catalog = catalog,
-            knownGroupIds = setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID),
-            groupPreferences = FixedGroupSelectionPreferences(setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID)),
+            knownThemeIds = setOf(THEME_ID, OTHER_THEME_ID),
+            themePreferences = FixedThemeSelectionPreferences(setOf(THEME_ID)),
         )
         runCurrent()
         advanceUntilIdle()
@@ -245,8 +254,8 @@ class AffirmityAppStateCatalogTest {
             affirmations = affirmations,
             favorites = favorites,
             catalog = catalog,
-            knownGroupIds = setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID),
-            groupPreferences = FixedGroupSelectionPreferences(setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID)),
+            knownThemeIds = setOf(THEME_ID, OTHER_THEME_ID),
+            themePreferences = FixedThemeSelectionPreferences(setOf(THEME_ID)),
         )
         runCurrent()
         advanceUntilIdle()
@@ -261,8 +270,8 @@ class AffirmityAppStateCatalogTest {
             affirmations = affirmations,
             favorites = favorites,
             catalog = catalog,
-            knownGroupIds = setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID),
-            groupPreferences = FixedGroupSelectionPreferences(setOf(PERSONALIZADAS_GROUP_ID)),
+            knownThemeIds = setOf(THEME_ID, OTHER_THEME_ID),
+            themePreferences = FixedThemeSelectionPreferences(setOf(OTHER_THEME_ID)),
         )
         runCurrent()
         advanceUntilIdle()
@@ -292,8 +301,8 @@ class AffirmityAppStateCatalogTest {
             favorites = favorites,
             catalog = catalog,
             entitlements = FakeCatalogEntitlementRepository(AccessTier.FREE),
-            knownGroupIds = setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID),
-            groupPreferences = FixedGroupSelectionPreferences(setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID)),
+            knownThemeIds = setOf(THEME_ID, OTHER_THEME_ID),
+            themePreferences = FixedThemeSelectionPreferences(setOf(THEME_ID)),
         )
         runCurrent()
         advanceUntilIdle()
@@ -407,9 +416,9 @@ private class FakeCatalogEntitlementRepository(private val tier: AccessTier) : E
     override fun observe(): Flow<Entitlement> = flowOf(Entitlement(tier))
 }
 
-private class FixedGroupSelectionPreferences(private val ids: Set<String>) : GroupSelectionPreferences {
-    override fun observeSelectedGroupIds(): Flow<Set<String>?> = flowOf(ids)
-    override suspend fun saveSelectedGroupIds(ids: Set<String>) = Unit
+private class FixedThemeSelectionPreferences(private val ids: Set<String>) : ThemeSelectionPreferences {
+    override fun observeSelectedThemeIds(): Flow<Set<String>?> = flowOf(ids)
+    override suspend fun saveSelectedThemeIds(ids: Set<String>) = Unit
 }
 
 private class RecordingAffirmationRepository2(
@@ -460,8 +469,9 @@ private fun buildState(
     catalog: CatalogAffirmationRepository = FakeCatalogAffirmationRepository(emptyList()),
     catalogOverrides: CatalogOverrideRepository = RecordingCatalogOverrideRepository(),
     entitlements: EntitlementRepository = FakeCatalogEntitlementRepository(AccessTier.PRO),
-    knownGroupIds: Set<String> = setOf(PERSONALIZADAS_GROUP_ID),
-    groupPreferences: GroupSelectionPreferences = FixedGroupSelectionPreferences(setOf(PERSONALIZADAS_GROUP_ID)),
+    knownGroupIds: Set<String> = setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID),
+    knownThemeIds: Set<String> = setOf(THEME_ID),
+    themePreferences: ThemeSelectionPreferences = FixedThemeSelectionPreferences(setOf(THEME_ID)),
     catalogSeeder: CatalogSeeder? = null,
 ): AffirmityAppState {
     val trackerPreferences = mock(TrackerPreferences::class.java)
@@ -500,9 +510,10 @@ private fun buildState(
         authRepository = SignedOutAuthRepository2,
         fcmTokenRepository = mock(FcmTokenRepository::class.java),
         onboardingRepository = mock(FirestoreOnboardingRepository::class.java),
-        groupPreferences = groupPreferences,
         knownGroupIds = knownGroupIds,
-        defaultThematicGroupIds = emptySet(),
+        themePreferences = themePreferences,
+        knownThemeIds = knownThemeIds,
+        defaultThematicThemeIds = emptySet(),
         favorites = favorites,
         catalog = catalog,
         catalogSeeder = catalogSeeder,

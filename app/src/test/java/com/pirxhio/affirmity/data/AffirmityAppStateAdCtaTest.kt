@@ -173,10 +173,10 @@ private fun buildAdCtaTestState(
         onboardingPreferences = onboardingPreferences,
         onboardingGuidePreferences = onboardingGuidePreferences,
         deviceTimeZoneId = { "UTC" },
-        groupPreferences = FakeGroupSelectionPreferences(),
-        knownGroupIds = setOf("personalizadas", "fuerza_de_voluntad"),
-        defaultThematicGroupIds = emptySet(),
-        proOnlyGroupIds = setOf("fuerza_de_voluntad"),
+        themePreferences = FakeThemeSelectionPreferences(),
+        knownThemeIds = setOf("fuerza_de_voluntad.t1"),
+        defaultThematicThemeIds = emptySet(),
+        proOnlyThemeIds = setOf("fuerza_de_voluntad.t1"),
         adUnlockSource = adUnlockSource,
     )
 }

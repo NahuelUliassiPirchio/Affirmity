@@ -1,7 +1,8 @@
 package com.pirxhio.affirmity.ui.groups
 
+import com.pirxhio.affirmity.access.isUnlocked
 import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
-import com.pirxhio.affirmity.data.resolveSelectedGroupIds
+import com.pirxhio.affirmity.data.resolveSelectedThemeIds
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -9,7 +10,8 @@ import org.junit.Test
 
 /** Covers design D17's legacy-group removal: `bienestar`/`autocuidado`/`fuerza_de_voluntad` are
  * DELETED outright from the selector, with no alias, migration, or fallback beyond D18's
- * tier-independent minimum-selection invariant (covered separately in `ResolveSelectedGroupIdsTest`). */
+ * tier-independent minimum-selection invariant. The theme-level legacy MIGRATION path (scope
+ * decision #4 of the "Your feed" refactor) is covered separately in `ResolveSelectedThemeIdsTest`. */
 class AffirmationGroupCatalogTest {
 
     private val legacyGroupIds = setOf("bienestar", "autocuidado", "fuerza_de_voluntad")
@@ -31,21 +33,32 @@ class AffirmationGroupCatalogTest {
     }
 
     @Test
-    fun `a persisted selection referencing only a deleted legacy id drops it and lands on a valid default`() {
-        val knownIds = selectableAffirmationGroups().map { it.id }.toSet()
-        val defaultThematicIds = defaultAffirmationGroups()
-            .filter { it.isThematic && it.access.requiredTier == com.pirxhio.affirmity.access.AccessTier.FREE }
+    fun `a legacy selection referencing only a deleted legacy group has nothing to migrate and lands on a valid default`() {
+        val knownThemeIds = catalogThemes().map { it.id }.toSet()
+        val defaultThemeIds = catalogThemes()
+            .filter {
+                themeAccessDecision(
+                    it.id,
+                    com.pirxhio.affirmity.access.AccessTier.FREE,
+                    com.pirxhio.affirmity.access.AdUnlockState(),
+                    System.currentTimeMillis(),
+                ).isUnlocked
+            }
             .map { it.id }.toSet()
 
-        val resolved = resolveSelectedGroupIds(
-            persisted = setOf("bienestar"),
-            knownIds = knownIds,
-            defaultThematicIds = defaultThematicIds,
+        val resolved = resolveSelectedThemeIds(
+            persistedThemeIds = null,
+            legacyGroupIds = setOf("bienestar"),
+            knownThemeIds = knownThemeIds,
+            defaultThemeIds = defaultThemeIds,
         )
 
-        assertFalse("bienestar" in resolved)
-        assertTrue(PERSONALIZADAS_GROUP_ID in resolved)
-        assertTrue("must land on a valid, non-empty default selection", resolved.any { it != PERSONALIZADAS_GROUP_ID })
-        assertTrue(resolved.all { it in knownIds })
+        assertTrue(
+            "must land on a valid, non-empty default selection -- personalizadas is not a theme " +
+                "and is never a member of the resolved set",
+            resolved.isNotEmpty() && PERSONALIZADAS_GROUP_ID !in resolved,
+        )
+        assertTrue(resolved.all { it in knownThemeIds })
+        assertEquals(defaultThemeIds, resolved)
     }
 }

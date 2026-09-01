@@ -2,6 +2,7 @@ package com.pirxhio.affirmity.analytics
 
 import com.pirxhio.affirmity.access.ContentKey
 import com.pirxhio.affirmity.ui.groups.AffirmationGroup
+import com.pirxhio.affirmity.ui.groups.CatalogTheme
 import com.pirxhio.affirmity.ui.meditation.catalog.MeditationCatalogEntry
 
 /**
@@ -15,5 +16,6 @@ value class AnalyticsId private constructor(val value: String) {
         fun of(key: ContentKey): AnalyticsId = AnalyticsId(key.storageKey)
         fun of(entry: MeditationCatalogEntry): AnalyticsId = AnalyticsId(entry.id)
         fun of(group: AffirmationGroup): AnalyticsId = AnalyticsId(group.id)
+        fun of(theme: CatalogTheme): AnalyticsId = AnalyticsId(theme.id)
     }
 }

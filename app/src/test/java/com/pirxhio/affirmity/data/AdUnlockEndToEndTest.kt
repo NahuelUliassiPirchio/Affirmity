@@ -22,7 +22,7 @@ import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
 import com.pirxhio.affirmity.data.local.DailyViewCount
 import com.pirxhio.affirmity.data.local.DaySegment
-import com.pirxhio.affirmity.data.local.GroupSelectionPreferences
+import com.pirxhio.affirmity.data.local.ThemeSelectionPreferences
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.OnboardingGuidePreferences
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
@@ -154,8 +154,8 @@ private fun buildState(
     scope: CoroutineScope,
     adUnlockSource: AdUnlockSource = FakeAdUnlockSource(AdUnlockOutcome.Unavailable),
     adUnlocks: AdUnlockRepository = FakeAdUnlockRepository(),
-    groupPreferences: GroupSelectionPreferences = FakeGroupSelectionPreferences(),
-    knownGroupIds: Set<String> = setOf("personalizadas", "bienestar", "autocuidado", "fuerza_de_voluntad"),
+    themePreferences: ThemeSelectionPreferences = FakeThemeSelectionPreferences(),
+    knownThemeIds: Set<String> = setOf("bienestar.t1", "fuerza_de_voluntad.t1"),
 ): AffirmityAppState {
     val local = DataSession.Local(
         affirmations = NoopAffirmationRepository(),
@@ -204,10 +204,10 @@ private fun buildState(
         onboardingPreferences = onboardingPreferences,
         onboardingGuidePreferences = onboardingGuidePreferences,
         deviceTimeZoneId = { "UTC" },
-        groupPreferences = groupPreferences,
-        knownGroupIds = knownGroupIds,
-        defaultThematicGroupIds = setOf("bienestar"),
-        proOnlyGroupIds = setOf("autocuidado", "fuerza_de_voluntad"),
+        themePreferences = themePreferences,
+        knownThemeIds = knownThemeIds,
+        defaultThematicThemeIds = setOf("bienestar.t1"),
+        proOnlyThemeIds = setOf("fuerza_de_voluntad.t1"),
         adUnlockSource = adUnlockSource,
     )
 }
@@ -271,51 +271,47 @@ class AdUnlockEndToEndTest {
         scope.cancel()
     }
 
-    // 3. toggleGroup + applyGroupSelection() commits the group correctly with the ad-unlocked item.
+    // 3. toggleTheme + applyThemeSelection() commits the theme correctly with the ad-unlocked
+    //    item's UNIVERSE retained -- theme-level equivalent of the old toggleGroup/applyGroupSelection
+    //    test. `retainSelectionScopedUnlocks` still operates on universe (AFFIRMATION_GROUP) ids,
+    //    derived from the committed theme ids' universe prefix (design §3).
     @Test
-    fun `toggling and committing the ad-unlocked group succeeds`() = runBlocking {
+    fun `toggling and committing a theme under the ad-unlocked universe succeeds`() = runBlocking {
         val scope = CoroutineScope(Dispatchers.Unconfined)
         val adUnlockSource = FakeAdUnlockSource(AdUnlockOutcome.Earned)
-        val groupPreferences = FakeGroupSelectionPreferences(initial = setOf("bienestar"))
-        val state = buildState(scope, adUnlockSource = adUnlockSource, groupPreferences = groupPreferences)
+        val themePreferences = FakeThemeSelectionPreferences(initial = setOf("bienestar.t1"))
+        val state = buildState(scope, adUnlockSource = adUnlockSource, themePreferences = themePreferences)
         delay(50)
 
         state.requestAdUnlock(fuerzaKey, AdUnlockPolicy.PER_USE)
         delay(50)
-        val decision = groupAccessDecision(
-            fuerzaDeVoluntad, state.entitlementTier.value, state.adUnlockState, System.currentTimeMillis(),
-        )
-        state.toggleGroup(fuerzaDeVoluntad.id, isToggleable(fuerzaDeVoluntad, decision))
-        val committed = state.applyGroupSelection()
+        state.toggleTheme("fuerza_de_voluntad.t1", toggleable = true)
+        val committed = state.applyThemeSelection()
 
         assertTrue("commit must succeed", committed)
-        // "personalizadas" absent from `initial` and TEMPORARILY no longer force-re-added to an
-        // otherwise-healthy persisted selection (see resolveSelectedGroupIds's KDoc) -- this test
-        // predates that relaxation and previously asserted force-inclusion.
         assertEquals(
-            setOf("bienestar", fuerzaDeVoluntad.id),
-            state.selectedGroupIds.value,
+            setOf("bienestar.t1", "fuerza_de_voluntad.t1"),
+            state.selectedThemeIds.value,
         )
 
         scope.cancel()
     }
 
-    // 4. Committing a selection WITHOUT the ad-unlocked group drops the grant via
-    //    retainSelectionScopedUnlocks; decision reverts to LockedAdUnlockable(PER_USE).
+    // 4. Committing a selection WITHOUT any theme under the ad-unlocked universe drops the grant
+    //    via retainSelectionScopedUnlocks; decision reverts to LockedAdUnlockable(PER_USE).
     @Test
-    fun `committing a selection without the ad-unlocked group drops the grant and re-locks it`() = runBlocking {
+    fun `committing a selection without the ad-unlocked universe drops the grant and re-locks it`() = runBlocking {
         val scope = CoroutineScope(Dispatchers.Unconfined)
         val adUnlockSource = FakeAdUnlockSource(AdUnlockOutcome.Earned)
-        val groupPreferences = FakeGroupSelectionPreferences(initial = setOf("bienestar"))
-        val state = buildState(scope, adUnlockSource = adUnlockSource, groupPreferences = groupPreferences)
+        val themePreferences = FakeThemeSelectionPreferences(initial = setOf("bienestar.t1"))
+        val state = buildState(scope, adUnlockSource = adUnlockSource, themePreferences = themePreferences)
         delay(50)
 
         state.requestAdUnlock(fuerzaKey, AdUnlockPolicy.PER_USE)
         delay(50)
-        // Committing here without ever toggling fuerza_de_voluntad into the draft: the committed
-        // set stays {personalizadas, bienestar}, so the grant is out-of-selection the moment it
-        // commits.
-        val committed = state.applyGroupSelection()
+        // Committing here without ever toggling a fuerza_de_voluntad theme into the draft: the
+        // committed set stays {bienestar.t1}, so the grant is out-of-selection the moment it commits.
+        val committed = state.applyThemeSelection()
         assertTrue(committed)
 
         val decision = groupAccessDecision(

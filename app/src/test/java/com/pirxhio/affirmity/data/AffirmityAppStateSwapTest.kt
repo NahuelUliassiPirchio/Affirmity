@@ -14,7 +14,7 @@ import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
 import com.pirxhio.affirmity.data.local.DailyViewCount
 import com.pirxhio.affirmity.data.local.DaySegment
-import com.pirxhio.affirmity.data.local.GroupSelectionPreferences
+import com.pirxhio.affirmity.data.local.ThemeSelectionPreferences
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.OnboardingGuidePreferences
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
@@ -148,16 +148,16 @@ private class FakeNotificationSettingsRepository(
     override suspend fun setTimeZone(zoneId: String) = Unit
 }
 
-/** Fake [GroupSelectionPreferences] — the real class needs an Android [Context], so JVM tests
+/** Fake [ThemeSelectionPreferences] — the real class needs an Android [Context], so JVM tests
  * that construct [AffirmityAppState] directly must fake this narrow interface (design risk #4).
  * Deliberately NOT `private`: reused as-is by [com.pirxhio.affirmity.data.AdUnlockEndToEndTest]. */
-class FakeGroupSelectionPreferences(
+class FakeThemeSelectionPreferences(
     initial: Set<String>? = null,
-) : GroupSelectionPreferences {
+) : ThemeSelectionPreferences {
     private val flow = MutableStateFlow(initial)
     val saved = CopyOnWriteArrayList<Set<String>>()
-    override fun observeSelectedGroupIds(): Flow<Set<String>?> = flow
-    override suspend fun saveSelectedGroupIds(ids: Set<String>) {
+    override fun observeSelectedThemeIds(): Flow<Set<String>?> = flow
+    override suspend fun saveSelectedThemeIds(ids: Set<String>) {
         saved += ids
         flow.value = ids
     }
@@ -295,9 +295,10 @@ private fun buildState(
     migrator: FirestoreMigrator,
     authRepository: AuthRepository,
     scope: CoroutineScope,
-    groupPreferences: GroupSelectionPreferences = FakeGroupSelectionPreferences(),
-    knownGroupIds: Set<String> = setOf("personalizadas", "bienestar"),
-    proOnlyGroupIds: Set<String> = emptySet(),
+    themePreferences: ThemeSelectionPreferences = FakeThemeSelectionPreferences(),
+    knownThemeIds: Set<String> = setOf("u1.t1"),
+    defaultThematicThemeIds: Set<String> = setOf("u1.t1"),
+    proOnlyThemeIds: Set<String> = emptySet(),
     onboardingPreferencesOverride: OnboardingPreferences? = null,
     onboardingGuidePreferencesOverride: OnboardingGuidePreferences? = null,
 ): AffirmityAppState {
@@ -335,10 +336,10 @@ private fun buildState(
         onboardingPreferences = onboardingPreferences,
         onboardingGuidePreferences = onboardingGuidePreferences,
         deviceTimeZoneId = { "UTC" },
-        groupPreferences = groupPreferences,
-        knownGroupIds = knownGroupIds,
-        defaultThematicGroupIds = setOf("bienestar"),
-        proOnlyGroupIds = proOnlyGroupIds,
+        themePreferences = themePreferences,
+        knownThemeIds = knownThemeIds,
+        defaultThematicThemeIds = defaultThematicThemeIds,
+        proOnlyThemeIds = proOnlyThemeIds,
     )
 }
 
@@ -476,33 +477,32 @@ class AffirmityAppStateSwapTest {
     }
 
     @Test
-    fun `a session swap preserves the committed group selection and filteredAffirmations reflects the new session`() = runBlocking {
+    fun `a session swap preserves the committed theme selection and filteredAffirmations reflects the new session`() = runBlocking {
         val events = mutableListOf<String>()
         val local = fakeLocal(events, id = "local-swap")
         val authRepository = FakeAuthRepository()
         val scope = CoroutineScope(Dispatchers.Unconfined)
-        // "personalizadas" included explicitly: it's no longer force-re-added to an
-        // otherwise-healthy persisted selection (see resolveSelectedGroupIds's KDoc), and both
-        // fixture affirmations below default to groupId=personalizadas -- this test verifies
-        // session-swap correctness via their presence/absence, which needs personalizadas
-        // selected regardless of that unrelated change.
-        val groupPreferences = FakeGroupSelectionPreferences(initial = setOf("bienestar", "personalizadas"))
+        // Both fixture affirmations below default to groupId=personalizadas (OWNED), which is now
+        // unconditionally included in `filteredAffirmations` regardless of theme selection (scope
+        // decision #2) -- this test verifies session-swap correctness purely via that inclusion,
+        // so the theme selection itself can be an arbitrary non-empty synthetic set.
+        val themePreferences = FakeThemeSelectionPreferences(initial = setOf("u1.t1"))
         val state = buildState(
             local = local,
             remote = { fakeRemote("uid-5", events, id = "remote-swap") },
             migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
             authRepository = authRepository,
             scope = scope,
-            groupPreferences = groupPreferences,
+            themePreferences = themePreferences,
         )
         delay(50)
-        assertEquals(setOf("bienestar", "personalizadas"), state.selectedGroupIds.value)
+        assertEquals(setOf("u1.t1"), state.selectedThemeIds.value)
         assertTrue(state.filteredAffirmations.any { it.id == "local-swap" })
 
         authRepository.emit(AuthState.SignedIn(uid = "uid-5", displayName = null, email = null))
         delay(200)
 
-        assertEquals(setOf("bienestar", "personalizadas"), state.selectedGroupIds.value)
+        assertEquals(setOf("u1.t1"), state.selectedThemeIds.value)
         assertTrue(state.filteredAffirmations.any { it.id == "remote-swap" })
         assertTrue(state.filteredAffirmations.none { it.id == "local-swap" })
 
@@ -558,20 +558,20 @@ class AffirmityAppStateSwapTest {
     }
 
     @Test
-    fun `a cold-start FREE-resolved emission deselects a stale Pro-only group with no live transition`() = runBlocking {
-        // EC-2(iv)/REQ-9.6 (design §10 Q4(iv), spec §9): before this fix, the deselect sweep only
-        // fired on a LIVE Pro->Free transition (entitlementFlowInitialized == true). A signed-out
-        // cold start's FIRST entitlement emission never satisfies that guard, so a Pro-only group
-        // left over in a persisted selection -- from a lapse that happened while the app was
-        // closed, or a dead PER_USE grant -- silently survived forever. This is a DELIBERATE,
-        // documented behavior fix (not a regression): the sweep must now also run on this very
-        // first, non-transition emission whenever the resolved tier is FREE.
+    fun `a cold-start FREE-resolved emission deselects a stale Pro-only theme with no live transition`() = runBlocking {
+        // EC-2(iv)/REQ-9.6 (design §10 Q4(iv), spec §9), theme-level equivalent: before this fix,
+        // the deselect sweep only fired on a LIVE Pro->Free transition (entitlementFlowInitialized
+        // == true). A signed-out cold start's FIRST entitlement emission never satisfies that
+        // guard, so a Pro-only theme left over in a persisted selection -- from a lapse that
+        // happened while the app was closed, or a dead PER_USE grant -- silently survived forever.
+        // This is a DELIBERATE, documented behavior fix (not a regression): the sweep must now
+        // also run on this very first, non-transition emission whenever the resolved tier is FREE.
         val events = mutableListOf<String>()
         val local = fakeLocal(events) // entitlements defaults to LocalFreeEntitlementRepository (always Free)
         val authRepository = FakeAuthRepository() // stays SignedOut -- no live transition ever occurs
         val scope = CoroutineScope(Dispatchers.Unconfined)
-        val groupPreferences = FakeGroupSelectionPreferences(
-            initial = setOf("personalizadas", "autocuidado"),
+        val themePreferences = FakeThemeSelectionPreferences(
+            initial = setOf("u1.t1", "u2.t2"),
         )
         val state = buildState(
             local = local,
@@ -579,21 +579,22 @@ class AffirmityAppStateSwapTest {
             migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
             authRepository = authRepository,
             scope = scope,
-            groupPreferences = groupPreferences,
-            knownGroupIds = setOf("personalizadas", "bienestar", "autocuidado"),
-            proOnlyGroupIds = setOf("autocuidado"),
+            themePreferences = themePreferences,
+            knownThemeIds = setOf("u1.t1", "u2.t2"),
+            defaultThematicThemeIds = setOf("u1.t1"),
+            proOnlyThemeIds = setOf("u2.t2"),
         )
         delay(200)
 
         assertEquals(
-            "the stale Pro-only group must be deselected and the minimum-thematic invariant" +
-                " restored from defaultThematicGroupIds, even though no live transition occurred",
-            setOf("personalizadas", "bienestar"),
-            state.selectedGroupIds.value,
+            "the stale Pro-only theme must be deselected and the minimum-thematic invariant" +
+                " restored from defaultThematicThemeIds, even though no live transition occurred",
+            setOf("u1.t1"),
+            state.selectedThemeIds.value,
         )
         assertTrue(
             "the sweep's result must actually be persisted back",
-            groupPreferences.saved.any { it == setOf("personalizadas", "bienestar") },
+            themePreferences.saved.any { it == setOf("u1.t1") },
         )
         assertFalse(
             "no live Pro->Free transition occurred, so no lapse notice should fire",

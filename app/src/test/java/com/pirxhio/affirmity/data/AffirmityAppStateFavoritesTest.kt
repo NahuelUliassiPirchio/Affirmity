@@ -11,7 +11,7 @@ import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
 import com.pirxhio.affirmity.data.local.DailyViewCount
 import com.pirxhio.affirmity.data.local.DaySegment
-import com.pirxhio.affirmity.data.local.GroupSelectionPreferences
+import com.pirxhio.affirmity.data.local.ThemeSelectionPreferences
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.OnboardingGuidePreferences
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
@@ -159,7 +159,12 @@ class AffirmityAppStateFavoritesTest {
     }
 
     @Test
-    fun `favoriteAffirmations is not filtered by current group selection`() = runTest {
+    fun `an OWNED row is unconditionally in filteredAffirmations regardless of its groupId, and favoriteAffirmations is not filtered by theme selection either`() = runTest {
+        // "Your feed" refactor scope decision #2: every OWNED row is now unconditionally included
+        // in the feed -- `filteredAffirmations` no longer consults an OWNED row's groupId at all
+        // (only CATALOG rows are theme-gated). This deliberately uses a non-personalizadas groupId
+        // to prove that unconditional inclusion, which is the theme-level replacement for the old
+        // group-level test's "not filtered by current group selection" premise.
         val favorites = RecordingFavoritesRepository(initialIds = listOf("outside"))
         val state = buildState(
             backgroundScope,
@@ -170,7 +175,7 @@ class AffirmityAppStateFavoritesTest {
         )
         runCurrent()
 
-        assertTrue(state.filteredAffirmations.isEmpty())
+        assertEquals(listOf("outside"), state.filteredAffirmations.map { it.id })
         assertEquals(listOf("outside"), state.favoriteAffirmations.map { it.id })
     }
 
@@ -312,9 +317,9 @@ private fun buildState(
         authRepository = SignedOutAuthRepository,
         fcmTokenRepository = mock(FcmTokenRepository::class.java),
         onboardingRepository = mock(FirestoreOnboardingRepository::class.java),
-        groupPreferences = TestGroupSelectionPreferences,
-        knownGroupIds = setOf(PERSONALIZADAS_GROUP_ID, "outside-selection"),
-        defaultThematicGroupIds = emptySet(),
+        themePreferences = TestThemeSelectionPreferences,
+        knownThemeIds = setOf("in-selection", "outside-selection"),
+        defaultThematicThemeIds = emptySet(),
         favorites = favorites,
         useRemoteSession = false,
     )
@@ -389,10 +394,10 @@ private object SignedOutAuthRepository : AuthRepository {
     override suspend fun signOut() = Unit
 }
 
-private object TestGroupSelectionPreferences : GroupSelectionPreferences {
-    override fun observeSelectedGroupIds(): Flow<Set<String>?> =
-        flowOf(setOf(PERSONALIZADAS_GROUP_ID))
-    override suspend fun saveSelectedGroupIds(ids: Set<String>) = Unit
+private object TestThemeSelectionPreferences : ThemeSelectionPreferences {
+    override fun observeSelectedThemeIds(): Flow<Set<String>?> =
+        flowOf(setOf("in-selection"))
+    override suspend fun saveSelectedThemeIds(ids: Set<String>) = Unit
 }
 
 private object NoOpMigrationSource : FirestoreMigrationSource {
