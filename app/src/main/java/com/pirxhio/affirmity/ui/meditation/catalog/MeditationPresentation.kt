@@ -41,6 +41,13 @@ data class MeditationCounter(
     /** Two-arg label, e.g. `R.string.guided_meditation_round_label` = "Ronda %1$d de %2$d". */
     @StringRes val labelRes: Int,
     val emphasis: CounterEmphasis = CounterEmphasis.SECONDARY,
+    /** Contrast/UX-audit item 10 fix: when set, the customization value at this key (if present
+     * and parseable) overrides [total] for display -- [total] alone is authored once at catalog
+     * definition time and can't reflect a per-session customized count (e.g. Dhikr's 11/33/99
+     * `repetitions` field), unlike [MeditationCatalogEntry.definition], which already IS a
+     * function of the confirmed customization. `null` (the default) means "always use [total]",
+     * unchanged behavior for every other entry's counters. */
+    val totalFromCustomizationKey: String? = null,
 )
 
 /** The two type styles the screen already uses for its two counters — `bodyMedium` for the outer,

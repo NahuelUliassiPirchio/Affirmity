@@ -1441,17 +1441,18 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                 DhikrText.REPETITION to R.string.meditation_dhikr_repetition,
             ),
             audioResources = emptyMap(),
-            // `total` is pinned to the `repetitions` default (33, assertion 7 only checks
-            // `entry.definition(emptyMap())`). A session customized to 11 or 99 repetitions still
-            // runs the correct count -- only the live "x of 33" label lags the real total, since
-            // `presentation` isn't itself a function of `config` (unlike `definition`). Fixing that
-            // display gap is future work, not fabricated here.
+            // Item 10 fix: `total` (33) stays the fallback/pinned-test value (assertion 7 only
+            // checks `entry.definition(emptyMap())`), but `totalFromCustomizationKey` now tells
+            // GuidedMeditationScreen to read the actual customized `repetitions` value (11/33/99)
+            // out of the session's confirmed customization map at display time, instead of always
+            // showing "x of 33" regardless of what the user picked.
             counters = listOf(
                 MeditationCounter(
                     repeatId = "repetition",
                     total = 33,
                     labelRes = R.string.guided_meditation_round_label,
                     emphasis = CounterEmphasis.SECONDARY,
+                    totalFromCustomizationKey = "repetitions",
                 ),
             ),
         ),
@@ -1924,14 +1925,20 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                 VisualizationConfig(
                     visualizationMillis = visualizationMillis,
                     scenario = config["scenario"] ?: "nature",
-                    backgroundSound = config["backgroundSound"] ?: "none",
                 ),
             )
         },
         presentation = MeditationPresentation(
+            // Item 7 fix: one entry per scenario cue now (visualizationCueFor's targets), so the
+            // GuidedMeditationScreen's textResources lookup actually resolves whichever cue the
+            // customized `scenario` selected, not always the same generic string.
             textResources = mapOf(
                 VisualizationText.RELAXATION to R.string.meditation_visualization_relaxation,
-                VisualizationText.VISUALIZATION to R.string.meditation_visualization_visualization,
+                VisualizationText.VISUALIZATION_NATURE to R.string.meditation_visualization_visualization_nature,
+                VisualizationText.VISUALIZATION_SAFE_PLACE to R.string.meditation_visualization_visualization_safe_place,
+                VisualizationText.VISUALIZATION_GOAL to R.string.meditation_visualization_visualization_goal,
+                VisualizationText.VISUALIZATION_PERFORMANCE to R.string.meditation_visualization_visualization_performance,
+                VisualizationText.VISUALIZATION_CUSTOM to R.string.meditation_visualization_visualization_custom,
                 VisualizationText.INTEGRATION to R.string.meditation_visualization_integration,
                 VisualizationText.RETURN to R.string.meditation_visualization_return,
             ),
@@ -1955,20 +1962,11 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                     }
                 },
             ),
-            CustomizationField.Options(
-                key = "backgroundSound",
-                labelRes = R.string.meditation_customization_visualization_background_sound,
-                default = "none",
-                options = listOf("none", "nature", "rain", "ocean"),
-                optionLabelRes = { option ->
-                    when (option) {
-                        "nature" -> R.string.meditation_customization_visualization_background_sound_nature
-                        "rain" -> R.string.meditation_customization_visualization_background_sound_rain
-                        "ocean" -> R.string.meditation_customization_visualization_background_sound_ocean
-                        else -> R.string.meditation_customization_visualization_background_sound_none
-                    }
-                },
-            ),
+            // Item 7 fix: `backgroundSound` removed -- it never had any real audio behind it (no
+            // per-sound assets/ambient-audio infrastructure exists in this codebase) and would
+            // still be a no-op after wiring `scenario`, which is the one part of this form a
+            // text-only fix could actually make do something. Re-add once real ambient audio
+            // assets/playback exist.
         ),
     ),
     MeditationCatalogEntry(

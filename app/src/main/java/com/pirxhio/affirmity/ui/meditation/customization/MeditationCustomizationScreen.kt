@@ -1,7 +1,9 @@
 package com.pirxhio.affirmity.ui.meditation.customization
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -49,6 +51,13 @@ fun MeditationCustomizationScreen(
     modifier: Modifier = Modifier,
 ) {
     var values by remember(entry.id) { mutableStateOf(initialValues) }
+
+    // Item 5 fix: this route previously had no system-Back path of its own -- only the in-content
+    // Cancel button below -- so Back could fall through past this screen entirely (potentially
+    // exiting the app) instead of returning to Discover. Wired to the exact same callback Cancel
+    // uses, so there is exactly one cancel path, mirroring GuidedMeditationScreen's own
+    // single-BackHandler convention. No top app bar exists on this screen, so this is sufficient.
+    BackHandler(onBack = onCancel)
 
     Column(modifier = modifier.fillMaxWidth().padding(16.dp)) {
         Text(stringResource(entry.titleRes))
@@ -107,7 +116,10 @@ private fun CustomizationFieldRow(
                 @Suppress("UNCHECKED_CAST")
                 val typedField = field as CustomizationField.Options<Any>
                 val current = values[key] ?: typedField.encode(typedField.default)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Item 6 fix: was a plain non-scrollable Row -- a field with enough options (e.g.
+                // affirmationUniverse, one per affirmation group) overflowed the screen width and
+                // left its later chips unreachable. FlowRow wraps instead of clipping.
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     typedField.options.forEach { option ->
                         val encoded = typedField.encode(option)
                         FilterChip(
@@ -140,7 +152,9 @@ private fun CustomizationFieldRow(
 
             is CustomizationField.MultiSelect -> {
                 val current = values[key]?.let(::decodeMultiSelect) ?: field.default
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Item 6 fix: same overflow issue as the Options branch above -- FlowRow instead
+                // of a non-scrollable Row.
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     field.options.forEach { option ->
                         FilterChip(
                             selected = option in current,

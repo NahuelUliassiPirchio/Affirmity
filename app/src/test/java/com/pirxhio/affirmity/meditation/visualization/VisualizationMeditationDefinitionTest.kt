@@ -32,6 +32,6 @@ class VisualizationMeditationDefinitionTest {
 
         assertEquals(SessionStatus.Completed, engine.state.value.status)
         assertEquals(4, phaseCount)
-        assertEquals(1, executor.commands.count { it is ShowText && it.textId == VisualizationText.VISUALIZATION })
+        assertEquals(1, executor.commands.count { it is ShowText && it.textId == VisualizationText.VISUALIZATION_NATURE })
     }
 }

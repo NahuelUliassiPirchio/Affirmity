@@ -9,15 +9,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Pause
@@ -45,7 +48,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -105,7 +107,6 @@ fun MeditationScreen(
     // Wall-clock instant of the first Start press, for DayClock.attributedEpochDay -- not touched
     // on resume, only on a fresh start (mirrors hasStarted).
     var sessionStartWallMillis by remember { mutableStateOf<Long?>(null) }
-    var selectedPreset by remember { mutableStateOf<String?>(null) }
     val presets = listOf(
         stringResource(R.string.meditation_preset_relax) to 5 * 60,
         stringResource(R.string.meditation_preset_focus) to 15 * 60,
@@ -161,10 +162,11 @@ fun MeditationScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         val viewportHeight = maxHeight
-        Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            item {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -181,7 +183,7 @@ fun MeditationScreen(
                 Text(
                     text = stringResource(R.string.meditation_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.outline,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp, bottom = 40.dp)
                 )
 
@@ -230,7 +232,7 @@ fun MeditationScreen(
                                 } else {
                                     stringResource(R.string.meditation_start_content_description)
                                 },
-                                tint = Color.Black
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                         }
                     }
@@ -241,8 +243,8 @@ fun MeditationScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(formatTime(MIN_DURATION_SECONDS), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline)
-                        Text(stringResource(R.string.meditation_max_duration_label), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline)
+                        Text(formatTime(MIN_DURATION_SECONDS), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.meditation_max_duration_label), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Slider(
                         value = durationSeconds.toFloat(),
@@ -273,10 +275,13 @@ fun MeditationScreen(
                     ) {
                         presets.forEach { (label, seconds) ->
                             FilterChip(
-                                selected = selectedPreset == label,
+                                // Item 14: derived straight from `durationSeconds` instead of a
+                                // separately tracked `selectedPreset` -- dragging the slider off a
+                                // preset's value now un-highlights every chip on its own, instead
+                                // of leaving a stale chip highlighted while the slider disagrees.
+                                selected = durationSeconds == seconds,
                                 onClick = {
                                     if (!isRunning) {
-                                        selectedPreset = label
                                         durationSeconds = seconds
                                         secondsRemaining = durationSeconds
                                         hasStarted = false
@@ -290,48 +295,24 @@ fun MeditationScreen(
                     }
                 }
             }
+            }
 
-            MeditationDiscoverSection(
-                entries = entries,
-                decisionFor = decisionFor,
-                onLaunch = onLaunch,
-                onUpgradeClick = onUpgradeClick,
-                onWatchAd = onWatchAd,
-                adInFlightFor = adInFlightFor,
-                anyAdInFlight = anyAdInFlight,
-                onEvent = onEvent,
-                modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 24.dp)
-            )
-        }
-    }
-}
-
-/** Real Discover list (REQ-5.3): renders every shipping [MeditationCatalogEntry], each row's
- * lock state resolved via [decisionFor] at composition time. Left peeking under the timer via
- * [DISCOVER_LIST_PEEK_HEIGHT] so the user notices there's more to scroll to. No [androidx.compose
- * .foundation.lazy.LazyColumn]: this section nests inside the screen's own unbounded-height
- * `verticalScroll` (design §4.3) — a nested LazyColumn there would crash. */
-@Composable
-fun MeditationDiscoverSection(
-    entries: List<MeditationCatalogEntry>,
-    decisionFor: (MeditationCatalogEntry) -> AccessDecision,
-    onLaunch: (MeditationCatalogEntry) -> Unit,
-    onUpgradeClick: () -> Unit,
-    onWatchAd: (MeditationCatalogEntry, AdUnlockPolicy) -> Unit,
-    adInFlightFor: (MeditationCatalogEntry) -> Boolean = { false },
-    anyAdInFlight: Boolean = false,
-    onEvent: (AnalyticsEvent) -> Unit = {},
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.meditation_discover_header),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            entries.forEach { entry ->
+            // Item 11: was a plain eager Column over all ~39 catalog entries, nested inside the
+            // screen's own unbounded-height `verticalScroll` -- didn't scale and (per the removed
+            // doc comment here) couldn't become a LazyColumn while nested like that anyway. Now
+            // this whole screen is ONE LazyColumn (the timer/duration block above is its `item {}`
+            // header), so the Discover list can lazily load via `items(...)` below without nesting.
+            item {
+                Text(
+                    text = stringResource(R.string.meditation_discover_header),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 12.dp)
+                )
+            }
+            items(entries, key = { it.id }) { entry ->
                 MeditationDiscoverCard(
                     entry = entry,
                     decision = decisionFor(entry),
@@ -341,7 +322,11 @@ fun MeditationDiscoverSection(
                     adInFlight = adInFlightFor(entry),
                     anyAdInFlight = anyAdInFlight,
                     onEvent = onEvent,
+                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp),
                 )
+            }
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
@@ -357,6 +342,7 @@ private fun MeditationDiscoverCard(
     adInFlight: Boolean = false,
     anyAdInFlight: Boolean = false,
     onEvent: (AnalyticsEvent) -> Unit = {},
+    modifier: Modifier = Modifier,
 ) {
     val locked = isMeditationLocked(decision)
     val badge = deriveMeditationBadge(entry, decision)
@@ -367,26 +353,35 @@ private fun MeditationDiscoverCard(
         onEvent(AnalyticsEvent.ContentLockedTapped(AnalyticsId.of(entry), AnalyticsContentType.MEDITATION, decision.provenance()))
         onUpgradeClick()
     }
-    // Three interaction branches (REQ-5.3/design §4.2), mirroring AffirmationGroupSelectableRow.
-    // An ad-unlockable row is inert while ANY ad request is in flight (§6.1) -- the tap is
-    // dropped, not queued -- defense in depth over AffirmityAppState's single-flight guard.
-    val onRowClick: () -> Unit = when (decision) {
+    // Fix (contrast-audit item 8): a LockedAdUnlockable row no longer fires onWatchAd from a tap
+    // anywhere on the row -- only the explicit "Watch ad to unlock" CTA below does. The row itself
+    // has no clickable at all in this state (fix item 2: a no-op clickable still produced a ripple
+    // and a misleading TalkBack-announced action for a tap that did nothing).
+    val onRowClick: (() -> Unit)? = when (decision) {
         is AccessDecision.Unlocked, is AccessDecision.UnlockedByAd -> {
             {
                 onEvent(AnalyticsEvent.MeditationEntryTapped(AnalyticsId.of(entry), decision.provenance(), entry.access.adUnlock))
                 onLaunch(entry)
             }
         }
-        is AccessDecision.LockedAdUnlockable ->
-            if (anyAdInFlight) { {} } else { { onWatchAd(entry, decision.policy) } }
+        is AccessDecision.LockedAdUnlockable -> null
         AccessDecision.LockedNeedsPro -> onLockedTap
     }
+    val onWatchAdTap: () -> Unit = {
+        if (decision is AccessDecision.LockedAdUnlockable && !anyAdInFlight) {
+            onWatchAd(entry, decision.policy)
+        }
+    }
+    // Item 12: while ANY ad request is in flight, every OTHER ad-unlockable card must read as
+    // non-interactive rather than silently swallowing taps -- the one place a blanket dim is
+    // correct (it's a transient loading state), unlike the generic `locked` case below (item 3).
+    val disabledByOtherAdInFlight = decision is AccessDecision.LockedAdUnlockable && anyAdInFlight && !adInFlight
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onRowClick)
-            .let { if (locked) it.alpha(0.6f) else it },
+            .let { if (onRowClick != null) it.clickable(onClick = onRowClick, enabled = !disabledByOtherAdInFlight) else it }
+            .let { if (disabledByOtherAdInFlight) it.alpha(0.5f) else it },
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
@@ -399,13 +394,22 @@ private fun MeditationDiscoverCard(
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(10.dp)),
+                    // Item 3: only the icon/thumbnail dims to signal "locked" now -- title, meta
+                    // and badge below stay at full opacity so they remain legible.
+                    .background(
+                        if (locked) {
+                            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHigh
+                        },
+                        RoundedCornerShape(10.dp),
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = entry.icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = if (locked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -420,11 +424,18 @@ private fun MeditationDiscoverCard(
                 Text(
                     text = "${entry.approxDurationMinutes} min • ${stringResource(entry.categoryRes)}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
                 )
-                if (badge != null) {
-                    AffirmationGroupAccessBadge(badge)
+                when {
+                    // Item 8: LockedAdUnlockable gets its own explicit "Watch ad to unlock" CTA
+                    // instead of the shared PREMIUM/"Pro only" badge -- tapping IT (not the row)
+                    // is the only thing that invokes onWatchAd.
+                    decision is AccessDecision.LockedAdUnlockable -> WatchAdBadge(
+                        onClick = onWatchAdTap,
+                        enabled = !anyAdInFlight,
+                    )
+                    badge != null -> AffirmationGroupAccessBadge(badge)
                 }
             }
             if (adInFlight) {
@@ -436,16 +447,14 @@ private fun MeditationDiscoverCard(
                     color = MaterialTheme.colorScheme.outline,
                 )
             } else if (locked) {
-                IconButton(onClick = onRowClick) {
-                    Icon(
-                        imageVector = Icons.Filled.Lock,
-                        contentDescription = stringResource(
-                            R.string.affirmation_group_locked_a11y,
-                            stringResource(entry.titleRes),
-                        ),
-                        tint = MaterialTheme.colorScheme.outline,
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Filled.Lock,
+                    contentDescription = stringResource(
+                        R.string.affirmation_group_locked_a11y,
+                        stringResource(entry.titleRes),
+                    ),
+                    tint = MaterialTheme.colorScheme.outline,
+                )
             } else {
                 Icon(
                     imageVector = Icons.Filled.PlayCircle,
@@ -455,6 +464,36 @@ private fun MeditationDiscoverCard(
                 )
             }
         }
+    }
+}
+
+/** Item 8's explicit ad-unlock CTA -- distinct from [AffirmationGroupAccessBadge]'s generic
+ *  "Pro only" copy, and the only tap target in [MeditationDiscoverCard] that invokes [onWatchAd]-
+ *  bound logic. [enabled] false (another card's ad is in flight) dims it without disabling the
+ *  rest of the row, since the card itself already handles that case via `disabledByOtherAdInFlight`. */
+@Composable
+private fun WatchAdBadge(onClick: () -> Unit, enabled: Boolean) {
+    Row(
+        modifier = Modifier
+            .defaultMinSize(minHeight = 48.dp)
+            .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(50))
+            .clickable(onClick = onClick, enabled = enabled)
+            .alpha(if (enabled) 1f else 0.5f)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.PlayCircle,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.size(14.dp),
+        )
+        Text(
+            text = stringResource(R.string.meditation_watch_ad_cta),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.padding(start = 4.dp),
+        )
     }
 }
 

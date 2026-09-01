@@ -265,6 +265,7 @@
     <string name="guided_meditation_retention_hint">Tap when you want to release</string>
     <string name="guided_meditation_recovery">Recovery</string>
     <string name="guided_meditation_completed">Session complete</string>
+    <string name="guided_meditation_done">Done</string>
     <string name="guided_meditation_start_content_description">Start</string>
     <string name="guided_meditation_pause_content_description">Pause</string>
     <string name="guided_meditation_resume_content_description">Resume</string>
@@ -369,6 +370,7 @@
     <string name="affirmation_group_upgrade_cta">Upgrade to Pro</string>
     <string name="ad_unlock_cta_a11y">Watch an ad to unlock %1$s</string>
     <string name="ad_unlock_loading_a11y">Loading ad…</string>
+    <string name="meditation_watch_ad_cta">Watch an ad to unlock</string>
     <string name="your_feed_expand">Expand your feed</string>
     <string name="your_feed_collapse">Hide your feed</string>
     <string name="your_feed_title">Your feed</string>
@@ -397,6 +399,7 @@
     <string name="paywall_unavailable">Couldn\'t load plans. Try again later.</string>
     <string name="paywall_snackbar_lapse_message">Your Pro access ended.</string>
     <string name="paywall_snackbar_lapse_action">View plans</string>
+    <string name="meditation_access_blocked_message">You no longer have access to this session.</string>
     <string name="settings_subscription_title">Subscription</string>
     <string name="settings_subscription_manage_button">Manage subscription</string>
 </resources>

@@ -47,15 +47,20 @@ class VisualizationChristianPrayerCustomizationTest {
     }
 
     @Test
-    fun `visualization custom scenario and backgroundSound reach variables`() {
+    fun `visualization custom scenario reaches variables and selects the matching cue`() {
         val entry = requireNotNull(findMeditationCatalogEntry("visualization"))
         val default = entry.definition(emptyMap())
         assertEquals("nature", default.variables["scenario"])
-        assertEquals("none", default.variables["backgroundSound"])
 
-        val custom = entry.definition(mapOf("scenario" to "goal", "backgroundSound" to "rain"))
+        val custom = entry.definition(mapOf("scenario" to "goal"))
         assertEquals("goal", custom.variables["scenario"])
-        assertEquals("rain", custom.variables["backgroundSound"])
+        // Item 7 fix: `scenario` now actually drives which cue the "visualization" phase shows,
+        // instead of only being recorded in `variables` with zero effect on the session.
+        val visualizationPhase = (custom.root as MeditationSequence).children[1] as Phase
+        assertEquals(
+            com.pirxhio.affirmity.meditation.visualization.VisualizationText.VISUALIZATION_GOAL,
+            (visualizationPhase.onEnter.first() as ShowText).textId,
+        )
     }
 
     @Test

@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,7 +33,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -204,6 +204,7 @@ fun GuidedMeditationScreen(
         currentTextId = currentTextId,
         currentLiteralText = currentLiteralText,
         entry = entry,
+        customization = customization,
         phaseDurations = phaseDurations,
         onStart = {
             val currentAccess = accessAtStart()
@@ -220,6 +221,10 @@ fun GuidedMeditationScreen(
         onResume = { engine.send(MeditationEvent.Resume) },
         onSkip = { engine.send(MeditationEvent.Next) },
         onRelease = { engine.send(MeditationEvent.UserAction()) },
+        // Item 13: session-complete had no visible exit affordance -- wired to the same single
+        // exit path (`requestExit`) the BackHandler above and MainActivity's top-bar back icon
+        // already dispatch through, so there is still exactly one exit implementation.
+        onDone = requestExit,
     )
 }
 
@@ -252,12 +257,14 @@ private fun GuidedMeditationContent(
     currentTextId: String?,
     currentLiteralText: String?,
     entry: MeditationCatalogEntry,
+    customization: Map<String, String>,
     phaseDurations: Map<String, Long>,
     onStart: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onSkip: () -> Unit,
     onRelease: () -> Unit,
+    onDone: () -> Unit,
 ) {
     Column(
         modifier = modifier
@@ -270,13 +277,20 @@ private fun GuidedMeditationContent(
         entry.presentation.counters.forEach { counter ->
             val index = state.iterationCounts[counter.repeatId]
             if (index != null && state.status != SessionStatus.Completed) {
+                // Item 10 fix: resolves the actual customized total (e.g. Dhikr's chosen
+                // repetitions) when the counter declares which customization key to read, instead
+                // of always showing the catalog-authored `total` (33) regardless of what the user
+                // picked on the pre-session customization screen.
+                val resolvedTotal = counter.totalFromCustomizationKey
+                    ?.let { customization[it]?.toIntOrNull() }
+                    ?: counter.total
                 Text(
-                    text = stringResource(counter.labelRes, index + 1, counter.total),
+                    text = stringResource(counter.labelRes, index + 1, resolvedTotal),
                     style = when (counter.emphasis) {
                         CounterEmphasis.PRIMARY -> MaterialTheme.typography.bodyMedium
                         CounterEmphasis.SECONDARY -> MaterialTheme.typography.bodySmall
                     },
-                    color = MaterialTheme.colorScheme.outline,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = if (counter.emphasis == CounterEmphasis.PRIMARY) {
                         Modifier.padding(top = 8.dp)
                     } else {
@@ -321,7 +335,7 @@ private fun GuidedMeditationContent(
                     Text(
                         text = "${remainingSeconds}s",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.outline,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
@@ -374,7 +388,17 @@ private fun GuidedMeditationContent(
                     )
                 }
 
-                SessionStatus.Completed, SessionStatus.Cancelled -> Unit
+                // Item 13 fix: Completed previously showed no button at all -- the user had to
+                // guess system Back was the way out. Cancelled still shows nothing: that state is
+                // never actually observed here (performGuidedSessionExit calls onExit in the same
+                // frame Cancel is dispatched, unmounting this composable before a Cancelled frame
+                // could render), so there's no reachable state to add a button for.
+                SessionStatus.Completed -> {
+                    Button(onClick = onDone) {
+                        Text(stringResource(R.string.guided_meditation_done))
+                    }
+                }
+                SessionStatus.Cancelled -> Unit
             }
         }
     }
@@ -392,7 +416,7 @@ private fun RoundIconButton(
             .size(64.dp)
             .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
     ) {
-        Icon(imageVector = icon, contentDescription = contentDescription, tint = Color.Black)
+        Icon(imageVector = icon, contentDescription = contentDescription, tint = MaterialTheme.colorScheme.onPrimaryContainer)
     }
 }
 

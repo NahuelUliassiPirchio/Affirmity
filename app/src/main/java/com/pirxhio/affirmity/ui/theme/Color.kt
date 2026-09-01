@@ -62,3 +62,28 @@ val OnSecondaryContainerDark = Color(OnSecondaryContainerDarkArgb)
 val OnSurfaceVariantDark = Color(0xFFB0BEC0)
 val OutlineDarkArgb: Long = 0xFF5C6B6D
 val OutlineDark = Color(OutlineDarkArgb)
+
+// Contrast-audit fix: DarkColorScheme left primaryContainer/onPrimaryContainer/
+// surfaceContainerHigh/surfaceContainerHighest/outlineVariant unset, so they silently fell back to
+// Material's default (mismatched) baseline in dark mode even though MeditationScreen/
+// GuidedMeditationScreen read all five roles. TealPrimaryDark doubles as the container tone (same
+// value already used for `primary`/`SecondaryContainerDark`), with a near-black on-container text
+// for 7.26:1 contrast (mirrors the SecondaryContainerDark/OnSecondaryContainerDark pairing above).
+// The two surfaceContainer steps continue the near-black elevation ramp past SurfaceContainerDark;
+// outlineVariant is a low-contrast divider tone, not text -- 3:1 non-text minimum only.
+val PrimaryContainerDark = Color(0xFF5BBCC3)
+val OnPrimaryContainerDark = Color(0xFF00252A)
+val SurfaceContainerHighDark = Color(0xFF1C1C1C)
+val SurfaceContainerHighestDark = Color(0xFF272727)
+val OutlineVariantDark = Color(0xFF3A4344)
+
+// Contrast-audit fix: AffirmationGroupAccessBadge's PREMIUM badge previously paired the same raw
+// orange (0xFFED9A68) as both text/icon color AND (at 8-20% alpha) its own container tint -- a
+// self-referential low-contrast combo, not a verified pair. These replace it: a light peach/dark
+// near-black-brown pair (light theme) and a dark brown/light peach pair (dark theme), each holding
+// >6.2:1 (well past the 4.5:1 text/icon minimum), computed with the same relative-luminance math
+// ContrastRatioTest uses.
+val PremiumContainerLight = Color(0xFFFFE0C7)
+val OnPremiumContainerLight = Color(0xFF7A3B00)
+val PremiumContainerDark = Color(0xFF5C3200)
+val OnPremiumContainerDark = Color(0xFFFFD9AD)

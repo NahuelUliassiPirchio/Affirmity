@@ -382,6 +382,26 @@ fun AffirmityApp(
     val adUnlockEarnedMessage = stringResource(R.string.ad_unlock_earned_message)
     val adUnlockDismissedMessage = stringResource(R.string.ad_unlock_dismissed_message)
     val adUnlockUnavailableMessage = stringResource(R.string.ad_unlock_unavailable_message)
+    // Item 9: strings for the mid-flow access-blocked snackbar, resolved here (composable scope)
+    // for the same LocalContextGetResourceValueCall reason as the ad-unlock messages above.
+    val meditationAccessBlockedMessage = stringResource(R.string.meditation_access_blocked_message)
+    val paywallSnackbarLapseAction = stringResource(R.string.paywall_snackbar_lapse_action)
+    // Fix item 3: shared by BOTH the mid-flow onAccessBlocked callback below AND the
+    // composition-time launch re-check further down -- whichever path first notices the access
+    // loss shows the SAME snackbar-with-"see plans"-action, instead of the re-check silently
+    // clearing the selection with no feedback.
+    val showMeditationAccessBlockedSnackbar: () -> Unit = {
+        snackbarScope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message = meditationAccessBlockedMessage,
+                actionLabel = paywallSnackbarLapseAction,
+                duration = androidx.compose.material3.SnackbarDuration.Short,
+            )
+            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                paywallSource = PaywallSource.OTHER
+            }
+        }
+    }
     LaunchedEffect(appState.adRequestNotice.value) {
         val notice = appState.adRequestNotice.value ?: return@LaunchedEffect
         snackbarScope.launch {
@@ -571,7 +591,13 @@ fun AffirmityApp(
             // composing GuidedMeditationScreen for gated content. If this removes an already
             // composed session, that screen's disposal invokes its shared requestExit path before
             // releasing audio so cancellation bookkeeping is preserved.
-            LaunchedEffect(selectedMeditationEntry.id) { selectedMeditationEntryId = null }
+            // Fix item 3: this recheck used to clear the selection silently -- now it surfaces the
+            // same access-blocked snackbar the onAccessBlocked callback below shows, so the user
+            // gets feedback regardless of which path caught the access loss.
+            LaunchedEffect(selectedMeditationEntry.id) {
+                selectedMeditationEntryId = null
+                showMeditationAccessBlockedSnackbar()
+            }
         } else {
             // True exactly when this entry's customization screen is actually about to be shown
             // (mirrors decideMeditationLaunchStep's own condition) -- gates the repository read
@@ -588,9 +614,19 @@ fun AffirmityApp(
             var savedCustomizationValues by remember(selectedMeditationEntry.id) {
                 mutableStateOf(emptyMap<String, String>())
             }
+            // Item 4 fix: distinguishes "not needed" from "needed but not back yet" -- true
+            // immediately when no read is required, so a no-fields (or already-confirmed) entry's
+            // StartSession branch below is never blocked on this. When a read IS required, this
+            // stays false until the LaunchedEffect resolves, which gates ShowCustomization below
+            // from ever composing MeditationCustomizationScreen with defaults it would then forget
+            // to update (that screen's `remember(entry.id)` form state only ever initializes once).
+            var savedCustomizationValuesLoaded by remember(selectedMeditationEntry.id) {
+                mutableStateOf(!needsSavedCustomizationValues)
+            }
             LaunchedEffect(selectedMeditationEntry.id, needsSavedCustomizationValues) {
                 if (needsSavedCustomizationValues) {
                     savedCustomizationValues = meditationCustomizationRepository.getValues(selectedMeditationEntry.id)
+                    savedCustomizationValuesLoaded = true
                 }
             }
             val launchStep = decideMeditationLaunchStep(
@@ -600,6 +636,16 @@ fun AffirmityApp(
             )
             when (launchStep) {
                 is MeditationLaunchStep.ShowCustomization -> {
+                    if (!savedCustomizationValuesLoaded) {
+                        // Same loading-placeholder shape as the StartSession branch's
+                        // `sessionCustomization == null` case below -- show nothing editable until
+                        // the real saved values are back, instead of composing the form with
+                        // defaults it can never pick the real values up from afterward.
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                        return
+                    }
                     // Pre-session customization step. Sits strictly after the access re-check
                     // above -- an entry never reaches this branch unless it's already unlocked --
                     // and strictly before GuidedMeditationScreen ever calls entry.definition(...),
@@ -683,7 +729,15 @@ fun AffirmityApp(
                                     System.currentTimeMillis(),
                                 )
                             },
-                            onAccessBlocked = { selectedMeditationEntryId = null },
+                            // Item 9 fix: a mid-flow access-check failure used to silently clear the
+                            // selection and bounce back to the catalog with zero feedback. Surfaces
+                            // the same snackbar host used elsewhere in this file (proLapseNotice,
+                            // adRequestNotice above), with an action into the paywall so the user
+                            // isn't just told "no" -- they're told what to do about it.
+                            onAccessBlocked = {
+                                selectedMeditationEntryId = null
+                                showMeditationAccessBlockedSnackbar()
+                            },
                             // The streak-bug fix (REQ-5.6): guided completion now calls the same
                             // recordMeditationCompleted() the free timer already calls at its own
                             // call site. consumeMeditationPlaybackUnlock runs for BOTH terminal

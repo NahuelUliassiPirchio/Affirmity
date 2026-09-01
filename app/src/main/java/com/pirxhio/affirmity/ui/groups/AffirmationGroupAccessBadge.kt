@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,19 +22,25 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
+import com.pirxhio.affirmity.ui.theme.OnPremiumContainerDark
+import com.pirxhio.affirmity.ui.theme.OnPremiumContainerLight
+import com.pirxhio.affirmity.ui.theme.PremiumContainerDark
+import com.pirxhio.affirmity.ui.theme.PremiumContainerLight
 
 /** Relocated from the now-deleted `AffirmationGroupSelectorSheet.kt` -- still used by
  *  [com.pirxhio.affirmity.ui.meditation.MeditationScreen]'s locked rows, and by the new
  *  `ui/feed` theme selection rows. Caller derives [badge] via [deriveBadge]/[deriveCatalogBadge]. */
 @Composable
 fun AffirmationGroupAccessBadge(badge: GroupBadge) {
+    val premiumContainer = premiumBadgeContainerColor()
+    val onPremiumContainer = premiumBadgeContentColor()
     when (badge) {
         GroupBadge.PREMIUM -> AccessBadge(
             icon = Icons.Filled.WorkspacePremium,
             label = stringResource(R.string.affirmation_group_badge_premium),
-            containerColor = PremiumBadgeColor.copy(alpha = 0.2f),
-            contentColor = PremiumBadgeColor,
-            borderColor = PremiumBadgeColor.copy(alpha = 0.3f),
+            containerColor = premiumContainer,
+            contentColor = onPremiumContainer,
+            borderColor = onPremiumContainer.copy(alpha = 0.3f),
         )
         GroupBadge.AD_UNLOCK -> AccessBadge(
             icon = Icons.Filled.PlayCircle,
@@ -45,9 +52,9 @@ fun AffirmationGroupAccessBadge(badge: GroupBadge) {
         GroupBadge.PARTIALLY_LOCKED -> AccessBadge(
             icon = Icons.Filled.LockOpen,
             label = stringResource(R.string.affirmation_group_badge_partial),
-            containerColor = PremiumBadgeColor.copy(alpha = 0.08f),
-            contentColor = PremiumBadgeColor,
-            borderColor = PremiumBadgeColor.copy(alpha = 0.3f),
+            containerColor = premiumContainer,
+            contentColor = onPremiumContainer,
+            borderColor = onPremiumContainer.copy(alpha = 0.3f),
         )
     }
 }
@@ -82,4 +89,15 @@ private fun AccessBadge(
     }
 }
 
-private val PremiumBadgeColor = Color(0xFFED9A68)
+/** Contrast-audit fix: replaces the old self-referential `Color(0xFFED9A68)` (used as both text
+ *  AND, at low alpha, its own container tint -- a pairing never verified for contrast). Resolves
+ *  the light/dark [PremiumContainerLight]/[PremiumContainerDark] pair by hand -- no `LocalXxxColors`
+ *  extended-color-scheme pattern exists yet in [com.pirxhio.affirmity.ui.theme.AffirmityTheme], so
+ *  these mirror how [MaterialTheme]'s own light/dark schemes are chosen. */
+@Composable
+private fun premiumBadgeContainerColor(): Color =
+    if (isSystemInDarkTheme()) PremiumContainerDark else PremiumContainerLight
+
+@Composable
+private fun premiumBadgeContentColor(): Color =
+    if (isSystemInDarkTheme()) OnPremiumContainerDark else OnPremiumContainerLight

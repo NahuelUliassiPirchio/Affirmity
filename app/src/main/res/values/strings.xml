@@ -265,6 +265,7 @@
     <string name="guided_meditation_retention_hint">Tocá cuando quieras soltar</string>
     <string name="guided_meditation_recovery">Recuperación</string>
     <string name="guided_meditation_completed">Sesión completa</string>
+    <string name="guided_meditation_done">Listo</string>
     <string name="guided_meditation_start_content_description">Iniciar</string>
     <string name="guided_meditation_pause_content_description">Pausar</string>
     <string name="guided_meditation_resume_content_description">Reanudar</string>
@@ -648,7 +649,11 @@
     <string name="meditation_catalog_category_bienestar">Bienestar</string>
 
     <string name="meditation_visualization_relaxation">Relajá el cuerpo y preparate para imaginar.</string>
-    <string name="meditation_visualization_visualization">Imaginá con detalle el escenario que elegiste.</string>
+    <string name="meditation_visualization_visualization_nature">Imaginá un paisaje natural que te dé calma: el sonido del agua, el aire, la luz.</string>
+    <string name="meditation_visualization_visualization_safe_place">Imaginá tu lugar seguro, con todo el detalle posible: qué ves, qué escuchás, cómo te sentís ahí.</string>
+    <string name="meditation_visualization_visualization_goal">Imaginate habiendo logrado ese objetivo: cómo te sentís, qué cambió, quién está con vos.</string>
+    <string name="meditation_visualization_visualization_performance">Visualizá ese momento de desempeño saliendo exactamente como querés, paso a paso.</string>
+    <string name="meditation_visualization_visualization_custom">Imaginá con detalle el escenario que elegiste.</string>
     <string name="meditation_visualization_integration">Notá cómo te sentís después de esa imagen.</string>
     <string name="meditation_visualization_return">De a poco, volvé la atención al espacio a tu alrededor.</string>
     <string name="meditation_gratitudemeditation_arrival">Acomodate y date un momento para llegar.</string>
@@ -712,6 +717,7 @@
     <string name="affirmation_group_upgrade_cta">Mejorar a Pro</string>
     <string name="ad_unlock_cta_a11y">Mirá un anuncio para desbloquear %1$s</string>
     <string name="ad_unlock_loading_a11y">Cargando anuncio…</string>
+    <string name="meditation_watch_ad_cta">Ver anuncio para desbloquear</string>
     <string name="your_feed_expand">Expandir tu feed</string>
     <string name="your_feed_collapse">Ocultar tu feed</string>
     <string name="your_feed_title">Tu feed</string>
@@ -740,6 +746,7 @@
     <string name="paywall_unavailable">No se pudieron cargar los planes. Intentá de nuevo más tarde.</string>
     <string name="paywall_snackbar_lapse_message">Tu acceso Pro terminó.</string>
     <string name="paywall_snackbar_lapse_action">Ver planes</string>
+    <string name="meditation_access_blocked_message">Ya no tenés acceso a esta sesión.</string>
     <string name="settings_subscription_title">Suscripción</string>
     <string name="settings_subscription_manage_button">Gestionar suscripción</string>
     <string name="meditation_customization_start">Comenzar</string>
@@ -793,11 +800,6 @@
     <string name="meditation_customization_visualization_scenario_goal">Objetivo</string>
     <string name="meditation_customization_visualization_scenario_performance">Desempeño</string>
     <string name="meditation_customization_visualization_scenario_custom">Personalizado</string>
-    <string name="meditation_customization_visualization_background_sound">Sonido de fondo</string>
-    <string name="meditation_customization_visualization_background_sound_none">Ninguno</string>
-    <string name="meditation_customization_visualization_background_sound_nature">Naturaleza</string>
-    <string name="meditation_customization_visualization_background_sound_rain">Lluvia</string>
-    <string name="meditation_customization_visualization_background_sound_ocean">Océano</string>
     <string name="meditation_customization_gratitude_prompt_count">Cantidad de reflexiones</string>
     <string name="meditation_customization_gratitude_journal_at_end">Anotar al finalizar</string>
     <string name="meditation_customization_centering_prayer_sacred_word">Palabra sagrada</string>
