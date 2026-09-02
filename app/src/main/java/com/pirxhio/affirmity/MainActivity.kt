@@ -1102,6 +1102,7 @@ fun AffirmityApp(
                     ) { innerPadding ->
                         GuidedMeditationScreen(
                             entry = selectedMeditationEntry,
+                            tierAtEntry = { appState.entitlementTier.value },
                             modifier = Modifier.padding(innerPadding),
                             customization = sessionCustomization,
                             accessAtStart = {

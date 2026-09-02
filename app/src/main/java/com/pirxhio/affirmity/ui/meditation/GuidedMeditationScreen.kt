@@ -34,11 +34,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.pirxhio.affirmity.BuildConfig
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.AccessDecision
+import com.pirxhio.affirmity.access.AccessTier
+import com.pirxhio.affirmity.ads.BannerAdView
 import com.pirxhio.affirmity.analytics.AnalyticsEvent
 import com.pirxhio.affirmity.analytics.AnalyticsId
 import com.pirxhio.affirmity.analytics.provenance
@@ -72,6 +77,10 @@ import com.pirxhio.affirmity.ui.meditation.catalog.isMeditationLocked
 @Composable
 fun GuidedMeditationScreen(
     entry: MeditationCatalogEntry,
+    /** Entitlement read once at screen entry (design D1, resolved — no default). A missing
+     * wire-up at the call site must be a compile error, not a silent fall-through to showing (or
+     * hiding) the free-tier banner ad. */
+    tierAtEntry: () -> AccessTier,
     modifier: Modifier = Modifier,
     /** Confirmed values from the pre-session customization screen, keyed by field id. Populated
      * per-entry based on the meditation's spec-defined customizable fields; empty only for
@@ -97,6 +106,10 @@ fun GuidedMeditationScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // D1 (resolved, no default): frozen for the composition lifetime, exactly like accessAtStart
+    // -- a mid-session tier change must never make the banner appear/disappear mid-meditation.
+    val showBannerAd = remember { shouldShowMeditationBanner(tierAtEntry()) }
 
     // D7: UI-local wall clock, captured at the Start dispatch below and diffed at both terminal
     // paths (Completed LaunchedEffect, Cancelled exit). Measures wall time including pauses --
@@ -206,6 +219,7 @@ fun GuidedMeditationScreen(
         entry = entry,
         customization = customization,
         phaseDurations = phaseDurations,
+        showBannerAd = showBannerAd,
         onStart = {
             val currentAccess = accessAtStart()
             if (isMeditationLocked(currentAccess)) {
@@ -259,6 +273,7 @@ private fun GuidedMeditationContent(
     entry: MeditationCatalogEntry,
     customization: Map<String, String>,
     phaseDurations: Map<String, Long>,
+    showBannerAd: Boolean,
     onStart: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
@@ -266,14 +281,20 @@ private fun GuidedMeditationContent(
     onRelease: () -> Unit,
     onDone: () -> Unit,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
+    // D3: Column -> Box so the banner can occupy a fixed BottomCenter slot outside the scrollable
+    // content, with the inner Column's bottom padding reserving exactly the banner's measured
+    // height (0.dp while pending/failed, ~50.dp once loaded) instead of overlapping the controls.
+    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        var bannerHeight by remember { mutableStateOf(0.dp) }
+        val density = LocalDensity.current
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 24.dp + bannerHeight),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
         entry.presentation.counters.forEach { counter ->
             val index = state.iterationCounts[counter.repeatId]
             if (index != null && state.status != SessionStatus.Completed) {
@@ -400,6 +421,19 @@ private fun GuidedMeditationContent(
                 }
                 SessionStatus.Cancelled -> Unit
             }
+        }
+        }
+
+        // D2: last, unconditional child -- never inside an `if (state.status ...)` branch and
+        // never `key()`ed, so its Compose identity (and the LaunchedEffect's one-shot delay+load)
+        // survives every status transition without restarting.
+        if (showBannerAd) {
+            BannerAdView(
+                adUnitId = BuildConfig.ADMOB_BANNER_UNIT,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .onSizeChanged { bannerHeight = with(density) { it.height.toDp() } },
+            )
         }
     }
 }

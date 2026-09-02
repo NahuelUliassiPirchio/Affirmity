@@ -56,6 +56,7 @@ android {
             buildConfigField("String", "ADMOB_REWARDED_UNIT_PER_USE", "\"ca-app-pub-3940256099942544/5224354917\"")
             buildConfigField("String", "ADMOB_REWARDED_UNIT_ONE_TIME_TRIAL", "\"ca-app-pub-3940256099942544/5224354917\"")
             buildConfigField("String", "ADMOB_REWARDED_UNIT_TIMED_REPEATABLE", "\"ca-app-pub-3940256099942544/5224354917\"")
+            buildConfigField("String", "ADMOB_BANNER_UNIT", "\"ca-app-pub-3940256099942544/6300978111\"")
             buildConfigField(
                 "String",
                 "ADMOB_TEST_DEVICE_HASH",
@@ -90,6 +91,13 @@ android {
                 }\"",
             )
             buildConfigField("String", "ADMOB_TEST_DEVICE_HASH", "\"\"")
+            // REQUIRED, unlike TIMED_REPEATABLE's deliberate opt-out above: there is no sane
+            // fallback unit for a banner, so a release build fails fast without the secret.
+            buildConfigField(
+                "String",
+                "ADMOB_BANNER_UNIT",
+                "\"${requiredAdSecret("admob.bannerUnit", "ADMOB_BANNER_UNIT")}\"",
+            )
         }
     }
     compileOptions {
