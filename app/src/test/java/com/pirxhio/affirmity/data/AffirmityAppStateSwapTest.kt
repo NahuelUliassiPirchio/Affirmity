@@ -26,6 +26,7 @@ import com.pirxhio.affirmity.data.remote.FcmTokenRepository
 import com.pirxhio.affirmity.data.remote.FirestoreMigrationSource
 import com.pirxhio.affirmity.data.remote.FirestoreMigrator
 import com.pirxhio.affirmity.data.remote.FirestoreOnboardingRepository
+import com.pirxhio.affirmity.data.remote.channelSettingsFromMap
 import com.pirxhio.affirmity.data.repository.AdUnlockRepository
 import com.pirxhio.affirmity.data.repository.AffirmationRepository
 import com.pirxhio.affirmity.data.repository.DailyCompletionRepository
@@ -143,8 +144,10 @@ private class FakeMeditationPreferencesRepository(
 
 private class FakeNotificationSettingsRepository(
     private val flow: Flow<ChannelSettings>,
+    private val settingsByChannel: Map<NotificationChannelSpec, ChannelSettings> = emptyMap(),
 ) : NotificationSettingsRepository {
-    override fun observe(channel: NotificationChannelSpec): Flow<ChannelSettings> = flow
+    override fun observe(channel: NotificationChannelSpec): Flow<ChannelSettings> =
+        settingsByChannel[channel]?.let(::flowOf) ?: flow
     override suspend fun setEnabled(channel: NotificationChannelSpec, enabled: Boolean) = Unit
     override suspend fun setSegments(channel: NotificationChannelSpec, segments: Set<DaySegment>) = Unit
     override fun observeQuietHours(): Flow<QuietHoursSettings> =
@@ -249,12 +252,21 @@ private class ImmediateFirestoreMigrationSource : FirestoreMigrationSource {
     override suspend fun commitChunk(writes: List<DocWrite>) = Unit
 }
 
+private class CapturingFirestoreMigrationSource : FirestoreMigrationSource {
+    val committedChunks = Channel<List<DocWrite>>(Channel.UNLIMITED)
+    override suspend fun markerExists(uid: String): Boolean = false
+    override suspend fun commitChunk(writes: List<DocWrite>) {
+        committedChunks.send(writes)
+    }
+}
+
 private fun fakeLocal(
     events: MutableList<String>,
     id: String = "local-1",
     adUnlocks: AdUnlockRepository = FakeAdUnlockRepository(),
     seededAffirmations: List<AffirmationEntity> = listOf(affirmation(id)),
     entitlements: EntitlementRepository = LocalFreeEntitlementRepository(),
+    notificationSettings: Map<NotificationChannelSpec, ChannelSettings> = emptyMap(),
 ): DataSession.Local = DataSession.Local(
     affirmations = FakeAffirmationRepository(
         EventedFlow("local-affirmations", events, listOf(seededAffirmations)),
@@ -266,6 +278,7 @@ private fun fakeLocal(
     meditation = FakeMeditationPreferencesRepository(EventedFlow("local-meditation", events, listOf(600))),
     notifications = FakeNotificationSettingsRepository(
         EventedFlow("local-notifications", events, listOf(ChannelSettings(enabled = false, segments = setOf(DaySegment.MANANA, DaySegment.TARDE)))),
+        notificationSettings,
     ),
     adUnlocks = adUnlocks,
 )
@@ -514,6 +527,41 @@ class AffirmityAppStateSwapTest {
         assertTrue("local Room collector must be cancelled ($events)", cancelIndex >= 0)
         assertTrue("Firestore fake must be subscribed after cancellation ($events)", remoteCollectIndex >= 0)
         assertTrue("cancellation must happen before the Firestore subscription", cancelIndex < remoteCollectIndex)
+
+        scope.cancel()
+    }
+
+    @Test
+    fun `guest notification settings for all six channels survive sign-in migration`() = runBlocking {
+        val events = mutableListOf<String>()
+        val localSettings = mapOf(
+            NotificationChannelSpec.REMINDER to ChannelSettings(true, setOf(DaySegment.NOCHE)),
+            NotificationChannelSpec.REFLECTION to ChannelSettings(true, setOf(DaySegment.MANANA)),
+            NotificationChannelSpec.MOOD to ChannelSettings(true, setOf(DaySegment.TARDE)),
+            NotificationChannelSpec.STREAK to ChannelSettings(false, setOf(DaySegment.MANANA)),
+            NotificationChannelSpec.HEALER to ChannelSettings(false, setOf(DaySegment.TARDE)),
+            NotificationChannelSpec.MEDITATION_RETURN to ChannelSettings(false, setOf(DaySegment.NOCHE)),
+        )
+        val source = CapturingFirestoreMigrationSource()
+        val authRepository = FakeAuthRepository()
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        buildState(
+            local = fakeLocal(events, notificationSettings = localSettings),
+            remote = { fakeRemote("uid-notification-settings", events) },
+            migrator = FirestoreMigrator(source),
+            authRepository = authRepository,
+            scope = scope,
+        )
+
+        authRepository.emit(AuthState.SignedIn(uid = "uid-notification-settings", displayName = null, email = null))
+        val preferencesWrite = source.committedChunks.receive().single {
+            it.path == "users/uid-notification-settings/settings/preferences"
+        }
+        val migratedSettings = NotificationChannelSpec.entries.associateWith { channel ->
+            channelSettingsFromMap(channel, preferencesWrite.fields)
+        }
+
+        assertEquals(localSettings, migratedSettings)
 
         scope.cancel()
     }
