@@ -32,7 +32,7 @@ class NotificationPreferences(private val context: Context) {
     fun observe(channel: NotificationChannelSpec): Flow<ChannelSettings> =
         context.notificationDataStore.data.map {
             ChannelSettings(
-                enabled = it[enabledKey(channel)] ?: false,
+                enabled = it[enabledKey(channel)] ?: channel.defaultEnabled,
                 segments = (it[segmentsKey(channel)] ?: defaultSegmentKeys(channel))
                     .mapNotNull { key -> DaySegment.entries.find { segment -> segment.key == key } }
                     .toSet(),
@@ -81,6 +81,13 @@ class NotificationPreferences(private val context: Context) {
     private fun defaultSegmentKeys(channel: NotificationChannelSpec): Set<String> {
         val defaults = when (channel) {
             NotificationChannelSpec.REFLECTION, NotificationChannelSpec.MOOD -> DEFAULT_NIGHT_SEGMENTS
+            // design §10: fixed-time families (evaluated server-side at a single daily instant,
+            // like STREAK already was pre-V2) have no segment picker -- an empty set, not the
+            // reminder default, since there is nothing for the Settings UI to render as selected.
+            NotificationChannelSpec.STREAK,
+            NotificationChannelSpec.HEALER,
+            NotificationChannelSpec.MEDITATION_RETURN,
+            -> return emptySet()
             else -> DEFAULT_REMINDER_SEGMENTS
         }
         return defaults.map { it.key }.toSet()

@@ -84,7 +84,31 @@ class FirebaseAnalyticsLogger(private val sink: FirebaseAnalyticsSink) : Analyti
         is AnalyticsEvent.DailyGoalReached -> listOf(
             text(AnalyticsParam.GOAL, event.goal.name),
         )
+        is AnalyticsEvent.NotificationOpened -> notificationParams(
+            event.family, event.variantKey, event.destination, event.locale,
+        )
+        is AnalyticsEvent.NotificationActionClicked -> notificationParams(
+            event.family, event.variantKey, event.destination, event.locale,
+        )
+        is AnalyticsEvent.NotificationCompleted -> notificationParams(
+            event.family, event.variantKey, event.destination, event.locale,
+        )
     }
+
+    /** Shared param mapping for the three notification_* events (design §9): all four declared
+     *  params are identical in shape across [AnalyticsEvent.NotificationOpened]/
+     *  [AnalyticsEvent.NotificationActionClicked]/[AnalyticsEvent.NotificationCompleted]. */
+    private fun notificationParams(
+        family: NotificationFamilyValue,
+        variantKey: AnalyticsId?,
+        destination: NotificationDestinationValue,
+        locale: NotificationLocaleValue,
+    ): List<AnalyticsParamValue> = listOfNotNull(
+        text(AnalyticsParam.NOTIFICATION_FAMILY, family.name),
+        variantKey?.let { id(AnalyticsParam.VARIANT_KEY, it) },
+        text(AnalyticsParam.DESTINATION, destination.name),
+        text(AnalyticsParam.LOCALE, locale.name),
+    )
 
     private fun id(param: AnalyticsParam, id: AnalyticsId) = AnalyticsParamValue.Text(param.wireName, id.value)
     private fun text(param: AnalyticsParam, value: String) =

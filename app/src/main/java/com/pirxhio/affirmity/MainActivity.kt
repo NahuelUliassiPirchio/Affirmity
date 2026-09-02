@@ -68,9 +68,13 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.pirxhio.affirmity.auth.AuthState
 import com.pirxhio.affirmity.billing.BillingService
+import com.pirxhio.affirmity.compass.CompassAnswerRepository
 import com.pirxhio.affirmity.access.AccessDecision
 import com.pirxhio.affirmity.analytics.AnalyticsEvent
 import com.pirxhio.affirmity.analytics.AnalyticsId
+import com.pirxhio.affirmity.analytics.NotificationDestinationValue
+import com.pirxhio.affirmity.analytics.NotificationFamilyValue
+import com.pirxhio.affirmity.analytics.NotificationLocaleValue
 import com.pirxhio.affirmity.analytics.PaywallPlan
 import com.pirxhio.affirmity.analytics.PaywallSource
 import com.pirxhio.affirmity.analytics.provenance
@@ -81,7 +85,9 @@ import com.pirxhio.affirmity.data.MOOD_MAX
 import com.pirxhio.affirmity.data.rememberAffirmityAppState
 import com.pirxhio.affirmity.data.resolveGuideGate
 import com.pirxhio.affirmity.meditation.SessionEndReason
+import com.pirxhio.affirmity.notifications.NotificationCanceller
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
+import com.pirxhio.affirmity.ui.compass.CompassAnswerScreen
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
 import com.pirxhio.affirmity.ui.components.FloatingStatusOverlay
 import com.pirxhio.affirmity.ui.favorites.FavoritesScreen
@@ -121,13 +127,86 @@ import kotlinx.coroutines.launch
 /** Extra key a launcher (e.g. the home-screen widget) sets to pick the initial [AppDestinations]. */
 const val EXTRA_START_DESTINATION = "start_destination"
 
-/** Extra key the mood notification's quick actions set to pre-select a value in
- * [com.pirxhio.affirmity.ui.mood.MoodScreen]'s today sheet. */
+/** Extra key that pre-selects a value in [com.pirxhio.affirmity.ui.mood.MoodScreen]'s today sheet.
+ * Notifications V2 (design §8) removed the mood notification's quick-action buttons that used to
+ * be the only producer of this extra — it is kept for other launch sources (e.g. widget/deep-link
+ * pre-selection) that still want to open the sheet with a value already chosen. */
 const val EXTRA_MOOD_VALUE = "mood_value"
 
 /** Extra set only on the mood notification body so it opens today's full 1-5 picker without
- * pretending the user selected a mood. Quick actions continue to use [EXTRA_MOOD_VALUE]. */
+ * pretending the user selected a mood. */
 const val EXTRA_OPEN_MOOD_PICKER = "open_mood_picker"
+
+/** Per-instance deep link (Notifications V2 spec's "Per-Instance Deep Links" requirement): carries
+ * the exact Compass/Reflection question id a notification was sent for, so tapping it can open
+ * that exact question rather than a random or generic Compass screen. Plumbed end-to-end from the
+ * FCM payload (`FcmAction.Post.questionId`) through [com.pirxhio.affirmity.notifications.Notifier]
+ * into this intent extra, and resolved back out by [resolveCompassQuestionId] to open
+ * [com.pirxhio.affirmity.ui.compass.CompassAnswerScreen] (Notifications V2 scope-expansion
+ * decision, mid-Phase-5 apply). */
+const val EXTRA_NOTIFICATION_QUESTION_ID = "notification_question_id"
+
+/** Companion extra to [EXTRA_NOTIFICATION_QUESTION_ID]: the exact question text the notification
+ * rendered (the copy catalog is Admin-SDK-only, so [com.pirxhio.affirmity.ui.compass.CompassAnswerScreen]
+ * displays this verbatim rather than looking the question up client-side). Set alongside
+ * [EXTRA_NOTIFICATION_QUESTION_ID] in [com.pirxhio.affirmity.notifications.Notifier.notify];
+ * consumed here to open the Compass answer sheet (Notifications V2 scope-expansion decision). */
+const val EXTRA_NOTIFICATION_QUESTION_TEXT = "notification_question_text"
+
+/** Notifications V2 client analytics (design §9): the wire `family` token (e.g. `"streak"`,
+ * `"meditation_return"`) [com.pirxhio.affirmity.notifications.Notifier] attaches to every posted
+ * notification's `PendingIntent`. Absent means this launch did not originate from a notification
+ * tap -- resolved by [resolveNotificationFamily] and consumed to fire `notification_opened`. */
+const val EXTRA_NOTIFICATION_FAMILY = "notification_family"
+
+/** Companion extra to [EXTRA_NOTIFICATION_FAMILY]: the exact copy-catalog `variant_key` rendered
+ * for this delivery, mapped through [com.pirxhio.affirmity.analytics.AnalyticsId.ofNotificationVariant]
+ * before it ever reaches an [com.pirxhio.affirmity.analytics.AnalyticsEvent]. */
+const val EXTRA_NOTIFICATION_VARIANT_KEY = "notification_variant_key"
+
+/** Companion extra to [EXTRA_NOTIFICATION_FAMILY]: the raw wire `destination` token (design §7,
+ * e.g. `"mood_checkin"`) -- distinct from [EXTRA_START_DESTINATION], which already carries the
+ * resolved [AppDestinations] name used for routing. This extra exists purely for analytics
+ * attribution (design §9). */
+const val EXTRA_NOTIFICATION_DESTINATION = "notification_destination"
+
+/** Companion extra to [EXTRA_NOTIFICATION_FAMILY]: the wire `locale` token (`"es"`/`"en"`) the
+ * server rendered this delivery's copy in (design §9). */
+const val EXTRA_NOTIFICATION_LOCALE = "notification_locale"
+
+/** Reserved for a future `NotificationCompat.Action` CTA button's own `PendingIntent` (design §9's
+ * `notification_action_clicked` call site). No producer sets this extra yet -- CTA button wiring
+ * itself remains the same open follow-up flagged since Phase 5b (`NotificationCanceller`'s kdoc) --
+ * so [resolveNotificationActionClickedEvent] never fires today, but the emission path exists and is
+ * tested so wiring a real CTA button later is a one-line addition, not a new analytics path. */
+const val EXTRA_NOTIFICATION_ACTION = "notification_action"
+
+/** Groups the Compass/Reflection per-instance-deep-link launch state (Readability fix): collapses
+ * what used to be 3 separate top-level [MainActivity]/[AffirmityApp] parameters
+ * (`startCompassQuestionId`/`startCompassQuestionText`/`startCompassEventKey`) into one. [eventKey]
+ * is [nextCompassLaunchEventKey]'s output — changes on every qualifying intent so a repeated
+ * `onNewIntent` delivery with the same [questionId] still re-opens the sheet. */
+data class CompassLaunchState(
+    val questionId: String? = null,
+    val questionText: String? = null,
+    val eventKey: Int = 0,
+)
+
+/** Groups the notification-analytics attribution launch state (Readability fix): collapses what
+ * used to be 6 separate top-level [MainActivity]/[AffirmityApp] parameters
+ * (`startNotificationFamily`/`startNotificationVariantKey`/`startNotificationDestination`/
+ * `startNotificationLocale`/`startNotificationAction`/`startNotificationEventKey`) into one.
+ * [family]/[variantKey]/[destination]/[locale]/[action] are the wire extras
+ * [com.pirxhio.affirmity.notifications.Notifier] attaches to every posted notification's
+ * `PendingIntent` (design §9); [eventKey] is [nextNotificationLaunchEventKey]'s output. */
+data class NotificationLaunchAttribution(
+    val family: String? = null,
+    val variantKey: String? = null,
+    val destination: String? = null,
+    val locale: String? = null,
+    val action: String? = null,
+    val eventKey: Int = 0,
+)
 
 private const val NOTIFICATION_PERMISSION_PREFERENCES = "notification_permission"
 private const val NOTIFICATION_PERMISSION_REQUESTED_KEY = "requested"
@@ -174,6 +253,87 @@ internal fun nextMoodLaunchEventKey(
     moodValue: Int?,
     openPicker: Boolean,
 ): Int = if (moodValue != null || openPicker) currentKey + 1 else currentKey
+
+/** Resolves [EXTRA_NOTIFICATION_QUESTION_ID] off a launch/new intent -- null for any launch that
+ * didn't come from a Compass notification tap. */
+private fun resolveCompassQuestionId(intent: Intent?): String? =
+    intent?.getStringExtra(EXTRA_NOTIFICATION_QUESTION_ID)
+
+/** Resolves [EXTRA_NOTIFICATION_QUESTION_TEXT] off a launch/new intent -- see that extra's kdoc
+ * for why this is display text straight from the notification, not a client-side catalog lookup. */
+private fun resolveCompassQuestionText(intent: Intent?): String? =
+    intent?.getStringExtra(EXTRA_NOTIFICATION_QUESTION_TEXT)
+
+/** Same problem [nextMoodLaunchEventKey] solves, for Compass: `onNewIntent` re-delivering the
+ * *same* questionId (e.g. the user backs out of the sheet without answering, then taps the still-
+ * visible notification again) must still re-open the sheet, so the state driving it needs a key
+ * that changes on every qualifying intent, not just on [resolveCompassQuestionId]'s value. */
+internal fun nextCompassLaunchEventKey(currentKey: Int, questionId: String?): Int =
+    if (questionId != null) currentKey + 1 else currentKey
+
+/** Resolves [EXTRA_NOTIFICATION_FAMILY] off a launch/new intent -- null for any launch that didn't
+ * come from a notification tap (design §9's `notification_opened` call site). */
+private fun resolveNotificationFamily(intent: Intent?): String? =
+    intent?.getStringExtra(EXTRA_NOTIFICATION_FAMILY)
+
+private fun resolveNotificationVariantKey(intent: Intent?): String? =
+    intent?.getStringExtra(EXTRA_NOTIFICATION_VARIANT_KEY)
+
+private fun resolveNotificationDestination(intent: Intent?): String? =
+    intent?.getStringExtra(EXTRA_NOTIFICATION_DESTINATION)
+
+private fun resolveNotificationLocale(intent: Intent?): String? =
+    intent?.getStringExtra(EXTRA_NOTIFICATION_LOCALE)
+
+/** See [EXTRA_NOTIFICATION_ACTION]'s kdoc -- no current producer, resolved for forward-compat. */
+private fun resolveNotificationAction(intent: Intent?): String? =
+    intent?.getStringExtra(EXTRA_NOTIFICATION_ACTION)
+
+/** Same problem [nextCompassLaunchEventKey] solves, for the notification-analytics extras: a
+ * repeated `onNewIntent` delivery with the same family (e.g. backing out and re-tapping the still-
+ * visible notification) must still re-fire `notification_opened`, so the state driving it needs a
+ * key that changes on every qualifying intent, not just on [resolveNotificationFamily]'s value. */
+internal fun nextNotificationLaunchEventKey(currentKey: Int, family: String?): Int =
+    if (family != null) currentKey + 1 else currentKey
+
+/** Pure construction of the `notification_opened` event (design §9) from a launch's notification
+ * extras. Returns null for any launch that didn't come from a notification tap. Extracted so the
+ * exact mapping -- raw wire values into the bounded [com.pirxhio.affirmity.analytics.NotificationFamilyValue]/
+ * [com.pirxhio.affirmity.analytics.NotificationDestinationValue]/
+ * [com.pirxhio.affirmity.analytics.NotificationLocaleValue]/[AnalyticsId] -- is directly
+ * JUnit-testable without a Robolectric harness (mirrors [resolveSelectedMeditationEntry]'s doc). */
+internal fun resolveNotificationOpenedEvent(
+    family: String?,
+    variantKey: String?,
+    destination: String?,
+    locale: String?,
+): AnalyticsEvent.NotificationOpened? {
+    if (family == null) return null
+    return AnalyticsEvent.NotificationOpened(
+        family = NotificationFamilyValue.fromWire(family),
+        variantKey = variantKey?.let { AnalyticsId.ofNotificationVariant(it) },
+        destination = NotificationDestinationValue.fromWire(destination),
+        locale = NotificationLocaleValue.fromWire(locale),
+    )
+}
+
+/** Same call site as [resolveNotificationOpenedEvent] (design §9), additionally gated on
+ * [EXTRA_NOTIFICATION_ACTION] -- see that extra's kdoc for why it never resolves non-null today. */
+internal fun resolveNotificationActionClickedEvent(
+    family: String?,
+    action: String?,
+    variantKey: String?,
+    destination: String?,
+    locale: String?,
+): AnalyticsEvent.NotificationActionClicked? {
+    if (family == null || action == null) return null
+    return AnalyticsEvent.NotificationActionClicked(
+        family = NotificationFamilyValue.fromWire(family),
+        variantKey = variantKey?.let { AnalyticsId.ofNotificationVariant(it) },
+        destination = NotificationDestinationValue.fromWire(destination),
+        locale = NotificationLocaleValue.fromWire(locale),
+    )
+}
 
 /**
  * Route-lookup fall-through for a persisted/restored `selectedMeditationEntryId` (REQ-5.4.3,
@@ -284,35 +444,109 @@ internal fun handleGuidedMeditationSessionEnded(
     )
 }
 
+/** Every value [resolveStartExtras] resolves off a launch/new intent (Readability fix): the exact
+ * ~20-line sequence [MainActivity.onCreate] and [MainActivity.onNewIntent] used to repeat
+ * identically -- resolve mood extras, then compass extras (bumping its event key), then
+ * notification-attribution extras (bumping its own event key). */
+private data class StartExtras(
+    val destination: AppDestinations,
+    val moodValue: Int?,
+    val openMoodPicker: Boolean,
+    val moodEventKey: Int,
+    val compass: CompassLaunchState,
+    val notification: NotificationLaunchAttribution,
+)
+
+/** Resolves every [StartExtras] value off [intent] in one place -- called identically from both
+ * [MainActivity.onCreate] and [MainActivity.onNewIntent] (previously ~20 duplicated lines in
+ * each). The `current*EventKey` params are the prior event-key values each `next*LaunchEventKey`
+ * call needs in order to decide whether to bump. */
+private fun resolveStartExtras(
+    intent: Intent?,
+    currentMoodEventKey: Int,
+    currentCompassEventKey: Int,
+    currentNotificationEventKey: Int,
+): StartExtras {
+    val moodValue = resolveMoodValue(intent)
+    val openMoodPicker = resolveOpenMoodPicker(intent)
+    val compassQuestionId = resolveCompassQuestionId(intent)
+    val notificationFamily = resolveNotificationFamily(intent)
+    return StartExtras(
+        destination = resolveStartDestination(intent),
+        moodValue = moodValue,
+        openMoodPicker = openMoodPicker,
+        moodEventKey = nextMoodLaunchEventKey(
+            currentKey = currentMoodEventKey,
+            moodValue = moodValue,
+            openPicker = openMoodPicker,
+        ),
+        compass = CompassLaunchState(
+            questionId = compassQuestionId,
+            questionText = resolveCompassQuestionText(intent),
+            eventKey = nextCompassLaunchEventKey(currentCompassEventKey, compassQuestionId),
+        ),
+        notification = NotificationLaunchAttribution(
+            family = notificationFamily,
+            variantKey = resolveNotificationVariantKey(intent),
+            destination = resolveNotificationDestination(intent),
+            locale = resolveNotificationLocale(intent),
+            action = resolveNotificationAction(intent),
+            eventKey = nextNotificationLaunchEventKey(currentNotificationEventKey, notificationFamily),
+        ),
+    )
+}
+
+/** Clears every extra [resolveStartExtras] just consumed off [intent] (Readability fix, paired
+ * helper). A per-app locale switch (Settings language toggle) triggers an Activity recreate that
+ * re-delivers this same held Intent to `onCreate` — without clearing these, e.g. the mood-value
+ * sheet would re-open every time the user switches language after opening the app from a mood
+ * notification action. */
+private fun removeConsumedStartExtras(intent: Intent?) {
+    intent?.removeExtra(EXTRA_MOOD_VALUE)
+    intent?.removeExtra(EXTRA_OPEN_MOOD_PICKER)
+    intent?.removeExtra(EXTRA_NOTIFICATION_QUESTION_ID)
+    intent?.removeExtra(EXTRA_NOTIFICATION_QUESTION_TEXT)
+    intent?.removeExtra(EXTRA_NOTIFICATION_FAMILY)
+    intent?.removeExtra(EXTRA_NOTIFICATION_VARIANT_KEY)
+    intent?.removeExtra(EXTRA_NOTIFICATION_DESTINATION)
+    intent?.removeExtra(EXTRA_NOTIFICATION_LOCALE)
+    intent?.removeExtra(EXTRA_NOTIFICATION_ACTION)
+}
+
 class MainActivity : AppCompatActivity() {
     private val startDestination = mutableStateOf(AppDestinations.AFIRMACIONES)
     private val startMoodValue = mutableStateOf<Int?>(null)
     private val startOpenMoodPicker = mutableStateOf(false)
     private val startMoodEventKey = mutableStateOf(0)
+    private val startCompass = mutableStateOf(CompassLaunchState())
+    private val startNotification = mutableStateOf(NotificationLaunchAttribution())
 
     /** Keeps the native cold-start splash (Theme.Affirmity.Starting) on screen until onboarding
      * state resolves, so there's no blank gap between the splash and the first real screen. */
     private var keepSplashOnScreen = true
+
+    private fun applyStartExtras(intent: Intent?) {
+        val extras = resolveStartExtras(
+            intent = intent,
+            currentMoodEventKey = startMoodEventKey.value,
+            currentCompassEventKey = startCompass.value.eventKey,
+            currentNotificationEventKey = startNotification.value.eventKey,
+        )
+        startDestination.value = extras.destination
+        startMoodValue.value = extras.moodValue
+        startOpenMoodPicker.value = extras.openMoodPicker
+        startMoodEventKey.value = extras.moodEventKey
+        startCompass.value = extras.compass
+        startNotification.value = extras.notification
+        removeConsumedStartExtras(intent)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         splashScreen.setKeepOnScreenCondition { keepSplashOnScreen }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        startDestination.value = resolveStartDestination(intent)
-        startMoodValue.value = resolveMoodValue(intent)
-        startOpenMoodPicker.value = resolveOpenMoodPicker(intent)
-        startMoodEventKey.value = nextMoodLaunchEventKey(
-            currentKey = startMoodEventKey.value,
-            moodValue = startMoodValue.value,
-            openPicker = startOpenMoodPicker.value,
-        )
-        // A per-app locale switch (Settings language toggle) triggers an Activity recreate that
-        // re-delivers this same held Intent to onCreate — without clearing the extra here, the
-        // mood-value sheet would re-open every time the user switches language after opening the
-        // app from a mood notification action.
-        intent?.removeExtra(EXTRA_MOOD_VALUE)
-        intent?.removeExtra(EXTRA_OPEN_MOOD_PICKER)
+        applyStartExtras(intent)
         setContent {
             AffirmityTheme {
                 AffirmityApp(
@@ -320,6 +554,8 @@ class MainActivity : AppCompatActivity() {
                     startMoodValue = startMoodValue.value,
                     startOpenMoodPicker = startOpenMoodPicker.value,
                     startMoodEventKey = startMoodEventKey.value,
+                    startCompass = startCompass.value,
+                    startNotification = startNotification.value,
                     onOnboardingStateResolved = { keepSplashOnScreen = false },
                 )
             }
@@ -329,16 +565,7 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        startDestination.value = resolveStartDestination(intent)
-        startMoodValue.value = resolveMoodValue(intent)
-        startOpenMoodPicker.value = resolveOpenMoodPicker(intent)
-        startMoodEventKey.value = nextMoodLaunchEventKey(
-            currentKey = startMoodEventKey.value,
-            moodValue = startMoodValue.value,
-            openPicker = startOpenMoodPicker.value,
-        )
-        intent.removeExtra(EXTRA_MOOD_VALUE)
-        intent.removeExtra(EXTRA_OPEN_MOOD_PICKER)
+        applyStartExtras(intent)
     }
 }
 
@@ -350,12 +577,18 @@ fun AffirmityApp(
     startMoodValue: Int? = null,
     startOpenMoodPicker: Boolean = false,
     startMoodEventKey: Int = 0,
+    startCompass: CompassLaunchState = CompassLaunchState(),
+    startNotification: NotificationLaunchAttribution = NotificationLaunchAttribution(),
     onOnboardingStateResolved: () -> Unit = {},
 ) {
     var currentDestination by rememberSaveable { mutableStateOf(startDestination) }
     var pendingMoodValue by rememberSaveable { mutableStateOf<Int?>(null) }
     var pendingOpenMoodPicker by rememberSaveable { mutableStateOf(false) }
     var pendingMoodEventKey by rememberSaveable { mutableStateOf(0) }
+    // Notifications V2 scope-expansion: the Compass answer sheet's pending question, mirroring
+    // the mood pending-state trio above -- null id means hidden.
+    var pendingCompassQuestionId by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingCompassQuestionText by rememberSaveable { mutableStateOf<String?>(null) }
     // Blocks screenshots/screen-recording/recent-apps thumbnails while the mood screen (free-text
     // personal notes) is visible (docs/security/SECURITY_AUDIT.md F-05). No-op in @Preview, where
     // LocalContext isn't backed by an Activity.
@@ -375,6 +608,12 @@ fun AffirmityApp(
         if (startOpenMoodPicker) pendingOpenMoodPicker = true
         if (startMoodValue != null || startOpenMoodPicker) {
             pendingMoodEventKey = startMoodEventKey
+        }
+    }
+    LaunchedEffect(startCompass.questionId, startCompass.eventKey) {
+        if (startCompass.questionId != null) {
+            pendingCompassQuestionId = startCompass.questionId
+            pendingCompassQuestionText = startCompass.questionText
         }
     }
     var showSettings by rememberSaveable { mutableStateOf(false) }
@@ -399,6 +638,34 @@ fun AffirmityApp(
     // is unrepresentable. Every trigger surface supplies its own PaywallSource (spec §5.3).
     var paywallSource by rememberSaveable { mutableStateOf<PaywallSource?>(null) }
     val appState = rememberAffirmityAppState()
+    // Notifications V2 Phase 6 (design §9): fires `notification_opened`/`notification_action_clicked`
+    // exactly once per qualifying launch (keyed on startNotification.eventKey the same way the Mood/
+    // Compass effects above are), and records the launch's attribution so whichever family's
+    // completion site fires next can emit `notification_completed` (see
+    // AffirmityAppState.setActiveNotificationAttribution).
+    LaunchedEffect(startNotification.family, startNotification.eventKey) {
+        resolveNotificationOpenedEvent(
+            family = startNotification.family,
+            variantKey = startNotification.variantKey,
+            destination = startNotification.destination,
+            locale = startNotification.locale,
+        )?.let { event ->
+            appState.logAnalyticsEvent(event)
+            appState.setActiveNotificationAttribution(
+                family = startNotification.family!!,
+                variantKey = startNotification.variantKey,
+                destination = startNotification.destination,
+                locale = startNotification.locale,
+            )
+        }
+        resolveNotificationActionClickedEvent(
+            family = startNotification.family,
+            action = startNotification.action,
+            variantKey = startNotification.variantKey,
+            destination = startNotification.destination,
+            locale = startNotification.locale,
+        )?.let { appState.logAnalyticsEvent(it) }
+    }
     val context = LocalContext.current
     // Local-only, deliberately outside AffirmityAppState/DataSession (see
     // RoomMeditationCustomizationRepository's doc) -- a per-device knob position, not account data.
@@ -909,6 +1176,9 @@ fun AffirmityApp(
                 reminderSettings = appState.reminderSettings.value,
                 reflectionSettings = appState.reflectionSettings.value,
                 moodSettings = appState.moodSettings.value,
+                streakSettings = appState.streakSettings.value,
+                healerSettings = appState.healerSettings.value,
+                meditationReturnSettings = appState.meditationReturnSettings.value,
                 quietHoursSettings = appState.quietHoursSettings.value,
                 notificationsPermissionGranted = notificationsPermissionGranted,
                 authState = appState.authState.value,
@@ -949,6 +1219,24 @@ fun AffirmityApp(
                     appState.setChannelSegments(
                         NotificationChannelSpec.MOOD,
                         segments
+                    )
+                },
+                onStreakEnabledChanged = { enabled ->
+                    appState.setChannelEnabled(
+                        NotificationChannelSpec.STREAK,
+                        enabled
+                    )
+                },
+                onHealerEnabledChanged = { enabled ->
+                    appState.setChannelEnabled(
+                        NotificationChannelSpec.HEALER,
+                        enabled
+                    )
+                },
+                onMeditationReturnEnabledChanged = { enabled ->
+                    appState.setChannelEnabled(
+                        NotificationChannelSpec.MEDITATION_RETURN,
+                        enabled
                     )
                 },
                 onNotificationEnableRequested = onNotificationEnableRequested,
@@ -1214,6 +1502,30 @@ fun AffirmityApp(
         snackbarScope = snackbarScope,
         emit = appState::logAnalyticsEvent,
     )
+
+    // Notifications V2 scope-expansion: rendered the same way PaywallHost is above -- unconditionally
+    // at the top level, so a Compass notification tap opens this sheet over whatever destination is
+    // currently showing, rather than needing its own bottom-nav tab or early-return branch.
+    pendingCompassQuestionId?.let { questionId ->
+        CompassAnswerHost(
+            questionId = questionId,
+            questionText = pendingCompassQuestionText ?: questionId,
+            snackbarScope = snackbarScope,
+            onDismiss = {
+                pendingCompassQuestionId = null
+                pendingCompassQuestionText = null
+            },
+            // Notifications V2 Phase 6 (design §9): the one `notification_completed` completion
+            // site outside AffirmityAppState -- see CompassAnswerRepository.submitAnswer's kdoc.
+            // Readability fix: was the raw literal "compass" -- which never matched, since the
+            // server sets the wire `family` extra to REFLECTION's own wireChannelKey ("reflection",
+            // functions/src/index.ts's "reflection family") for this channel, not "compass". Using
+            // NotificationChannelSpec.REFLECTION.wireChannelKey here both removes the magic string
+            // AND fixes that pre-existing mismatch, so notification_completed now actually fires
+            // for a Compass/Reflection answer.
+            onAnswered = { appState.completeNotificationAttribution(NotificationChannelSpec.REFLECTION.wireChannelKey) },
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1313,6 +1625,50 @@ private const val PRO_SUBSCRIPTION_PRODUCT_ID = "pro"
 /** Deployed `syncEntitlement` Cloud Function URL -- part of the Phase 0 user-owned prerequisite
  * (service account + function deploy); placeholder until that deployment exists. */
 private const val SYNC_ENTITLEMENT_URL = ""
+
+/** Deployed `answerCompassQuestion` Cloud Function URL (Notifications V2 scope-expansion
+ * decision) -- same "user-owned prerequisite" placeholder posture as [SYNC_ENTITLEMENT_URL]
+ * above, until that deployment exists. */
+private const val ANSWER_COMPASS_QUESTION_URL = ""
+
+/** Hosts [com.pirxhio.affirmity.ui.compass.CompassAnswerScreen], wiring it to
+ * [CompassAnswerRepository] the same way [PaywallHost] wires [PaywallSheet] to [BillingService]:
+ * a `remember`-scoped instance built from `LocalContext.current.applicationContext`, called
+ * unconditionally at [AffirmityApp]'s top level. On save, submits the answer (best-effort,
+ * see [CompassAnswerRepository]'s kdoc) and dismisses immediately -- the user's note isn't worth
+ * blocking the sheet close on a network round-trip for.
+ *
+ * The typed note itself is intentionally NOT sent anywhere: the approved scope-expansion decision
+ * pins `answerCompassQuestion`'s request body to `{ questionId }` only (spec only requires
+ * acknowledging/reflecting on the question, not persisting free text server-side) -- the note
+ * field exists purely so the sheet doesn't feel like a bare "dismiss" button. */
+@Composable
+private fun CompassAnswerHost(
+    questionId: String,
+    questionText: String,
+    snackbarScope: CoroutineScope,
+    onDismiss: () -> Unit,
+    onAnswered: () -> Unit = {},
+) {
+    val context = LocalContext.current
+    val notificationCanceller = remember { NotificationCanceller(context.applicationContext) }
+    val compassAnswerRepository = remember {
+        CompassAnswerRepository(
+            context = context.applicationContext,
+            answerCompassQuestionUrl = ANSWER_COMPASS_QUESTION_URL,
+            notificationCanceller = notificationCanceller,
+            scope = snackbarScope,
+        )
+    }
+    CompassAnswerScreen(
+        questionText = questionText,
+        onDismiss = onDismiss,
+        onSave = {
+            compassAnswerRepository.submitAnswer(questionId, onCompleted = onAnswered)
+            onDismiss()
+        },
+    )
+}
 
 enum class AppDestinations(
     @StringRes val labelRes: Int,

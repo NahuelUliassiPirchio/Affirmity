@@ -116,5 +116,45 @@ service cloud.firestore {
     match /users/{uid}/catalogOverrides/{catalogAffirmationId} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
+
+    // Notifications V2 copy catalog (design §1, `notification-copy-catalog` capability).
+    // Server/Admin-SDK-only, unlike the world-readable `catalogAffirmations` block above: the
+    // client never reads this directly -- it has static per-channel fallback strings instead, and
+    // copy selection/rendering happens entirely at send time inside `sendNotification`. Written
+    // exclusively by `functions/tools/seedCopyCatalog.ts` via the Admin SDK, which bypasses rules.
+    match /notificationCopy/{variantKey} {
+      allow read: if false;
+      allow write: if false;
+    }
+
+    // Notifications V2 per-user anti-repeat + cooldown state (design §2). Server-written only --
+    // `sendNotification` merge-writes this after every successful send via the Admin SDK, which
+    // bypasses rules. Owner may read their own state (harmless: it only reveals which copy
+    // variants they were recently shown), but a client write could defeat the anti-repeat
+    // guarantee entirely, so write is unconditionally denied, including to the owner.
+    match /users/{uid}/notificationState/{doc} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // Notifications V2 per-day, per-family delivery log (design §2/§3). Backs the send-time
+    // cross-family freshness checks (e.g. Compass-too-soon-after-Mood, one-delivery-per-family-
+    // per-day). Same posture as notificationState above: owner-read, server-write-only.
+    match /users/{uid}/notificationDeliveries/{localDay} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // Notifications V2 Compass-answer tracking (design D9). Drives the send-time
+    // `compassAnsweredToday` suppression check. Server-written only, like the two collections
+    // above: even though the *event* (answering a Compass question) originates from the client,
+    // the write happens through a Cloud Function so it can be trusted as the single source of
+    // truth for suppression -- a client-writable doc here would let a client fake "answered" to
+    // silence its own Compass notifications, which is low-stakes, but keeping all three
+    // Notifications V2 server-state collections on one write posture avoids a special case.
+    match /users/{uid}/compassAnswers/{localDay} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
   }
 }

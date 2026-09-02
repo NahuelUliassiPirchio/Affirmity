@@ -55,3 +55,16 @@ export function shouldFireStreakAlert(rows: Completion[], todayEpochDay: number)
 
   return currentStreak(rows, todayEpochDay - 1) >= 1 && (!affirmationDone || !meditationDone);
 }
+
+export type StreakBand = 'streak_1_3' | 'streak_4_13' | 'streak_14plus';
+
+/**
+ * Copy-context band for a live streak count (design §1/File Changes, `notification-copy-catalog`'s
+ * "Context Filtering of Variant Pools" requirement). Only meaningful for `count >= 1` --
+ * `shouldFireStreakAlert` never fires with a zero streak, so no band is defined for it here.
+ */
+export function streakBand(count: number): StreakBand {
+  if (count >= 14) return 'streak_14plus';
+  if (count >= 4) return 'streak_4_13';
+  return 'streak_1_3';
+}

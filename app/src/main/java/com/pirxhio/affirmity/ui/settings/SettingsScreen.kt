@@ -75,6 +75,9 @@ fun SettingsScreen(
     reminderSettings: ChannelSettings,
     reflectionSettings: ChannelSettings,
     moodSettings: ChannelSettings,
+    streakSettings: ChannelSettings,
+    healerSettings: ChannelSettings,
+    meditationReturnSettings: ChannelSettings,
     quietHoursSettings: QuietHoursSettings,
     notificationsPermissionGranted: Boolean,
     authState: AuthState,
@@ -85,6 +88,9 @@ fun SettingsScreen(
     onReflectionSegmentsChanged: (Set<DaySegment>) -> Unit,
     onMoodEnabledChanged: (Boolean) -> Unit,
     onMoodSegmentsChanged: (Set<DaySegment>) -> Unit,
+    onStreakEnabledChanged: (Boolean) -> Unit,
+    onHealerEnabledChanged: (Boolean) -> Unit,
+    onMeditationReturnEnabledChanged: (Boolean) -> Unit,
     onNotificationEnableRequested: () -> Unit,
     onQuietHoursEnabledChanged: (Boolean) -> Unit,
     onQuietHoursWindowChanged: (startMinute: Int, endMinute: Int) -> Unit,
@@ -139,6 +145,36 @@ fun SettingsScreen(
                 onEnableRequested = onNotificationEnableRequested,
                 onEnabledChanged = onMoodEnabledChanged,
                 onSegmentsChanged = onMoodSegmentsChanged,
+            )
+        }
+
+        item {
+            ToggleOnlyChannelCard(
+                label = stringResource(id = R.string.settings_streak_label),
+                enabled = streakSettings.enabled,
+                controlsEnabled = areNotificationControlsEnabled,
+                onEnableRequested = onNotificationEnableRequested,
+                onEnabledChanged = onStreakEnabledChanged,
+            )
+        }
+
+        item {
+            ToggleOnlyChannelCard(
+                label = stringResource(id = R.string.settings_healer_label),
+                enabled = healerSettings.enabled,
+                controlsEnabled = areNotificationControlsEnabled,
+                onEnableRequested = onNotificationEnableRequested,
+                onEnabledChanged = onHealerEnabledChanged,
+            )
+        }
+
+        item {
+            ToggleOnlyChannelCard(
+                label = stringResource(id = R.string.settings_meditation_return_label),
+                enabled = meditationReturnSettings.enabled,
+                controlsEnabled = areNotificationControlsEnabled,
+                onEnableRequested = onNotificationEnableRequested,
+                onEnabledChanged = onMeditationReturnEnabledChanged,
             )
         }
 
@@ -362,6 +398,49 @@ private fun ChannelSettingsCard(
                         label = { Text(stringResource(id = segmentLabelRes(segment))) },
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Toggle-only settings row for the fixed-time families (design §10: Streak-Risk, Streak Healer,
+ * Meditation Return are each evaluated server-side at a single daily instant, so there is no
+ * day-part segment for the user to pick — unlike [ChannelSettingsCard]'s reminder/reflection/mood
+ * rows, this card renders no [FilterChip] row at all.
+ */
+@Composable
+private fun ToggleOnlyChannelCard(
+    label: String,
+    enabled: Boolean,
+    controlsEnabled: Boolean,
+    onEnableRequested: () -> Unit,
+    onEnabledChanged: (Boolean) -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(text = label, style = MaterialTheme.typography.titleMedium)
+                Switch(
+                    checked = controlsEnabled && enabled,
+                    enabled = controlsEnabled,
+                    onCheckedChange = { changedEnabled ->
+                        if (changedEnabled) onEnableRequested()
+                        onEnabledChanged(changedEnabled)
+                    },
+                )
+            }
+
+            if (!controlsEnabled) {
+                Text(
+                    text = stringResource(id = R.string.settings_notifications_sign_in_required),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

@@ -24,6 +24,12 @@ enum class AnalyticsEventName(val wireName: String) {
     CUSTOM_AFFIRMATION_CREATED("custom_affirmation_created"),
     CUSTOM_AFFIRMATION_DELETED("custom_affirmation_deleted"),
     DAILY_GOAL_REACHED("daily_goal_reached"),
+    // Notifications V2 (design §9): client-side half of the "Client and Server Analytics Split"
+    // requirement -- notification_planned/notification_suppressed/notification_delivered are
+    // server-only (Cloud Logging, functions/src/index.ts), never emitted from this client enum.
+    NOTIFICATION_OPENED("notification_opened"),
+    NOTIFICATION_ACTION_CLICKED("notification_action_clicked"),
+    NOTIFICATION_COMPLETED("notification_completed"),
 }
 
 /** Wire name for every declared parameter across the 19 events (REQ-4.5). */
@@ -40,6 +46,68 @@ enum class AnalyticsParam(val wireName: String) {
     CONTENT_TYPE("content_type"),
     CREATION_METHOD("creation_method"),
     GOAL("goal"),
+    // Notifications V2 (design §9): carried by all three client-side notification_* events.
+    NOTIFICATION_FAMILY("notification_family"),
+    VARIANT_KEY("variant_key"),
+    DESTINATION("destination"),
+    LOCALE("locale"),
+    // Declared per design §9's exact AnalyticsParam list. Not yet populated on any event this phase
+    // -- no client-side streak/inactivity banding function exists (that logic lives server-side,
+    // functions/src/streak.ts's streakBand / the planned meditationReturnBand), and the spec's
+    // "Client and Server Analytics Split" requirement only mandates notification_family/variant_key/
+    // locale/destination on the six events. Reserved for a future band-aware client event.
+    STREAK_COUNT_BAND("streak_count_band"),
+    INACTIVE_DAYS_BAND("inactive_days_band"),
+}
+
+/** Bounded mapping of the wire `family` token (design §7's `V2FcmData.family`) carried by every
+ *  notification-related client analytics event (design §9). `UNKNOWN` is the safe fallback for a
+ *  missing/legacy/malformed value -- never a raw `String` crosses the [AnalyticsEvent] boundary.
+ *
+ *  The server's `family` field is actually the internal wire *channel* token
+ *  (functions/src/copyCatalog.ts's `NotificationFamily`: 'reminder'/'reflection'/'mood'/'streak'/
+ *  'healer'/'meditation_return' -- see index.ts's `const family: NotificationFamily = channel`),
+ *  not the analytics-facing display name. `reminder` and `reflection` diverge from their display
+ *  name (`AFFIRMATION`/`COMPASS`), so this MUST be an explicit map, not a by-name match -- a prior
+ *  ignoreCase-name-match version silently mapped both to UNKNOWN. */
+enum class NotificationFamilyValue {
+    AFFIRMATION, MOOD, COMPASS, STREAK, HEALER, MEDITATION_RETURN, UNKNOWN;
+
+    companion object {
+        fun fromWire(raw: String?): NotificationFamilyValue = when (raw) {
+            "reminder" -> AFFIRMATION
+            "mood" -> MOOD
+            "reflection" -> COMPASS
+            "streak" -> STREAK
+            "healer" -> HEALER
+            "meditation_return" -> MEDITATION_RETURN
+            else -> UNKNOWN
+        }
+    }
+}
+
+/** Bounded mapping of the wire `destination` token (design §7). `UNKNOWN` covers a missing/legacy
+ *  value the same way [NotificationFamilyValue.UNKNOWN] does. */
+enum class NotificationDestinationValue {
+    AFFIRMATIONS_FEED, MOOD_CHECKIN, COMPASS_QUESTION, STREAK_ACTION, HEALER_FLOW, SHORT_MEDITATION, UNKNOWN;
+
+    companion object {
+        fun fromWire(raw: String?): NotificationDestinationValue =
+            entries.firstOrNull { it.name.equals(raw, ignoreCase = true) } ?: UNKNOWN
+    }
+}
+
+/** Bounded mapping of the wire `locale` token (design §7, `'es'|'en'`). `UNKNOWN` covers a
+ *  missing/unsupported value -- the render-time locale fallback (design §9's copy-catalog capability)
+ *  already defaults unsupported locales to `en`, but this analytics-side mapping stays honest about
+ *  a value that didn't come through at all rather than silently reporting `EN`. */
+enum class NotificationLocaleValue {
+    ES, EN, UNKNOWN;
+
+    companion object {
+        fun fromWire(raw: String?): NotificationLocaleValue =
+            entries.firstOrNull { it.name.equals(raw, ignoreCase = true) } ?: UNKNOWN
+    }
 }
 
 /** [com.pirxhio.affirmity.access.AccessDecision] provenance, mapped for the wire (D4). */
@@ -199,5 +267,43 @@ sealed interface AnalyticsEvent {
         val goal: DailyGoal,
     ) : AnalyticsEvent {
         override val name = AnalyticsEventName.DAILY_GOAL_REACHED
+    }
+
+    /** Fired from [com.pirxhio.affirmity.MainActivity]'s `onCreate`/`onNewIntent` when a launch
+     *  carries the notification extras Notifications V2's [com.pirxhio.affirmity.notifications.Notifier]
+     *  now attaches to every posted notification's `PendingIntent` (design §9). */
+    data class NotificationOpened(
+        val family: NotificationFamilyValue,
+        val variantKey: AnalyticsId?,
+        val destination: NotificationDestinationValue,
+        val locale: NotificationLocaleValue,
+    ) : AnalyticsEvent {
+        override val name = AnalyticsEventName.NOTIFICATION_OPENED
+    }
+
+    /** Same call site as [NotificationOpened] (design §9), gated on a CTA action extra that no
+     *  `NotificationCompat.Action` button currently sets (see design's File Changes table / the
+     *  Phase 5b follow-up flag on CTA wiring) -- the emission path exists and is tested, but has no
+     *  live producer until that follow-up lands. */
+    data class NotificationActionClicked(
+        val family: NotificationFamilyValue,
+        val variantKey: AnalyticsId?,
+        val destination: NotificationDestinationValue,
+        val locale: NotificationLocaleValue,
+    ) : AnalyticsEvent {
+        override val name = AnalyticsEventName.NOTIFICATION_ACTION_CLICKED
+    }
+
+    /** Fired at the family's completion site (design §9), attribution scoped to the launching
+     *  intent's notification extras still held in-memory -- no new persistence store. See
+     *  `AffirmityAppState.setActiveNotificationAttribution`/`completeNotificationAttribution` and
+     *  `CompassAnswerHost`'s `onAnswered` (the one completion site outside `AffirmityAppState`). */
+    data class NotificationCompleted(
+        val family: NotificationFamilyValue,
+        val variantKey: AnalyticsId?,
+        val destination: NotificationDestinationValue,
+        val locale: NotificationLocaleValue,
+    ) : AnalyticsEvent {
+        override val name = AnalyticsEventName.NOTIFICATION_COMPLETED
     }
 }

@@ -47,6 +47,10 @@ fun MoodDayDetailSheet(
     initialNote: String?,
     onDismiss: () -> Unit,
     onSave: (moodValue: Int, note: String?) -> Unit,
+    // Notifications V2 design §8 (`MoodCheckInSheet`): the check-in wrapper swaps this one string
+    // for its own "¿Qué pasó hoy?" prompt while leaving every other part of this sheet untouched —
+    // default preserves the existing calendar-edit behavior exactly.
+    notePlaceholder: String = stringResource(R.string.mood_detail_notes_placeholder),
 ) {
     val sheetState = rememberModalBottomSheetState()
     val sheetScope = rememberCoroutineScope()
@@ -114,7 +118,7 @@ fun MoodDayDetailSheet(
                 value = note,
                 onValueChange = { note = it },
                 label = { Text(stringResource(R.string.mood_detail_notes_label)) },
-                placeholder = { Text(stringResource(R.string.mood_detail_notes_placeholder)) },
+                placeholder = { Text(notePlaceholder) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .onFocusChanged { focusState ->

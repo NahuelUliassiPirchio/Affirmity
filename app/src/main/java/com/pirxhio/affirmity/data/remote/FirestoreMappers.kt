@@ -115,11 +115,27 @@ fun streakHealerUseFromMap(map: Map<String, Any?>): StreakHealerUseEntity = Stre
 private val DEFAULT_REMINDER_SEGMENTS = setOf(DaySegment.MANANA, DaySegment.TARDE) // mirrors NotificationPreferences' default.
 private val DEFAULT_NIGHT_SEGMENTS = setOf(DaySegment.NOCHE) // mirrors NotificationPreferences' default.
 
-fun enabledKey(channel: NotificationChannelSpec) = "${channel.prefsPrefix}_enabled"
+/** Firestore field name for [channel]'s enabled flag. Deliberately NOT always
+ * `"${channel.prefsPrefix}_enabled"`: [NotificationChannelSpec.MEDITATION_RETURN]'s `prefsPrefix`
+ * (`"meditationReturn"`, the DataStore-side local key, unrelated to and independent of this
+ * Firestore field name) would otherwise produce `meditationReturn_enabled`, which no longer
+ * matches the server's `meditation_return_enabled` field (`functions/src/index.ts`) -- so this is
+ * special-cased to keep client writes and server reads on the same field name. Every other channel's
+ * prefix already coincides with its server field name. */
+fun enabledKey(channel: NotificationChannelSpec) = when (channel) {
+    NotificationChannelSpec.MEDITATION_RETURN -> "meditation_return_enabled"
+    else -> "${channel.prefsPrefix}_enabled"
+}
 fun segmentsKey(channel: NotificationChannelSpec) = "${channel.prefsPrefix}_segments"
 
 private fun defaultSegments(channel: NotificationChannelSpec) = when (channel) {
     NotificationChannelSpec.REFLECTION, NotificationChannelSpec.MOOD -> DEFAULT_NIGHT_SEGMENTS
+    // design §10: fixed-time families have no segment picker -- mirrors
+    // NotificationPreferences.defaultSegmentKeys' DataStore-side default.
+    NotificationChannelSpec.STREAK,
+    NotificationChannelSpec.HEALER,
+    NotificationChannelSpec.MEDITATION_RETURN,
+    -> emptySet()
     else -> DEFAULT_REMINDER_SEGMENTS
 }
 
@@ -133,7 +149,11 @@ fun channelSettingsToMap(channel: NotificationChannelSpec, settings: ChannelSett
 )
 
 fun channelSettingsFromMap(channel: NotificationChannelSpec, map: Map<String, Any?>): ChannelSettings = ChannelSettings(
-    enabled = map[enabledKey(channel)] as? Boolean ?: false,
+    // design D8: STREAK/HEALER/MEDITATION_RETURN default to enabled when the field has never been
+    // written, mirroring the server-side `!== false` read in `functions/src/index.ts` -- otherwise
+    // the Settings UI would show these toggles OFF for every existing user even though the server
+    // is (correctly) still sending them.
+    enabled = map[enabledKey(channel)] as? Boolean ?: channel.defaultEnabled,
     segments = (map[segmentsKey(channel)] as? List<*>)
         ?.mapNotNull { key -> DaySegment.entries.find { it.key == key } }
         ?.toSet()

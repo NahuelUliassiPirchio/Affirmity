@@ -99,7 +99,9 @@ fun MoodScreen(
     var selectedDay by remember { mutableStateOf<SelectedDay?>(null) }
 
     // Mood notification actions land here with a pre-picked value; tapping the notification body
-    // opens the same sheet with no synthetic selection so all five choices remain explicit.
+    // opens the same sheet with no synthetic selection so all five choices remain explicit. This
+    // is the check-in entry point (design §8/MoodCheckInSheet) — distinct from a calendar-day tap
+    // below, which still opens the plain date-labelled [MoodDayDetailSheet].
     LaunchedEffect(initialMoodValue, openInitialPicker, initialMoodEventKey) {
         if (initialMoodValue != null || openInitialPicker) {
             selectedDay = SelectedDay(
@@ -107,6 +109,7 @@ fun MoodScreen(
                 label = dayLabel(Calendar.getInstance(), todayEpochDay),
                 moodValue = initialMoodValue,
                 note = moodByDay[todayEpochDay]?.note,
+                isCheckIn = true,
             )
             if (initialMoodValue != null) onInitialMoodConsumed()
             if (openInitialPicker) onInitialPickerConsumed()
@@ -201,17 +204,29 @@ fun MoodScreen(
     selectedDay?.let { day ->
         val canLog = day.epochDay <= todayEpochDay
         if (canLog) {
-            MoodDayDetailSheet(
-                dayLabel = day.label,
-                initialMoodValue = day.moodValue,
-                selectionEventKey = initialMoodEventKey,
-                initialNote = day.note,
-                onDismiss = { selectedDay = null },
-                onSave = { moodValue, note ->
-                    onSaveMood(day.epochDay, moodValue, note)
-                    selectedDay = null
-                },
-            )
+            if (day.isCheckIn) {
+                MoodCheckInSheet(
+                    initialMoodValue = day.moodValue,
+                    initialNote = day.note,
+                    onDismiss = { selectedDay = null },
+                    onSave = { moodValue, note ->
+                        onSaveMood(day.epochDay, moodValue, note)
+                        selectedDay = null
+                    },
+                )
+            } else {
+                MoodDayDetailSheet(
+                    dayLabel = day.label,
+                    initialMoodValue = day.moodValue,
+                    selectionEventKey = initialMoodEventKey,
+                    initialNote = day.note,
+                    onDismiss = { selectedDay = null },
+                    onSave = { moodValue, note ->
+                        onSaveMood(day.epochDay, moodValue, note)
+                        selectedDay = null
+                    },
+                )
+            }
         } else {
             selectedDay = null
         }
@@ -223,6 +238,9 @@ private data class SelectedDay(
     val label: String,
     val moodValue: Int?,
     val note: String?,
+    /** True only for the notification-deep-link/check-in entry point (design §8); a calendar-day
+     * tap always leaves this false and keeps the date-labelled [MoodDayDetailSheet]. */
+    val isCheckIn: Boolean = false,
 )
 
 private data class MonthDay(val dayOfMonth: Int, val epochDay: Long, val calendar: Calendar)

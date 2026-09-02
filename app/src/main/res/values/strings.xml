@@ -11,85 +11,48 @@
     <string name="notification_channel_healer_description">Avisos cuando tenés un sanador disponible para curar tu racha</string>
     <string name="notification_channel_mood_name">Recordatorio de ánimo</string>
     <string name="notification_channel_mood_description">Un aviso para loguear cómo te sentiste hoy</string>
+    <string name="notification_channel_meditation_return_name">Volver a meditar</string>
+    <string name="notification_channel_meditation_return_description">Un aviso suave si hace unos días que no meditás</string>
 
     <string name="notification_reminder_title">Un momento para ti</string>
     <string name="notification_reminder_fallback_body">Tómate un momento para meditar o ver tus afirmaciones.</string>
     <string name="notification_reflection_title">Un momento de honestidad</string>
+    <string name="notification_reflection_fallback_body">Una pregunta honesta para mirar hacia adentro hoy.</string>
     <string name="notification_mood_title">¿Cómo te sentiste hoy?</string>
     <string name="notification_mood_fallback_body">Tocá un emoji para loguear tu ánimo de hoy.</string>
     <string name="notification_streak_title">Tu racha está por terminar</string>
     <string name="notification_streak_fallback_body">Todavía puedes completar hoy y mantener tu racha.</string>
     <string name="notification_healer_title">Tu racha se rompió, pero tenés un sanador</string>
     <string name="notification_healer_fallback_body">Activá tu sanador hoy para recuperar la racha que perdiste ayer.</string>
+    <string name="notification_meditation_return_title">¿Volvemos a meditar?</string>
+    <string name="notification_meditation_return_fallback_body">Unos minutos hoy pueden ayudarte a retomar el hábito.</string>
 
-    <string-array name="reflection_prompts_monday">
-        <item>Hoy, lunes, ¿cómo te sentiste?</item>
-        <item>Arrancamos la semana. ¿Cómo veniste hoy, lunes?</item>
-        <item>Lunes de nuevo. ¿Cómo estuvo tu ánimo hoy?</item>
-        <item>¿Qué es lo más honesto que podrías decirte hoy?</item>
-        <item>¿Hay algo que estuviste evitando mirar esta semana?</item>
-        <item>¿Hacia dónde apunta tu brújula hoy: hacia adentro o hacia afuera?</item>
-        <item>¿Qué verdad incómoda podrías reconocerte hoy, lunes?</item>
-    </string-array>
-    <string-array name="reflection_prompts_tuesday">
-        <item>Hoy, martes, ¿cómo te sentiste?</item>
-        <item>¿Cómo va este martes? Contanos cómo te sentiste.</item>
-        <item>Martes al día. ¿Cómo estuvo tu ánimo hoy?</item>
-        <item>¿Qué estás sintiendo que todavía no te animaste a nombrar?</item>
-        <item>¿A quién le debés una conversación honesta?</item>
-        <item>¿Qué parte de vos estuviste ignorando últimamente?</item>
-        <item>Si fueras totalmente honesto con vos, ¿qué cambiarías hoy?</item>
-    </string-array>
-    <string-array name="reflection_prompts_wednesday">
-        <item>Hoy, miércoles, ¿cómo te sentiste?</item>
-        <item>Mitad de semana. ¿Cómo veniste hoy, miércoles?</item>
-        <item>¿Cómo estuvo tu ánimo este miércoles?</item>
-        <item>¿Qué te está costando aceptar de vos mismo?</item>
-        <item>¿Hay una excusa que te repetís seguido? ¿Es cierta?</item>
-        <item>¿Qué necesitás escuchar de vos mismo hoy?</item>
-        <item>¿En qué momento del día de hoy fuiste más vos?</item>
-    </string-array>
-    <string-array name="reflection_prompts_thursday">
-        <item>Hoy, jueves, ¿cómo te sentiste?</item>
-        <item>Ya casi. ¿Cómo estuvo tu ánimo hoy, jueves?</item>
-        <item>Jueves al día. Contanos cómo te sentiste.</item>
-        <item>¿Qué verdad sobre vos mismo te cuesta aceptar?</item>
-        <item>¿Qué estás postergando por miedo, no por falta de tiempo?</item>
-        <item>¿Dónde sentís que no estás siendo del todo honesto con vos?</item>
-        <item>¿Qué te diría tu brújula interna si le hicieras caso hoy?</item>
-    </string-array>
-    <string-array name="reflection_prompts_friday">
-        <item>Hoy, viernes, ¿cómo te sentiste?</item>
-        <item>Llegaste al viernes. ¿Cómo veniste hoy?</item>
-        <item>¿Cómo estuvo tu ánimo en este viernes?</item>
-        <item>Mirando la semana, ¿qué fuiste evitando sentir?</item>
-        <item>¿Qué decisión tomaste esta semana sin ser del todo honesto con vos?</item>
-        <item>¿Qué necesitás soltar antes de que arranque el finde?</item>
-        <item>¿Qué es lo más real que te pasó esta semana?</item>
-    </string-array>
-    <string-array name="reflection_prompts_saturday">
-        <item>Hoy, sábado, ¿cómo te sentiste?</item>
-        <item>Fin de semana. ¿Cómo veniste hoy, sábado?</item>
-        <item>¿Cómo estuvo tu ánimo este sábado?</item>
-        <item>Sin nada que cumplir hoy, ¿qué sentís de verdad?</item>
-        <item>¿Qué parte de tu vida necesita más honestidad?</item>
-        <item>¿Qué te gustaría admitirte hoy que nunca dirías en voz alta?</item>
-        <item>¿Hacia dónde te está llevando tu brújula últimamente?</item>
-    </string-array>
-    <string-array name="reflection_prompts_sunday">
-        <item>Hoy, domingo, ¿cómo te sentiste?</item>
-        <item>Último día del finde. ¿Cómo veniste hoy, domingo?</item>
-        <item>¿Cómo estuvo tu ánimo este domingo?</item>
-        <item>Antes de arrancar la semana que viene, ¿qué necesitás reconocerte?</item>
-        <item>¿Qué verdad querés llevarte de esta semana?</item>
-        <item>¿Con qué intención honesta te gustaría empezar la próxima semana?</item>
-        <item>¿Qué verdad incómoda podrías admitirte hoy?</item>
-    </string-array>
+    <!-- Notifications V2 task 5.3: one CTA label per family, resolved from the server's `ctaKey`. -->
+    <string name="notification_cta_affirmations">Ver afirmaciones</string>
+    <string name="notification_cta_mood">Loguear ánimo</string>
+    <string name="notification_cta_reflection">Responder</string>
+    <string name="notification_cta_streak">Mantener racha</string>
+    <string name="notification_cta_healer">Activar sanador</string>
+    <string name="notification_cta_meditation_return">Meditar</string>
+
+    <!-- Notifications V2 design §8: MoodCheckInSheet's header + note prompt (replaces the day-label
+         used by the calendar-edit MoodDayDetailSheet). -->
+    <string name="mood_checkin_header">¿Cómo estás?</string>
+    <string name="mood_checkin_note_prompt">¿Qué pasó hoy?</string>
+
+    <!-- Notifications V2 scope-expansion: minimal Compass answer screen (task 4.7's fifth
+         completion site). Question text itself comes from the notification payload, not a string
+         resource; these are the screen's static chrome only. -->
+    <string name="compass_answer_note_placeholder">Escribí tu respuesta (opcional)</string>
+    <string name="compass_answer_save_button">Guardar</string>
 
     <string name="settings_title">Ajustes</string>
     <string name="settings_reminders_label">Recordatorios</string>
     <string name="settings_reflection_label">Preguntas Brújula</string>
     <string name="settings_mood_label">Recordatorio de ánimo</string>
+    <string name="settings_streak_label">Racha en riesgo</string>
+    <string name="settings_healer_label">Sanador de racha</string>
+    <string name="settings_meditation_return_label">Volver a meditar</string>
     <string name="settings_segment_madrugada">Madrugada (00–06)</string>
     <string name="settings_segment_manana">Mañana (06–12)</string>
     <string name="settings_segment_tarde">Tarde (12–18)</string>

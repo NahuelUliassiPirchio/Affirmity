@@ -59,3 +59,15 @@ export function shouldFireHealerAlert(rows: Completion[], uses: HealerUse[], tod
 
   return isBreakDay && held && !healedDays.has(breakCandidate);
 }
+
+/**
+ * True when the healer notification's `IMPORTANCE_HIGH` treatment applies (design §5, Android
+ * Channel Importance Assignment / D5): the healer opportunity is a single-day window
+ * (`breakEpochDay + 1`), so by construction it is always "expiring today" whenever it is available
+ * at all -- tomorrow's window can never contain today's break day. Structurally identical to
+ * `shouldFireHealerAlert`; kept as a separate, purpose-named export because it drives copy context
+ * and notification importance/analytics regardless of whether a send is actually being evaluated.
+ */
+export function isHealerExpiringToday(rows: Completion[], uses: HealerUse[], todayEpochDay: number): boolean {
+  return shouldFireHealerAlert(rows, uses, todayEpochDay);
+}

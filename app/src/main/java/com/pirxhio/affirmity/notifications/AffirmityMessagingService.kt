@@ -27,6 +27,11 @@ class AffirmityMessagingService : FirebaseMessagingService() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    // Notifications V2 (design §1/§7): the server always renders and sends title/body at send
+    // time. These are the ONE honest static fallback per channel — used only when the payload
+    // omits title/body (e.g. upstream catalog resolution failed) — never a per-variant pool.
+    // The old per-day-of-week `ReflectionPromptProvider`/`reflection_prompts_*` variant pool was
+    // removed entirely (task 5.3) now that the server is the sole source of Reflection copy.
     private val handler = FcmMessageHandler { channel ->
         when (channel) {
             NotificationChannelSpec.REMINDER ->
@@ -35,7 +40,7 @@ class AffirmityMessagingService : FirebaseMessagingService() {
 
             NotificationChannelSpec.REFLECTION ->
                 getString(R.string.notification_reflection_title) to
-                    ReflectionPromptProvider.randomPrompt(applicationContext)
+                    getString(R.string.notification_reflection_fallback_body)
 
             NotificationChannelSpec.MOOD ->
                 getString(R.string.notification_mood_title) to
@@ -48,6 +53,10 @@ class AffirmityMessagingService : FirebaseMessagingService() {
             NotificationChannelSpec.HEALER ->
                 getString(R.string.notification_healer_title) to
                     getString(R.string.notification_healer_fallback_body)
+
+            NotificationChannelSpec.MEDITATION_RETURN ->
+                getString(R.string.notification_meditation_return_title) to
+                    getString(R.string.notification_meditation_return_fallback_body)
         }
     }
 

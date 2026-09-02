@@ -40,6 +40,9 @@ import com.pirxhio.affirmity.analytics.CreationMethod
 import com.pirxhio.affirmity.analytics.DailyGoal
 import com.pirxhio.affirmity.analytics.FirebaseAnalyticsLogger
 import com.pirxhio.affirmity.analytics.NoOpAnalyticsLogger
+import com.pirxhio.affirmity.analytics.NotificationDestinationValue
+import com.pirxhio.affirmity.analytics.NotificationFamilyValue
+import com.pirxhio.affirmity.analytics.NotificationLocaleValue
 import com.pirxhio.affirmity.analytics.firebase.AndroidFirebaseAnalyticsSink
 import com.pirxhio.affirmity.analytics.toAdFailureReason
 import com.pirxhio.affirmity.ads.GoogleRewardedAdGateway
@@ -57,6 +60,7 @@ import com.pirxhio.affirmity.data.local.AffirmationThemePreferences
 import com.pirxhio.affirmity.data.local.AffirmationImageStore
 import com.pirxhio.affirmity.data.local.AffirmityDatabase
 import com.pirxhio.affirmity.data.local.ChannelSettings
+import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
 import com.pirxhio.affirmity.data.local.DailyViewCount
 import com.pirxhio.affirmity.data.local.DaySegment
@@ -100,6 +104,8 @@ import com.pirxhio.affirmity.data.repository.RoomMeditationPreferencesRepository
 import com.pirxhio.affirmity.data.repository.RoomNotificationSettingsRepository
 import com.pirxhio.affirmity.data.repository.RoomStreakHealerRepository
 import com.pirxhio.affirmity.meditation.SessionEndReason
+import com.pirxhio.affirmity.notifications.NotificationAttribution
+import com.pirxhio.affirmity.notifications.NotificationCanceller
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
 import com.pirxhio.affirmity.notifications.FcmTokenOwnershipCoordinator
@@ -344,6 +350,28 @@ internal fun canPersistQuietHoursSettings(authState: AuthState): Boolean =
     authState is AuthState.SignedIn
 
 /**
+ * Pure predicate mirroring the negation of the server's `shouldFireStreakAlert`
+ * (`functions/src/streak.ts`, Notifications V2 spec's "Streak-About-to-End Channel" requirement):
+ * "today's requirement" is complete only once BOTH affirmation and meditation are done for that
+ * day. A missing row (never marked) is incomplete. Extracted so [AffirmityAppState]'s
+ * cancel-on-completion wiring (task 4.7) can be driven by a plain JUnit test.
+ */
+internal fun isStreakRequirementCompleteToday(row: DailyCompletionEntity?): Boolean =
+    row?.affirmationDone == true && row.meditationDone == true
+
+/** Raw wire values of the launching notification's extras (Notifications V2 design §9), held
+ *  in-memory only by [AffirmityAppState.setActiveNotificationAttribution] until the matching
+ *  family's completion site consumes it via [AffirmityAppState.completeNotificationAttribution].
+ *  Kept as raw strings here -- the bounded [AnalyticsId]/enum mapping happens only at the moment of
+ *  emission, the same boundary every other raw-wire-value call site in this codebase applies it at. */
+private data class NotificationCompletionAttribution(
+    val family: String,
+    val variantKey: String?,
+    val destination: String?,
+    val locale: String?,
+)
+
+/**
  * Shared in-memory state for the whole app, backed by Room (affirmations) and DataStore
  * (trackers) — see README "Decisions". Screens read plain [Affirmation]/[WeeklyStreak] state;
  * this class owns translating that to/from the persisted shapes.
@@ -359,6 +387,10 @@ class AffirmityAppState(
     private val imageStore: AffirmationImageStore,
     private val notificationDebugLog: NotificationDebugLog,
     private val notifier: Notifier,
+    /** Cancel-on-completion (Notifications V2 design §6/task 4.7). Nullable with a `null` default,
+     * matching [catalogSeeder]'s pattern below, so the five existing JVM test constructions of this
+     * class keep compiling unchanged; every real call site injects a real instance. */
+    private val notificationCanceller: NotificationCanceller? = null,
     private val widgetUpdater: WidgetUpdater,
     private val authRepository: AuthRepository,
     private val fcmTokenRepository: FcmTokenRepository,
@@ -625,6 +657,24 @@ class AffirmityAppState(
     var moodSettings = mutableStateOf(ChannelSettings(enabled = false, segments = emptySet()))
         private set
 
+    // design §10: toggle-only (fixed-time families, no segment picker) -- initial value matches
+    // each channel's own [NotificationChannelSpec.defaultEnabled] (D8: opt-out, not opt-in) so the
+    // UI never flashes "disabled" before the first DataStore/Firestore read completes.
+    var streakSettings = mutableStateOf(
+        ChannelSettings(enabled = NotificationChannelSpec.STREAK.defaultEnabled, segments = emptySet()),
+    )
+        private set
+
+    var healerSettings = mutableStateOf(
+        ChannelSettings(enabled = NotificationChannelSpec.HEALER.defaultEnabled, segments = emptySet()),
+    )
+        private set
+
+    var meditationReturnSettings = mutableStateOf(
+        ChannelSettings(enabled = NotificationChannelSpec.MEDITATION_RETURN.defaultEnabled, segments = emptySet()),
+    )
+        private set
+
     var quietHoursSettings = mutableStateOf(QuietHoursSettings(enabled = false, startMinute = 1380, endMinute = 420))
         private set
 
@@ -860,6 +910,21 @@ class AffirmityAppState(
             session.flatMapLatest { it.notifications.observe(NotificationChannelSpec.MOOD) }
                 .catch { error -> Log.e(TAG, "mood settings flow failed", error) }
                 .collect { moodSettings.value = it }
+        }
+        scope.launch {
+            session.flatMapLatest { it.notifications.observe(NotificationChannelSpec.STREAK) }
+                .catch { error -> Log.e(TAG, "streak settings flow failed", error) }
+                .collect { streakSettings.value = it }
+        }
+        scope.launch {
+            session.flatMapLatest { it.notifications.observe(NotificationChannelSpec.HEALER) }
+                .catch { error -> Log.e(TAG, "healer settings flow failed", error) }
+                .collect { healerSettings.value = it }
+        }
+        scope.launch {
+            session.flatMapLatest { it.notifications.observe(NotificationChannelSpec.MEDITATION_RETURN) }
+                .catch { error -> Log.e(TAG, "meditation return settings flow failed", error) }
+                .collect { meditationReturnSettings.value = it }
         }
         scope.launch {
             session.flatMapLatest { it.notifications.observeQuietHours() }
@@ -1101,18 +1166,20 @@ class AffirmityAppState(
                 channel = NotificationChannelSpec.REMINDER,
                 title = "Notificación de prueba",
                 body = "Si ves esto, el sistema de notificaciones funciona en este teléfono.",
+                attribution = NotificationAttribution(),
             )
         }
     }
 
-    /** Same as [sendTestNotification] but on the mood channel, so the mood-value action buttons
-     * (and the tap-to-open-Ánimo behavior) can be tried without waiting for the nightly window. */
+    /** Same as [sendTestNotification] but on the mood channel, so the tap-to-open-Ánimo behavior
+     * can be tried without waiting for the nightly window. */
     fun sendTestMoodNotification() {
         scope.launch {
             notifier.notify(
                 channel = NotificationChannelSpec.MOOD,
                 title = "¿Cómo te sentiste hoy?",
                 body = "Notificación de prueba: tocá un emoji para abrir tu ánimo de hoy con esa opción elegida.",
+                attribution = NotificationAttribution(),
             )
         }
     }
@@ -1337,8 +1404,62 @@ class AffirmityAppState(
                 if (updated.count == AFFIRMATIONS_GOAL_PER_DAY) {
                     analytics.log(AnalyticsEvent.DailyGoalReached(DailyGoal.AFFIRMATION))
                 }
+                cancelStreakNotificationIfRequirementComplete(today)
             }
         }
+    }
+
+    /** Notifications V2 task 4.7 (design §6's "Cancel on completion for each family" scenario):
+     * the Streak-Risk notification fires on "current streak >= 1 AND today's requirement
+     * incomplete" (spec's Streak-About-to-End Channel), where "today's requirement" is BOTH
+     * affirmation and meditation done -- mirroring the server's `shouldFireStreakAlert` negation
+     * (`functions/src/streak.ts`). Called from both completion sites ([recordAffirmationViewed] and
+     * [recordMeditationCompleted]) since either one can be the action that completes the day. */
+    private suspend fun cancelStreakNotificationIfRequirementComplete(day: Long) {
+        val row = ready().completions.getRange(day, day).firstOrNull()
+        if (isStreakRequirementCompleteToday(row)) {
+            notificationCanceller?.cancelFamily(NotificationChannelSpec.STREAK)
+            completeNotificationAttribution(NotificationChannelSpec.STREAK.wireChannelKey)
+        }
+    }
+
+    /** Notifications V2 Phase 6 (design §9): intent-scoped attribution for `notification_completed`.
+     *  Set once per app launch/new-intent from a notification tap by [AffirmityApp]'s
+     *  `LaunchedEffect` (see `MainActivity.kt`'s `resolveNotificationOpenedEvent` call site) and by
+     *  `CompassAnswerHost` for the one completion site outside this class. Deliberately NOT a
+     *  Firestore/DataStore field -- "no new persistence store" (design §9) -- it lives only as long
+     *  as this in-memory instance does. */
+    private var activeNotificationAttribution: NotificationCompletionAttribution? = null
+
+    fun setActiveNotificationAttribution(
+        family: String,
+        variantKey: String?,
+        destination: String?,
+        locale: String?,
+    ) {
+        activeNotificationAttribution = NotificationCompletionAttribution(family, variantKey, destination, locale)
+    }
+
+    /** Emits `notification_completed` iff [family] matches the still-in-scope attribution set by
+     *  [setActiveNotificationAttribution], then clears it -- single-fire per launch, mirroring
+     *  [NotificationCanceller.cancelFamily]'s own "only once, at the moment of completion" shape.
+     *  Called at exactly the same 5 sites `cancelFamily` is (design §9's completion-site list):
+     *  [recordMood], [cancelStreakNotificationIfRequirementComplete] (itself called from both
+     *  [recordAffirmationViewed] and [recordMeditationCompleted]), [recordMeditationCompleted]
+     *  itself (`meditation_return`), [activateStreakHealer], and `CompassAnswerHost`'s `onAnswered`
+     *  (`compass`, the one completion site outside this class). */
+    fun completeNotificationAttribution(family: String) {
+        val attribution = activeNotificationAttribution ?: return
+        if (attribution.family != family) return
+        analytics.log(
+            AnalyticsEvent.NotificationCompleted(
+                family = NotificationFamilyValue.fromWire(attribution.family),
+                variantKey = attribution.variantKey?.let { AnalyticsId.ofNotificationVariant(it) },
+                destination = NotificationDestinationValue.fromWire(attribution.destination),
+                locale = NotificationLocaleValue.fromWire(attribution.locale),
+            ),
+        )
+        activeNotificationAttribution = null
     }
 
     /** In-memory per-process day guard (D9) -- recordMeditationCompleted has no counter to test a
@@ -1362,6 +1483,12 @@ class AffirmityAppState(
                 meditationGoalEmittedEpochDay = day
                 analytics.log(AnalyticsEvent.DailyGoalReached(DailyGoal.MEDITATION))
             }
+            // Task 4.7: Meditation Return exists purely to nudge a return to meditating, so any
+            // completion cancels it unconditionally (design §6/"meditation-return" capability's
+            // "Cancelled on meditating" scenario) -- unlike Streak, there is no compound condition.
+            notificationCanceller?.cancelFamily(NotificationChannelSpec.MEDITATION_RETURN)
+            completeNotificationAttribution(NotificationChannelSpec.MEDITATION_RETURN.wireChannelKey)
+            cancelStreakNotificationIfRequirementComplete(day)
         }
     }
 
@@ -1375,7 +1502,17 @@ class AffirmityAppState(
 
     /** Call from the day-detail sheet, for today or any past day the user is backfilling. */
     fun recordMood(epochDay: Long, moodValue: Int, note: String?) {
-        scope.launch { ready().moods.upsert(epochDay, moodValue, note?.trim()?.ifBlank { null }) }
+        scope.launch {
+            ready().moods.upsert(epochDay, moodValue, note?.trim()?.ifBlank { null })
+            // Task 4.7: cancel-on-completion for Mood (design §6/"mood-checkin-sheet" capability's
+            // "Saving cancels the pending notification" scenario). Scoped to *today* only -- this
+            // function also backfills past days from the calendar, and a past-day edit must not
+            // dismiss a currently pending Mood notification for today.
+            if (epochDay == DayClock.epochDay()) {
+                notificationCanceller?.cancelFamily(NotificationChannelSpec.MOOD)
+                completeNotificationAttribution(NotificationChannelSpec.MOOD.wireChannelKey)
+            }
+        }
     }
 
     /**
@@ -1395,6 +1532,11 @@ class AffirmityAppState(
             val activation = StreakHealerStats.evaluate(rows, uses, todayEpochDay = today, startEpochDay = start).activation
             if (activation is HealerActivation.Available) {
                 activeSession.healerUses.recordUse(activation.breakEpochDay)
+                // Task 4.7: cancel-on-completion for Healer (design §6's "Cancel on completion for
+                // each family" scenario) -- only on an actual activation, matching the silent no-op
+                // for an already-invalid click documented above.
+                notificationCanceller?.cancelFamily(NotificationChannelSpec.HEALER)
+                completeNotificationAttribution(NotificationChannelSpec.HEALER.wireChannelKey)
             }
         }
     }
@@ -1610,6 +1752,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             imageStore = AffirmationImageStore(context.applicationContext),
             notificationDebugLog = notificationDebugLog,
             notifier = Notifier(context.applicationContext, notificationDebugLog),
+            notificationCanceller = NotificationCanceller(context.applicationContext),
             widgetUpdater = widgetUpdater(context.applicationContext),
             fcmTokenRepository = FcmTokenRepository(firestore),
             onboardingRepository = FirestoreOnboardingRepository(firestore),

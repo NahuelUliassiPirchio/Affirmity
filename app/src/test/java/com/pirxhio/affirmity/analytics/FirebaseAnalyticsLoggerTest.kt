@@ -239,4 +239,90 @@ class FirebaseAnalyticsLoggerTest {
         assertEquals("daily_goal_reached", logged.name)
         assertEquals(listOf(AnalyticsParamValue.Text("goal", "meditation")), logged.params)
     }
+
+    @Test
+    fun `notification_opened maps family, variant_key, destination, locale`() {
+        val logged = log(
+            AnalyticsEvent.NotificationOpened(
+                NotificationFamilyValue.STREAK,
+                AnalyticsId.ofNotificationVariant("streak_risk_14plus_a"),
+                NotificationDestinationValue.STREAK_ACTION,
+                NotificationLocaleValue.ES,
+            ),
+        )
+        assertEquals("notification_opened", logged.name)
+        assertEquals(
+            listOf(
+                AnalyticsParamValue.Text("notification_family", "streak"),
+                AnalyticsParamValue.Text("variant_key", "streak_risk_14plus_a"),
+                AnalyticsParamValue.Text("destination", "streak_action"),
+                AnalyticsParamValue.Text("locale", "es"),
+            ),
+            logged.params,
+        )
+    }
+
+    @Test
+    fun `notification_opened omits null variant_key`() {
+        val logged = log(
+            AnalyticsEvent.NotificationOpened(
+                NotificationFamilyValue.MEDITATION_RETURN,
+                variantKey = null,
+                NotificationDestinationValue.SHORT_MEDITATION,
+                NotificationLocaleValue.EN,
+            ),
+        )
+        assertEquals(
+            listOf(
+                AnalyticsParamValue.Text("notification_family", "meditation_return"),
+                AnalyticsParamValue.Text("destination", "short_meditation"),
+                AnalyticsParamValue.Text("locale", "en"),
+            ),
+            logged.params,
+        )
+    }
+
+    @Test
+    fun `notification_action_clicked maps family, variant_key, destination, locale`() {
+        val logged = log(
+            AnalyticsEvent.NotificationActionClicked(
+                NotificationFamilyValue.HEALER,
+                AnalyticsId.ofNotificationVariant("healer_window_a"),
+                NotificationDestinationValue.HEALER_FLOW,
+                NotificationLocaleValue.ES,
+            ),
+        )
+        assertEquals("notification_action_clicked", logged.name)
+        assertEquals(
+            listOf(
+                AnalyticsParamValue.Text("notification_family", "healer"),
+                AnalyticsParamValue.Text("variant_key", "healer_window_a"),
+                AnalyticsParamValue.Text("destination", "healer_flow"),
+                AnalyticsParamValue.Text("locale", "es"),
+            ),
+            logged.params,
+        )
+    }
+
+    @Test
+    fun `notification_completed maps family, variant_key, destination, locale`() {
+        val logged = log(
+            AnalyticsEvent.NotificationCompleted(
+                NotificationFamilyValue.COMPASS,
+                AnalyticsId.ofNotificationVariant("gratitude_today"),
+                NotificationDestinationValue.COMPASS_QUESTION,
+                NotificationLocaleValue.EN,
+            ),
+        )
+        assertEquals("notification_completed", logged.name)
+        assertEquals(
+            listOf(
+                AnalyticsParamValue.Text("notification_family", "compass"),
+                AnalyticsParamValue.Text("variant_key", "gratitude_today"),
+                AnalyticsParamValue.Text("destination", "compass_question"),
+                AnalyticsParamValue.Text("locale", "en"),
+            ),
+            logged.params,
+        )
+    }
 }

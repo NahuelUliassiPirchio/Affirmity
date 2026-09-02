@@ -5,6 +5,9 @@ import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.access.AdUnlockState
 import com.pirxhio.affirmity.analytics.AnalyticsEvent
 import com.pirxhio.affirmity.analytics.AnalyticsId
+import com.pirxhio.affirmity.analytics.NotificationDestinationValue
+import com.pirxhio.affirmity.analytics.NotificationFamilyValue
+import com.pirxhio.affirmity.analytics.NotificationLocaleValue
 import com.pirxhio.affirmity.meditation.SessionEndReason
 import androidx.lifecycle.Lifecycle
 import com.pirxhio.affirmity.ui.meditation.catalog.findMeditationCatalogEntry
@@ -32,6 +35,124 @@ class MainActivityTest {
         eventKey = nextMoodLaunchEventKey(eventKey, moodValue = 2, openPicker = false)
 
         assertEquals(4, eventKey)
+    }
+
+    @Test
+    fun `repeated taps on the same still-visible Compass notification still re-open the sheet`() {
+        var eventKey = 0
+        eventKey = nextCompassLaunchEventKey(eventKey, questionId = "gratitude_today")
+        eventKey = nextCompassLaunchEventKey(eventKey, questionId = "gratitude_today")
+
+        assertEquals(2, eventKey)
+    }
+
+    @Test
+    fun `a launch with no Compass question id leaves the event key untouched`() {
+        assertEquals(0, nextCompassLaunchEventKey(0, questionId = null))
+    }
+
+    // --- Notifications V2 client analytics (design §9): notification_opened / _action_clicked ----
+
+    @Test
+    fun `identical notification-family intents still create distinct launch events`() {
+        var eventKey = 0
+        eventKey = nextNotificationLaunchEventKey(eventKey, family = "streak")
+        eventKey = nextNotificationLaunchEventKey(eventKey, family = "streak")
+
+        assertEquals(2, eventKey)
+    }
+
+    @Test
+    fun `a launch with no notification family leaves the event key untouched`() {
+        assertEquals(0, nextNotificationLaunchEventKey(0, family = null))
+    }
+
+    @Test
+    fun `resolveNotificationOpenedEvent returns null for a launch with no family`() {
+        assertNull(resolveNotificationOpenedEvent(family = null, variantKey = "x", destination = "x", locale = "es"))
+    }
+
+    @Test
+    fun `resolveNotificationOpenedEvent maps a full V2 payload`() {
+        val event = resolveNotificationOpenedEvent(
+            family = "streak",
+            variantKey = "streak_14plus_a",
+            destination = "streak_action",
+            locale = "es",
+        )
+
+        assertEquals(
+            AnalyticsEvent.NotificationOpened(
+                NotificationFamilyValue.STREAK,
+                AnalyticsId.ofNotificationVariant("streak_14plus_a"),
+                NotificationDestinationValue.STREAK_ACTION,
+                NotificationLocaleValue.ES,
+            ),
+            event,
+        )
+    }
+
+    @Test
+    fun `resolveNotificationOpenedEvent maps a missing variant key to null and unknown wire values to UNKNOWN`() {
+        val event = resolveNotificationOpenedEvent(
+            family = "streak",
+            variantKey = null,
+            destination = "some_future_destination",
+            locale = "fr",
+        )
+
+        assertEquals(
+            AnalyticsEvent.NotificationOpened(
+                NotificationFamilyValue.STREAK,
+                null,
+                NotificationDestinationValue.UNKNOWN,
+                NotificationLocaleValue.UNKNOWN,
+            ),
+            event,
+        )
+    }
+
+    @Test
+    fun `resolveNotificationActionClickedEvent returns null without a family or an action`() {
+        assertNull(
+            resolveNotificationActionClickedEvent(
+                family = null,
+                action = "cta_streak",
+                variantKey = null,
+                destination = null,
+                locale = null,
+            ),
+        )
+        assertNull(
+            resolveNotificationActionClickedEvent(
+                family = "streak",
+                action = null,
+                variantKey = null,
+                destination = null,
+                locale = null,
+            ),
+        )
+    }
+
+    @Test
+    fun `resolveNotificationActionClickedEvent maps a full payload once both family and action are present`() {
+        val event = resolveNotificationActionClickedEvent(
+            family = "healer",
+            action = "cta_healer",
+            variantKey = "healer_window_a",
+            destination = "healer_flow",
+            locale = "en",
+        )
+
+        assertEquals(
+            AnalyticsEvent.NotificationActionClicked(
+                NotificationFamilyValue.HEALER,
+                AnalyticsId.ofNotificationVariant("healer_window_a"),
+                NotificationDestinationValue.HEALER_FLOW,
+                NotificationLocaleValue.EN,
+            ),
+            event,
+        )
     }
 
     @Test

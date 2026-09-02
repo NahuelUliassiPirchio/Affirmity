@@ -1,5 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { resetCopyCatalogCacheForTests, type CopyVariant } from '../src/copyCatalog';
+
 const boundary = vi.hoisted(() => ({
   db: undefined as unknown,
   messagingSend: vi.fn(),
@@ -7,6 +9,7 @@ const boundary = vi.hoisted(() => ({
   createTask: vi.fn(),
   deletedPaths: [] as string[],
   readPaths: [] as string[],
+  setWrites: [] as Array<{ path: string; data: unknown }>,
 }));
 
 vi.mock('firebase-admin/app', () => ({
@@ -66,6 +69,10 @@ interface HandlerState {
   healerUses: number[];
   tokens: string[];
   moodExists: boolean;
+  /** `notificationCopy` docs `firestoreCatalogSource().loadEnabledVariants()` returns. Defaults to
+   * `[]` so every pre-existing test keeps exercising the legacy pass-through path unchanged --
+   * only tests that explicitly seed this exercise real server-rendered copy. */
+  catalogVariants: CopyVariant[];
 }
 
 interface TaskBody {
@@ -95,6 +102,7 @@ function baseState(overrides: Partial<HandlerState> = {}): HandlerState {
     healerUses: [],
     tokens: ['token-1'],
     moodExists: false,
+    catalogVariants: [],
     ...overrides,
   };
 }
@@ -120,6 +128,13 @@ function fakeFirestore(state: HandlerState) {
         async delete() {
           boundary.deletedPaths.push(path);
         },
+        async set(data: unknown) {
+          // notificationState/current + notificationDeliveries/{localDay} writes (design §2/§9),
+          // only reached after a successful send. Recorded so tests can assert on the real
+          // `variantKey` a server-rendered send writes (not just the legacy-focused tests' happy
+          // path, which never inspected this before).
+          boundary.setWrites.push({ path, data });
+        },
       };
     },
     collection(path: string) {
@@ -141,6 +156,16 @@ function fakeFirestore(state: HandlerState) {
             return { docs: state.tokens.map((token) => queryDoc(token)) };
           }
           return { docs: [] };
+        },
+        // `firestoreCatalogSource` (index.ts) calls `.collection('notificationCopy').where(...).get()`.
+        // Returns `state.catalogVariants` (default `[]`, preserving every pre-existing test's
+        // legacy-pass-through behavior); tests exercising real server-rendered copy seed it.
+        where() {
+          return {
+            async get() {
+              return { docs: state.catalogVariants.map((variant) => queryDoc(variant.key, variant)) };
+            },
+          };
         },
       };
     },
@@ -175,6 +200,11 @@ beforeEach(() => {
   });
   boundary.deletedPaths.length = 0;
   boundary.readPaths.length = 0;
+  boundary.setWrites.length = 0;
+  // `loadCopyCatalog` memoizes in module scope for 10 minutes (design §1) -- without resetting
+  // here, whichever test seeds `catalogVariants` first would leak its catalog into every later
+  // test in this file, since they all share the same imported `../src/index` module instance.
+  resetCopyCatalogCacheForTests();
 });
 
 afterEach(() => {
@@ -196,11 +226,78 @@ function task(channel: string): TaskBody {
   return { uid: 'user-1', channel, localDay: LOCAL_DAY };
 }
 
+function makeVariant(overrides: Partial<CopyVariant> = {}): CopyVariant {
+  return {
+    key: 'variant_a',
+    family: 'reminder',
+    context: [],
+    placeholders: [],
+    enabled: true,
+    order: 1,
+    locales: {
+      es: { title: 'Título ES', body: 'Cuerpo ES' },
+      en: { title: 'Title EN', body: 'Body EN' },
+    },
+    ...overrides,
+  };
+}
+
 describe('sendNotification', () => {
   it('skips when the current channel setting was disabled after planning', async () => {
     const state = baseState({ settings: { ...baseState().settings, reminder_enabled: false } });
 
     const response = await invoke(task('reminder'), state);
+
+    expect(response.status).toHaveBeenCalledWith(200);
+    expect(response.send).toHaveBeenCalledWith('Skipped: channel-disabled');
+    expect(boundary.messagingSend).not.toHaveBeenCalled();
+  });
+
+  // design D8: streak/healer/meditation_return toggles are new -- an existing user's settings doc
+  // (this test's `baseState()`) has never written `streak_enabled`/`healer_enabled`/
+  // `meditation_return_enabled`, and the send handler MUST still treat them as enabled.
+  it('does not skip a streak alert as channel-disabled when the toggle field is absent (default-on)', async () => {
+    const state = baseState({
+      completions: [
+        { epochDay: LOCAL_DAY - 2, meditationDone: true, affirmationDone: true },
+        { epochDay: LOCAL_DAY - 1, meditationDone: true, affirmationDone: true },
+      ],
+    });
+    boundary.messagingSend.mockResolvedValue('message-id');
+
+    const response = await invoke(task('streak'), state);
+
+    expect(response.send).not.toHaveBeenCalledWith('Skipped: channel-disabled');
+    expect(boundary.messagingSend).toHaveBeenCalled();
+  });
+
+  it('skips a streak alert as channel-disabled when the Streak-Risk toggle is explicitly false', async () => {
+    const state = baseState({
+      settings: { ...baseState().settings, streak_enabled: false },
+      completions: [
+        { epochDay: LOCAL_DAY - 2, meditationDone: true, affirmationDone: true },
+        { epochDay: LOCAL_DAY - 1, meditationDone: true, affirmationDone: true },
+      ],
+    });
+
+    const response = await invoke(task('streak'), state);
+
+    expect(response.status).toHaveBeenCalledWith(200);
+    expect(response.send).toHaveBeenCalledWith('Skipped: channel-disabled');
+    expect(boundary.messagingSend).not.toHaveBeenCalled();
+  });
+
+  it('skips a healer alert as channel-disabled when the Streak Healer toggle is explicitly false', async () => {
+    const state = baseState({
+      settings: { ...baseState().settings, healer_enabled: false },
+      completions: [
+        { epochDay: LOCAL_DAY - 3, meditationDone: true, affirmationDone: true },
+        { epochDay: LOCAL_DAY - 2, meditationDone: true, affirmationDone: true },
+      ],
+      healerUses: [],
+    });
+
+    const response = await invoke(task('healer'), state);
 
     expect(response.status).toHaveBeenCalledWith(200);
     expect(response.send).toHaveBeenCalledWith('Skipped: channel-disabled');
@@ -283,13 +380,21 @@ describe('sendNotification', () => {
       state,
     );
 
+    // The legacy `title`/`streakCount` this task carried are forwarded verbatim (no catalog variant
+    // matched with an empty test pool, so rendering falls back to the legacy pass-through per design
+    // §7); `family`/`destination`/`ctaKey`/`locale` are always added to `data` per design §7's
+    // `V2FcmData` contract, regardless of whether copy was rendered or passed through.
     expect(boundary.messagingSend).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: {
+        data: expect.objectContaining({
           channel: 'streak',
           streakCount: '3',
           title: 'Keep your streak',
-        },
+          family: 'streak',
+          destination: 'streak_action',
+          ctaKey: 'cta_streak',
+          locale: 'es',
+        }),
       }),
     );
     expect(response.status).toHaveBeenCalledWith(200);
@@ -343,5 +448,116 @@ describe('sendNotification', () => {
 
     expect(boundary.messagingSend).toHaveBeenCalledTimes(2);
     expect(response.status).toHaveBeenCalledWith(503);
+  });
+
+  // CRITICAL (Resilience): a malformed/partially-seeded `notificationCopy` doc must never crash
+  // this handler before it can fall back to legacy pass-through -- `renderCopy` iterating a
+  // missing `placeholders` array throws a raw TypeError with no guard, and nothing upstream of
+  // the try/catch in index.ts previously caught it.
+  it('does not crash on a malformed catalog doc and still sends via the legacy pass-through', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const malformedVariant = {
+      key: 'malformed_variant',
+      family: 'reminder',
+      context: [],
+      enabled: true,
+      order: 1,
+      locales: { es: { title: 'x', body: 'y' }, en: { title: 'x', body: 'y' } },
+      // `placeholders` intentionally omitted -- simulates a malformed/partially-seeded doc.
+    } as unknown as CopyVariant;
+    const state = baseState({ catalogVariants: [malformedVariant] });
+    boundary.messagingSend.mockResolvedValue('message-id');
+
+    const response = await invoke(
+      { ...task('reminder'), title: 'Legacy title', body: 'Legacy body' },
+      state,
+    );
+
+    expect(boundary.messagingSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ title: 'Legacy title', body: 'Legacy body' }),
+      }),
+    );
+    expect(response.status).toHaveBeenCalledWith(200);
+    expect(response.send).toHaveBeenCalledWith('OK');
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('"event":"notification_send_failed"'),
+    );
+    consoleErrorSpy.mockRestore();
+  });
+
+  // CRITICAL (Reliability): the server-rendered copy path (design §1/§7) was never exercised
+  // end-to-end before -- `fakeFirestore` always returned an empty catalog, so every existing test
+  // only ever covered the legacy pass-through fallback.
+  it('renders copy from the catalog and records the real variantKey end-to-end', async () => {
+    const variant = makeVariant({ key: 'reminder_variant_a', family: 'reminder' });
+    const state = baseState({ catalogVariants: [variant] });
+    boundary.messagingSend.mockResolvedValue('message-id');
+
+    const response = await invoke(task('reminder'), state);
+
+    expect(boundary.messagingSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: 'Título ES',
+          body: 'Cuerpo ES',
+          variantKey: 'reminder_variant_a',
+        }),
+      }),
+    );
+    expect(response.status).toHaveBeenCalledWith(200);
+
+    const deliveryWrite = boundary.setWrites.find(
+      (write) => write.path === `users/user-1/notificationDeliveries/${LOCAL_DAY}`,
+    );
+    const deliveryData = deliveryWrite?.data as {
+      families: { reminder: { variantKey: string } };
+    };
+    expect(deliveryData.families.reminder.variantKey).toBe('reminder_variant_a');
+  });
+
+  it('propagates the selected variant key as the reflection channel\'s questionId', async () => {
+    const variant = makeVariant({ key: 'reflection_variant_a', family: 'reflection' });
+    const state = baseState({ catalogVariants: [variant] });
+    boundary.messagingSend.mockResolvedValue('message-id');
+
+    const response = await invoke(task('reflection'), state);
+
+    expect(boundary.messagingSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ questionId: 'reflection_variant_a' }),
+      }),
+    );
+    expect(response.status).toHaveBeenCalledWith(200);
+  });
+
+  it('selects the afternoon-tagged mood variant when the local hour is before 18:00', async () => {
+    const afternoon = makeVariant({ key: 'mood_afternoon', family: 'mood', context: ['afternoon'] });
+    const evening = makeVariant({ key: 'mood_evening', family: 'mood', context: ['evening'] });
+    const state = baseState({ catalogVariants: [afternoon, evening] });
+    boundary.messagingSend.mockResolvedValue('message-id');
+
+    // NOW_MILLIS is 12:00 UTC / zone UTC -> local minute 720, before MOOD_EVENING_START_MINUTE (18:00).
+    const response = await invoke(task('mood'), state);
+
+    expect(boundary.messagingSend).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ variantKey: 'mood_afternoon' }) }),
+    );
+    expect(response.status).toHaveBeenCalledWith(200);
+  });
+
+  it('selects the evening-tagged mood variant when the local hour is 18:00 or later', async () => {
+    vi.setSystemTime(Date.UTC(2026, 7, 10, 19)); // 19:00 UTC / zone UTC -> local minute 1140, past 18:00.
+    const afternoon = makeVariant({ key: 'mood_afternoon', family: 'mood', context: ['afternoon'] });
+    const evening = makeVariant({ key: 'mood_evening', family: 'mood', context: ['evening'] });
+    const state = baseState({ catalogVariants: [afternoon, evening] });
+    boundary.messagingSend.mockResolvedValue('message-id');
+
+    const response = await invoke(task('mood'), state);
+
+    expect(boundary.messagingSend).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ variantKey: 'mood_evening' }) }),
+    );
+    expect(response.status).toHaveBeenCalledWith(200);
   });
 });

@@ -291,6 +291,54 @@ describe('firestore.rules: users/{uid}/timedUnlocks/{contentKey}', () => {
   });
 });
 
+// [ENVIRONMENT-BLOCKED, written but not executed in this sandbox -- same missing-`firebase`-CLI
+// blocker as the suites above] Spec: Notifications V2 server-owned copy catalog (design §1) --
+// `notificationCopy/{variantKey}` denies BOTH read and write to every client, always (unlike the
+// `describe.each` block below, which is owner-read/deny-write on per-uid subcollections):
+// `notificationCopy` is a top-level collection with no owner at all, and the client never reads it
+// directly (it renders server-side only, inside `sendNotification`) -- see `firestore.rules`'s
+// `match /notificationCopy/{variantKey}` block.
+describe('firestore.rules: notificationCopy/{variantKey}', () => {
+  let testEnv: RulesTestEnvironment;
+  const variantId = 'affirmation_a';
+  const seededVariant = { key: variantId, family: 'reminder', enabled: true };
+
+  beforeAll(async () => {
+    testEnv = await initializeTestEnvironment({
+      projectId: 'demo-affirmity-rules-test',
+      firestore: {
+        rules: readFileSync(resolve(__dirname, '../../firestore.rules'), 'utf8'),
+        host: '127.0.0.1',
+        port: 8080,
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await testEnv?.cleanup();
+  });
+
+  it('denies an authenticated client write, even from an otherwise-plausible owner-like caller', async () => {
+    const callerDb = testEnv.authenticatedContext('uid-owner').firestore();
+    await assertFails(setDoc(doc(callerDb, `notificationCopy/${variantId}`), seededVariant));
+  });
+
+  it('denies an authenticated client read', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `notificationCopy/${variantId}`), seededVariant);
+    });
+
+    const callerDb = testEnv.authenticatedContext('uid-owner').firestore();
+    await assertFails(getDoc(doc(callerDb, `notificationCopy/${variantId}`)));
+  });
+
+  it('denies an unauthenticated client read and write', async () => {
+    const anonDb = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(anonDb, `notificationCopy/${variantId}`)));
+    await assertFails(setDoc(doc(anonDb, `notificationCopy/${variantId}`), seededVariant));
+  });
+});
+
 // Regression guard (task 1.17): the existing adUnlocks suite above must still pass byte-for-byte
 // -- this new timedUnlocks block must not weaken users/{uid}/adUnlocks' update/delete-denied
 // guarantee. No new assertions needed here: the `firestore.rules: users/{uid}/adUnlocks/{contentKey}`
@@ -394,5 +442,64 @@ describe('firestore.rules: users/{uid}/catalogOverrides/{catalogAffirmationId}',
     const anonDb = testEnv.unauthenticatedContext().firestore();
     await assertFails(getDoc(doc(anonDb, `users/uid-owner/catalogOverrides/${docId}`)));
     await assertFails(setDoc(doc(anonDb, `users/uid-owner/catalogOverrides/${docId}`), overridePayload));
+  });
+});
+
+// [ENVIRONMENT-BLOCKED, written but not executed in this sandbox -- same missing-`firebase`-CLI
+// blocker as the suites above] Spec: Notifications V2 server-only state (design §2/§3/D9) --
+// `notificationState`, `notificationDeliveries`, and `compassAnswers` all share the same posture:
+// owner can read their own doc, write is unconditionally denied (Admin SDK bypasses rules).
+describe.each([
+  ['notificationState', 'current'],
+  ['notificationDeliveries', '19900'],
+  ['compassAnswers', '19900'],
+])('firestore.rules: users/{uid}/%s/{doc}', (collection, docId) => {
+  let testEnv: RulesTestEnvironment;
+
+  beforeAll(async () => {
+    testEnv = await initializeTestEnvironment({
+      projectId: 'demo-affirmity-rules-test',
+      firestore: {
+        rules: readFileSync(resolve(__dirname, '../../firestore.rules'), 'utf8'),
+        host: '127.0.0.1',
+        port: 8080,
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await testEnv?.cleanup();
+  });
+
+  it('denies a client write attempt, even by the owner', async () => {
+    const ownerDb = testEnv.authenticatedContext('uid-owner').firestore();
+    await assertFails(
+      setDoc(doc(ownerDb, `users/uid-owner/${collection}/${docId}`), { seeded: true }),
+    );
+  });
+
+  it('allows the owner to read their own doc', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `users/uid-owner/${collection}/${docId}`), { seeded: true });
+    });
+
+    const ownerDb = testEnv.authenticatedContext('uid-owner').firestore();
+    await assertSucceeds(getDoc(doc(ownerDb, `users/uid-owner/${collection}/${docId}`)));
+  });
+
+  it('denies a different uid from reading or writing this doc', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `users/uid-owner/${collection}/${docId}`), { seeded: true });
+    });
+
+    const otherDb = testEnv.authenticatedContext('uid-other').firestore();
+    await assertFails(getDoc(doc(otherDb, `users/uid-owner/${collection}/${docId}`)));
+    await assertFails(setDoc(doc(otherDb, `users/uid-owner/${collection}/${docId}`), { seeded: true }));
+  });
+
+  it('denies an unauthenticated client from reading or writing this doc', async () => {
+    const anonDb = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(anonDb, `users/uid-owner/${collection}/${docId}`)));
+    await assertFails(setDoc(doc(anonDb, `users/uid-owner/${collection}/${docId}`), { seeded: true }));
   });
 });

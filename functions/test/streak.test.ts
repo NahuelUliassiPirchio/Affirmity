@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { streakOf, shouldFireStreakAlert, currentStreak, type Completion } from '../src/streak';
+import { streakOf, shouldFireStreakAlert, currentStreak, streakBand, type Completion } from '../src/streak';
 
 const MONDAY = 100;
 
@@ -92,5 +92,32 @@ describe('currentStreak', () => {
 
   it('is 0 when neither track has an active streak', () => {
     expect(currentStreak([], MONDAY)).toBe(0);
+  });
+});
+
+describe('streakBand', () => {
+  // design §1/File Changes: streakBand(count): 'streak_1_3'|'streak_4_13'|'streak_14plus'
+  it('classifies the low end of the 1-3 band', () => {
+    expect(streakBand(1)).toBe('streak_1_3');
+  });
+
+  it('classifies the high boundary of the 1-3 band', () => {
+    expect(streakBand(3)).toBe('streak_1_3');
+  });
+
+  it('classifies the low boundary of the 4-13 band', () => {
+    expect(streakBand(4)).toBe('streak_4_13');
+  });
+
+  it('classifies the high boundary of the 4-13 band', () => {
+    expect(streakBand(13)).toBe('streak_4_13');
+  });
+
+  it('classifies the low boundary of the 14+ band', () => {
+    expect(streakBand(14)).toBe('streak_14plus');
+  });
+
+  it('classifies a large streak into the 14+ band', () => {
+    expect(streakBand(500)).toBe('streak_14plus');
   });
 });

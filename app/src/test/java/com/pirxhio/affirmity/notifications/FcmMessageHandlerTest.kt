@@ -14,6 +14,7 @@ class FcmMessageHandlerTest {
             NotificationChannelSpec.MOOD -> "Mood title" to "Mood body"
             NotificationChannelSpec.STREAK -> "Streak title" to "Streak body"
             NotificationChannelSpec.HEALER -> "Healer title" to "Healer body"
+            NotificationChannelSpec.MEDITATION_RETURN -> "Meditation return title" to "Meditation return body"
         }
     }
 
@@ -55,6 +56,76 @@ class FcmMessageHandlerTest {
     }
 
     @Test
+    fun `resolves meditation_return wire token to the MEDITATION_RETURN channel`() {
+        val action = handler.resolve(mapOf("channel" to "meditation_return"))
+
+        assertEquals(
+            FcmAction.Post(
+                NotificationChannelSpec.MEDITATION_RETURN,
+                "Meditation return title",
+                "Meditation return body",
+            ),
+            action,
+        )
+    }
+
+    @Test
+    fun `V2 payload with server title and body is trusted verbatim over the static fallback`() {
+        val action = handler.resolve(
+            mapOf(
+                "channel" to "streak",
+                "title" to "5 días seguidos",
+                "body" to "No pierdas tu racha hoy",
+                "family" to "streak",
+                "variantKey" to "streak_4_13_a",
+                "destination" to "streak_action",
+                "ctaKey" to "cta_streak",
+                "locale" to "es",
+                "streakCount" to "5",
+            ),
+        )
+
+        assertEquals(
+            FcmAction.Post(
+                channel = NotificationChannelSpec.STREAK,
+                title = "5 días seguidos",
+                body = "No pierdas tu racha hoy",
+                family = "streak",
+                variantKey = "streak_4_13_a",
+                destination = "streak_action",
+                ctaKey = "cta_streak",
+                locale = "es",
+                streakCount = "5",
+            ),
+            action,
+        )
+    }
+
+    @Test
+    fun `V2 payload missing server title and body falls back to the single static string, not per-variant copy`() {
+        val action = handler.resolve(mapOf("channel" to "reflection", "family" to "reflection"))
+
+        assertEquals(
+            FcmAction.Post(
+                channel = NotificationChannelSpec.REFLECTION,
+                title = "Reflection title",
+                body = "Reflection body",
+                family = "reflection",
+            ),
+            action,
+        )
+    }
+
+    @Test
+    fun `expiringToday is parsed from the string literal true and defaults to false otherwise`() {
+        val expiring = handler.resolve(mapOf("channel" to "healer", "expiringToday" to "true"))
+        val notExpiring = handler.resolve(mapOf("channel" to "healer"))
+
+        assertEquals(true, (expiring as FcmAction.Post).expiringToday)
+        assertEquals(false, (notExpiring as FcmAction.Post).expiringToday)
+    }
+
+    @Test
     fun `Post action calls poster notify with channel title and body`() = runBlocking {
         val poster = FakeNotificationPoster()
         val action = FcmAction.Post(NotificationChannelSpec.REMINDER, "Title", "Body")
@@ -65,6 +136,38 @@ class FcmMessageHandlerTest {
         assertEquals(NotificationChannelSpec.REMINDER, poster.calls.single().channel)
         assertEquals("Title", poster.calls.single().title)
         assertEquals("Body", poster.calls.single().body)
+    }
+
+    @Test
+    fun `Post action forwards questionId so Compass opens the exact question sent`() = runBlocking {
+        val poster = FakeNotificationPoster()
+        val action = handler.resolve(
+            mapOf("channel" to "reflection", "questionId" to "q_042"),
+        )
+
+        action.applyTo(poster) { }
+
+        assertEquals("q_042", poster.calls.single().questionId)
+    }
+
+    @Test
+    fun `Post action forwards family, variantKey, locale for notification analytics attribution`() = runBlocking {
+        val poster = FakeNotificationPoster()
+        val action = handler.resolve(
+            mapOf(
+                "channel" to "streak",
+                "family" to "streak",
+                "variantKey" to "streak_4_13_a",
+                "locale" to "es",
+            ),
+        )
+
+        action.applyTo(poster) { }
+
+        val call = poster.calls.single()
+        assertEquals("streak", call.family)
+        assertEquals("streak_4_13_a", call.variantKey)
+        assertEquals("es", call.locale)
     }
 
     @Test
@@ -90,12 +193,35 @@ class FcmMessageHandlerTest {
     }
 
     private class FakeNotificationPoster : NotificationPoster {
-        data class Call(val channel: NotificationChannelSpec, val title: String, val body: String)
+        data class Call(
+            val channel: NotificationChannelSpec,
+            val title: String,
+            val body: String,
+            val questionId: String? = null,
+            val family: String? = null,
+            val variantKey: String? = null,
+            val locale: String? = null,
+        )
 
         val calls = mutableListOf<Call>()
 
-        override suspend fun notify(channel: NotificationChannelSpec, title: String, body: String) {
-            calls.add(Call(channel, title, body))
+        override suspend fun notify(
+            channel: NotificationChannelSpec,
+            title: String,
+            body: String,
+            attribution: NotificationAttribution,
+        ) {
+            calls.add(
+                Call(
+                    channel,
+                    title,
+                    body,
+                    attribution.questionId,
+                    attribution.family,
+                    attribution.variantKey,
+                    attribution.locale,
+                ),
+            )
         }
     }
 }

@@ -163,6 +163,65 @@ class FirestoreMappersTest {
     }
 
     @Test
+    fun `channelSettingsFromMap defaults streak, healer, and meditation_return to enabled when the field is absent`() {
+        val emptyMap = emptyMap<String, Any?>()
+
+        assertTrue(channelSettingsFromMap(NotificationChannelSpec.STREAK, emptyMap).enabled)
+        assertTrue(channelSettingsFromMap(NotificationChannelSpec.HEALER, emptyMap).enabled)
+        assertTrue(channelSettingsFromMap(NotificationChannelSpec.MEDITATION_RETURN, emptyMap).enabled)
+    }
+
+    @Test
+    fun `channelSettingsFromMap still defaults reminder, reflection, and mood to disabled when the field is absent`() {
+        val emptyMap = emptyMap<String, Any?>()
+
+        assertFalse(channelSettingsFromMap(NotificationChannelSpec.REMINDER, emptyMap).enabled)
+        assertFalse(channelSettingsFromMap(NotificationChannelSpec.REFLECTION, emptyMap).enabled)
+        assertFalse(channelSettingsFromMap(NotificationChannelSpec.MOOD, emptyMap).enabled)
+    }
+
+    @Test
+    fun `channelSettingsFromMap honors an explicit false for streak, healer, and meditation_return`() {
+        val map = mapOf(
+            enabledKey(NotificationChannelSpec.STREAK) to false,
+            enabledKey(NotificationChannelSpec.HEALER) to false,
+            enabledKey(NotificationChannelSpec.MEDITATION_RETURN) to false,
+        )
+
+        assertFalse(channelSettingsFromMap(NotificationChannelSpec.STREAK, map).enabled)
+        assertFalse(channelSettingsFromMap(NotificationChannelSpec.HEALER, map).enabled)
+        assertFalse(channelSettingsFromMap(NotificationChannelSpec.MEDITATION_RETURN, map).enabled)
+    }
+
+    @Test
+    fun `channelSettingsFromMap gives streak, healer, and meditation_return no segments by default`() {
+        val emptyMap = emptyMap<String, Any?>()
+
+        assertEquals(emptySet<DaySegment>(), channelSettingsFromMap(NotificationChannelSpec.STREAK, emptyMap).segments)
+        assertEquals(emptySet<DaySegment>(), channelSettingsFromMap(NotificationChannelSpec.HEALER, emptyMap).segments)
+        assertEquals(
+            emptySet<DaySegment>(),
+            channelSettingsFromMap(NotificationChannelSpec.MEDITATION_RETURN, emptyMap).segments,
+        )
+    }
+
+    @Test
+    fun `meditation_return's enabled field is written as meditation_return_enabled, matching the server's field name`() {
+        // functions/src/index.ts reads data.meditation_return_enabled -- the client must write the
+        // exact same field name, not the prefsPrefix-derived "meditationReturn_enabled".
+        assertEquals("meditation_return_enabled", enabledKey(NotificationChannelSpec.MEDITATION_RETURN))
+
+        val map = channelSettingsToMap(
+            NotificationChannelSpec.MEDITATION_RETURN,
+            ChannelSettings(enabled = true, segments = emptySet()),
+        )
+
+        assertTrue(map.containsKey("meditation_return_enabled"))
+        assertEquals(true, map["meditation_return_enabled"])
+        assertFalse(map.containsKey("meditationReturn_enabled"))
+    }
+
+    @Test
     fun `streak healer use entity round-trips and the map carries a numeric healedEpochDay field`() {
         val entity = StreakHealerUseEntity(healedEpochDay = 19_876L, activatedAtMillis = 1_700_000_000_000L)
 

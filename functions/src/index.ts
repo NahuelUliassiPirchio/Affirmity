@@ -17,7 +17,7 @@ import { CloudTasksClient as GoogleCloudTasksClient } from '@google-cloud/tasks'
 import { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
 
-import { localHourInZone, utcMillisToLocalEpochDay } from './localDay';
+import { localHourInZone, localMinuteOfDay, utcMillisToLocalEpochDay } from './localDay';
 import {
   planAllUsers,
   type NotificationChannel,
@@ -29,8 +29,27 @@ import {
 import { taskName } from './tasks';
 import { hasTransientFcmFailures, sendAndPrune, type FcmClient, type TokenStore } from './fcm';
 import { evaluateSendEligibility, notificationTtl, type SendTimeSettings } from './sendPolicy';
-import type { Completion } from './streak';
-import type { HealerUse } from './healer';
+import { currentStreak, streakBand, type Completion } from './streak';
+import { isHealerExpiringToday, type HealerUse } from './healer';
+import { shouldFireMeditationReturn, type MeditationReturnState } from './meditationReturn';
+import {
+  loadCopyCatalog,
+  renderCopy,
+  selectVariant,
+  type CatalogSource,
+  type CopyLocale,
+  type CopyText,
+  type CopyVariant,
+  type NotificationFamily,
+} from './copyCatalog';
+import {
+  buildDeliveryLogUpdate,
+  buildVariantHistoryUpdate,
+  type DeliveryLogDoc,
+  type DeliveryLogEntry,
+  type NotificationStateDoc,
+} from './notificationState';
+import { wasCompassAnsweredToday, buildCompassAnswerDoc, type CompassAnswerDoc } from './compassAnswers';
 import {
   handleRtdn,
   resolveEntitlement,
@@ -126,6 +145,87 @@ function cloudTasksEnqueuer(): TaskEnqueuer {
   };
 }
 
+const EMPTY_MEDITATION_RETURN_STATE: MeditationReturnState = {
+  absenceStartLocalDay: null,
+  lastSentLocalDay: null,
+  lastBand: null,
+};
+
+/** Reads `users/{uid}/notificationState/current.meditationReturn` (design §2/§4), defaulting to an
+ * empty cooldown state when the document or field is missing (new users, first-ever evaluation).
+ * Used at PLAN time only -- `sendNotification` (send time) reads the full doc via
+ * `loadNotificationState` below, since it also needs `variantHistory` for anti-repeat. */
+async function loadMeditationReturnState(uid: string): Promise<MeditationReturnState> {
+  const db = getFirestore();
+  const doc = await db.doc(`users/${uid}/notificationState/current`).get();
+  const stored = doc.data()?.meditationReturn as MeditationReturnState | undefined;
+  return stored ?? EMPTY_MEDITATION_RETURN_STATE;
+}
+
+/** Full `users/{uid}/notificationState/current` read (design §2), used at SEND time by
+ * `sendNotification`: `variantHistory` drives anti-repeat selection for every channel;
+ * `meditationReturn` drives the meditation-return-specific cooldown re-check. */
+async function loadNotificationState(uid: string): Promise<NotificationStateDoc> {
+  const db = getFirestore();
+  const doc = await db.doc(`users/${uid}/notificationState/current`).get();
+  const data = doc.data();
+  return {
+    variantHistory: (data?.variantHistory as NotificationStateDoc['variantHistory']) ?? {},
+    meditationReturn: (data?.meditationReturn as MeditationReturnState | undefined) ?? EMPTY_MEDITATION_RETURN_STATE,
+  };
+}
+
+/** `users/{uid}/notificationDeliveries/{localDay}` read (design §2/§3) -- today's cross-family
+ * delivery log, feeding the "compass-too-soon-after-mood" and "≤1/family/day" send-time rules. */
+async function loadDeliveryLog(uid: string, localDay: number): Promise<DeliveryLogDoc | undefined> {
+  const db = getFirestore();
+  const doc = await db.doc(`users/${uid}/notificationDeliveries/${localDay}`).get();
+  return doc.exists ? (doc.data() as DeliveryLogDoc) : undefined;
+}
+
+/** `users/{uid}/compassAnswers/{localDay}` read (design D9) -- feeds the reflection family's
+ * send-time "already answered today" check. The write side is a client-owned Firestore write on
+ * answer (out of this Cloud Functions file's scope; see design D9 / `compassAnswers.ts`). */
+async function loadCompassAnswer(uid: string, localDay: number): Promise<CompassAnswerDoc | null> {
+  const db = getFirestore();
+  const doc = await db.doc(`users/${uid}/compassAnswers/${localDay}`).get();
+  return doc.exists ? (doc.data() as CompassAnswerDoc) : null;
+}
+
+/** Admin-SDK-backed `CatalogSource` (design §1): one `.where('enabled','==',true).get()`, memoized
+ * by `loadCopyCatalog`'s own 10-minute module-scope cache. */
+function firestoreCatalogSource(): CatalogSource {
+  return {
+    async loadEnabledVariants() {
+      const db = getFirestore();
+      const snap = await db.collection('notificationCopy').where('enabled', '==', true).get();
+      return snap.docs.map((d: QueryDocumentSnapshot) => d.data() as CopyVariant);
+    },
+  };
+}
+
+/** Local-hour cut for Mood's two copy contexts (design §1 Context Filtering: "Mood by
+ * afternoon/evening"). 18:00 matches `schedule.ts`'s `noche` segment boundary. */
+const MOOD_EVENING_START_MINUTE = 18 * 60;
+
+const DESTINATION_BY_CHANNEL: Record<NotificationChannel, string> = {
+  reminder: 'affirmations_feed',
+  mood: 'mood_checkin',
+  reflection: 'compass_question',
+  streak: 'streak_action',
+  healer: 'healer_flow',
+  meditation_return: 'short_meditation',
+};
+
+const CTA_KEY_BY_CHANNEL: Record<NotificationChannel, string> = {
+  reminder: 'cta_affirmations',
+  mood: 'cta_mood',
+  reflection: 'cta_compass',
+  streak: 'cta_streak',
+  healer: 'cta_healer',
+  meditation_return: 'cta_meditation',
+};
+
 async function loadActiveUserInputs(): Promise<UserPlanInput[]> {
   const db = getFirestore();
   // Every document under users/{uid}/settings/ is the single `preferences` doc (per
@@ -151,6 +251,7 @@ async function loadActiveUserInputs(): Promise<UserPlanInput[]> {
 
     const completionsSnap = await db.collection(`users/${uid}/dailyCompletions`).get();
     const healerUsesSnap = await db.collection(`users/${uid}/streakHealerUses`).get();
+    const meditationReturnState = await loadMeditationReturnState(uid);
 
     inputs.push({
       uid,
@@ -162,6 +263,12 @@ async function loadActiveUserInputs(): Promise<UserPlanInput[]> {
         remindersEnabled: Boolean(data.reminder_enabled),
         reflectionEnabled: Boolean(data.reflection_enabled),
         moodEnabled: Boolean(data.mood_enabled),
+        // design D8: these three are new -- existing users have never written these fields, so
+        // `Boolean(undefined) === false` would silently opt every current user out on deploy.
+        // Absent or explicit `true` -> enabled; only an explicit `false` disables.
+        streakEnabled: data.streak_enabled !== false,
+        healerEnabled: data.healer_enabled !== false,
+        meditationReturnEnabled: data.meditation_return_enabled !== false,
         reminderSegments: Array.isArray(data.reminder_segments) ? data.reminder_segments : [],
         reflectionSegments: Array.isArray(data.reflection_segments) ? data.reflection_segments : [],
         moodSegments: Array.isArray(data.mood_segments) ? data.mood_segments : [],
@@ -178,6 +285,7 @@ async function loadActiveUserInputs(): Promise<UserPlanInput[]> {
       healerUses: healerUsesSnap.docs.map((d: QueryDocumentSnapshot) => ({
         healedEpochDay: Number(d.data().healedEpochDay ?? d.id),
       })),
+      meditationReturnState,
     });
   }
   return inputs;
@@ -212,7 +320,14 @@ export const sendNotification = onRequest(async (req, res) => {
     return;
   }
 
-  const { uid, channel, localDay, title, body, data } = req.body as {
+  const {
+    uid,
+    channel,
+    localDay,
+    title: legacyTitle,
+    body: legacyBody,
+    data: legacyData,
+  } = req.body as {
     uid: string;
     channel: NotificationChannel;
     localDay?: number;
@@ -226,6 +341,7 @@ export const sendNotification = onRequest(async (req, res) => {
     'mood',
     'streak',
     'healer',
+    'meditation_return',
   ]);
   if (!uid || !supportedChannels.has(channel) || typeof localDay !== 'number') {
     res.status(400).send('Missing or invalid uid/channel/localDay');
@@ -240,33 +356,54 @@ export const sendNotification = onRequest(async (req, res) => {
     remindersEnabled: Boolean(settingsData.reminder_enabled),
     reflectionEnabled: Boolean(settingsData.reflection_enabled),
     moodEnabled: Boolean(settingsData.mood_enabled),
+    // design D8: same default-true-when-absent rule as `loadActiveUserInputs` above -- these
+    // three toggles must never silently opt an existing user out on deploy.
+    streakEnabled: settingsData.streak_enabled !== false,
+    healerEnabled: settingsData.healer_enabled !== false,
+    meditationReturnEnabled: settingsData.meditation_return_enabled !== false,
     quietHoursEnabled: Boolean(settingsData.quietHours_enabled),
     quietHoursStartMinute: Number(settingsData.quietHours_startMinute ?? 1380),
     quietHoursEndMinute: Number(settingsData.quietHours_endMinute ?? 420),
     timeZone: typeof settingsData.timeZone === 'string' ? settingsData.timeZone : null,
   };
+  // design §1: locale resolution -- missing/unsupported falls back to 'es'.
+  const locale: CopyLocale = settingsData.locale === 'en' ? 'en' : 'es';
 
-  let moodAlreadyLogged = false;
-  let completions: Completion[] = [];
-  let healerUses: HealerUse[] = [];
+  const moodAlreadyLogged =
+    channel === 'mood' ? (await db.doc(`users/${uid}/dailyMoods/${localDay}`).get()).exists : false;
 
-  if (channel === 'mood') {
-    moodAlreadyLogged = (await db.doc(`users/${uid}/dailyMoods/${localDay}`).get()).exists;
-  }
-  if (channel === 'streak' || channel === 'healer') {
-    const completionsSnap = await db.collection(`users/${uid}/dailyCompletions`).get();
-    completions = completionsSnap.docs.map((completionDoc: QueryDocumentSnapshot) => ({
-      epochDay: Number(completionDoc.id),
-      meditationDone: Boolean(completionDoc.data().meditationDone),
-      affirmationDone: Boolean(completionDoc.data().affirmationDone),
-    }));
-  }
-  if (channel === 'healer') {
-    const healerUsesSnap = await db.collection(`users/${uid}/streakHealerUses`).get();
-    healerUses = healerUsesSnap.docs.map((healerUseDoc: QueryDocumentSnapshot) => ({
-      healedEpochDay: Number(healerUseDoc.data().healedEpochDay ?? healerUseDoc.id),
-    }));
-  }
+  // Recomputed authoritatively at send time for every channel (design §7): the planner's own
+  // `data.streakCount` hint is a plan-time guess, never trusted here.
+  const completionsSnap = await db.collection(`users/${uid}/dailyCompletions`).get();
+  const completions: Completion[] = completionsSnap.docs.map((completionDoc: QueryDocumentSnapshot) => ({
+    epochDay: Number(completionDoc.id),
+    meditationDone: Boolean(completionDoc.data().meditationDone),
+    affirmationDone: Boolean(completionDoc.data().affirmationDone),
+  }));
+
+  const healerUses: HealerUse[] =
+    channel === 'healer'
+      ? (await db.collection(`users/${uid}/streakHealerUses`).get()).docs.map(
+          (healerUseDoc: QueryDocumentSnapshot) => ({
+            healedEpochDay: Number(healerUseDoc.data().healedEpochDay ?? healerUseDoc.id),
+          }),
+        )
+      : [];
+
+  // design §2: read once, needed for every channel's anti-repeat pool, not just meditation_return.
+  const notificationState = await loadNotificationState(uid);
+  const meditationReturnState = notificationState.meditationReturn ?? EMPTY_MEDITATION_RETURN_STATE;
+  const meditationReturnDecision =
+    channel === 'meditation_return' ? shouldFireMeditationReturn(completions, localDay, meditationReturnState) : null;
+
+  const compassAnswerDoc = channel === 'reflection' ? await loadCompassAnswer(uid, localDay) : null;
+  const compassAnsweredToday = wasCompassAnsweredToday(compassAnswerDoc, localDay);
+  const affirmationDoneToday = completions.find((row) => row.epochDay === localDay)?.affirmationDone ?? false;
+
+  const deliveryLog = await loadDeliveryLog(uid, localDay);
+  const family: NotificationFamily = channel;
+  const familyAlreadyDeliveredToday = Boolean(deliveryLog?.families?.[family]);
+  const moodDeliveredAtMillis = deliveryLog?.families?.mood?.deliveredAtMillis ?? null;
 
   const sendCheckedAtMillis = Date.now();
   const eligibility = evaluateSendEligibility({
@@ -277,8 +414,16 @@ export const sendNotification = onRequest(async (req, res) => {
     moodAlreadyLogged,
     completions,
     healerUses,
+    affirmationDoneToday,
+    compassAnsweredToday,
+    moodDeliveredAtMillis,
+    familyAlreadyDeliveredToday,
+    meditationReturnState,
   });
   if (!eligibility.eligible) {
+    console.log(
+      JSON.stringify({ event: 'notification_suppressed', uid, family, locale, reason: eligibility.reason }),
+    );
     res.status(200).send(`Skipped: ${eligibility.reason}`);
     return;
   }
@@ -293,6 +438,68 @@ export const sendNotification = onRequest(async (req, res) => {
     res.status(200).send('Skipped: target-day-expired');
     return;
   }
+
+  // ---------------------------------------------------------------------------------------------
+  // Copy resolution + render (design §1/§7, task 4.8). `sendNotification` ALWAYS renders from the
+  // catalog at send time -- any `title`/`body` in the request body is only a legacy pass-through
+  // fallback (design §7's backward-compat guarantee: pre-deploy Cloud Tasks need no migration).
+  // ---------------------------------------------------------------------------------------------
+  const streakCountValue =
+    channel === 'streak'
+      ? String(currentStreak(completions, localDay - 1))
+      : channel === 'healer'
+        ? // The streak count being protected/recovered by the healer -- the streak held through the
+          // break day (localDay - 1), i.e. as of localDay - 2.
+          String(currentStreak(completions, localDay - 2))
+        : undefined;
+
+  const context: string[] =
+    channel === 'mood'
+      ? [localMinuteOfDay(sendCheckedAtMillis, zone) < MOOD_EVENING_START_MINUTE ? 'afternoon' : 'evening']
+      : channel === 'streak' && streakCountValue !== undefined
+        ? [streakBand(Number(streakCountValue))]
+        : channel === 'meditation_return' && meditationReturnDecision?.band
+          ? [meditationReturnDecision.band]
+          : [];
+
+  const placeholderValues: Record<string, string> = streakCountValue !== undefined ? { streakCount: streakCountValue } : {};
+
+  // A malformed/partially-seeded `notificationCopy` doc (e.g. missing `locales`/`placeholders`)
+  // must never crash this handler before it can fall back to the legacy title/body pass-through
+  // (design §7). Mirrors the try/catch pattern `answerCompassQuestion`/`syncEntitlement` already
+  // use elsewhere in this file: log a structured error and fall through with `variant`/`rendered`
+  // left `null`, which the legacy pass-through below already handles.
+  let variant: CopyVariant | null = null;
+  let rendered: CopyText | null = null;
+  try {
+    const catalog = await loadCopyCatalog(firestoreCatalogSource());
+    const recentKeys = notificationState.variantHistory[family] ?? [];
+    variant = selectVariant(catalog, family, context, recentKeys);
+    rendered = variant ? renderCopy(variant, locale, placeholderValues) : null;
+  } catch (err) {
+    console.error(
+      JSON.stringify({ event: 'notification_send_failed', uid, channel, error: String(err) }),
+    );
+  }
+
+  const title = rendered?.title ?? legacyTitle;
+  const body = rendered?.body ?? legacyBody;
+  const variantKey = rendered ? variant?.key : undefined;
+
+  const v2Data: Record<string, string> = {
+    ...(legacyData ?? {}),
+    family,
+    destination: DESTINATION_BY_CHANNEL[channel],
+    ctaKey: CTA_KEY_BY_CHANNEL[channel],
+    locale,
+    ...(variantKey ? { variantKey } : {}),
+    ...(streakCountValue !== undefined ? { streakCount: streakCountValue } : {}),
+    ...(channel === 'meditation_return' && meditationReturnDecision?.inactiveDays !== undefined
+      ? { inactiveDays: String(meditationReturnDecision.inactiveDays) }
+      : {}),
+    ...(channel === 'reflection' && variant ? { questionId: variant.key } : {}),
+    ...(channel === 'healer' ? { expiringToday: String(isHealerExpiringToday(completions, healerUses, localDay)) } : {}),
+  };
 
   const tokensSnap = await db.collection(`users/${uid}/fcmTokens`).get();
   const tokens = tokensSnap.docs.map((d: QueryDocumentSnapshot) => d.id);
@@ -322,11 +529,45 @@ export const sendNotification = onRequest(async (req, res) => {
     },
   };
 
-  const results = await sendAndPrune(fcmClient, tokenStore, uid, tokens, { channel, title, body, data, ttl });
+  const results = await sendAndPrune(fcmClient, tokenStore, uid, tokens, { channel, title, body, data: v2Data, ttl });
   if (hasTransientFcmFailures(results)) {
     res.status(503).send('Transient FCM failure');
     return;
   }
+
+  // design §2/§9: state/delivery writes + the `notification_delivered` analytics log happen ONLY
+  // on a successful (non-transient) send.
+  const stateUpdate: Partial<NotificationStateDoc> = {};
+  if (variantKey) {
+    stateUpdate.variantHistory = buildVariantHistoryUpdate(notificationState.variantHistory, family, variantKey);
+  }
+  if (channel === 'meditation_return' && meditationReturnDecision?.nextState) {
+    stateUpdate.meditationReturn = meditationReturnDecision.nextState;
+  }
+  if (Object.keys(stateUpdate).length > 0) {
+    await db.doc(`users/${uid}/notificationState/current`).set(stateUpdate, { merge: true });
+  }
+
+  const deliveredAtMillis = Date.now();
+  const deliveryEntry: DeliveryLogEntry = {
+    deliveredAtMillis,
+    variantKey: variantKey ?? 'legacy-fallback',
+    destination: DESTINATION_BY_CHANNEL[channel],
+  };
+  const nextDeliveryLog = buildDeliveryLogUpdate(deliveryLog, localDay, family, deliveryEntry);
+  await db.doc(`users/${uid}/notificationDeliveries/${localDay}`).set(nextDeliveryLog, { merge: true });
+
+  console.log(
+    JSON.stringify({
+      event: 'notification_delivered',
+      uid,
+      family,
+      variantKey: variantKey ?? null,
+      locale,
+      destination: DESTINATION_BY_CHANNEL[channel],
+    }),
+  );
+
   res.status(200).send('OK');
 });
 
@@ -482,6 +723,74 @@ export const syncEntitlement = onRequest(async (req, res) => {
       Date.now(),
     );
     res.status(200).json({ outcome: result.outcome });
+  } catch (err) {
+    res.status(500).send(err instanceof Error ? err.message : 'unknown-error');
+  }
+});
+
+/**
+ * Client-triggered "I answered today's Compass question" write (Notifications V2 scope-expansion
+ * decision, made mid-Phase-5 apply after discovering the app had no Compass answer surface at
+ * all): the ONLY writer of `users/{uid}/compassAnswers/{localDay}` (design D9). `firestore.rules`
+ * denies ALL client writes to that collection outright -- a client-writable doc there would let a
+ * modified client fake "answered" to silence its own Compass notifications -- so this Cloud
+ * Function (Admin SDK, bypasses rules) is the only legitimate path to that write.
+ *
+ * Auth follows the exact same trust leg as [syncEntitlement] above: a Firebase ID token in the
+ * `Authorization: Bearer` header, verified via `getAuth().verifyIdToken`. Unlike `syncEntitlement`,
+ * the resolved uid IS used directly as the write target (there is no separate "which account does
+ * this purchase token belong to" indirection here) -- but it still never comes from anything the
+ * client asserts about itself beyond the token's own subject claim.
+ *
+ * `localDay` is derived server-side from the caller's own `users/{uid}/settings/preferences.
+ * timeZone` (same `utcMillisToLocalEpochDay` pattern `loadActiveUserInputs` above and
+ * `sendNotification` already use), never trusted from the client request body, so a caller can't
+ * misrecord which local day it answered on. A caller with no timezone captured yet (never opened
+ * notification settings) gets 400 -- there is no reasonable default local day to fall back to.
+ */
+export const answerCompassQuestion = onRequest(async (req, res) => {
+  if (req.method !== 'POST') {
+    res.status(405).send('Method Not Allowed');
+    return;
+  }
+
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith('Bearer ')) {
+    res.status(401).send('Unauthorized');
+    return;
+  }
+  let uid: string;
+  try {
+    const decoded = await getAuth().verifyIdToken(authorization.slice('Bearer '.length));
+    uid = decoded.uid;
+  } catch {
+    res.status(401).send('Unauthorized');
+    return;
+  }
+
+  const { questionId } = req.body as { questionId?: unknown };
+  // Bound comfortably above the longest real catalog key (33 chars, `notification-copy.v1.json`)
+  // -- a bare truthy check lets a non-string value (object/number/array) pass through and get
+  // stored verbatim via `.set()` below.
+  if (typeof questionId !== 'string' || questionId.length === 0 || questionId.length > 100) {
+    res.status(400).send('Missing or invalid questionId');
+    return;
+  }
+
+  try {
+    const db = getFirestore();
+    const settingsDoc = await db.doc(`users/${uid}/settings/preferences`).get();
+    const zone: string | undefined = settingsDoc.data()?.timeZone;
+    if (!zone) {
+      res.status(400).send('Missing timeZone');
+      return;
+    }
+
+    const answeredAtMillis = Date.now();
+    const localDay = utcMillisToLocalEpochDay(answeredAtMillis, zone);
+    const doc = buildCompassAnswerDoc(localDay, questionId, answeredAtMillis);
+    await db.doc(`users/${uid}/compassAnswers/${localDay}`).set(doc);
+    res.status(200).json({ localDay });
   } catch (err) {
     res.status(500).send(err instanceof Error ? err.message : 'unknown-error');
   }

@@ -37,7 +37,10 @@ class FirestoreNotificationSettingsRepository(
     }
 
     override suspend fun setEnabled(channel: NotificationChannelSpec, enabled: Boolean) {
-        document().set(mapOf("${channel.prefsPrefix}_enabled" to enabled), SetOptions.merge()).await()
+        // Reuses enabledKey (FirestoreMappers.kt) rather than re-deriving "${channel.prefsPrefix}_enabled"
+        // inline -- that duplication had drifted out of sync with the server's
+        // meditation_return_enabled field name for MEDITATION_RETURN.
+        document().set(mapOf(enabledKey(channel) to enabled), SetOptions.merge()).await()
     }
 
     override suspend fun setSegments(channel: NotificationChannelSpec, segments: Set<DaySegment>) {
