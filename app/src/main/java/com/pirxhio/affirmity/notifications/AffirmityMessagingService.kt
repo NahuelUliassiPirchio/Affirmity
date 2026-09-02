@@ -13,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 /**
  * Client's sole notification receipt path (design.md's "Client testability" decision): resolves
@@ -52,7 +53,9 @@ class AffirmityMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         val action = handler.resolve(message.data)
-        scope.launch {
+        // Firebase invokes this callback on a background thread. Keep the suspendable debug-log /
+        // Glance update work inside the callback lifetime so process death cannot drop a delivery.
+        runBlocking {
             val poster = Notifier(applicationContext, NotificationDebugLog(applicationContext))
             action.applyTo(poster) {
                 WeeklyTrackerWidget().updateAll(applicationContext)
@@ -61,9 +64,17 @@ class AffirmityMessagingService : FirebaseMessagingService() {
     }
 
     override fun onNewToken(token: String) {
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val auth = FirebaseAuth.getInstance()
+        val uid = auth.currentUser?.uid ?: return
         scope.launch {
-            FcmTokenRepository(FirebaseFirestore.getInstance()).registerToken(uid, token)
+            val repository = FcmTokenRepository(FirebaseFirestore.getInstance())
+            processFcmTokenOwnershipCoordinator.registerIfActive(
+                uid = uid,
+                token = token,
+                activeUid = { auth.currentUser?.uid },
+                register = repository::registerToken,
+                delete = repository::deleteToken,
+            )
         }
     }
 }

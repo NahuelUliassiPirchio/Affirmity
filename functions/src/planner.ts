@@ -6,7 +6,7 @@
  */
 
 import { localMinuteOfDay } from './localDay';
-import { isWithinQuietHours, segmentSlots, slotInstant } from './schedule';
+import { isSafelyFuture, isWithinQuietHours, segmentSlots, slotInstant } from './schedule';
 import { currentStreak, shouldFireStreakAlert, type Completion } from './streak';
 import { shouldFireHealerAlert, type HealerUse } from './healer';
 
@@ -45,9 +45,12 @@ export interface PlannedTask {
   channel: NotificationChannel;
   slot: number;
   atMillis: number;
-  /** Overrides the client's default body for this task (e.g. the streak channel's day count) --
-   * forwarded verbatim through the Cloud Task to `sendNotification`'s FCM payload. */
-  body?: string;
+  /** Structured values the Android client localizes when rendering the notification. */
+  data?: NotificationData;
+}
+
+export interface NotificationData {
+  streakCount?: string;
 }
 
 export type PlanStatus = 'planned' | 'skipped' | 'failed';
@@ -71,7 +74,11 @@ export interface TaskEnqueuer {
 }
 
 /** Pure: computes this user's tasks for one local day. No I/O. */
-export function planUserTasks(input: UserPlanInput, rng: () => number = Math.random): PlannedTask[] {
+export function planUserTasks(
+  input: UserPlanInput,
+  rng: () => number = Math.random,
+  planGeneratedAtMillis: number = Date.now(),
+): PlannedTask[] {
   const { settings, completions, healerUses, localDay, uid } = input;
   const zone = settings.timeZone;
   if (!zone) return [];
@@ -80,41 +87,68 @@ export function planUserTasks(input: UserPlanInput, rng: () => number = Math.ran
 
   if (settings.remindersEnabled) {
     tasks.push(
-      ...segmentSlots(localDay, zone, settings.reminderSegments, REMINDER_SLOT_COUNT, 'reminder', rng),
+      ...segmentSlots(
+        localDay,
+        zone,
+        settings.reminderSegments,
+        REMINDER_SLOT_COUNT,
+        'reminder',
+        rng,
+        planGeneratedAtMillis,
+      ),
     );
   }
 
   if (settings.reflectionEnabled) {
     tasks.push(
-      ...segmentSlots(localDay, zone, settings.reflectionSegments, REFLECTION_SLOT_COUNT, 'reflection', rng),
+      ...segmentSlots(
+        localDay,
+        zone,
+        settings.reflectionSegments,
+        REFLECTION_SLOT_COUNT,
+        'reflection',
+        rng,
+        planGeneratedAtMillis,
+      ),
     );
   }
 
   if (settings.moodEnabled) {
-    tasks.push(...segmentSlots(localDay, zone, settings.moodSegments, MOOD_SLOT_COUNT, 'mood', rng));
+    tasks.push(
+      ...segmentSlots(
+        localDay,
+        zone,
+        settings.moodSegments,
+        MOOD_SLOT_COUNT,
+        'mood',
+        rng,
+        planGeneratedAtMillis,
+      ),
+    );
   }
 
   if (shouldFireStreakAlert(completions, localDay)) {
-    const streak = currentStreak(completions, localDay);
-    const dayWord = streak === 1 ? 'día' : 'días';
-    tasks.push({
+    const streak = currentStreak(completions, localDay - 1);
+    const task: PlannedTask = {
       uid: '',
       localDay,
       channel: 'streak',
       slot: 0,
       atMillis: slotInstant(localDay, zone, STREAK_ALERT_MINUTE, STREAK_ALERT_MINUTE, rng).getTime(),
-      body: `Llevás una racha de ${streak} ${dayWord}. Todavía puedes completar hoy y no perderla.`,
-    });
+      data: { streakCount: String(streak) },
+    };
+    if (isSafelyFuture(task.atMillis, planGeneratedAtMillis)) tasks.push(task);
   }
 
   if (shouldFireHealerAlert(completions, healerUses, localDay)) {
-    tasks.push({
+    const task: PlannedTask = {
       uid: '',
       localDay,
       channel: 'healer',
       slot: 0,
       atMillis: slotInstant(localDay, zone, HEALER_ALERT_MINUTE, HEALER_ALERT_MINUTE, rng).getTime(),
-    });
+    };
+    if (isSafelyFuture(task.atMillis, planGeneratedAtMillis)) tasks.push(task);
   }
 
   const filtered = settings.quietHoursEnabled
@@ -134,13 +168,14 @@ export async function planAndEnqueueUser(
   store: PlanStore,
   enqueuer: TaskEnqueuer,
   rng: () => number = Math.random,
+  planGeneratedAtMillis: number = Date.now(),
 ): Promise<PlanResult> {
   const alreadyPlanned = await store.hasPlan(input.uid, input.localDay);
   if (alreadyPlanned) {
     return { uid: input.uid, localDay: input.localDay, tasks: [], status: 'skipped' };
   }
 
-  const tasks = planUserTasks(input, rng);
+  const tasks = planUserTasks(input, rng, planGeneratedAtMillis);
   for (const task of tasks) {
     await enqueuer.enqueue(task);
   }
@@ -156,11 +191,13 @@ export async function planAllUsers(
   store: PlanStore,
   enqueuer: TaskEnqueuer,
   rng: () => number = Math.random,
+  planGeneratedAtMillis?: number,
 ): Promise<PlanResult[]> {
   const results: PlanResult[] = [];
   for (const input of inputs) {
     try {
-      results.push(await planAndEnqueueUser(input, store, enqueuer, rng));
+      const userPlanGeneratedAtMillis = planGeneratedAtMillis ?? Date.now();
+      results.push(await planAndEnqueueUser(input, store, enqueuer, rng, userPlanGeneratedAtMillis));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       // Visible in Cloud Functions logs, not just the Firestore marker doc -- a silent catch here

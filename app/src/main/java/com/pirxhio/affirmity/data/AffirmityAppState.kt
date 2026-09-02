@@ -102,6 +102,8 @@ import com.pirxhio.affirmity.data.repository.RoomStreakHealerRepository
 import com.pirxhio.affirmity.meditation.SessionEndReason
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
+import com.pirxhio.affirmity.notifications.FcmTokenOwnershipCoordinator
+import com.pirxhio.affirmity.notifications.processFcmTokenOwnershipCoordinator
 import com.pirxhio.affirmity.data.catalog.AndroidCatalogAssetReader
 import com.pirxhio.affirmity.data.catalog.CATALOG_ID_PREFIX
 import com.pirxhio.affirmity.data.catalog.CatalogSeeder
@@ -124,10 +126,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
-import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
@@ -338,6 +340,9 @@ private object NoOpThemeSelectionPreferences : ThemeSelectionPreferences {
  *  copy -- while [DISMISSED] stays distinct, matching "you closed it early" vs "no ad available". */
 enum class AdRequestNotice { EARNED, DISMISSED, UNAVAILABLE }
 
+internal fun canPersistQuietHoursSettings(authState: AuthState): Boolean =
+    authState is AuthState.SignedIn
+
 /**
  * Shared in-memory state for the whole app, backed by Room (affirmations) and DataStore
  * (trackers) — see README "Decisions". Screens read plain [Affirmation]/[WeeklyStreak] state;
@@ -357,6 +362,11 @@ class AffirmityAppState(
     private val widgetUpdater: WidgetUpdater,
     private val authRepository: AuthRepository,
     private val fcmTokenRepository: FcmTokenRepository,
+    private val fcmTokenProvider: suspend () -> String = {
+        FirebaseMessaging.getInstance().token.await()
+    },
+    private val fcmTokenOwnershipCoordinator: FcmTokenOwnershipCoordinator =
+        processFcmTokenOwnershipCoordinator,
     private val onboardingRepository: FirestoreOnboardingRepository,
     /** 7-item Sun..Sat weekday-letter array, resolved from `R.array.weekday_letters` by the caller
      * (composable-only `stringResource`s can't be called from this class's coroutines) — see
@@ -866,23 +876,39 @@ class AffirmityAppState(
             // raced [session]'s own transformLatest pipeline (both react to the same authState
             // emission concurrently), so a `ready()` call could return a stale pre-sign-in `Local`
             // value read from the StateFlow's current value before migration had even started.
-            session.filterIsInstance<DataSession.Remote>()
-                .distinctUntilChangedBy { it.uid }
-                .collect { remoteSession ->
+            // Mapping Local/Migrating to null BEFORE distinctness is load-bearing: Remote(A) ->
+            // Local -> Remote(A) emits A/null/A, so the same UID is registered again on re-login.
+            // collectLatest cancels retry/backoff immediately when the active session changes.
+            session.map { it as? DataSession.Remote }
+                .distinctUntilChangedBy { it?.uid }
+                .collectLatest { remoteSession ->
+                    if (remoteSession == null) return@collectLatest
                     val uid = remoteSession.uid
                     // Firebase UID is a stable per-user identifier; only interpolated into logs in
                     // debug builds (CWE-532 — see docs/security/SECURITY_AUDIT.md F-03).
                     if (BuildConfig.DEBUG) Log.d(TAG, "fcm/timezone sync: session is Remote for uid=$uid")
-                    runCatching {
-                        val zoneId = deviceTimeZoneId()
-                        if (BuildConfig.DEBUG) Log.d(TAG, "fcm/timezone sync: writing timeZone=$zoneId for uid=$uid")
-                        remoteSession.notifications.setTimeZone(zoneId)
-                        Log.d(TAG, "fcm/timezone sync: timeZone write succeeded")
-                        val token = FirebaseMessaging.getInstance().token.await()
-                        if (BuildConfig.DEBUG) Log.d(TAG, "fcm/timezone sync: got FCM token, registering for uid=$uid")
-                        fcmTokenRepository.registerToken(uid, token)
-                        Log.d(TAG, "fcm/timezone sync: token registration succeeded")
-                    }.onFailure { error ->
+                    try {
+                        retryNotificationSync {
+                            val zoneId = deviceTimeZoneId()
+                            if (BuildConfig.DEBUG) Log.d(TAG, "fcm/timezone sync: writing timeZone=$zoneId for uid=$uid")
+                            remoteSession.notifications.setTimeZone(zoneId)
+                            Log.d(TAG, "fcm/timezone sync: timeZone write succeeded")
+                            val token = fcmTokenProvider()
+                            if (BuildConfig.DEBUG) Log.d(TAG, "fcm/timezone sync: got FCM token, registering for uid=$uid")
+                            fcmTokenOwnershipCoordinator.registerIfActive(
+                                uid = uid,
+                                token = token,
+                                activeUid = {
+                                    (authRepository.authState.value as? AuthState.SignedIn)?.uid
+                                },
+                                register = fcmTokenRepository::registerToken,
+                                delete = fcmTokenRepository::deleteToken,
+                            )
+                            Log.d(TAG, "fcm/timezone sync: token registration succeeded")
+                        }
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (error: Exception) {
                         if (BuildConfig.DEBUG) {
                             Log.e(TAG, "fcm/timezone sync: FAILED for uid=$uid", error)
                         } else {
@@ -1046,7 +1072,21 @@ class AffirmityAppState(
     }
 
     fun signOut() {
-        scope.launch { authRepository.signOut() }
+        val uid = (authState.value as? AuthState.SignedIn)?.uid
+        scope.launch {
+            if (uid == null) {
+                authRepository.signOut()
+                return@launch
+            }
+            fcmTokenOwnershipCoordinator.deleteBeforeSignOut(
+                timeoutMillis = FCM_TOKEN_CLEANUP_TIMEOUT_MILLIS,
+                delete = { fcmTokenRepository.deleteCurrentToken(uid) },
+                signOut = { authRepository.signOut() },
+                onDeleteFailure = { error ->
+                    Log.w(TAG, "FCM token cleanup failed; continuing sign-out", error)
+                },
+            )
+        }
     }
 
     fun clearNotificationDebugLog() {
@@ -1096,14 +1136,22 @@ class AffirmityAppState(
     }
 
     fun setQuietHoursEnabled(enabled: Boolean) {
+        if (!canPersistQuietHoursSettings(authRepository.authState.value)) return
         scope.launch {
-            ready().notifications.setQuietHoursEnabled(enabled)
+            val remote = ready() as? DataSession.Remote ?: return@launch
+            val activeUid = (authRepository.authState.value as? AuthState.SignedIn)?.uid
+            if (activeUid != remote.uid) return@launch
+            remote.notifications.setQuietHoursEnabled(enabled)
         }
     }
 
     fun setQuietHoursWindow(startMinute: Int, endMinute: Int) {
+        if (!canPersistQuietHoursSettings(authRepository.authState.value)) return
         scope.launch {
-            ready().notifications.setQuietHoursWindow(startMinute, endMinute)
+            val remote = ready() as? DataSession.Remote ?: return@launch
+            val activeUid = (authRepository.authState.value as? AuthState.SignedIn)?.uid
+            if (activeUid != remote.uid) return@launch
+            remote.notifications.setQuietHoursWindow(startMinute, endMinute)
         }
     }
 
@@ -1478,6 +1526,7 @@ class AffirmityAppState(
     private companion object {
         const val TAG = "AffirmityAppState"
         const val AFFIRMATIONS_GOAL_PER_DAY = 5
+        const val FCM_TOKEN_CLEANUP_TIMEOUT_MILLIS = 2_000L
 
         /** How far back to look when deriving the running streak from `daily_completion`. */
         const val STREAK_LOOKBACK_DAYS = StreakHealerStats.LOOKBACK_DAYS

@@ -102,6 +102,8 @@
     <string name="settings_time_picker_ok">OK</string>
     <string name="settings_permission_banner_text">Notifications are turned off in system settings</string>
     <string name="settings_permission_banner_action">Open settings</string>
+    <string name="settings_notifications_sign_in_required">Sign in to enable notifications</string>
+    <string name="settings_notification_permission_open_settings">Notification permission is blocked. Enable notifications in system settings.</string>
 
     <string name="settings_account_sign_in_button">Sign in with Google</string>
     <string name="settings_account_signed_in_prefix">Signed in as</string>

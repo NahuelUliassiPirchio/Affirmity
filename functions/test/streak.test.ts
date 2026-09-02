@@ -41,6 +41,15 @@ describe('streakOf', () => {
 });
 
 describe('shouldFireStreakAlert', () => {
+  it('fires when a streak is live through yesterday and today has no completion yet', () => {
+    const rows: Completion[] = [
+      { epochDay: MONDAY - 2, meditationDone: true, affirmationDone: true },
+      { epochDay: MONDAY - 1, meditationDone: true, affirmationDone: true },
+    ];
+
+    expect(shouldFireStreakAlert(rows, MONDAY)).toBe(true);
+  });
+
   // Spec scenario: "Fires when streak is live and day incomplete".
   it('fires when streak is live and day incomplete', () => {
     const rows: Completion[] = [

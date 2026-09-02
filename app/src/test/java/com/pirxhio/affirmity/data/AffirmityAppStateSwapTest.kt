@@ -39,20 +39,26 @@ import com.pirxhio.affirmity.data.repository.NotificationSettingsRepository
 import com.pirxhio.affirmity.data.repository.StreakHealerRepository
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
+import com.pirxhio.affirmity.notifications.FcmTokenOwnershipCoordinator
 import com.pirxhio.affirmity.ui.myaffirmations.isCustomAffirmationCreationLocked
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -207,13 +213,20 @@ class FakeAdUnlockRepository(
 
 private class FakeAuthRepository(
     initial: AuthState = AuthState.SignedOut,
+    private val onSignOut: () -> Unit = {},
 ) : AuthRepository {
     private val flow = MutableStateFlow(initial)
     override val authState: StateFlow<AuthState> = flow
     fun emit(state: AuthState) { flow.value = state }
     override suspend fun signIn(provider: AuthProviderId, activityContext: android.content.Context): Result<Unit> =
         Result.success(Unit)
-    override suspend fun signOut() = Unit
+    var signOutCalls = 0
+        private set
+    override suspend fun signOut() {
+        onSignOut()
+        signOutCalls++
+        flow.value = AuthState.SignedOut
+    }
 }
 
 /** A [FirestoreMigrationSource] whose [markerExists] suspends on [gate] — lets a test hold the
@@ -301,6 +314,9 @@ private fun buildState(
     proOnlyThemeIds: Set<String> = emptySet(),
     onboardingPreferencesOverride: OnboardingPreferences? = null,
     onboardingGuidePreferencesOverride: OnboardingGuidePreferences? = null,
+    fcmTokenRepositoryOverride: FcmTokenRepository? = null,
+    fcmTokenProvider: suspend () -> String = { "test-token" },
+    fcmTokenOwnershipCoordinator: FcmTokenOwnershipCoordinator = FcmTokenOwnershipCoordinator(),
 ): AffirmityAppState {
     val trackerPreferences = mock(TrackerPreferences::class.java)
     whenever(trackerPreferences.observeAffirmationsViewedToday())
@@ -310,7 +326,7 @@ private fun buildState(
         .thenReturn(EventedFlow("debug-log", mutableListOf(), listOf(emptyList())))
     val notifier = mock(Notifier::class.java)
     val imageStore = mock(AffirmationImageStore::class.java)
-    val fcmTokenRepository = mock(FcmTokenRepository::class.java)
+    val fcmTokenRepository = fcmTokenRepositoryOverride ?: mock(FcmTokenRepository::class.java)
     val onboardingPreferences = onboardingPreferencesOverride ?: mock(OnboardingPreferences::class.java).also {
         whenever(it.observeHasCompletedOnboarding())
             .thenReturn(EventedFlow("onboarding-completed", mutableListOf(), listOf(true)))
@@ -332,6 +348,8 @@ private fun buildState(
         widgetUpdater = WidgetUpdater { },
         authRepository = authRepository,
         fcmTokenRepository = fcmTokenRepository,
+        fcmTokenProvider = fcmTokenProvider,
+        fcmTokenOwnershipCoordinator = fcmTokenOwnershipCoordinator,
         onboardingRepository = mock(FirestoreOnboardingRepository::class.java),
         onboardingPreferences = onboardingPreferences,
         onboardingGuidePreferences = onboardingGuidePreferences,
@@ -343,7 +361,134 @@ private fun buildState(
     )
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class AffirmityAppStateSwapTest {
+
+    @Test
+    fun `sign-out deletes the departing user's device token before signing out`() = runTest {
+        val events = mutableListOf<String>()
+        val tokenEvents = mutableListOf<String>()
+        val authRepository = FakeAuthRepository(
+            AuthState.SignedIn(uid = "uid-sign-out", displayName = null, email = null),
+            onSignOut = { tokenEvents += "sign-out" },
+        )
+        val fcmTokenRepository = mock(FcmTokenRepository::class.java)
+        whenever(fcmTokenRepository.deleteCurrentToken("uid-sign-out")).thenAnswer {
+            tokenEvents += "delete"
+            Unit
+        }
+        val state = buildState(
+            local = fakeLocal(events),
+            remote = { fakeRemote("uid-sign-out", events) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = authRepository,
+            scope = backgroundScope,
+            fcmTokenRepositoryOverride = fcmTokenRepository,
+        )
+        runCurrent()
+
+        state.signOut()
+        runCurrent()
+
+        assertEquals(listOf("delete", "sign-out"), tokenEvents)
+        assertEquals(1, authRepository.signOutCalls)
+    }
+
+    @Test
+    fun `token deletion failure never blocks sign-out`() = runTest {
+        val events = mutableListOf<String>()
+        val authRepository = FakeAuthRepository(
+            AuthState.SignedIn(uid = "uid-cleanup-fails", displayName = null, email = null),
+        )
+        val fcmTokenRepository = mock(FcmTokenRepository::class.java)
+        whenever(fcmTokenRepository.deleteCurrentToken("uid-cleanup-fails"))
+            .thenThrow(IllegalStateException("offline"))
+        val state = buildState(
+            local = fakeLocal(events),
+            remote = { fakeRemote("uid-cleanup-fails", events) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = authRepository,
+            scope = backgroundScope,
+            fcmTokenRepositoryOverride = fcmTokenRepository,
+        )
+        runCurrent()
+
+        state.signOut()
+        runCurrent()
+
+        assertEquals(1, authRepository.signOutCalls)
+    }
+
+    @Test
+    fun `same UID re-login registers the token again after the Local transition resets the gate`() = runTest {
+        val events = mutableListOf<String>()
+        val authRepository = FakeAuthRepository(
+            AuthState.SignedIn(uid = "same-uid", displayName = null, email = null),
+        )
+        val registrations = Channel<String>(Channel.UNLIMITED)
+        val fcmTokenRepository = mock(FcmTokenRepository::class.java)
+        whenever(
+            fcmTokenRepository.registerToken(
+                org.mockito.kotlin.eq("same-uid"),
+                org.mockito.kotlin.eq("test-token"),
+                org.mockito.kotlin.any(),
+            ),
+        ).thenAnswer {
+            registrations.trySend("registered")
+            Unit
+        }
+        buildState(
+            local = fakeLocal(events),
+            remote = { fakeRemote("same-uid", events) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = authRepository,
+            scope = backgroundScope,
+            fcmTokenRepositoryOverride = fcmTokenRepository,
+        )
+
+        assertEquals("registered", registrations.receive())
+        authRepository.emit(AuthState.SignedOut)
+        runCurrent()
+        authRepository.emit(AuthState.SignedIn(uid = "same-uid", displayName = null, email = null))
+        assertEquals("registered", registrations.receive())
+    }
+
+    @Test
+    fun `sign-out cancels a pending token-sync retry before it can register`() = runTest {
+        val events = mutableListOf<String>()
+        val firstAttempt = CompletableDeferred<Unit>()
+        var providerCalls = 0
+        val authRepository = FakeAuthRepository(
+            AuthState.SignedIn(uid = "retry-uid", displayName = null, email = null),
+        )
+        val fcmTokenRepository = mock(FcmTokenRepository::class.java)
+        val state = buildState(
+            local = fakeLocal(events),
+            remote = { fakeRemote("retry-uid", events) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = authRepository,
+            scope = backgroundScope,
+            fcmTokenRepositoryOverride = fcmTokenRepository,
+            fcmTokenProvider = {
+                providerCalls++
+                firstAttempt.complete(Unit)
+                error("transient")
+            },
+        )
+        firstAttempt.await()
+
+        state.signOut()
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(1, providerCalls)
+        org.mockito.Mockito.verify(fcmTokenRepository, org.mockito.Mockito.never())
+            .registerToken(
+                org.mockito.kotlin.any<String>(),
+                org.mockito.kotlin.any<String>(),
+                org.mockito.kotlin.any(),
+            )
+    }
 
     @Test
     fun `sign-in cancels the in-flight Room collector before subscribing to Firestore`() = runBlocking {

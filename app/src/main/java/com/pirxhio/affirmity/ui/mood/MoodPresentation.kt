@@ -15,3 +15,22 @@ fun moodLabel(moodValue: Int): String = MOOD_LABELS.getOrElse(moodValue - 1) { M
 
 /** Sanity check shared by call sites that index into [MOOD_EMOJIS]/[MOOD_LABELS]. */
 internal val MOOD_VALUES = 1..MOOD_MAX
+
+internal fun initialMoodSelection(initialMoodValue: Int?): Int? =
+    initialMoodValue?.takeIf { it in MOOD_VALUES }
+
+internal fun canSaveMoodSelection(selectedMood: Int?): Boolean =
+    selectedMood != null && selectedMood in MOOD_VALUES
+
+internal data class MoodSelectionForEvent(
+    val eventKey: Int,
+    val selectedMood: Int?,
+)
+
+internal fun initialMoodSelectionForEvent(
+    eventKey: Int,
+    initialMoodValue: Int?,
+): MoodSelectionForEvent = MoodSelectionForEvent(
+    eventKey = eventKey,
+    selectedMood = initialMoodSelection(initialMoodValue),
+)

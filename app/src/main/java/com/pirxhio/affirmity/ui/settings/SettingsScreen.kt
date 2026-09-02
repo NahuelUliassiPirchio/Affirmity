@@ -26,9 +26,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,6 +85,7 @@ fun SettingsScreen(
     onReflectionSegmentsChanged: (Set<DaySegment>) -> Unit,
     onMoodEnabledChanged: (Boolean) -> Unit,
     onMoodSegmentsChanged: (Set<DaySegment>) -> Unit,
+    onNotificationEnableRequested: () -> Unit,
     onQuietHoursEnabledChanged: (Boolean) -> Unit,
     onQuietHoursWindowChanged: (startMinute: Int, endMinute: Int) -> Unit,
     onOpenNotificationDebug: () -> Unit,
@@ -94,6 +97,7 @@ fun SettingsScreen(
     onManageSubscriptionClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val areNotificationControlsEnabled = notificationControlsEnabled(authState)
     LazyColumn(
         modifier = modifier
             .fillMaxWidth()
@@ -109,6 +113,8 @@ fun SettingsScreen(
             ChannelSettingsCard(
                 label = stringResource(id = R.string.settings_reminders_label),
                 settings = reminderSettings,
+                controlsEnabled = areNotificationControlsEnabled,
+                onEnableRequested = onNotificationEnableRequested,
                 onEnabledChanged = onReminderEnabledChanged,
                 onSegmentsChanged = onReminderSegmentsChanged,
             )
@@ -118,6 +124,8 @@ fun SettingsScreen(
             ChannelSettingsCard(
                 label = stringResource(id = R.string.settings_reflection_label),
                 settings = reflectionSettings,
+                controlsEnabled = areNotificationControlsEnabled,
+                onEnableRequested = onNotificationEnableRequested,
                 onEnabledChanged = onReflectionEnabledChanged,
                 onSegmentsChanged = onReflectionSegmentsChanged,
             )
@@ -127,6 +135,8 @@ fun SettingsScreen(
             ChannelSettingsCard(
                 label = stringResource(id = R.string.settings_mood_label),
                 settings = moodSettings,
+                controlsEnabled = areNotificationControlsEnabled,
+                onEnableRequested = onNotificationEnableRequested,
                 onEnabledChanged = onMoodEnabledChanged,
                 onSegmentsChanged = onMoodSegmentsChanged,
             )
@@ -135,6 +145,7 @@ fun SettingsScreen(
         item {
             QuietHoursCard(
                 settings = quietHoursSettings,
+                controlsEnabled = areNotificationControlsEnabled,
                 onEnabledChanged = onQuietHoursEnabledChanged,
                 onWindowChanged = onQuietHoursWindowChanged,
             )
@@ -197,6 +208,11 @@ fun SettingsScreen(
         }
     }
 }
+
+internal fun notificationControlsEnabled(authState: AuthState): Boolean =
+    authState is AuthState.SignedIn
+
+internal fun canApplyQuietHoursWindowChange(controlsEnabled: Boolean): Boolean = controlsEnabled
 
 /**
  * Bug 1 fix: guests who finished onboarding via "continue without account" (`AuthState.SignedOut`
@@ -303,6 +319,8 @@ private fun LanguageSettingsCard() {
 private fun ChannelSettingsCard(
     label: String,
     settings: ChannelSettings,
+    controlsEnabled: Boolean,
+    onEnableRequested: () -> Unit,
     onEnabledChanged: (Boolean) -> Unit,
     onSegmentsChanged: (Set<DaySegment>) -> Unit,
 ) {
@@ -314,7 +332,22 @@ private fun ChannelSettingsCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(text = label, style = MaterialTheme.typography.titleMedium)
-                Switch(checked = settings.enabled, onCheckedChange = onEnabledChanged)
+                Switch(
+                    checked = controlsEnabled && settings.enabled,
+                    enabled = controlsEnabled,
+                    onCheckedChange = { enabled ->
+                        if (enabled) onEnableRequested()
+                        onEnabledChanged(enabled)
+                    },
+                )
+            }
+
+            if (!controlsEnabled) {
+                Text(
+                    text = stringResource(id = R.string.settings_notifications_sign_in_required),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -322,10 +355,9 @@ private fun ChannelSettingsCard(
                     val selected = segment in settings.segments
                     FilterChip(
                         selected = selected,
+                        enabled = controlsEnabled,
                         onClick = {
-                            onSegmentsChanged(
-                                if (selected) settings.segments - segment else settings.segments + segment,
-                            )
+                            onSegmentsChanged(toggledNotificationSegments(settings.segments, segment))
                         },
                         label = { Text(stringResource(id = segmentLabelRes(segment))) },
                     )
@@ -333,6 +365,16 @@ private fun ChannelSettingsCard(
             }
         }
     }
+}
+
+/** A channel that is enabled with no active time segment can never be scheduled server-side. */
+internal fun toggledNotificationSegments(
+    current: Set<DaySegment>,
+    segment: DaySegment,
+): Set<DaySegment> = when {
+    segment !in current -> current + segment
+    current.size > 1 -> current - segment
+    else -> current
 }
 
 private fun segmentLabelRes(segment: DaySegment): Int = when (segment) {
@@ -350,11 +392,20 @@ private fun segmentLabelRes(segment: DaySegment): Int = when (segment) {
 @Composable
 private fun QuietHoursCard(
     settings: QuietHoursSettings,
+    controlsEnabled: Boolean,
     onEnabledChanged: (Boolean) -> Unit,
     onWindowChanged: (startMinute: Int, endMinute: Int) -> Unit,
 ) {
     var editingStart by remember { mutableStateOf(false) }
     var editingEnd by remember { mutableStateOf(false) }
+    val latestControlsEnabled by rememberUpdatedState(controlsEnabled)
+
+    LaunchedEffect(controlsEnabled) {
+        if (!controlsEnabled) {
+            editingStart = false
+            editingEnd = false
+        }
+    }
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -364,7 +415,18 @@ private fun QuietHoursCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(text = stringResource(id = R.string.settings_quiet_hours_label), style = MaterialTheme.typography.titleMedium)
-                Switch(checked = settings.enabled, onCheckedChange = onEnabledChanged)
+                Switch(
+                    checked = controlsEnabled && settings.enabled,
+                    enabled = controlsEnabled,
+                    onCheckedChange = onEnabledChanged,
+                )
+            }
+            if (!controlsEnabled) {
+                Text(
+                    text = stringResource(id = R.string.settings_notifications_sign_in_required),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             Text(
                 text = stringResource(id = R.string.settings_quiet_hours_description),
@@ -372,10 +434,10 @@ private fun QuietHoursCard(
             )
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                TextButton(onClick = { editingStart = true }) {
+                TextButton(onClick = { editingStart = true }, enabled = controlsEnabled) {
                     Text("${stringResource(id = R.string.settings_quiet_hours_start_label)}: ${formatMinute(settings.startMinute)}")
                 }
-                TextButton(onClick = { editingEnd = true }) {
+                TextButton(onClick = { editingEnd = true }, enabled = controlsEnabled) {
                     Text("${stringResource(id = R.string.settings_quiet_hours_end_label)}: ${formatMinute(settings.endMinute)}")
                 }
             }
@@ -388,7 +450,9 @@ private fun QuietHoursCard(
             onDismiss = { editingStart = false },
             onConfirm = { newStart ->
                 editingStart = false
-                onWindowChanged(newStart, settings.endMinute)
+                if (canApplyQuietHoursWindowChange(latestControlsEnabled)) {
+                    onWindowChanged(newStart, settings.endMinute)
+                }
             },
         )
     }
@@ -399,7 +463,9 @@ private fun QuietHoursCard(
             onDismiss = { editingEnd = false },
             onConfirm = { newEnd ->
                 editingEnd = false
-                onWindowChanged(settings.startMinute, newEnd)
+                if (canApplyQuietHoursWindowChange(latestControlsEnabled)) {
+                    onWindowChanged(settings.startMinute, newEnd)
+                }
             },
         )
     }

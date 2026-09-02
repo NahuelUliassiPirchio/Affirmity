@@ -4,7 +4,7 @@
  * scope for this PR (no Firebase project/credentials in this environment, per design.md's
  * "User-owned prerequisites") -- this file is written to a reasonable production shape but is
  * intentionally not unit-tested; the pure logic it wires (schedule/localDay/streak/planner/
- * tasks/fcm) is covered by the Vitest suites next to it.
+ * tasks/fcm/sendPolicy) is covered by the Vitest suites next to it.
  */
 
 import { initializeApp, getApps } from 'firebase-admin/app';
@@ -18,9 +18,19 @@ import { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
 
 import { localHourInZone, utcMillisToLocalEpochDay } from './localDay';
-import { planAllUsers, type PlanStore, type PlanResult, type TaskEnqueuer, type UserPlanInput } from './planner';
+import {
+  planAllUsers,
+  type NotificationChannel,
+  type PlanStore,
+  type PlanResult,
+  type TaskEnqueuer,
+  type UserPlanInput,
+} from './planner';
 import { taskName } from './tasks';
-import { sendAndPrune, type FcmClient, type TokenStore } from './fcm';
+import { hasTransientFcmFailures, sendAndPrune, type FcmClient, type TokenStore } from './fcm';
+import { evaluateSendEligibility, notificationTtl, type SendTimeSettings } from './sendPolicy';
+import type { Completion } from './streak';
+import type { HealerUse } from './healer';
 import {
   handleRtdn,
   resolveEntitlement,
@@ -37,6 +47,7 @@ export * from './streak';
 export * from './planner';
 export * from './tasks';
 export * from './fcm';
+export * from './sendPolicy';
 export * from './billing';
 
 if (getApps().length === 0) {
@@ -201,28 +212,86 @@ export const sendNotification = onRequest(async (req, res) => {
     return;
   }
 
-  const { uid, channel, localDay, title, body } = req.body as {
+  const { uid, channel, localDay, title, body, data } = req.body as {
     uid: string;
-    channel: string;
+    channel: NotificationChannel;
     localDay?: number;
     title?: string;
     body?: string;
+    data?: Record<string, string>;
   };
-  if (!uid || !channel) {
-    res.status(400).send('Missing uid/channel');
+  const supportedChannels = new Set<NotificationChannel>([
+    'reminder',
+    'reflection',
+    'mood',
+    'streak',
+    'healer',
+  ]);
+  if (!uid || !supportedChannels.has(channel) || typeof localDay !== 'number') {
+    res.status(400).send('Missing or invalid uid/channel/localDay');
     return;
   }
 
   const db = getFirestore();
 
-  // The mood check-in is redundant once the user already logged today's mood between planning
-  // time (PLANNING_LOCAL_HOUR, early morning) and this task actually firing tonight.
-  if (channel === 'mood' && typeof localDay === 'number') {
-    const moodDoc = await db.doc(`users/${uid}/dailyMoods/${localDay}`).get();
-    if (moodDoc.exists) {
-      res.status(200).send('Skipped: mood already logged');
-      return;
-    }
+  const settingsDoc = await db.doc(`users/${uid}/settings/preferences`).get();
+  const settingsData = settingsDoc.data() ?? {};
+  const settings: SendTimeSettings = {
+    remindersEnabled: Boolean(settingsData.reminder_enabled),
+    reflectionEnabled: Boolean(settingsData.reflection_enabled),
+    moodEnabled: Boolean(settingsData.mood_enabled),
+    quietHoursEnabled: Boolean(settingsData.quietHours_enabled),
+    quietHoursStartMinute: Number(settingsData.quietHours_startMinute ?? 1380),
+    quietHoursEndMinute: Number(settingsData.quietHours_endMinute ?? 420),
+    timeZone: typeof settingsData.timeZone === 'string' ? settingsData.timeZone : null,
+  };
+
+  let moodAlreadyLogged = false;
+  let completions: Completion[] = [];
+  let healerUses: HealerUse[] = [];
+
+  if (channel === 'mood') {
+    moodAlreadyLogged = (await db.doc(`users/${uid}/dailyMoods/${localDay}`).get()).exists;
+  }
+  if (channel === 'streak' || channel === 'healer') {
+    const completionsSnap = await db.collection(`users/${uid}/dailyCompletions`).get();
+    completions = completionsSnap.docs.map((completionDoc: QueryDocumentSnapshot) => ({
+      epochDay: Number(completionDoc.id),
+      meditationDone: Boolean(completionDoc.data().meditationDone),
+      affirmationDone: Boolean(completionDoc.data().affirmationDone),
+    }));
+  }
+  if (channel === 'healer') {
+    const healerUsesSnap = await db.collection(`users/${uid}/streakHealerUses`).get();
+    healerUses = healerUsesSnap.docs.map((healerUseDoc: QueryDocumentSnapshot) => ({
+      healedEpochDay: Number(healerUseDoc.data().healedEpochDay ?? healerUseDoc.id),
+    }));
+  }
+
+  const sendCheckedAtMillis = Date.now();
+  const eligibility = evaluateSendEligibility({
+    channel,
+    localDay,
+    settings,
+    nowMillis: sendCheckedAtMillis,
+    moodAlreadyLogged,
+    completions,
+    healerUses,
+  });
+  if (!eligibility.eligible) {
+    res.status(200).send(`Skipped: ${eligibility.reason}`);
+    return;
+  }
+
+  const zone = settings.timeZone;
+  if (!zone) {
+    res.status(200).send('Skipped: time-zone-missing');
+    return;
+  }
+  const ttl = notificationTtl(channel, localDay, zone, sendCheckedAtMillis);
+  if (!ttl) {
+    res.status(200).send('Skipped: target-day-expired');
+    return;
   }
 
   const tokensSnap = await db.collection(`users/${uid}/fcmTokens`).get();
@@ -233,11 +302,17 @@ export const sendNotification = onRequest(async (req, res) => {
       await getMessaging().send({
         token,
         data: {
+          ...(message.data ?? {}),
           channel: message.channel,
           ...(message.title ? { title: message.title } : {}),
           ...(message.body ? { body: message.body } : {}),
         },
-        android: { priority: 'high', collapseKey: message.channel },
+        android: {
+          priority: 'high',
+          collapseKey: message.channel,
+          // Admin SDK accepts milliseconds and serializes the HTTP v1 `ttl` duration string.
+          ttl: message.ttl ? Number(message.ttl.slice(0, -1)) * 1000 : undefined,
+        },
       });
     },
   };
@@ -247,7 +322,11 @@ export const sendNotification = onRequest(async (req, res) => {
     },
   };
 
-  await sendAndPrune(fcmClient, tokenStore, uid, tokens, { channel, title, body });
+  const results = await sendAndPrune(fcmClient, tokenStore, uid, tokens, { channel, title, body, data, ttl });
+  if (hasTransientFcmFailures(results)) {
+    res.status(503).send('Transient FCM failure');
+    return;
+  }
   res.status(200).send('OK');
 });
 

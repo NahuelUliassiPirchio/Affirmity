@@ -60,7 +60,10 @@ fun MoodScreen(
     moodEntries: List<DailyMoodEntity>,
     onSaveMood: (epochDay: Long, moodValue: Int, note: String?) -> Unit,
     initialMoodValue: Int? = null,
+    openInitialPicker: Boolean = false,
+    initialMoodEventKey: Int = 0,
     onInitialMoodConsumed: () -> Unit = {},
+    onInitialPickerConsumed: () -> Unit = {},
 ) {
     // Not `remember`-keyed: `moodEntries` is a SnapshotStateList mutated in place (clear + addAll),
     // so its reference never changes and a remember(moodEntries) key would never invalidate,
@@ -95,17 +98,18 @@ fun MoodScreen(
     var period by remember { mutableStateOf(ResumenPeriod.SEMANA) }
     var selectedDay by remember { mutableStateOf<SelectedDay?>(null) }
 
-    // Reflection notification's mood-value actions land here with a pre-picked value — open
-    // today's sheet with it selected instead of making the user find today's cell again.
-    LaunchedEffect(initialMoodValue) {
-        if (initialMoodValue != null) {
+    // Mood notification actions land here with a pre-picked value; tapping the notification body
+    // opens the same sheet with no synthetic selection so all five choices remain explicit.
+    LaunchedEffect(initialMoodValue, openInitialPicker, initialMoodEventKey) {
+        if (initialMoodValue != null || openInitialPicker) {
             selectedDay = SelectedDay(
                 epochDay = todayEpochDay,
                 label = dayLabel(Calendar.getInstance(), todayEpochDay),
                 moodValue = initialMoodValue,
                 note = moodByDay[todayEpochDay]?.note,
             )
-            onInitialMoodConsumed()
+            if (initialMoodValue != null) onInitialMoodConsumed()
+            if (openInitialPicker) onInitialPickerConsumed()
         }
     }
 
@@ -200,6 +204,7 @@ fun MoodScreen(
             MoodDayDetailSheet(
                 dayLabel = day.label,
                 initialMoodValue = day.moodValue,
+                selectionEventKey = initialMoodEventKey,
                 initialNote = day.note,
                 onDismiss = { selectedDay = null },
                 onSave = { moodValue, note ->

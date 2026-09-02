@@ -23,7 +23,8 @@ enum class NotificationLogEvent(val label: String) {
     WORKER_STARTED("Worker arrancó"),
     SKIPPED_CHANNEL_DISABLED("Saltado: canal desactivado"),
     NOTIFY_POSTED("Notificación enviada al sistema"),
-    NOTIFY_SKIPPED_PERMISSION("Bloqueada: permiso/canal desactivado en el SO"),
+    NOTIFY_SKIPPED_PERMISSION("Bloqueada: permiso de notificaciones desactivado"),
+    NOTIFY_SKIPPED_CHANNEL_BLOCKED("Bloqueada: canal desactivado en el sistema"),
     WORKER_FAILED("Worker falló (se reintentará)"),
 }
 

@@ -6,6 +6,7 @@ import com.pirxhio.affirmity.access.AdUnlockState
 import com.pirxhio.affirmity.analytics.AnalyticsEvent
 import com.pirxhio.affirmity.analytics.AnalyticsId
 import com.pirxhio.affirmity.meditation.SessionEndReason
+import androidx.lifecycle.Lifecycle
 import com.pirxhio.affirmity.ui.meditation.catalog.findMeditationCatalogEntry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -21,6 +22,73 @@ import org.junit.Test
 class MainActivityTest {
 
     private val now = 1_000_000L
+
+    @Test
+    fun `identical mood notification intents still create distinct launch events`() {
+        var eventKey = 0
+        eventKey = nextMoodLaunchEventKey(eventKey, moodValue = null, openPicker = true)
+        eventKey = nextMoodLaunchEventKey(eventKey, moodValue = null, openPicker = true)
+        eventKey = nextMoodLaunchEventKey(eventKey, moodValue = 2, openPicker = false)
+        eventKey = nextMoodLaunchEventKey(eventKey, moodValue = 2, openPicker = false)
+
+        assertEquals(4, eventKey)
+    }
+
+    @Test
+    fun `notification permission state refreshes on resume after returning from settings`() {
+        assertTrue(
+            notificationPermissionStateAfterLifecycleEvent(
+                event = Lifecycle.Event.ON_RESUME,
+                current = false,
+                notificationsEnabled = true,
+            ),
+        )
+        assertFalse(
+            notificationPermissionStateAfterLifecycleEvent(
+                event = Lifecycle.Event.ON_PAUSE,
+                current = false,
+                notificationsEnabled = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `notification permission is requested only from the contextual first enable`() {
+        assertEquals(
+            NotificationPermissionAction.REQUEST_SYSTEM_PERMISSION,
+            notificationPermissionAction(
+                sdkInt = 33,
+                permissionGranted = false,
+                previouslyRequested = false,
+                shouldShowRationale = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `permanently denied notification permission routes to system settings`() {
+        assertEquals(
+            NotificationPermissionAction.OPEN_SYSTEM_SETTINGS,
+            notificationPermissionAction(
+                sdkInt = 33,
+                permissionGranted = false,
+                previouslyRequested = true,
+                shouldShowRationale = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `notification permission needs no action below API 33 or when already granted`() {
+        assertEquals(
+            NotificationPermissionAction.NONE,
+            notificationPermissionAction(32, false, false, false),
+        )
+        assertEquals(
+            NotificationPermissionAction.NONE,
+            notificationPermissionAction(33, true, true, false),
+        )
+    }
 
     // --- resolveSelectedMeditationEntry (REQ-5.4.3, AC15): unknown restored id fail-safe --------
 

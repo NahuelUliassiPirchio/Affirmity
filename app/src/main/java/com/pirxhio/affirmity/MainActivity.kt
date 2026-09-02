@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.setContent
@@ -59,8 +60,12 @@ import androidx.compose.ui.unit.dp
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.pirxhio.affirmity.auth.AuthState
 import com.pirxhio.affirmity.billing.BillingService
 import com.pirxhio.affirmity.access.AccessDecision
@@ -116,9 +121,39 @@ import kotlinx.coroutines.launch
 /** Extra key a launcher (e.g. the home-screen widget) sets to pick the initial [AppDestinations]. */
 const val EXTRA_START_DESTINATION = "start_destination"
 
-/** Extra key the reflection notification's mood-value actions set to pre-select a value in
+/** Extra key the mood notification's quick actions set to pre-select a value in
  * [com.pirxhio.affirmity.ui.mood.MoodScreen]'s today sheet. */
 const val EXTRA_MOOD_VALUE = "mood_value"
+
+/** Extra set only on the mood notification body so it opens today's full 1-5 picker without
+ * pretending the user selected a mood. Quick actions continue to use [EXTRA_MOOD_VALUE]. */
+const val EXTRA_OPEN_MOOD_PICKER = "open_mood_picker"
+
+private const val NOTIFICATION_PERMISSION_PREFERENCES = "notification_permission"
+private const val NOTIFICATION_PERMISSION_REQUESTED_KEY = "requested"
+
+internal enum class NotificationPermissionAction {
+    NONE,
+    REQUEST_SYSTEM_PERMISSION,
+    OPEN_SYSTEM_SETTINGS,
+}
+
+internal fun notificationPermissionAction(
+    sdkInt: Int,
+    permissionGranted: Boolean,
+    previouslyRequested: Boolean,
+    shouldShowRationale: Boolean,
+): NotificationPermissionAction = when {
+    sdkInt < Build.VERSION_CODES.TIRAMISU || permissionGranted -> NotificationPermissionAction.NONE
+    previouslyRequested && !shouldShowRationale -> NotificationPermissionAction.OPEN_SYSTEM_SETTINGS
+    else -> NotificationPermissionAction.REQUEST_SYSTEM_PERMISSION
+}
+
+internal fun notificationPermissionStateAfterLifecycleEvent(
+    event: Lifecycle.Event,
+    current: Boolean,
+    notificationsEnabled: Boolean,
+): Boolean = if (event == Lifecycle.Event.ON_RESUME) notificationsEnabled else current
 
 /** Unknown or absent values fall back to [AppDestinations.AFIRMACIONES] (D10). */
 private fun resolveStartDestination(intent: Intent?): AppDestinations {
@@ -130,6 +165,15 @@ private fun resolveMoodValue(intent: Intent?): Int? {
     val value = intent?.getIntExtra(EXTRA_MOOD_VALUE, -1) ?: -1
     return value.takeIf { it in 1..MOOD_MAX }
 }
+
+private fun resolveOpenMoodPicker(intent: Intent?): Boolean =
+    intent?.getBooleanExtra(EXTRA_OPEN_MOOD_PICKER, false) == true
+
+internal fun nextMoodLaunchEventKey(
+    currentKey: Int,
+    moodValue: Int?,
+    openPicker: Boolean,
+): Int = if (moodValue != null || openPicker) currentKey + 1 else currentKey
 
 /**
  * Route-lookup fall-through for a persisted/restored `selectedMeditationEntryId` (REQ-5.4.3,
@@ -243,6 +287,8 @@ internal fun handleGuidedMeditationSessionEnded(
 class MainActivity : AppCompatActivity() {
     private val startDestination = mutableStateOf(AppDestinations.AFIRMACIONES)
     private val startMoodValue = mutableStateOf<Int?>(null)
+    private val startOpenMoodPicker = mutableStateOf(false)
+    private val startMoodEventKey = mutableStateOf(0)
 
     /** Keeps the native cold-start splash (Theme.Affirmity.Starting) on screen until onboarding
      * state resolves, so there's no blank gap between the splash and the first real screen. */
@@ -255,16 +301,25 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         startDestination.value = resolveStartDestination(intent)
         startMoodValue.value = resolveMoodValue(intent)
+        startOpenMoodPicker.value = resolveOpenMoodPicker(intent)
+        startMoodEventKey.value = nextMoodLaunchEventKey(
+            currentKey = startMoodEventKey.value,
+            moodValue = startMoodValue.value,
+            openPicker = startOpenMoodPicker.value,
+        )
         // A per-app locale switch (Settings language toggle) triggers an Activity recreate that
         // re-delivers this same held Intent to onCreate — without clearing the extra here, the
         // mood-value sheet would re-open every time the user switches language after opening the
-        // app from a reflection notification action.
+        // app from a mood notification action.
         intent?.removeExtra(EXTRA_MOOD_VALUE)
+        intent?.removeExtra(EXTRA_OPEN_MOOD_PICKER)
         setContent {
             AffirmityTheme {
                 AffirmityApp(
                     startDestination = startDestination.value,
                     startMoodValue = startMoodValue.value,
+                    startOpenMoodPicker = startOpenMoodPicker.value,
+                    startMoodEventKey = startMoodEventKey.value,
                     onOnboardingStateResolved = { keepSplashOnScreen = false },
                 )
             }
@@ -276,6 +331,14 @@ class MainActivity : AppCompatActivity() {
         setIntent(intent)
         startDestination.value = resolveStartDestination(intent)
         startMoodValue.value = resolveMoodValue(intent)
+        startOpenMoodPicker.value = resolveOpenMoodPicker(intent)
+        startMoodEventKey.value = nextMoodLaunchEventKey(
+            currentKey = startMoodEventKey.value,
+            moodValue = startMoodValue.value,
+            openPicker = startOpenMoodPicker.value,
+        )
+        intent.removeExtra(EXTRA_MOOD_VALUE)
+        intent.removeExtra(EXTRA_OPEN_MOOD_PICKER)
     }
 }
 
@@ -285,10 +348,14 @@ class MainActivity : AppCompatActivity() {
 fun AffirmityApp(
     startDestination: AppDestinations = AppDestinations.AFIRMACIONES,
     startMoodValue: Int? = null,
+    startOpenMoodPicker: Boolean = false,
+    startMoodEventKey: Int = 0,
     onOnboardingStateResolved: () -> Unit = {},
 ) {
     var currentDestination by rememberSaveable { mutableStateOf(startDestination) }
     var pendingMoodValue by rememberSaveable { mutableStateOf<Int?>(null) }
+    var pendingOpenMoodPicker by rememberSaveable { mutableStateOf(false) }
+    var pendingMoodEventKey by rememberSaveable { mutableStateOf(0) }
     // Blocks screenshots/screen-recording/recent-apps thumbnails while the mood screen (free-text
     // personal notes) is visible (docs/security/SECURITY_AUDIT.md F-05). No-op in @Preview, where
     // LocalContext isn't backed by an Activity.
@@ -302,9 +369,13 @@ fun AffirmityApp(
             activityWindow?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
         }
     }
-    LaunchedEffect(startDestination, startMoodValue) {
+    LaunchedEffect(startDestination, startMoodValue, startOpenMoodPicker, startMoodEventKey) {
         currentDestination = startDestination
         if (startMoodValue != null) pendingMoodValue = startMoodValue
+        if (startOpenMoodPicker) pendingOpenMoodPicker = true
+        if (startMoodValue != null || startOpenMoodPicker) {
+            pendingMoodEventKey = startMoodEventKey
+        }
     }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     // D4: manual re-entry state, distinct from `appState.shouldShowOnboardingGuide` (the one-time
@@ -420,19 +491,64 @@ fun AffirmityApp(
     var notificationsPermissionGranted by remember {
         mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled())
     }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, context) {
+        val observer = LifecycleEventObserver { _, event ->
+            notificationsPermissionGranted = notificationPermissionStateAfterLifecycleEvent(
+                event = event,
+                current = notificationsPermissionGranted,
+                notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled(),
+            )
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { notificationsPermissionGranted = NotificationManagerCompat.from(context).areNotificationsEnabled() }
-
-    LaunchedEffect(Unit) {
-        val needsRuntimePrompt = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+    val notificationPermissionSettingsMessage =
+        stringResource(R.string.settings_notification_permission_open_settings)
+    val onNotificationEnableRequested: () -> Unit = {
+        val permissionGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(
                 context,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) != PackageManager.PERMISSION_GRANTED
-        if (needsRuntimePrompt) {
-            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) == PackageManager.PERMISSION_GRANTED
+        val preferences = context.getSharedPreferences(
+            NOTIFICATION_PERMISSION_PREFERENCES,
+            android.content.Context.MODE_PRIVATE,
+        )
+        val activity = context as? Activity
+        val action = notificationPermissionAction(
+            sdkInt = Build.VERSION.SDK_INT,
+            permissionGranted = permissionGranted,
+            previouslyRequested = preferences.getBoolean(NOTIFICATION_PERMISSION_REQUESTED_KEY, false),
+            shouldShowRationale = activity?.let {
+                ActivityCompat.shouldShowRequestPermissionRationale(
+                    it,
+                    Manifest.permission.POST_NOTIFICATIONS,
+                )
+            } == true,
+        )
+        when (action) {
+            NotificationPermissionAction.NONE ->
+                notificationsPermissionGranted = NotificationManagerCompat.from(context).areNotificationsEnabled()
+
+            NotificationPermissionAction.REQUEST_SYSTEM_PERMISSION -> {
+                preferences.edit().putBoolean(NOTIFICATION_PERMISSION_REQUESTED_KEY, true).apply()
+                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+
+            NotificationPermissionAction.OPEN_SYSTEM_SETTINGS -> {
+                snackbarScope.launch {
+                    snackbarHostState.showSnackbar(notificationPermissionSettingsMessage)
+                }
+                context.startActivity(
+                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+                )
+            }
         }
     }
 
@@ -773,6 +889,7 @@ fun AffirmityApp(
         BackHandler { showSettings = false }
         Scaffold(
             modifier = Modifier.fillMaxSize(),
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
                     title = { Text(stringResource(R.string.settings_title)) },
@@ -834,6 +951,7 @@ fun AffirmityApp(
                         segments
                     )
                 },
+                onNotificationEnableRequested = onNotificationEnableRequested,
                 onQuietHoursEnabledChanged = { enabled ->
                     appState.setQuietHoursEnabled(enabled)
                 },
@@ -1061,7 +1179,10 @@ fun AffirmityApp(
                     moodEntries = appState.moodEntries,
                     onSaveMood = { epochDay, moodValue, note -> appState.recordMood(epochDay, moodValue, note) },
                     initialMoodValue = pendingMoodValue,
+                    openInitialPicker = pendingOpenMoodPicker,
+                    initialMoodEventKey = pendingMoodEventKey,
                     onInitialMoodConsumed = { pendingMoodValue = null },
+                    onInitialPickerConsumed = { pendingOpenMoodPicker = false },
                 )
             }
 

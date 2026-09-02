@@ -20,7 +20,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,13 +43,20 @@ import kotlinx.coroutines.launch
 fun MoodDayDetailSheet(
     dayLabel: String,
     initialMoodValue: Int?,
+    selectionEventKey: Int = 0,
     initialNote: String?,
     onDismiss: () -> Unit,
     onSave: (moodValue: Int, note: String?) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState()
     val sheetScope = rememberCoroutineScope()
-    var selectedMood by remember { mutableIntStateOf(initialMoodValue ?: 4) }
+    val initialSelectionEvent = initialMoodSelectionForEvent(
+        eventKey = selectionEventKey,
+        initialMoodValue = initialMoodValue,
+    )
+    var selectedMood by remember(initialSelectionEvent) {
+        mutableStateOf(initialSelectionEvent.selectedMood)
+    }
     var note by remember { mutableStateOf(initialNote.orEmpty()) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -62,13 +68,17 @@ fun MoodDayDetailSheet(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            Text(text = moodEmoji(selectedMood), fontSize = 56.sp)
+            selectedMood?.let { mood ->
+                Text(text = moodEmoji(mood), fontSize = 56.sp)
+            }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = moodLabel(selectedMood),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+                selectedMood?.let { mood ->
+                    Text(
+                        text = moodLabel(mood),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
                 Text(
                     text = dayLabel,
                     style = MaterialTheme.typography.bodySmall,
@@ -115,7 +125,10 @@ fun MoodDayDetailSheet(
                 minLines = 3,
             )
             Button(
-                onClick = { onSave(selectedMood, note.trim()) },
+                onClick = {
+                    selectedMood?.let { mood -> onSave(mood, note.trim()) }
+                },
+                enabled = canSaveMoodSelection(selectedMood),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(R.string.mood_detail_save_button))

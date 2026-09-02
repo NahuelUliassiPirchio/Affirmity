@@ -51,12 +51,24 @@ const baseInput: UserPlanInput = {
   healerUses: [],
 };
 
+function planGeneratedAt(input: UserPlanInput): number {
+  return input.localDay * 86_400_000 + 3 * 60 * 60_000;
+}
+
+function planUser(input: UserPlanInput, store: PlanStore, enqueuer: TaskEnqueuer) {
+  return planAndEnqueueUser(input, store, enqueuer, Math.random, planGeneratedAt(input));
+}
+
+function planUsers(inputs: UserPlanInput[], store: PlanStore, enqueuer: TaskEnqueuer) {
+  return planAllUsers(inputs, store, enqueuer, Math.random, planGeneratedAt(inputs[0]));
+}
+
 describe('planAndEnqueueUser', () => {
   it('enqueues 3 reminder tasks and marks the plan as planned', async () => {
     const store = makeStore();
     const enqueuer = makeEnqueuer();
 
-    const result = await planAndEnqueueUser(baseInput, store, enqueuer);
+    const result = await planUser(baseInput, store, enqueuer);
 
     expect(result.status).toBe('planned');
     expect(enqueuer.calls).toHaveLength(3);
@@ -77,7 +89,7 @@ describe('planAndEnqueueUser', () => {
       },
     };
 
-    const result = await planAndEnqueueUser(input, store, enqueuer);
+    const result = await planUser(input, store, enqueuer);
 
     expect(result.status).toBe('planned');
     expect(enqueuer.calls).toHaveLength(0);
@@ -88,8 +100,8 @@ describe('planAndEnqueueUser', () => {
     const store = makeStore();
     const enqueuer = makeEnqueuer();
 
-    await planAndEnqueueUser(baseInput, store, enqueuer);
-    const second = await planAndEnqueueUser(baseInput, store, enqueuer);
+    await planUser(baseInput, store, enqueuer);
+    const second = await planUser(baseInput, store, enqueuer);
 
     expect(second.status).toBe('skipped');
     expect(enqueuer.calls).toHaveLength(3); // unchanged from the first run
@@ -112,14 +124,14 @@ describe('planAllUsers', () => {
       { ...baseInput, uid: 'good-user' },
     ];
 
-    const results = await planAllUsers(inputs, store, failingEnqueuer);
+    const results = await planUsers(inputs, store, failingEnqueuer);
 
     expect(results.find((r) => r.uid === 'bad-user')?.status).toBe('failed');
     expect(results.find((r) => r.uid === 'good-user')?.status).toBe('planned');
     expect(store.markFailed).toHaveBeenCalledWith('bad-user', 19000, expect.any(String));
   });
 
-  it('includes the current streak count in the streak task body', async () => {
+  it('includes the at-risk streak count as structured data without a server-localized body', async () => {
     const store = makeStore();
     const enqueuer = makeEnqueuer();
     const localDay = baseInput.localDay;
@@ -127,17 +139,34 @@ describe('planAllUsers', () => {
     const input: UserPlanInput = {
       ...baseInput,
       completions: [
+        { epochDay: localDay - 2, meditationDone: true, affirmationDone: true },
         { epochDay: localDay - 1, meditationDone: true, affirmationDone: true },
-        { epochDay: localDay, meditationDone: true, affirmationDone: false },
       ],
     };
 
-    await planAndEnqueueUser(input, store, enqueuer);
+    await planUser(input, store, enqueuer);
 
     const streakTask = enqueuer.calls.find((task) => (task as { channel: string }).channel === 'streak') as
-      | { body?: string }
+      | { body?: string; data?: { streakCount?: string } }
       | undefined;
-    expect(streakTask?.body).toBe('Llevás una racha de 2 días. Todavía puedes completar hoy y no perderla.');
+    expect(streakTask?.data?.streakCount).toBe('2');
+    expect(streakTask?.body).toBeUndefined();
+  });
+
+  it('does not enqueue a fixed-time alert once its safe scheduling window has passed', async () => {
+    const store = makeStore();
+    const enqueuer = makeEnqueuer();
+    const localDay = baseInput.localDay;
+    const input: UserPlanInput = {
+      ...baseInput,
+      settings: { ...baseInput.settings, remindersEnabled: false },
+      completions: [{ epochDay: localDay - 1, meditationDone: true, affirmationDone: true }],
+    };
+    const alertTime = localDay * 86_400_000 + 20 * 60 * 60_000;
+
+    await planAndEnqueueUser(input, store, enqueuer, Math.random, alertTime);
+
+    expect(enqueuer.calls).toEqual([]);
   });
 
   it('fires the healer channel the day after a break when a healer is held', async () => {
@@ -157,7 +186,7 @@ describe('planAllUsers', () => {
       healerUses: [],
     };
 
-    await planAndEnqueueUser(input, store, enqueuer);
+    await planUser(input, store, enqueuer);
 
     const healerTask = enqueuer.calls.find((task) => (task as { channel: string }).channel === 'healer');
     expect(healerTask).toBeDefined();
@@ -178,7 +207,7 @@ describe('planAllUsers', () => {
       healerUses: [{ healedEpochDay: localDay - 1 }],
     };
 
-    await planAndEnqueueUser(input, store, enqueuer);
+    await planUser(input, store, enqueuer);
 
     const healerTask = enqueuer.calls.find((task) => (task as { channel: string }).channel === 'healer');
     expect(healerTask).toBeUndefined();
@@ -188,7 +217,7 @@ describe('planAllUsers', () => {
     const store = makeStore();
     const enqueuer = makeEnqueuer();
 
-    const results = await planAllUsers(
+    const results = await planUsers(
       [{ ...baseInput, settings: { ...baseInput.settings, timeZone: null } }],
       store,
       enqueuer,

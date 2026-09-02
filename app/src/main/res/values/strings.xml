@@ -102,6 +102,8 @@
     <string name="settings_time_picker_ok">OK</string>
     <string name="settings_permission_banner_text">Las notificaciones están desactivadas en el sistema</string>
     <string name="settings_permission_banner_action">Abrir ajustes</string>
+    <string name="settings_notifications_sign_in_required">Iniciá sesión para activar las notificaciones</string>
+    <string name="settings_notification_permission_open_settings">El permiso de notificaciones está bloqueado. Activá las notificaciones desde los ajustes del sistema.</string>
 
     <string name="settings_account_sign_in_button">Iniciar sesión con Google</string>
     <string name="settings_account_signed_in_prefix">Sesión iniciada como</string>

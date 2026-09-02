@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { DAY_SEGMENTS, isWithinQuietHours, segmentSlots, slotInstant } from '../src/schedule';
+import { localInstantMillis } from '../src/localDay';
+import {
+  DAY_SEGMENTS,
+  MIN_SCHEDULE_LEAD_MS,
+  isSafelyFuture,
+  isWithinQuietHours,
+  segmentSlots,
+  slotInstant,
+} from '../src/schedule';
 
 // Deterministic LCG so `slotInstant`'s rng argument is reproducible in tests -- mirrors the
 // seeded `kotlin.random.Random(seed)` used in the retired NotificationScheduleTest.
@@ -29,7 +37,7 @@ describe('segmentSlots', () => {
     for (const task of tasks) {
       const minute = minuteOfDayUtc(new Date(task.atMillis));
       expect(minute).toBeGreaterThanOrEqual(startMinute);
-      expect(minute).toBeLessThanOrEqual(endMinute);
+      expect(minute).toBeLessThan(endMinute);
     }
   });
 
@@ -41,7 +49,7 @@ describe('segmentSlots', () => {
     tasks.forEach((task, i) => {
       const minute = minuteOfDayUtc(new Date(task.atMillis));
       expect(minute).toBeGreaterThanOrEqual(bounds[i].startMinute);
-      expect(minute).toBeLessThanOrEqual(bounds[i].endMinute);
+      expect(minute).toBeLessThan(bounds[i].endMinute);
     });
   });
 
@@ -53,6 +61,29 @@ describe('segmentSlots', () => {
     const tasks = segmentSlots(TEST_LOCAL_DAY, ZONE, ['not-a-segment'], 1, 'reminder', seededRng(4));
 
     expect(tasks).toEqual([]);
+  });
+
+  it('discards generated slots that are not safely in the future', () => {
+    const planGeneratedAt = localInstantMillis(TEST_LOCAL_DAY, ZONE, 3 * 60);
+
+    const tasks = segmentSlots(TEST_LOCAL_DAY, ZONE, ['madrugada'], 3, 'reminder', () => 0, planGeneratedAt);
+
+    expect(tasks).toEqual([]);
+  });
+
+  it('never samples a night segment endpoint onto the next local day', () => {
+    const tasks = segmentSlots(
+      TEST_LOCAL_DAY,
+      ZONE,
+      ['noche'],
+      1,
+      'reminder',
+      () => 1 - Number.EPSILON,
+    );
+
+    expect(tasks).toHaveLength(1);
+    expect(minuteOfDayUtc(new Date(tasks[0].atMillis))).toBe(23 * 60 + 59);
+    expect(Math.floor(tasks[0].atMillis / 86_400_000)).toBe(TEST_LOCAL_DAY);
   });
 });
 
@@ -79,6 +110,13 @@ describe('isWithinQuietHours', () => {
   });
 });
 
+describe('isSafelyFuture', () => {
+  it('requires the full minimum scheduling lead time', () => {
+    expect(isSafelyFuture(MIN_SCHEDULE_LEAD_MS - 1, 0)).toBe(false);
+    expect(isSafelyFuture(MIN_SCHEDULE_LEAD_MS, 0)).toBe(true);
+  });
+});
+
 describe('slotInstant', () => {
   // Ported from `pick falls within configured window on the same day`.
   it('pick falls within the configured window', () => {
@@ -89,7 +127,7 @@ describe('slotInstant', () => {
 
     const minute = minuteOfDayUtc(result);
     expect(minute).toBeGreaterThanOrEqual(startMinute);
-    expect(minute).toBeLessThanOrEqual(endMinute);
+    expect(minute).toBeLessThan(endMinute);
   });
 
   // Ported from `degenerate window with equal start and end always picks that exact minute`.

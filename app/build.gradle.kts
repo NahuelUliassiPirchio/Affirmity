@@ -157,6 +157,9 @@ dependencies {
     // Mocks android.content.Context for auth unit tests that only pass it through to a fake
     // AuthProvider — never calls a real platform method.
     testImplementation(libs.mockito.core)
+    // Kotlin-safe argument matchers (eq/any) that return non-null dummies instead of Mockito's
+    // raw Java null, which crashes against Kotlin's non-null parameter checks.
+    testImplementation(libs.mockito.kotlin)
     testImplementation(libs.kotlinx.coroutines.test)
     // Reflection-based structural tests only (e.g. the analytics no-PII-representable invariant,
     // REQ-6.3.2) — never used by production code.

@@ -194,6 +194,15 @@ class MeditationCatalogTest {
             mapOf("promptTopics" to "gratitude|concerns|requests|relationships|purpose|forgiveness"),
         ),
         "centering_prayer" to listOf(mapOf("openingGuidance" to "false")),
+        // visualization: `scenario` picks which VisualizationText id the VISUALIZATION phase shows
+        // (visualizationCueFor) -- "nature" is the emptyMap() default, the other four scenarios
+        // each reach a distinct textId not covered by any single config.
+        "visualization" to listOf(
+            mapOf("scenario" to "safe_place"),
+            mapOf("scenario" to "goal"),
+            mapOf("scenario" to "performance"),
+            mapOf("scenario" to "custom"),
+        ),
         // breathing_affirmations: HOLD is only emitted by the box_breathing technique branch, and
         // the affirmation-unavailable fallback (already reachable at the emptyMap() baseline, since
         // this test never populates "affirmationText.0"..) is the only affirmation-phase cue this

@@ -44,13 +44,14 @@ export function currentStreak(rows: Completion[], todayEpochDay: number): number
 
 /**
  * Streak-about-to-end trigger condition (proposal decision 3, spec's "Streak-About-to-End
- * Channel"): the user's current streak is >= 1 AND at least one of affirmation/meditation is
- * still unmarked for `todayEpochDay`.
+ * Channel"): the user had a live streak through yesterday AND at least one of
+ * affirmation/meditation is still unmarked for `todayEpochDay`. Basing the at-risk count on
+ * yesterday is essential: early-morning planning normally runs before today's first completion.
  */
 export function shouldFireStreakAlert(rows: Completion[], todayEpochDay: number): boolean {
   const today = rows.find((row) => row.epochDay === todayEpochDay);
   const affirmationDone = today?.affirmationDone ?? false;
   const meditationDone = today?.meditationDone ?? false;
 
-  return currentStreak(rows, todayEpochDay) >= 1 && (!affirmationDone || !meditationDone);
+  return currentStreak(rows, todayEpochDay - 1) >= 1 && (!affirmationDone || !meditationDone);
 }

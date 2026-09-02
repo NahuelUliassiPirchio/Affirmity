@@ -1,13 +1,15 @@
 /**
  * Port of `NotificationSchedule` (app/src/main/java/com/pirxhio/affirmity/notifications/NotificationSchedule.kt)
- * -- pure slot-randomization math, no I/O. `nextTriggerAtMillis`'s "roll forward if now has
- * already passed the window" responsibility does not port 1:1: the planner always computes a
- * slot for one explicit `localDay` (never "the next occurrence after now"), so idempotent
- * per-day planning (see planner.ts / design.md) replaces that roll-forward branch.
+ * -- pure slot-randomization math, no I/O. The planner targets one explicit `localDay`, so slots
+ * that have already passed (or have less than the minimum lead time) are discarded instead of
+ * rolled into a different day's idempotent plan.
  */
 
 import { localInstantMillis } from './localDay';
 import type { NotificationChannel, PlannedTask } from './planner';
+
+/** Cloud Tasks created closer than this can become immediately eligible while planning finishes. */
+export const MIN_SCHEDULE_LEAD_MS = 5 * 60_000;
 
 /**
  * The four fixed, user-selectable day-part segments (minutes since local midnight). Mirrors the
@@ -38,6 +40,7 @@ export function segmentSlots(
   slotCount: number,
   channel: NotificationChannel,
   rng: () => number = Math.random,
+  planGeneratedAtMillis: number = Number.NEGATIVE_INFINITY,
 ): PlannedTask[] {
   if (segments.length === 0) return [];
   const tasks: PlannedTask[] = [];
@@ -45,9 +48,15 @@ export function segmentSlots(
     const range = DAY_SEGMENTS[segments[i % segments.length]];
     if (!range) continue;
     const instant = slotInstant(localDay, zone, range.startMinute, range.endMinute, rng);
+    if (!isSafelyFuture(instant.getTime(), planGeneratedAtMillis)) continue;
     tasks.push({ uid: '', localDay, channel, slot: i, atMillis: instant.getTime() });
   }
   return tasks;
+}
+
+/** Whether a generated task has enough lead time to avoid immediate Cloud Tasks delivery. */
+export function isSafelyFuture(atMillis: number, planGeneratedAtMillis: number): boolean {
+  return atMillis >= planGeneratedAtMillis + MIN_SCHEDULE_LEAD_MS;
 }
 
 /**
@@ -63,9 +72,9 @@ export function isWithinQuietHours(minuteOfDay: number, startMinute: number, end
 }
 
 /**
- * A random instant inside `[startMinute, endMinute]` (minutes since local midnight) on the given
- * `localDay`, in `zone`. `rng` must return a value in `[0, 1)` (defaults to `Math.random`); pass a
- * seeded generator for deterministic tests.
+ * A random instant inside `[startMinute, endMinute)` (minutes since local midnight) on the given
+ * `localDay`, in `zone`. A zero-length or inverted range resolves to `startMinute`. `rng` must
+ * return a value in `[0, 1)` (defaults to `Math.random`); pass a seeded generator for tests.
  */
 export function slotInstant(
   localDay: number,
@@ -75,7 +84,7 @@ export function slotInstant(
   rng: () => number = Math.random,
 ): Date {
   const span = Math.max(endMinute - startMinute, 0);
-  const offset = Math.min(Math.floor(rng() * (span + 1)), span);
+  const offset = span === 0 ? 0 : Math.min(Math.floor(rng() * span), span - 1);
   const minuteOfDay = startMinute + offset;
   return new Date(localInstantMillis(localDay, zone, minuteOfDay));
 }

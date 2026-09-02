@@ -7,8 +7,8 @@
  * `functions/` dependency-free for this pure layer.
  */
 
-const MS_PER_MINUTE = 60_000;
 const MS_PER_DAY = 86_400_000;
+const OFFSET_SAMPLE_RANGE_MS = 36 * 60 * 60_000;
 
 interface ZonedParts {
   year: number;
@@ -46,10 +46,19 @@ function getZonedParts(utcMillis: number, zone: string): ZonedParts {
   };
 }
 
+function zonedPartsAsUtcMillis(parts: ZonedParts): number {
+  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+}
+
+function zoneOffsetMillis(utcMillis: number, zone: string): number {
+  return zonedPartsAsUtcMillis(getZonedParts(utcMillis, zone)) - utcMillis;
+}
+
 /**
- * UTC millis for the given local wall-clock date/time in `zone`. Uses the standard
- * guess-then-correct technique: format a first guess back through the zone and adjust for the
- * observed offset (handles DST transitions with one extra correction pass).
+ * UTC millis for the given local wall-clock date/time in `zone`. Candidate instants are built
+ * from the offsets surrounding the target date. Ambiguous fall-back times resolve to their
+ * earlier occurrence; nonexistent spring-forward times advance by the gap to the corresponding
+ * valid post-transition wall time (for example 02:30 -> 03:30).
  */
 function zonedTimeToUtcMillis(
   year: number,
@@ -61,15 +70,27 @@ function zonedTimeToUtcMillis(
   zone: string,
 ): number {
   const target = Date.UTC(year, month - 1, day, hour, minute, second);
-  let guess = target;
-  for (let i = 0; i < 2; i++) {
-    const zoned = getZonedParts(guess, zone);
-    const zonedAsUtc = Date.UTC(zoned.year, zoned.month - 1, zoned.day, zoned.hour, zoned.minute, zoned.second);
-    const diff = zonedAsUtc - target;
-    if (diff === 0) break;
-    guess -= diff;
-  }
-  return guess;
+  const offsets = new Set([
+    zoneOffsetMillis(target - OFFSET_SAMPLE_RANGE_MS, zone),
+    zoneOffsetMillis(target, zone),
+    zoneOffsetMillis(target + OFFSET_SAMPLE_RANGE_MS, zone),
+  ]);
+  const candidates = [...offsets].map((offset) => {
+    const utcMillis = target - offset;
+    return { utcMillis, wallMillis: zonedPartsAsUtcMillis(getZonedParts(utcMillis, zone)) };
+  });
+
+  const exact = candidates
+    .filter((candidate) => candidate.wallMillis === target)
+    .sort((left, right) => left.utcMillis - right.utcMillis);
+  if (exact.length > 0) return exact[0].utcMillis;
+
+  const advanced = candidates
+    .filter((candidate) => candidate.wallMillis > target)
+    .sort((left, right) => left.wallMillis - right.wallMillis || left.utcMillis - right.utcMillis);
+  if (advanced.length > 0) return advanced[0].utcMillis;
+
+  return candidates.sort((left, right) => right.wallMillis - left.wallMillis)[0].utcMillis;
 }
 
 /** epoch day -> {year, month, day} (UTC-calendar-aligned, matches `epochDay * MS_PER_DAY`). */
@@ -84,9 +105,12 @@ export function localMidnightUtcMillis(epochDay: number, zone: string): number {
   return zonedTimeToUtcMillis(year, month, day, 0, 0, 0, zone);
 }
 
-/** UTC millis for local midnight of `epochDay` in `zone`, plus `minuteOfDay` minutes. */
+/** UTC millis for `minuteOfDay` on `epochDay` in `zone`, resolved as a complete local date/time. */
 export function localInstantMillis(epochDay: number, zone: string, minuteOfDay: number): number {
-  return localMidnightUtcMillis(epochDay, zone) + minuteOfDay * MS_PER_MINUTE;
+  const { year, month, day } = epochDayToYmd(epochDay);
+  const hour = Math.floor(minuteOfDay / 60);
+  const minute = minuteOfDay % 60;
+  return zonedTimeToUtcMillis(year, month, day, hour, minute, 0, zone);
 }
 
 /** The epoch day (UTC-calendar-aligned) that `utcMillis` falls on when viewed in `zone`. */
