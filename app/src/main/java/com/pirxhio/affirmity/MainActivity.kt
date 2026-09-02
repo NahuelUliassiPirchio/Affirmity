@@ -1624,12 +1624,12 @@ private const val PRO_SUBSCRIPTION_PRODUCT_ID = "pro"
 
 /** Deployed `syncEntitlement` Cloud Function URL -- part of the Phase 0 user-owned prerequisite
  * (service account + function deploy); placeholder until that deployment exists. */
-private const val SYNC_ENTITLEMENT_URL = ""
+private const val SYNC_ENTITLEMENT_URL = "https://us-central1-affirmity-7ace6.cloudfunctions.net/syncEntitlement"
 
 /** Deployed `answerCompassQuestion` Cloud Function URL (Notifications V2 scope-expansion
  * decision) -- same "user-owned prerequisite" placeholder posture as [SYNC_ENTITLEMENT_URL]
  * above, until that deployment exists. */
-private const val ANSWER_COMPASS_QUESTION_URL = ""
+private const val ANSWER_COMPASS_QUESTION_URL = "https://us-central1-affirmity-7ace6.cloudfunctions.net/answerCompassQuestion"
 
 /** Hosts [com.pirxhio.affirmity.ui.compass.CompassAnswerScreen], wiring it to
  * [CompassAnswerRepository] the same way [PaywallHost] wires [PaywallSheet] to [BillingService]:
