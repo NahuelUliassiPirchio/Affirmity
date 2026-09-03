@@ -16,6 +16,14 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { CloudTasksClient as GoogleCloudTasksClient } from '@google-cloud/tasks';
 import { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import {
+  Environment as AppStoreEnvironment,
+  SignedDataVerifier,
+  VerificationException,
+  VerificationStatus,
+} from '@apple/app-store-server-library';
 
 import { localHourInZone, localMinuteOfDay, utcMillisToLocalEpochDay } from './localDay';
 import {
@@ -59,6 +67,11 @@ import {
   type PlayApiClient,
   type PlaySubscriptionV2,
 } from './billing';
+import {
+  AppStoreVerificationError,
+  resolveIosEntitlement,
+  type AppStoreVerifier,
+} from './appStoreBilling';
 
 export * from './schedule';
 export * from './localDay';
@@ -645,6 +658,153 @@ async function verifyRtdnPushClaims(authorizationHeader: string | undefined): Pr
     return null;
   }
 }
+
+// -------------------------------------------------------------------------------------------
+// App Store (StoreKit 2) entitlement verification for iOS (`syncEntitlementIOS`). Pure logic
+// lives in `appStoreBilling.ts`; this section is SDK wiring only, same split as Play billing above.
+// -------------------------------------------------------------------------------------------
+
+// Deploy-time configuration -- same category as ANDROID_PACKAGE_NAME above. Both platforms happen
+// to use the same identifier string, but they're independently configurable.
+const IOS_BUNDLE_ID = process.env.IOS_BUNDLE_ID ?? 'com.pirxhio.affirmity';
+// App Store Connect's numeric "Apple ID" for this app. `SignedDataVerifier`'s constructor throws
+// unless this is provided whenever its environment is Production -- even though
+// `verifyAndDecodeTransaction` itself never reads it -- so it's a hard prerequisite for verifying
+// real (non-Sandbox) purchases, not an optional nicety. It's only obtainable once an app record
+// exists in App Store Connect; the iOS app has not shipped yet, so this is very likely unset in
+// every environment today. Left unset, `appStoreVerifier()` below constructs Sandbox-only, and any
+// Production-environment JWS from a real App Store purchase will fail verification with 401 --
+// this is a deliberate "not required now" gap, not a bug, until the user supplies this value.
+const IOS_APP_APPLE_ID = process.env.IOS_APP_APPLE_ID ? Number(process.env.IOS_APP_APPLE_ID) : undefined;
+
+let appleRootCertificatesCache: Buffer[] | null = null;
+
+/** Loads Apple's public root CA cert (non-secret, committed under `src/certs/`, downloaded from
+ * https://www.apple.com/certificateauthority/ -- the one Apple's own App Store Server Library docs
+ * point to for this verification path). `__dirname` resolves to `lib/` at runtime (compiled) or
+ * `src/` under `vitest` -- both are one level under `functions/`, so `../src/certs/...` reaches the
+ * same file either way. */
+function appleRootCertificates(): Buffer[] {
+  if (!appleRootCertificatesCache) {
+    const certPath = join(__dirname, '..', 'src', 'certs', 'AppleRootCA-G3.cer');
+    appleRootCertificatesCache = [readFileSync(certPath)];
+  }
+  return appleRootCertificatesCache;
+}
+
+let productionVerifierCache: SignedDataVerifier | null | undefined;
+let sandboxVerifierCache: SignedDataVerifier | null = null;
+
+/** `undefined` cache sentinel means "not yet attempted"; `null` means "attempted, unavailable"
+ * (no `IOS_APP_APPLE_ID` configured -- see above). Memoized so the verifier/cert are built once
+ * per function instance, same pattern as `playApiClient()`. */
+function productionVerifier(): SignedDataVerifier | null {
+  if (productionVerifierCache === undefined) {
+    productionVerifierCache =
+      IOS_APP_APPLE_ID !== undefined
+        ? new SignedDataVerifier(appleRootCertificates(), true, AppStoreEnvironment.PRODUCTION, IOS_BUNDLE_ID, IOS_APP_APPLE_ID)
+        : null;
+  }
+  return productionVerifierCache;
+}
+
+function sandboxVerifier(): SignedDataVerifier {
+  if (!sandboxVerifierCache) {
+    sandboxVerifierCache = new SignedDataVerifier(appleRootCertificates(), true, AppStoreEnvironment.SANDBOX, IOS_BUNDLE_ID);
+  }
+  return sandboxVerifierCache;
+}
+
+/**
+ * Real `AppStoreVerifier`: a client's JWS can legitimately come from either the Production or
+ * Sandbox App Store environment (a real purchase vs. a TestFlight/dev build), and the library only
+ * supports one environment per verifier instance, so this tries Production first (when configured)
+ * and falls back to Sandbox on `INVALID_ENVIRONMENT` -- the specific failure the library throws
+ * when a JWS verifies cryptographically but was minted for the other environment.
+ * `RETRYABLE_VERIFICATION_FAILURE` (Apple's OCSP/revocation-check endpoint unreachable) is treated
+ * as transient and rethrown as-is so the caller maps it to 500; every other `VerificationException`
+ * status is a genuine auth failure, wrapped as `AppStoreVerificationError` (401).
+ */
+function appStoreVerifier(): AppStoreVerifier {
+  return {
+    async verifyTransaction(signedTransaction: string) {
+      const production = productionVerifier();
+      if (production) {
+        try {
+          return await production.verifyAndDecodeTransaction(signedTransaction);
+        } catch (err) {
+          if (!(err instanceof VerificationException) || err.status !== VerificationStatus.INVALID_ENVIRONMENT) {
+            throw mapVerificationError(err);
+          }
+          // Fall through to Sandbox below.
+        }
+      }
+      try {
+        return await sandboxVerifier().verifyAndDecodeTransaction(signedTransaction);
+      } catch (err) {
+        throw mapVerificationError(err);
+      }
+    },
+  };
+}
+
+function mapVerificationError(err: unknown): Error {
+  if (err instanceof VerificationException && err.status === VerificationStatus.RETRYABLE_VERIFICATION_FAILURE) {
+    return err;
+  }
+  if (err instanceof VerificationException) {
+    return new AppStoreVerificationError(err.message || 'Apple JWS verification failed');
+  }
+  return err instanceof Error ? err : new Error('unknown-error');
+}
+
+/**
+ * Client-triggered App Store entitlement sync (iOS's `StoreKitPurchaseService.swift`), called right
+ * after a purchase/restore completes. `firestore.rules` denies ALL client writes to
+ * `users/{uid}/entitlements/current` (server-authoritative, same rule Android's `syncEntitlement`
+ * already relies on), so this Cloud Function -- Admin SDK, bypasses rules -- is the only legitimate
+ * path to that write for iOS. Auth follows the same trust leg as `answerCompassQuestion`: a Firebase
+ * ID token in the `Authorization` header, verified via `getAuth().verifyIdToken`, and the decoded
+ * token's own `uid` claim used directly as the write target -- see `appStoreBilling.ts`'s doc
+ * comment for why that's the right (and deliberately simpler-than-Play's) trust model here.
+ */
+export const syncEntitlementIOS = onRequest(async (req, res) => {
+  if (req.method !== 'POST') {
+    res.status(405).send('Method Not Allowed');
+    return;
+  }
+
+  const authorization = req.headers.authorization;
+  if (!authorization?.startsWith('Bearer ')) {
+    res.status(401).send('Unauthorized');
+    return;
+  }
+  let uid: string;
+  try {
+    const decoded = await getAuth().verifyIdToken(authorization.slice('Bearer '.length));
+    uid = decoded.uid;
+  } catch {
+    res.status(401).send('Unauthorized');
+    return;
+  }
+
+  const { signedTransaction } = req.body as { signedTransaction?: unknown };
+  if (typeof signedTransaction !== 'string' || signedTransaction.length === 0) {
+    res.status(400).send('Missing or invalid signedTransaction');
+    return;
+  }
+
+  try {
+    const result = await resolveIosEntitlement(appStoreVerifier(), firestoreEntitlementStore(), uid, signedTransaction, Date.now());
+    if (result.outcome === 'invalid') {
+      res.status(401).send('Unauthorized');
+      return;
+    }
+    res.status(200).json({ outcome: result.outcome });
+  } catch (err) {
+    res.status(500).send(err instanceof Error ? err.message : 'unknown-error');
+  }
+});
 
 /**
  * Play RTDN push endpoint (design.md D1). Pub/Sub retries any non-2xx response, so the status
