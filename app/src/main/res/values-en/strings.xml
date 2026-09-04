@@ -235,6 +235,7 @@
     <string name="guided_meditation_pause_content_description">Pause</string>
     <string name="guided_meditation_resume_content_description">Resume</string>
     <string name="guided_meditation_skip_content_description">Advance phase</string>
+    <string name="guided_meditation_idle_duration_minutes">%1$d min</string>
 
     <string name="meditation_catalog_reset_rapido_title">Quick reset</string>
     <string name="meditation_catalog_reset_rapido_description">A brief 2-minute pause to recover your center.</string>
