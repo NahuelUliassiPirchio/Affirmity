@@ -1,6 +1,7 @@
 package com.pirxhio.affirmity.ui.meditation
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -327,7 +328,12 @@ private fun GuidedMeditationContent(
                 .size(240.dp),
             contentAlignment = Alignment.Center,
         ) {
-            if (state.status == SessionStatus.Running || state.status == SessionStatus.Paused) {
+            if (state.status == SessionStatus.Idle) {
+                // Calmer pre-play treatment: a soft breathing-ring backdrop instead of the empty
+                // space this box used to show before Start was tapped. Purely decorative --
+                // Running/Paused keep their own CircularProgressIndicator branch below untouched.
+                IdleBreathingBackdrop(modifier = Modifier.fillMaxSize())
+            } else if (state.status == SessionStatus.Running || state.status == SessionStatus.Paused) {
                 val totalMillis = phaseDurations[state.currentPhaseId]
                 val progress = if (totalMillis != null && totalMillis > 0) {
                     (state.elapsedInPhaseMillis.toFloat() / totalMillis).coerceIn(0f, 1f)
@@ -342,23 +348,47 @@ private fun GuidedMeditationContent(
                     strokeWidth = 4.dp,
                 )
             }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = phaseLabel(currentTextId, currentLiteralText, state.status, entry.presentation.textResources),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
-                )
-                val remainingSeconds = state.remainingInPhaseMillis?.let { (it / 1000L).toInt() + 1 }
-                val showsRemaining = remainingSeconds != null &&
-                    (state.status == SessionStatus.Running || state.status == SessionStatus.Paused)
-                if (showsRemaining) {
+
+            if (state.status == SessionStatus.Idle) {
+                // Real content instead of a void: the meditation's own title, and its duration
+                // when one can be resolved, so this screen reads as a pre-session summary rather
+                // than a blank stage waiting for the play button.
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "${remainingSeconds}s",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp),
+                        text = stringResource(entry.titleRes),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
                     )
+                    val durationMinutes = idleDurationMinutes(phaseDurations, entry.approxDurationMinutes)
+                    if (durationMinutes != null) {
+                        Text(
+                            text = stringResource(R.string.guided_meditation_idle_duration_minutes, durationMinutes),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
+                }
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = phaseLabel(currentTextId, currentLiteralText, state.status, entry.presentation.textResources),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                    )
+                    val remainingSeconds = state.remainingInPhaseMillis?.let { (it / 1000L).toInt() + 1 }
+                    val showsRemaining = remainingSeconds != null &&
+                        (state.status == SessionStatus.Running || state.status == SessionStatus.Paused)
+                    if (showsRemaining) {
+                        Text(
+                            text = "${remainingSeconds}s",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
                 }
             }
         }
@@ -451,6 +481,44 @@ private fun RoundIconButton(
             .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
     ) {
         Icon(imageVector = icon, contentDescription = contentDescription, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+    }
+}
+
+/**
+ * Best-effort session length for the Idle summary, in whole minutes. Prefers the sum of this
+ * entry's actually-customized [phaseDurations] (Fixed-duration phases only, per
+ * [com.pirxhio.affirmity.ui.meditation.catalog.fixedPhaseDurationsById]) rounded up, so a
+ * duration/rounds customization the user just picked on the previous screen is reflected here.
+ * Falls back to the catalog-declared [approxDurationMinutes] when no phase in this entry has a
+ * Fixed duration (e.g. an entry driven entirely by manual release or variable-length phases),
+ * and is never null in practice since every entry declares an approximate duration.
+ */
+private fun idleDurationMinutes(phaseDurations: Map<String, Long>, approxDurationMinutes: Int): Int? {
+    val fixedTotalMillis = phaseDurations.values.sum()
+    if (fixedTotalMillis <= 0L) return approxDurationMinutes.takeIf { it > 0 }
+    val wholeMinutesRoundedUp = ((fixedTotalMillis + 59_999L) / 60_000L).toInt()
+    return wholeMinutesRoundedUp.coerceAtLeast(1)
+}
+
+/**
+ * Soft, non-literal pre-play backdrop for [SessionStatus.Idle]: three concentric rings fading
+ * outward from the brand teal, evoking a breathing motif without drawing custom illustration
+ * assets (none exist in this app -- see craft constraints). Purely decorative -- draws behind the
+ * title/duration text and the play button sits just below this box, never on top of it.
+ */
+@Composable
+private fun IdleBreathingBackdrop(modifier: Modifier = Modifier) {
+    val ringColor = MaterialTheme.colorScheme.primary
+    Canvas(modifier = modifier) {
+        val maxRadius = size.minDimension / 2f
+        val ringSpecs = listOf(1f to 0.05f, 0.74f to 0.09f, 0.5f to 0.14f)
+        ringSpecs.forEach { (radiusFraction, alpha) ->
+            drawCircle(
+                color = ringColor.copy(alpha = alpha),
+                radius = maxRadius * radiusFraction,
+                center = center,
+            )
+        }
     }
 }
 
