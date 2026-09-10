@@ -20,6 +20,7 @@ import com.pirxhio.affirmity.data.local.OnboardingGuidePreferences
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
+import com.pirxhio.affirmity.data.local.FeedSources
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.DocWrite
 import com.pirxhio.affirmity.data.remote.FcmTokenRepository
@@ -339,6 +340,7 @@ private fun buildState(
     // launch and cancels every sibling collector -- which surfaces as unrelated tests here either
     // failing their assertions or hanging forever on a channel receive.
     whenever(trackerPreferences.observeHiddenAffirmationIds()).thenReturn(flowOf(emptySet()))
+    whenever(trackerPreferences.observeFeedSources()).thenReturn(flowOf(FeedSources()))
     val notificationDebugLog = mock(NotificationDebugLog::class.java)
     whenever(notificationDebugLog.entries)
         .thenReturn(EventedFlow("debug-log", mutableListOf(), listOf(emptyList())))

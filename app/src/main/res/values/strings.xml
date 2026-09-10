@@ -243,6 +243,9 @@
     <string name="guided_meditation_resume_content_description">Reanudar</string>
     <string name="guided_meditation_skip_content_description">Avanzar fase</string>
     <string name="guided_meditation_idle_duration_minutes">%1$d min</string>
+    <!-- "Vale la pena conocerlas" shelf + primer sheet: plain-words explanations for the four
+         entries whose title tells a newcomer nothing. Deliberately written with no Sanskrit gloss
+         and no "práctica milenaria" framing, because they are meant to be read at a glance. -->
     <string name="meditation_primer_shelf_title">Vale la pena conocerlas</string>
     <string name="meditation_primer_shelf_subtitle">Prácticas con nombres raros, explicadas simple</string>
     <string name="meditation_primer_expectations_label">QUÉ ESPERAR</string>
@@ -275,6 +278,7 @@
     <string name="meditation_primer_metta_expect_1">Se repiten frases, no se vacía la mente</string>
     <string name="meditation_primer_metta_expect_2">Empezás por vos</string>
     <string name="meditation_primer_metta_expect_3">Que al principio no sientas nada es normal</string>
+
     <string name="guided_meditation_cue_sound_mute_content_description">Silenciar sonido de transición</string>
     <string name="guided_meditation_cue_sound_unmute_content_description">Activar sonido de transición</string>
 
@@ -655,13 +659,21 @@
     <string name="meditation_catalog_category_gratitud">Gratitud</string>
     <string name="meditation_catalog_category_bienestar">Bienestar</string>
 
+    <!-- Merged Discover shelves (Item: "agrupar algunas categories porque hay muchas que tienen
+         un solo elemento", raised to a 3-entry minimum per shelf): combine categories with too
+         few entries into a broader shelf instead of showing a thin one. See
+         categoryShelfGroups in MeditationScreen.kt. -->
     <string name="meditation_shelf_calm_sleep">Calma y sueño</string>
     <string name="meditation_shelf_mindfulness">Mindfulness y silencio</string>
     <string name="meditation_shelf_body">Cuerpo y movimiento</string>
     <string name="meditation_shelf_energy_focus">Energía y enfoque</string>
     <string name="meditation_shelf_compassion">Compasión y autocompasión</string>
     <string name="meditation_shelf_prayer_contemplation">Oración y contemplación</string>
+
+    <!-- Pre-launch audit item #5: "recent meditations" shelf label, shown only against the "Todo"
+         pill (see MeditationScreen.kt's recentEntries visibility condition). -->
     <string name="meditation_shelf_recent">Recientes</string>
+
     <string name="meditation_visualization_relaxation">Relajá el cuerpo y preparate para imaginar.</string>
     <string name="meditation_visualization_visualization_nature">Imaginá un paisaje natural que te dé calma: el sonido del agua, el aire, la luz.</string>
     <string name="meditation_visualization_visualization_safe_place">Imaginá tu lugar seguro, con todo el detalle posible: qué ves, qué escuchás, cómo te sentís ahí.</string>
@@ -742,6 +754,11 @@
     <string name="your_feed_expand">Expandir tu feed</string>
     <string name="your_feed_collapse">Ocultar tu feed</string>
     <string name="your_feed_title">Tu feed</string>
+    <string name="your_feed_sources_title">Qué más entra en tu feed</string>
+    <string name="your_feed_source_favorites">Favoritas</string>
+    <string name="your_feed_source_favorites_description">Aunque su tema no esté elegido</string>
+    <string name="your_feed_source_own">Mías</string>
+    <string name="your_feed_source_own_description">Las que escribiste vos</string>
     <string name="your_feed_done">Listo</string>
     <string name="your_feed_feeding_you_now">Alimentando tu feed ahora</string>
     <string name="your_feed_add_theme_a11y">Agregar temas</string>

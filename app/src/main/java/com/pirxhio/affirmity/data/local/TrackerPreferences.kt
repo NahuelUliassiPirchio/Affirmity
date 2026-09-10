@@ -17,6 +17,19 @@ private val Context.trackerDataStore by preferencesDataStore(name = "tracker_pre
 /** Which day the user last viewed affirmations, and how many they'd viewed by then. */
 data class DailyViewCount(val epochDay: Long, val count: Int)
 
+/**
+ * The two optional sources the main affirmation feed can draw from, on top of the theme selection.
+ *
+ * [includeFavorites] on means a favourited affirmation stays in the rotation even when its theme is
+ * not currently selected -- favouriting it is a stronger signal than the theme filter. It defaults
+ * OFF: that is the behaviour that shipped before the toggle existed, so no existing feed changes
+ * shape until the user asks for it. [includeOwn] defaults on for the same reason -- own rows were
+ * always in the feed.
+ */
+data class FeedSources(
+    val includeFavorites: Boolean = false,
+    val includeOwn: Boolean = true,
+)
 
 /**
  * Non-streak tracker preferences. Streak/weekly derivation lives exclusively in
@@ -104,13 +117,36 @@ class TrackerPreferences(private val context: Context) {
         }
     }
 
+    /** Which optional sources feed the main rotation. Deliberately ONE preference returning both
+     * flags rather than two: every flow collected in [com.pirxhio.affirmity.data.AffirmityAppState]'s
+     * init has to be stubbed in all 8 `AffirmityAppState*Test` helpers, and an unstubbed Mockito
+     * mock returns null there, which throws inside the collector and cancels every sibling. One
+     * method is one stub. */
+    fun observeFeedSources(): Flow<FeedSources> =
+        context.trackerDataStore.data.map { prefs ->
+            FeedSources(
+                includeFavorites = prefs[FEED_INCLUDE_FAVORITES] ?: false,
+                includeOwn = prefs[FEED_INCLUDE_OWN] ?: true,
+            )
+        }
+
+    suspend fun saveFeedSources(sources: FeedSources) {
+        context.trackerDataStore.edit { prefs ->
+            prefs[FEED_INCLUDE_FAVORITES] = sources.includeFavorites
+            prefs[FEED_INCLUDE_OWN] = sources.includeOwn
+        }
+    }
+
     private companion object {
         val AFFIRMATIONS_VIEWED_EPOCH_DAY = longPreferencesKey("affirmations_viewed_epoch_day")
         val AFFIRMATIONS_VIEWED_COUNT = intPreferencesKey("affirmations_viewed_count")
         val MEDITATION_DURATION_SECONDS = intPreferencesKey("meditation_duration_seconds")
+        val FEED_INCLUDE_FAVORITES = booleanPreferencesKey("feed_include_favorites")
+        val FEED_INCLUDE_OWN = booleanPreferencesKey("feed_include_own")
         val MEDITATION_CUE_SOUND_ENABLED = booleanPreferencesKey("meditation_cue_sound_enabled")
         val HIDDEN_AFFIRMATION_IDS = stringSetPreferencesKey("hidden_affirmation_ids")
         val RECENT_MEDITATION_IDS = stringPreferencesKey("recent_meditation_ids")
+        // A "recents" shortcut past a handful of entries stops being a shortcut -- caps the list so
         // it stays scannable and the stored string stays small.
         const val RECENT_MEDITATION_IDS_LIMIT = 8
     }

@@ -1,9 +1,12 @@
 package com.pirxhio.affirmity.ui.feed
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
@@ -27,15 +31,18 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.AccessDecision
+import com.pirxhio.affirmity.data.local.FeedSources
 import com.pirxhio.affirmity.ui.groups.CatalogTheme
 
 /**
@@ -60,6 +67,8 @@ fun YourFeedScreen(
     onUpdateFeed: () -> Unit,
     onDone: () -> Unit,
     onFavoritesClick: () -> Unit,
+    feedSources: FeedSources,
+    onFeedSourcesChange: (FeedSources) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val selectedThemes = draftThemeIds.mapNotNull { catalogThemesById[it] }.sortedBy { it.label }
@@ -106,6 +115,11 @@ fun YourFeedScreen(
                 onClick = onSeeAllThemes,
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp),
             )
+            FeedSourcesSection(
+                sources = feedSources,
+                onChange = onFeedSourcesChange,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp),
+            )
             FavoritesEntryCard(
                 onClick = onFavoritesClick,
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 8.dp),
@@ -113,6 +127,114 @@ fun YourFeedScreen(
         }
 
         UpdateFeedButton(isDirty = isDirty, isValid = isValid, onClick = onUpdateFeed)
+    }
+}
+
+/** The two optional feed sources, on top of the theme selection: favourites and the user's own
+ *  affirmations. Deliberately the same square card as [DiscoverySurfaceCard] above rather than a
+ *  switch row, so the whole sheet reads as one grid of tappable tiles -- an "on" tile fills with the
+ *  primary container colour instead of relying on a small switch thumb to carry the state. */
+@Composable
+private fun FeedSourcesSection(
+    sources: FeedSources,
+    onChange: (FeedSources) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = stringResource(R.string.your_feed_sources_title),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            FeedSourceCard(
+                icon = Icons.Filled.Favorite,
+                label = stringResource(R.string.your_feed_source_favorites),
+                description = stringResource(R.string.your_feed_source_favorites_description),
+                checked = sources.includeFavorites,
+                onClick = { onChange(sources.copy(includeFavorites = !sources.includeFavorites)) },
+                modifier = Modifier.weight(1f),
+            )
+            FeedSourceCard(
+                icon = Icons.Filled.Edit,
+                label = stringResource(R.string.your_feed_source_own),
+                description = stringResource(R.string.your_feed_source_own_description),
+                checked = sources.includeOwn,
+                onClick = { onChange(sources.copy(includeOwn = !sources.includeOwn)) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun FeedSourceCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    description: String,
+    checked: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // Every colour flips together so "on" is legible from across the room, not just at the corner
+    // where a switch would sit.
+    val container = if (checked) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow
+    val onContainer = if (checked) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+    val secondary = if (checked) {
+        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Card(
+        modifier = modifier
+            .aspectRatio(1f)
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = container),
+        border = BorderStroke(
+            1.dp,
+            if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+        ),
+        shape = RoundedCornerShape(20.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Same circular icon badge DiscoverySurfaceCard uses, so an "off" tile is visually
+            // indistinguishable from the grid above it and only "on" stands out.
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        if (checked) {
+                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.14f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHigh
+                        },
+                        CircleShape,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = if (checked) onContainer else MaterialTheme.colorScheme.primary,
+                )
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.titleMedium,
+                color = onContainer,
+                modifier = Modifier.padding(top = 12.dp),
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = secondary,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
     }
 }
 
@@ -206,6 +328,8 @@ fun YourFeedSheetContent(
     onDone: () -> Unit,
     onPeekClick: () -> Unit,
     onFavoritesClick: () -> Unit,
+    feedSources: FeedSources,
+    onFeedSourcesChange: (FeedSources) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxHeight(0.85f)) {
@@ -229,6 +353,8 @@ fun YourFeedSheetContent(
                 onUpdateFeed = onUpdateFeed,
                 onDone = onDone,
                 onFavoritesClick = onFavoritesClick,
+                feedSources = feedSources,
+                onFeedSourcesChange = onFeedSourcesChange,
                 modifier = Modifier.weight(1f, fill = true),
             )
         }

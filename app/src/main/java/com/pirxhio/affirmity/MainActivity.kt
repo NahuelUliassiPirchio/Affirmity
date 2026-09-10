@@ -1463,6 +1463,8 @@ fun AffirmityApp(
                                     }
                                 },
                                 onFavoritesClick = { showFavorites = true },
+                                feedSources = appState.feedSources.value,
+                                onFeedSourcesChange = appState::setFeedSources,
                             )
                         },
                     ) {

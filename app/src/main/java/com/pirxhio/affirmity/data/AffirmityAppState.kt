@@ -73,6 +73,7 @@ import com.pirxhio.affirmity.data.local.OnboardingGuidePreferences
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
 import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
+import com.pirxhio.affirmity.data.local.FeedSources
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.FcmTokenRepository
 import com.pirxhio.affirmity.data.remote.FirestoreAdUnlockRepository
@@ -469,6 +470,11 @@ class AffirmityAppState(
     var hiddenAffirmationIds = mutableStateOf<Set<String>>(emptySet())
         private set
 
+    /** Which optional sources feed the rotation, toggled from Your feed. Device-local, same posture
+     *  as [hiddenAffirmationIds]. */
+    var feedSources = mutableStateOf(FeedSources())
+        private set
+
     private var favoriteOrderedIds = mutableStateOf<List<String>>(emptyList())
     private val favoriteToggleMutex = Mutex()
 
@@ -500,29 +506,56 @@ class AffirmityAppState(
     val filteredAffirmations: List<Affirmation>
         get() {
             val hiddenIds = hiddenAffirmationIds.value
-            val ids = selectedThemeIds.value ?: return affirmations.filterNot { it.id in hiddenIds }
+            val sources = feedSources.value
+            // Own rows are a source the user can switch off entirely ("Mías" in Your feed); hidden
+            // ids are filtered regardless, since hiding is per-affirmation and outranks a source
+            // toggle either way.
+            val own = if (sources.includeOwn) affirmations.filterNot { it.id in hiddenIds } else emptyList()
+            val ownIds = affirmations.mapTo(mutableSetOf()) { it.id }
+            // Pre-resolution the feed is owned-rows-only (see kdoc), so a favourite can only
+            // contribute an owned row here -- never a catalog one, whose access cannot be judged
+            // before the theme selection resolves.
+            val ids = selectedThemeIds.value ?: return (
+                own + favoriteAffirmations.filter {
+                    sources.includeFavorites && it.id in ownIds && it.id !in hiddenIds
+                }
+                ).distinctBy { it.id }
             val collectionsById = catalogCollectionsById()
             val groupsById = catalogUniverseGroups().associateBy { it.id }
             val now = System.currentTimeMillis()
             val tier = entitlementTier.value
             val grants = adUnlockState
-            return affirmations.filterNot { it.id in hiddenIds } +
-                catalogAffirmations.filter { affirmation ->
+            // The access rule, applied identically to a themed row and to an injected favourite.
+            fun catalogRowUnlocked(affirmation: Affirmation): Boolean {
+                val collection = collectionsById[affirmation.collectionId]
+                return groupsById[affirmation.groupId]?.let { group ->
+                    catalogAccessDecision(
+                        group = group,
+                        collection = collection,
+                        tier = tier,
+                        grants = grants,
+                        nowMillis = now,
+                    ).isUnlocked
+                } == true
+            }
+            // Favourites bypass the THEME filter when their toggle is on -- never the ACCESS gate.
+            // favoriteAffirmations is deliberately access-unfiltered (a favourite made while Pro
+            // stays visible there after a downgrade), so injecting it raw would put Pro-locked rows
+            // back into a free user's feed. Owned rows need no access check; catalog rows get the
+            // same one a themed row gets.
+            val favorites = if (sources.includeFavorites) {
+                favoriteAffirmations.filter { affirmation ->
                     affirmation.id !in hiddenIds &&
-                        run {
-                            val collection = collectionsById[affirmation.collectionId]
-                            collection?.themeId in ids &&
-                                groupsById[affirmation.groupId]?.let { group ->
-                                    catalogAccessDecision(
-                                        group = group,
-                                        collection = collection,
-                                        tier = tier,
-                                        grants = grants,
-                                        nowMillis = now,
-                                    ).isUnlocked
-                                } == true
-                        }
+                        (affirmation.id in ownIds || catalogRowUnlocked(affirmation))
                 }
+            } else {
+                emptyList()
+            }
+            return (own + favorites + catalogAffirmations.filter { affirmation ->
+                    affirmation.id !in hiddenIds &&
+                        collectionsById[affirmation.collectionId]?.themeId in ids &&
+                        catalogRowUnlocked(affirmation)
+                }).distinctBy { it.id }
         }
 
     /** Resolved [Affirmation]s for every hidden id (pre-launch audit item #1's "Manage hidden
@@ -918,6 +951,11 @@ class AffirmityAppState(
         scope.launch {
             trackerPreferences.observeHiddenAffirmationIds().collect { ids ->
                 hiddenAffirmationIds.value = ids
+            }
+        }
+        scope.launch {
+            trackerPreferences.observeFeedSources().collect { sources ->
+                feedSources.value = sources
             }
         }
         scope.launch {
@@ -1390,6 +1428,12 @@ class AffirmityAppState(
      *  fire-and-forget, same convention as every other [trackerPreferences] write from Compose. */
     fun hideAffirmation(id: String) {
         scope.launch { trackerPreferences.hideAffirmation(id) }
+    }
+
+    /** Persists a Your-feed source toggle. Fire-and-forget: [feedSources] catches up through the
+     *  DataStore flow collected in init, so there is no second source of truth to keep in step. */
+    fun setFeedSources(sources: FeedSources) {
+        scope.launch { trackerPreferences.saveFeedSources(sources) }
     }
 
     /** Reverses [hideAffirmation] from the "Manage hidden affirmations" screen. */
