@@ -112,6 +112,12 @@ fun GuidedMeditationScreen(
      * without tearing down and rebuilding [audioExecutor]. */
     cueSoundEnabled: Boolean = true,
     onToggleCueSound: () -> Unit = {},
+    /** Fired at the same Start dispatch as [AnalyticsEvent.MeditationStarted], right below --
+     * pre-launch audit item #5's "recent meditations" shortcut counts an entry as recent exactly
+     * when the user presses Start, not on catalog tap or completion, so the caller can persist it
+     * (see [com.pirxhio.affirmity.data.local.TrackerPreferences.recordRecentMeditation]) without
+     * this screen knowing anything about that storage. */
+    onSessionStarted: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -241,6 +247,7 @@ fun GuidedMeditationScreen(
                 sessionStartMillis = AndroidMonotonicTimeSource.nowMillis()
                 sessionStartWallMillis = System.currentTimeMillis()
                 onEvent(AnalyticsEvent.MeditationStarted(AnalyticsId.of(entry), currentAccess.provenance()))
+                onSessionStarted()
                 engine.send(MeditationEvent.Start)
             }
         },

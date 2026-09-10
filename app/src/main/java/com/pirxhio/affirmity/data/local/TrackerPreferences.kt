@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -77,11 +78,40 @@ class TrackerPreferences(private val context: Context) {
             prefs[HIDDEN_AFFIRMATION_IDS] = (prefs[HIDDEN_AFFIRMATION_IDS] ?: emptySet()) - id
         }
     }
+
+    /** Most-recent-first catalog entry ids the user has actually started a guided session for
+     * (pre-launch audit item #5). Device-local, same rationale as [MEDITATION_CUE_SOUND_ENABLED] --
+     * a "jump back into what you were doing" shortcut is a per-device navigation convenience, not
+     * account data worth syncing through DataSession/Firestore. DataStore Preferences has no list
+     * type, so ids are stored newline-joined in a single string (catalog entry ids are slugs like
+     * `breathing_affirmations` -- no newlines, so `"\n"` is a safe delimiter). */
+    fun observeRecentMeditationIds(): Flow<List<String>> =
+        context.trackerDataStore.data.map { prefs ->
+            prefs[RECENT_MEDITATION_IDS]
+                ?.split("\n")
+                ?.filter { it.isNotBlank() }
+                ?: emptyList()
+        }
+
+    suspend fun recordRecentMeditation(id: String) {
+        context.trackerDataStore.edit { prefs ->
+            val existing = prefs[RECENT_MEDITATION_IDS]
+                ?.split("\n")
+                ?.filter { it.isNotBlank() }
+                ?: emptyList()
+            val reordered = listOf(id) + existing.filterNot { it == id }
+            prefs[RECENT_MEDITATION_IDS] = reordered.take(RECENT_MEDITATION_IDS_LIMIT).joinToString("\n")
+        }
+    }
+
     private companion object {
         val AFFIRMATIONS_VIEWED_EPOCH_DAY = longPreferencesKey("affirmations_viewed_epoch_day")
         val AFFIRMATIONS_VIEWED_COUNT = intPreferencesKey("affirmations_viewed_count")
         val MEDITATION_DURATION_SECONDS = intPreferencesKey("meditation_duration_seconds")
         val MEDITATION_CUE_SOUND_ENABLED = booleanPreferencesKey("meditation_cue_sound_enabled")
         val HIDDEN_AFFIRMATION_IDS = stringSetPreferencesKey("hidden_affirmation_ids")
+        val RECENT_MEDITATION_IDS = stringPreferencesKey("recent_meditation_ids")
+        // it stays scannable and the stored string stays small.
+        const val RECENT_MEDITATION_IDS_LIMIT = 8
     }
 }

@@ -221,6 +221,13 @@
     <string name="meditation_preset_focus">Focus</string>
     <string name="meditation_preset_sleep">Sleep</string>
     <string name="meditation_discover_header">Descubre más sesiones</string>
+    <string name="meditation_category_all">Todo</string>
+    <string name="meditation_badge_ad_unlock">Anuncio gratis</string>
+    <string name="meditation_ad_unlock_sheet_title">Desbloquear %1$s</string>
+    <string name="meditation_ad_unlock_body_per_use">Mirá un anuncio corto y esta sesión queda disponible ahora mismo.</string>
+    <string name="meditation_ad_unlock_body_one_time_trial">Mirá un anuncio corto para probar esta sesión una vez, sin costo.</string>
+    <string name="meditation_ad_unlock_body_timed">Mirá un anuncio corto y esta sesión queda disponible por %1$d horas.</string>
+    <string name="meditation_ad_unlock_dismiss">Ahora no</string>
 
     <string name="guided_meditation_round_label">Ronda %1$d de %2$d</string>
     <string name="guided_meditation_breath_label">Respiración %1$d de %2$d</string>
@@ -616,6 +623,13 @@
     <string name="meditation_catalog_category_gratitud">Gratitud</string>
     <string name="meditation_catalog_category_bienestar">Bienestar</string>
 
+    <string name="meditation_shelf_calm_sleep">Calma y sueño</string>
+    <string name="meditation_shelf_mindfulness">Mindfulness y silencio</string>
+    <string name="meditation_shelf_body">Cuerpo y movimiento</string>
+    <string name="meditation_shelf_energy_focus">Energía y enfoque</string>
+    <string name="meditation_shelf_compassion">Compasión y autocompasión</string>
+    <string name="meditation_shelf_prayer_contemplation">Oración y contemplación</string>
+    <string name="meditation_shelf_recent">Recientes</string>
     <string name="meditation_visualization_relaxation">Relajá el cuerpo y preparate para imaginar.</string>
     <string name="meditation_visualization_visualization_nature">Imaginá un paisaje natural que te dé calma: el sonido del agua, el aire, la luz.</string>
     <string name="meditation_visualization_visualization_safe_place">Imaginá tu lugar seguro, con todo el detalle posible: qué ves, qué escuchás, cómo te sentís ahí.</string>

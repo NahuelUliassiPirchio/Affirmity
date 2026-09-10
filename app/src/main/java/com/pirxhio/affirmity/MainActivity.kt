@@ -704,6 +704,19 @@ fun AffirmityApp(
             meditationCueSoundEnabled = enabled
         }
     }
+    // Pre-launch audit item #5's "recent meditations" shelf. Same device-local posture as
+    // meditationCueSoundEnabled above -- deliberately kept out of AffirmityAppState/DataSession.
+    // Ids that no longer resolve to a catalog entry (e.g. removed in a later version) are silently
+    // dropped here rather than surfacing a broken card.
+    var recentMeditationIds by remember { mutableStateOf<List<String>>(emptyList()) }
+    LaunchedEffect(meditationTrackerPreferences) {
+        meditationTrackerPreferences.observeRecentMeditationIds().collect { ids ->
+            recentMeditationIds = ids
+        }
+    }
+    val recentMeditationEntries = remember(recentMeditationIds) {
+        recentMeditationIds.mapNotNull { id -> findMeditationCatalogEntry(id) }
+    }
 
     // Shared upgrade-CTA routing (design.md D7): signed-out taps route to sign-in, never straight
     // to the paywall -- used by both the group selector sheet's per-row CTA and any other entry
@@ -1207,6 +1220,11 @@ fun AffirmityApp(
                                     meditationTrackerPreferences.saveMeditationCueSoundEnabled(newValue)
                                 }
                             },
+                            onSessionStarted = {
+                                snackbarScope.launch {
+                                    meditationTrackerPreferences.recordRecentMeditation(selectedMeditationEntry.id)
+                                }
+                            },
                         )
                     }
                 }
@@ -1503,6 +1521,7 @@ fun AffirmityApp(
                         appState.logAnalyticsEvent(AnalyticsEvent.FreeTimerCompleted(durationSeconds))
                     },
                     entries = meditationCatalog(),
+                    recentEntries = recentMeditationEntries,
                     decisionFor = { entry ->
                         meditationAccessDecision(
                             entry,
