@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -14,6 +15,7 @@ private val Context.trackerDataStore by preferencesDataStore(name = "tracker_pre
 
 /** Which day the user last viewed affirmations, and how many they'd viewed by then. */
 data class DailyViewCount(val epochDay: Long, val count: Int)
+
 
 /**
  * Non-streak tracker preferences. Streak/weekly derivation lives exclusively in
@@ -58,10 +60,28 @@ class TrackerPreferences(private val context: Context) {
         context.trackerDataStore.edit { it[MEDITATION_CUE_SOUND_ENABLED] = enabled }
     }
 
+    /** Catalog affirmation ids the user has hidden from their rotation (pre-launch audit item #1).
+     * Device-local, same rationale as [MEDITATION_CUE_SOUND_ENABLED] -- a "don't show me this one"
+     * preference is not account data. Defaults to empty. */
+    fun observeHiddenAffirmationIds(): Flow<Set<String>> =
+        context.trackerDataStore.data.map { it[HIDDEN_AFFIRMATION_IDS] ?: emptySet() }
+
+    suspend fun hideAffirmation(id: String) {
+        context.trackerDataStore.edit { prefs ->
+            prefs[HIDDEN_AFFIRMATION_IDS] = (prefs[HIDDEN_AFFIRMATION_IDS] ?: emptySet()) + id
+        }
+    }
+
+    suspend fun unhideAffirmation(id: String) {
+        context.trackerDataStore.edit { prefs ->
+            prefs[HIDDEN_AFFIRMATION_IDS] = (prefs[HIDDEN_AFFIRMATION_IDS] ?: emptySet()) - id
+        }
+    }
     private companion object {
         val AFFIRMATIONS_VIEWED_EPOCH_DAY = longPreferencesKey("affirmations_viewed_epoch_day")
         val AFFIRMATIONS_VIEWED_COUNT = intPreferencesKey("affirmations_viewed_count")
         val MEDITATION_DURATION_SECONDS = intPreferencesKey("meditation_duration_seconds")
         val MEDITATION_CUE_SOUND_ENABLED = booleanPreferencesKey("meditation_cue_sound_enabled")
+        val HIDDEN_AFFIRMATION_IDS = stringSetPreferencesKey("hidden_affirmation_ids")
     }
 }

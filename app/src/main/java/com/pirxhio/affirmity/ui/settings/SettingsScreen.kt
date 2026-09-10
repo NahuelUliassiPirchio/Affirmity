@@ -96,6 +96,7 @@ fun SettingsScreen(
     onQuietHoursWindowChanged: (startMinute: Int, endMinute: Int) -> Unit,
     onOpenNotificationDebug: () -> Unit,
     onOpenOnboardingGuide: () -> Unit,
+    onOpenHiddenAffirmations: () -> Unit,
     onSignInClicked: () -> Unit,
     onSignOutClicked: () -> Unit,
     tier: AccessTier,
@@ -225,6 +226,21 @@ fun SettingsScreen(
                 ) {
                     Text(text = stringResource(id = R.string.settings_notification_debug_title), style = MaterialTheme.typography.titleMedium)
                     TextButton(onClick = onOpenNotificationDebug) { Text(stringResource(id = R.string.settings_notification_debug_view_history_button)) }
+                }
+            }
+        }
+
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(text = stringResource(id = R.string.settings_manage_hidden_affirmations), style = MaterialTheme.typography.titleMedium)
+                    TextButton(onClick = onOpenHiddenAffirmations) { Text(stringResource(id = R.string.settings_manage_hidden_affirmations_button)) }
                 }
             }
         }

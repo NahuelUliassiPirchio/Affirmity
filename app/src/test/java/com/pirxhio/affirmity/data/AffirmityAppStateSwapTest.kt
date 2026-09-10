@@ -334,6 +334,11 @@ private fun buildState(
     val trackerPreferences = mock(TrackerPreferences::class.java)
     whenever(trackerPreferences.observeAffirmationsViewedToday())
         .thenReturn(EventedFlow("tracker-viewed", mutableListOf(), listOf(DailyViewCount(epochDay = -1L, count = 0))))
+    // Must be stubbed: AffirmityAppState collects this in its init, and the scope these tests pass
+    // is a plain Job (not SupervisorJob), so an unstubbed mock returning null throws inside that
+    // launch and cancels every sibling collector -- which surfaces as unrelated tests here either
+    // failing their assertions or hanging forever on a channel receive.
+    whenever(trackerPreferences.observeHiddenAffirmationIds()).thenReturn(flowOf(emptySet()))
     val notificationDebugLog = mock(NotificationDebugLog::class.java)
     whenever(notificationDebugLog.entries)
         .thenReturn(EventedFlow("debug-log", mutableListOf(), listOf(emptyList())))

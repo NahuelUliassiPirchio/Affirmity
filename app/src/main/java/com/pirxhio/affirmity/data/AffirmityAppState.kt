@@ -462,6 +462,13 @@ class AffirmityAppState(
     var favoriteAffirmationIds = mutableStateOf<Set<String>>(emptySet())
         private set
 
+    /** Catalog affirmation ids the user hid from their rotation (pre-launch audit item #1).
+     * Device-local (see [TrackerPreferences.observeHiddenAffirmationIds]) -- deliberately not
+     * synced through [DataSession]/Firestore, same posture as [meditationDurationSeconds]'s
+     * sibling knobs. */
+    var hiddenAffirmationIds = mutableStateOf<Set<String>>(emptySet())
+        private set
+
     private var favoriteOrderedIds = mutableStateOf<List<String>>(emptyList())
     private val favoriteToggleMutex = Mutex()
 
@@ -492,26 +499,40 @@ class AffirmityAppState(
      * behavior of returning `affirmations` unfiltered pre-resolution. */
     val filteredAffirmations: List<Affirmation>
         get() {
-            val ids = selectedThemeIds.value ?: return affirmations
+            val hiddenIds = hiddenAffirmationIds.value
+            val ids = selectedThemeIds.value ?: return affirmations.filterNot { it.id in hiddenIds }
             val collectionsById = catalogCollectionsById()
             val groupsById = catalogUniverseGroups().associateBy { it.id }
             val now = System.currentTimeMillis()
             val tier = entitlementTier.value
             val grants = adUnlockState
-            return affirmations +
+            return affirmations.filterNot { it.id in hiddenIds } +
                 catalogAffirmations.filter { affirmation ->
-                    val collection = collectionsById[affirmation.collectionId]
-                    collection?.themeId in ids &&
-                        groupsById[affirmation.groupId]?.let { group ->
-                            catalogAccessDecision(
-                                group = group,
-                                collection = collection,
-                                tier = tier,
-                                grants = grants,
-                                nowMillis = now,
-                            ).isUnlocked
-                        } == true
+                    affirmation.id !in hiddenIds &&
+                        run {
+                            val collection = collectionsById[affirmation.collectionId]
+                            collection?.themeId in ids &&
+                                groupsById[affirmation.groupId]?.let { group ->
+                                    catalogAccessDecision(
+                                        group = group,
+                                        collection = collection,
+                                        tier = tier,
+                                        grants = grants,
+                                        nowMillis = now,
+                                    ).isUnlocked
+                                } == true
+                        }
                 }
+        }
+
+    /** Resolved [Affirmation]s for every hidden id (pre-launch audit item #1's "Manage hidden
+     *  affirmations" screen), reusing the same cross-id-space lookup [favoriteAffirmations] uses --
+     *  no second id-to-text resolution mechanism. A hidden id whose row no longer exists (e.g. a
+     *  removed catalog entry) is silently dropped, same as [favoriteAffirmations]. */
+    val hiddenAffirmations: List<Affirmation>
+        get() {
+            val byId = allAffirmations.associateBy { it.id }
+            return hiddenAffirmationIds.value.mapNotNull(byId::get)
         }
 
     /** Unchanged in shape; now resolves across BOTH id spaces (design D10). Access-unfiltered on
@@ -892,6 +913,11 @@ class AffirmityAppState(
         scope.launch {
             trackerPreferences.observeAffirmationsViewedToday().collect { viewed ->
                 affirmationsViewedToday = viewed
+            }
+        }
+        scope.launch {
+            trackerPreferences.observeHiddenAffirmationIds().collect { ids ->
+                hiddenAffirmationIds.value = ids
             }
         }
         scope.launch {
@@ -1358,6 +1384,17 @@ class AffirmityAppState(
     /** Remove-only action for the Favorites screen. Repeated or stale callbacks stay idempotent. */
     fun removeFavorite(id: String) {
         scope.launch { favorites.remove(id) }
+    }
+
+    /** Hides a catalog affirmation from the main feed (pre-launch audit item #1). Device-local,
+     *  fire-and-forget, same convention as every other [trackerPreferences] write from Compose. */
+    fun hideAffirmation(id: String) {
+        scope.launch { trackerPreferences.hideAffirmation(id) }
+    }
+
+    /** Reverses [hideAffirmation] from the "Manage hidden affirmations" screen. */
+    fun unhideAffirmation(id: String) {
+        scope.launch { trackerPreferences.unhideAffirmation(id) }
     }
 
     /**

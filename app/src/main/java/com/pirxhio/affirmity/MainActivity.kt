@@ -91,6 +91,7 @@ import com.pirxhio.affirmity.ui.compass.CompassAnswerScreen
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
 import com.pirxhio.affirmity.ui.components.FloatingStatusOverlay
 import com.pirxhio.affirmity.ui.favorites.FavoritesScreen
+import com.pirxhio.affirmity.ui.hidden.HiddenAffirmationsScreen
 import com.pirxhio.affirmity.ui.feed.SeeAllThemesScreen
 import com.pirxhio.affirmity.ui.feed.SurfaceDetailBottomSheet
 import com.pirxhio.affirmity.ui.feed.YourFeedSheetContent
@@ -624,6 +625,9 @@ fun AffirmityApp(
     var showNotificationDebug by rememberSaveable { mutableStateOf(false) }
     var showMyAffirmations by rememberSaveable { mutableStateOf(false) }
     var showFavorites by rememberSaveable { mutableStateOf(false) }
+    // Pre-launch audit item #1's "Manage hidden affirmations" entry point (Settings) -- same
+    // rememberSaveable-boolean-overlay pattern as showMyAffirmations/showFavorites above.
+    var showHiddenAffirmations by rememberSaveable { mutableStateOf(false) }
     // REQ-5.4: replaces the old single-demo boolean. Holds a MeditationCatalogEntry.id so the
     // guided session route is parameterized on which entry to play, not just whether to show one.
     var selectedMeditationEntryId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -966,6 +970,33 @@ fun AffirmityApp(
         return
     }
 
+    if (showHiddenAffirmations) {
+        BackHandler { showHiddenAffirmations = false }
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            topBar = {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.hidden_affirmations_title)) },
+                    navigationIcon = {
+                        IconButton(onClick = { showHiddenAffirmations = false }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.nav_back_content_description)
+                            )
+                        }
+                    }
+                )
+            }
+        ) { innerPadding ->
+            HiddenAffirmationsScreen(
+                modifier = Modifier.padding(innerPadding),
+                hidden = appState.hiddenAffirmations,
+                onUnhide = appState::unhideAffirmation,
+            )
+        }
+        return
+    }
+
     val selectedMeditationEntry = resolveSelectedMeditationEntry(selectedMeditationEntryId)
     if (selectedMeditationEntry != null) {
         // Launch-time access re-check (REQ-5.4.1, EC-5): re-resolved at composition time, not
@@ -1283,6 +1314,10 @@ fun AffirmityApp(
                 },
                 onOpenOnboardingGuide = {
                     showOnboardingGuide = true
+                    showSettings = false
+                },
+                onOpenHiddenAffirmations = {
+                    showHiddenAffirmations = true
                     showSettings = false
                 },
             )
