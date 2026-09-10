@@ -57,8 +57,15 @@ export function toAppStoreEntitlement(
   payload: AppStoreTransactionPayload,
   nowMillis: number,
 ): AppStoreEntitlementDoc {
+  // A verified StoreKit 2 transaction JWS always carries a transactionId -- its absence means the
+  // decoded payload is malformed, not that this specific field is legitimately optional. Reject
+  // here rather than falling through to `sha256Hex('')`, which would collapse every such payload
+  // onto the same `purchaseTokenHash` and defeat any dedup/fraud-correlation use of that field.
+  if (!payload.transactionId) {
+    throw new AppStoreVerificationError('Apple transaction payload missing transactionId');
+  }
   const tier: EntitlementTier = payload.revocationDate ? 'free' : 'pro';
-  const transactionId = payload.transactionId ?? null;
+  const transactionId = payload.transactionId;
   return {
     tier,
     status: payload.revocationDate ? 'REVOKED' : 'ACTIVE',
@@ -72,7 +79,7 @@ export function toAppStoreEntitlement(
     // rather than false-as-fact. Left `false` (not derived) until renewal-info verification is
     // added, same "not required now" scope as the `appAccountToken` hardening idea above.
     autoRenewing: false,
-    purchaseTokenHash: sha256Hex(transactionId ?? ''),
+    purchaseTokenHash: sha256Hex(transactionId),
     lastVerifiedAt: nowMillis,
     source: 'sync-ios',
     transactionId,
@@ -115,9 +122,10 @@ export async function resolveIosEntitlement(
   signedTransaction: string,
   nowMillis: number,
 ): Promise<ResolveIosEntitlementResult> {
-  let payload: AppStoreTransactionPayload;
+  let doc: AppStoreEntitlementDoc;
   try {
-    payload = await verifier.verifyTransaction(signedTransaction);
+    const payload = await verifier.verifyTransaction(signedTransaction);
+    doc = toAppStoreEntitlement(payload, nowMillis);
   } catch (err) {
     if (err instanceof AppStoreVerificationError) {
       return { outcome: 'invalid' };
@@ -125,7 +133,6 @@ export async function resolveIosEntitlement(
     throw err;
   }
 
-  const doc = toAppStoreEntitlement(payload, nowMillis);
   const lastVerifiedAt = await store.getLastVerifiedAt(uid);
   if (lastVerifiedAt !== null && doc.lastVerifiedAt <= lastVerifiedAt) {
     return { outcome: 'dropped-stale', doc };

@@ -56,11 +56,15 @@ describe('toAppStoreEntitlement', () => {
     expect(doc.purchaseTokenHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
-  it('handles a payload missing productId/transactionId without throwing', () => {
-    const doc = toAppStoreEntitlement({}, 1000);
+  it('handles a payload missing productId without throwing', () => {
+    const doc = toAppStoreEntitlement({ transactionId: 'txn-1' }, 1000);
     expect(doc.productId).toBeNull();
-    expect(doc.transactionId).toBeNull();
+    expect(doc.transactionId).toBe('txn-1');
     expect(doc.tier).toBe('pro');
+  });
+
+  it('rejects a verified payload missing transactionId instead of hashing an empty string', () => {
+    expect(() => toAppStoreEntitlement({}, 1000)).toThrow('missing transactionId');
   });
 });
 
