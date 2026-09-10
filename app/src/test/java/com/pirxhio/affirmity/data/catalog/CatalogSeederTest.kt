@@ -19,7 +19,7 @@ private fun catalogJson(version: String, rowCount: Int = 1) = buildString {
     (1..rowCount).forEach { i ->
         if (i > 1) append(",")
         append(
-            """{"id":"cat_$COLLECTION_ID.00$i","text":"Texto $i","groupId":"self_worth",""" +
+            """{"id":"cat_$COLLECTION_ID.00$i","title":"Texto $i","subtitle":"Subtexto $i","groupId":"self_worth",""" +
                 """"themeId":"self_worth.feeling_enough","collectionId":"$COLLECTION_ID","sortOrder":${i - 1}}""",
         )
     }

@@ -40,15 +40,21 @@ object CatalogAssetParser {
                 "$id references unknown collectionId $collectionId"
             }
 
-            val text = row.getString("text")
-            val illegalBrackets = CatalogTextSanitizer.findIllegalBrackets(text)
-            require(illegalBrackets.isEmpty()) {
-                "$id contains illegal bracket(s) at offsets $illegalBrackets"
+            val title = row.getString("title")
+            val subtitle = row.getString("subtitle")
+            val illegalTitleBrackets = CatalogTextSanitizer.findIllegalBrackets(title)
+            require(illegalTitleBrackets.isEmpty()) {
+                "$id contains illegal bracket(s) in title at offsets $illegalTitleBrackets"
+            }
+            val illegalSubtitleBrackets = CatalogTextSanitizer.findIllegalBrackets(subtitle)
+            require(illegalSubtitleBrackets.isEmpty()) {
+                "$id contains illegal bracket(s) in subtitle at offsets $illegalSubtitleBrackets"
             }
 
             entities += CatalogAffirmationEntity(
                 id = id,
-                text = text,
+                text = title,
+                subtitle = subtitle,
                 groupId = row.getString("groupId"),
                 themeId = row.getString("themeId"),
                 collectionId = collectionId,

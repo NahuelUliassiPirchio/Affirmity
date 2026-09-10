@@ -4,6 +4,7 @@ import {
   buildWritePlan,
   chunk,
   MAX_OPS_PER_BATCH,
+  parseSourceCatalog,
   seedCatalog,
   type BatchCommitter,
   type FirestoreWrite,
@@ -23,26 +24,63 @@ import {
 
 function sourceCatalog(overrides: Partial<SourceCatalog> = {}): SourceCatalog {
   return {
-    catalogVersion: '1.0.0',
+    catalogVersion: '2.0.0',
     universes: [
       { id: 'u1', title: 'U1', description: 'd', coreNeed: 'c', order: 1, status: 'active' },
     ],
     themes: [
-      { id: 'u1.t1', universeId: 'u1', title: 'T1', description: 'd', order: 1, status: 'active' },
+      {
+        id: 'u1.t1',
+        universeId: 'u1',
+        title: 'T1',
+        description: 'd',
+        conceptTagIds: ['tag1'],
+        desiredStateIds: ['state1'],
+        order: 1,
+        status: 'active',
+      },
     ],
     collections: [
       {
         id: 'u1.t1.c1',
         universeId: 'u1',
         themeId: 'u1.t1',
+        title: 'C1',
+        description: 'd',
         access: { tier: 'free', rewardedUnlockHours: null },
+        conceptTagIds: ['tag1'],
+        contextIds: [],
+        momentIds: [],
+        desiredStateIds: [],
         order: 1,
         status: 'active',
       },
     ],
     affirmations: [
-      { id: 'u1.t1.c1.001', collectionId: 'u1.t1.c1', text: 'Text 1', order: 1, status: 'active' },
-      { id: 'u1.t1.c1.002', collectionId: 'u1.t1.c1', text: 'Text 2', order: 2, status: 'active' },
+      {
+        id: 'u1.t1.c1.001',
+        collectionId: 'u1.t1.c1',
+        themeId: 'u1.t1',
+        universeId: 'u1',
+        tone: 'powerful',
+        semanticAngle: 'identity',
+        title: 'Title 1',
+        subtitle: 'Subtitle 1',
+        order: 1,
+        status: 'active',
+      },
+      {
+        id: 'u1.t1.c1.002',
+        collectionId: 'u1.t1.c1',
+        themeId: 'u1.t1',
+        universeId: 'u1',
+        tone: 'powerful',
+        semanticAngle: 'identity',
+        title: 'Title 2',
+        subtitle: 'Subtitle 2',
+        order: 2,
+        status: 'active',
+      },
     ],
     ...overrides,
   };
@@ -68,7 +106,12 @@ function manyAffirmations(count: number): SourceCatalog['affirmations'] {
   return Array.from({ length: count }, (_, i) => ({
     id: `u1.t1.c1.${String(i + 1).padStart(4, '0')}`,
     collectionId: 'u1.t1.c1',
-    text: `Text ${i + 1}`,
+    themeId: 'u1.t1',
+    universeId: 'u1',
+    tone: 'powerful',
+    semanticAngle: 'identity',
+    title: `Title ${i + 1}`,
+    subtitle: `Subtitle ${i + 1}`,
     order: i + 1,
     status: 'active',
   }));
@@ -105,19 +148,6 @@ describe('buildWritePlan', () => {
         { id: 'u1', title: 'U1', description: 'd', coreNeed: 'c', order: 1, status: 'active' },
         { id: 'u2', title: 'U2', description: 'd', coreNeed: 'c', order: 2, status: 'active' },
       ],
-      themes: [
-        { id: 'u1.t1', universeId: 'u1', title: 'T1', description: 'd', order: 1, status: 'active' },
-      ],
-      collections: [
-        {
-          id: 'u1.t1.c1',
-          universeId: 'u1',
-          themeId: 'u1.t1',
-          access: { tier: 'free', rewardedUnlockHours: null },
-          order: 1,
-          status: 'active',
-        },
-      ],
     });
     const { taxonomyWrites } = buildWritePlan(catalog);
     expect(taxonomyWrites.map((w) => w.path)).toEqual([
@@ -140,6 +170,54 @@ describe('buildWritePlan', () => {
     const { versionWrite } = buildWritePlan(sourceCatalog({ catalogVersion: '2.3.4' }));
     expect(versionWrite.path).toBe('catalogMeta/version');
     expect(versionWrite.data.version).toBe('2.3.4');
+  });
+
+  it('affirmation writes carry v2 copy fields (title/subtitle/tone/semanticAngle), never text/legacyText', () => {
+    const { affirmationWrites } = buildWritePlan(sourceCatalog());
+    const first = affirmationWrites[0];
+    expect(first.data).toMatchObject({
+      title: 'Title 1',
+      subtitle: 'Subtitle 1',
+      tone: 'powerful',
+      semanticAngle: 'identity',
+      groupId: 'u1',
+      themeId: 'u1.t1',
+      collectionId: 'u1.t1.c1',
+      sortOrder: 1,
+    });
+    expect(first.data).not.toHaveProperty('text');
+    expect(first.data).not.toHaveProperty('legacyText');
+  });
+
+  it('collection writes carry title/description and the four tag-id arrays', () => {
+    const { taxonomyWrites } = buildWritePlan(sourceCatalog());
+    const collectionWrite = taxonomyWrites.find((w) => w.path === 'catalogCollections/u1.t1.c1')!;
+    expect(collectionWrite.data).toMatchObject({
+      title: 'C1',
+      description: 'd',
+      conceptTagIds: ['tag1'],
+      contextIds: [],
+      momentIds: [],
+      desiredStateIds: [],
+    });
+  });
+
+  it('theme writes carry title/description and conceptTagIds/desiredStateIds', () => {
+    const { taxonomyWrites } = buildWritePlan(sourceCatalog());
+    const themeWrite = taxonomyWrites.find((w) => w.path === 'catalogThemes/u1.t1')!;
+    expect(themeWrite.data).toMatchObject({
+      title: 'T1',
+      description: 'd',
+      conceptTagIds: ['tag1'],
+      desiredStateIds: ['state1'],
+    });
+  });
+
+  it('no write in the entire plan ever carries a legacyText field', () => {
+    const { taxonomyWrites, affirmationWrites, versionWrite } = buildWritePlan(sourceCatalog());
+    for (const write of [...taxonomyWrites, ...affirmationWrites, versionWrite]) {
+      expect(write.data).not.toHaveProperty('legacyText');
+    }
   });
 });
 
@@ -211,5 +289,67 @@ describe('seedCatalog', () => {
     await expect(seedCatalog(catalog, committer)).rejects.toThrow('simulated mid-run failure');
     expect(committer.commits).toHaveLength(contentChunkCount - 1);
     expect(committer.commits.flat().some((w) => w.path === 'catalogMeta/version')).toBe(false);
+  });
+});
+
+describe('parseSourceCatalog', () => {
+  function raw(overrides: Partial<SourceCatalog> = {}): unknown {
+    return sourceCatalog(overrides);
+  }
+
+  it('accepts a well-formed v2 catalog and returns it unchanged in shape', () => {
+    const parsed = parseSourceCatalog(raw());
+    expect(parsed.affirmations).toHaveLength(2);
+    expect(parsed.affirmations[0].title).toBe('Title 1');
+  });
+
+  it('throws naming the affirmation id when title is missing', () => {
+    const catalog = sourceCatalog();
+    // @ts-expect-error -- intentionally malformed for the RED test
+    delete catalog.affirmations[0].title;
+    expect(() => parseSourceCatalog(catalog)).toThrow(/u1\.t1\.c1\.001/);
+  });
+
+  it('throws naming the affirmation id when tone is not a string', () => {
+    const catalog = sourceCatalog();
+    // @ts-expect-error -- intentionally malformed for the RED test
+    catalog.affirmations[0].tone = 42;
+    expect(() => parseSourceCatalog(catalog)).toThrow(/u1\.t1\.c1\.001/);
+  });
+
+  it('throws naming the collection id when tier=free declares a non-null rewardedUnlockHours', () => {
+    const catalog = sourceCatalog();
+    catalog.collections[0].access = { tier: 'free', rewardedUnlockHours: 12 };
+    expect(() => parseSourceCatalog(catalog)).toThrow(/u1\.t1\.c1/);
+  });
+
+  it('throws naming the collection id when rewardedUnlockHours is non-positive', () => {
+    const catalog = sourceCatalog();
+    catalog.collections[0].access = { tier: 'pro', rewardedUnlockHours: 0 };
+    expect(() => parseSourceCatalog(catalog)).toThrow(/u1\.t1\.c1/);
+  });
+
+  it('throws naming the duplicate affirmation id', () => {
+    const catalog = sourceCatalog();
+    catalog.affirmations[1] = { ...catalog.affirmations[0] };
+    expect(() => parseSourceCatalog(catalog)).toThrow(/u1\.t1\.c1\.001/);
+  });
+
+  it('throws naming the affirmation id when collectionId does not resolve', () => {
+    const catalog = sourceCatalog();
+    catalog.affirmations[0].collectionId = 'unknown.collection';
+    expect(() => parseSourceCatalog(catalog)).toThrow(/u1\.t1\.c1\.001/);
+  });
+
+  it('throws naming the affirmation id when themeId disagrees with the resolved collection', () => {
+    const catalog = sourceCatalog();
+    catalog.affirmations[0].themeId = 'some.other.theme';
+    expect(() => parseSourceCatalog(catalog)).toThrow(/u1\.t1\.c1\.001/);
+  });
+
+  it('throws naming the affirmation id when universeId disagrees with the resolved collection', () => {
+    const catalog = sourceCatalog();
+    catalog.affirmations[0].universeId = 'some-other-universe';
+    expect(() => parseSourceCatalog(catalog)).toThrow(/u1\.t1\.c1\.001/);
   });
 });

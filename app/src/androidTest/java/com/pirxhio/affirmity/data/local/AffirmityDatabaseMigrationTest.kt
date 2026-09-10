@@ -235,6 +235,38 @@ class AffirmityDatabaseMigrationTest {
         }
     }
 
+    /** Covers spec "Room Catalog Cache Table" (design D4, catalog-schema-v2): `subtitle` is added
+     * additively, defaults to `''` for every pre-existing row, and every other column/table is
+     * byte-for-byte untouched -- the backfill is transient by construction (next `CatalogSeeder`
+     * full-replace overwrites it with the real v2 subtitle). */
+    @Test
+    fun migrate10To11_addsSubtitleColumnDefaultingToEmptyAndLeavesExistingRowsUntouched() {
+        helper.createDatabase(TEST_DB, 10).apply {
+            execSQL(
+                "INSERT INTO catalog_affirmations " +
+                    "(id, text, groupId, themeId, collectionId, sortOrder) " +
+                    "VALUES ('cat_id-1', 'Title', 'self_worth', 'self_worth.t1', 'self_worth.t1.c1', 0)",
+            )
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(TEST_DB, 11, true, MIGRATION_10_11)
+
+        migrated.query(
+            "SELECT text, subtitle, groupId, themeId, collectionId, sortOrder " +
+                "FROM catalog_affirmations WHERE id = 'cat_id-1'",
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("Title", cursor.getString(0))
+            assertEquals("", cursor.getString(1))
+            assertFalse(cursor.isNull(1))
+            assertEquals("self_worth", cursor.getString(2))
+            assertEquals("self_worth.t1", cursor.getString(3))
+            assertEquals("self_worth.t1.c1", cursor.getString(4))
+            assertEquals(0, cursor.getInt(5))
+        }
+    }
+
     private companion object {
         const val TEST_DB = "migration-test"
     }

@@ -179,6 +179,15 @@ val MIGRATION_9_10 = object : androidx.room.migration.Migration(9, 10) {
     }
 }
 
+/** Additive: adds `subtitle` to `catalog_affirmations` (design D4/spec "Room Catalog Cache
+ * Table" -- v2 copy shape). Every pre-existing row backfills to `''`, which is transient by
+ * construction: `catalogVersion` 2.0.0 makes `CatalogSeeder` full-replace the table on next sync. */
+val MIGRATION_10_11 = object : androidx.room.migration.Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `catalog_affirmations` ADD COLUMN `subtitle` TEXT NOT NULL DEFAULT ''")
+    }
+}
+
 @Database(
     entities = [
         AffirmationEntity::class,
@@ -192,7 +201,7 @@ val MIGRATION_9_10 = object : androidx.room.migration.Migration(9, 10) {
         CatalogOverrideEntity::class,
         MeditationCustomizationEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 @androidx.room.TypeConverters(OverridesConverters::class)
@@ -228,6 +237,7 @@ abstract class AffirmityDatabase : RoomDatabase() {
                     MIGRATION_7_8,
                     MIGRATION_8_9,
                     MIGRATION_9_10,
+                    MIGRATION_10_11,
                 ).build().also { instance = it }
             }
     }

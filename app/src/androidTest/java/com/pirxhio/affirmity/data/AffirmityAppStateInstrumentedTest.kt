@@ -20,10 +20,13 @@ import com.pirxhio.affirmity.data.remote.FirestoreMigrationSource
 import com.pirxhio.affirmity.data.remote.FirestoreMigrator
 import com.pirxhio.affirmity.data.remote.FirestoreOnboardingRepository
 import com.pirxhio.affirmity.data.repository.DataSession
+import com.pirxhio.affirmity.data.repository.RoomAdUnlockRepository
 import com.pirxhio.affirmity.data.repository.RoomAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomDailyCompletionRepository
+import com.pirxhio.affirmity.data.repository.RoomDailyMoodRepository
 import com.pirxhio.affirmity.data.repository.RoomMeditationPreferencesRepository
 import com.pirxhio.affirmity.data.repository.RoomNotificationSettingsRepository
+import com.pirxhio.affirmity.data.repository.RoomStreakHealerRepository
 import com.pirxhio.affirmity.notifications.Notifier
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope
@@ -76,8 +79,11 @@ class AffirmityAppStateInstrumentedTest {
         val local = DataSession.Local(
             affirmations = RoomAffirmationRepository(db.affirmationDao()),
             completions = RoomDailyCompletionRepository(db.dailyCompletionDao()),
+            moods = RoomDailyMoodRepository(db.dailyMoodDao()),
+            healerUses = RoomStreakHealerRepository(db.streakHealerUseDao()),
             meditation = RoomMeditationPreferencesRepository(trackerPreferences),
             notifications = RoomNotificationSettingsRepository(notificationPreferences),
+            adUnlocks = RoomAdUnlockRepository(db.adUnlockDao(), db.timedAdUnlockDao()),
         )
         state = AffirmityAppState(
             scope = CoroutineScope(Dispatchers.Unconfined),

@@ -402,6 +402,7 @@ private class RecordingSeederPrefs(initial: String? = null) : CatalogPreferences
 private fun catalogEntity(id: String, collectionId: String, withToken: Boolean = false) = CatalogAffirmationEntity(
     id = id,
     text = if (withToken) "Text for $id, [name]" else "Text for $id",
+    subtitle = "Subtitle for $id",
     groupId = UNIVERSE_ID,
     themeId = "$UNIVERSE_ID.theme",
     collectionId = collectionId,

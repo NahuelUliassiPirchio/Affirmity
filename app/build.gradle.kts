@@ -182,4 +182,13 @@ dependencies {
     androidTestImplementation(libs.androidx.glance.appwidget.testing)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
+
+    // Room 2.8.4's migration-bundle deserializer needs kotlinx-serialization-core >= 1.8.0
+    // (GeneratedSerializer.typeParametersSerializers()); without this, Compose's transitive
+    // lifecycle-viewmodel-savedstate:2.9.4 pins the resolved version down to 1.7.3 and every
+    // MigrationTestHelper-based instrumented test fails with AbstractMethodError. Nothing in this
+    // app uses kotlinx-serialization directly, so a constraint (not a real dependency) is enough.
+    constraints {
+        implementation(libs.kotlinx.serialization.core)
+    }
 }

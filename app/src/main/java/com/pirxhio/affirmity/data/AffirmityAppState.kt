@@ -205,15 +205,16 @@ private fun AffirmationEntity.toAffirmation(): Affirmation = Affirmation(
     overrides = overrides,
 )
 
-/** Catalog row -> read-model [Affirmation] (design D8/D14): `text` maps to `title`, `subtitle` is
- *  empty (one authored string per affirmation, no split); the background is DERIVED, never stored
- *  (design D4); [overrides] comes from the per-user override map, keyed off the row's own id. */
+/** Catalog row -> read-model [Affirmation] (design D4/D8/D14): `text` maps to `title` (accepted
+ *  naming debt -- the column holds the v2 source's `title`), `subtitle` maps to the row's real
+ *  `subtitle`; the background is DERIVED, never stored (design D4); [overrides] comes from the
+ *  per-user override map, keyed off the row's own id. */
 private fun com.pirxhio.affirmity.data.local.CatalogAffirmationEntity.toAffirmation(
     overrides: Map<String, String>,
 ): Affirmation = Affirmation(
     id = id,
     title = text,
-    subtitle = "",
+    subtitle = subtitle,
     background = com.pirxhio.affirmity.ui.affirmations.forCatalogAffirmation(groupId, id),
     groupId = groupId,
     overrides = overrides,
