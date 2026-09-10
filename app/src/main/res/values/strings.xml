@@ -741,6 +741,8 @@
     <string name="favorites_unlike_content_description">Quitar de favoritos</string>
     <string name="affirmation_share_content_description">Compartir afirmación</string>
     <string name="affirmation_hide_content_description">Ocultar afirmación</string>
+    <string name="affirmation_unfavorited_snackbar">Quitada de favoritas</string>
+    <string name="affirmation_unfavorited_undo">Deshacer</string>
     <string name="hidden_affirmations_title">Afirmaciones ocultas</string>
     <string name="hidden_affirmations_empty_state">No ocultaste ninguna afirmación.</string>
     <string name="hidden_affirmations_unhide_content_description">Dejar de ocultar</string>

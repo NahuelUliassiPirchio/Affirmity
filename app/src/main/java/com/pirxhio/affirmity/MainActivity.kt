@@ -764,6 +764,8 @@ fun AffirmityApp(
     // for the same LocalContextGetResourceValueCall reason as the ad-unlock messages above.
     val meditationAccessBlockedMessage = stringResource(R.string.meditation_access_blocked_message)
     val paywallSnackbarLapseAction = stringResource(R.string.paywall_snackbar_lapse_action)
+    val unfavoritedMessage = stringResource(R.string.affirmation_unfavorited_snackbar)
+    val unfavoritedUndoAction = stringResource(R.string.affirmation_unfavorited_undo)
     // Fix item 3: shared by BOTH the mid-flow onAccessBlocked callback below AND the
     // composition-time launch re-check further down -- whichever path first notices the access
     // loss shows the SAME snackbar-with-"see plans"-action, instead of the re-check silently
@@ -1473,7 +1475,27 @@ fun AffirmityApp(
                             onAffirmationViewed = { appState.recordAffirmationViewed() },
                             onOverrideCommitted = appState::setTokenOverride,
                             favoriteIds = appState.favoriteAffirmationIds.value,
-                            onToggleFavorite = appState::toggleFavorite,
+                            onToggleFavorite = { id ->
+                                // Undo is offered only in the destructive direction: losing a
+                                // favourite by a stray double-tap is the costly mistake, gaining one
+                                // is not. Strings are resolved above in composable scope, never via
+                                // context.getString inside the coroutine (LocalContextGetResourceValueCall).
+                                val wasFavorite = id in appState.favoriteAffirmationIds.value
+                                appState.toggleFavorite(id)
+                                if (wasFavorite) {
+                                    snackbarScope.launch {
+                                        val result = snackbarHostState.showSnackbar(
+                                            message = unfavoritedMessage,
+                                            actionLabel = unfavoritedUndoAction,
+                                            duration = androidx.compose.material3.SnackbarDuration.Short,
+                                        )
+                                        if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                                            appState.restoreFavorite(id)
+                                        }
+                                    }
+                                }
+                            },
+                            onHideAffirmation = appState::hideAffirmation,
                         )
                     }
 

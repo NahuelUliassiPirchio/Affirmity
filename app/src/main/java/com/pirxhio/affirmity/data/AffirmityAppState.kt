@@ -1424,6 +1424,15 @@ class AffirmityAppState(
         scope.launch { favorites.remove(id) }
     }
 
+    /** Add-only counterpart to [removeFavorite], for the unfavorite undo snackbar. Deliberately not
+     *  [toggleFavorite]: if the user re-favorited the same affirmation while the snackbar was still
+     *  up, toggling would remove it again -- the opposite of what "undo" promised. */
+    fun restoreFavorite(id: String) {
+        scope.launch {
+            favoriteToggleMutex.withLock { favorites.add(id, System.currentTimeMillis()) }
+        }
+    }
+
     /** Hides a catalog affirmation from the main feed (pre-launch audit item #1). Device-local,
      *  fire-and-forget, same convention as every other [trackerPreferences] write from Compose. */
     fun hideAffirmation(id: String) {
