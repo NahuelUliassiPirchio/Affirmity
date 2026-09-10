@@ -114,6 +114,22 @@ describe('buildCatalog', () => {
     expect(() => buildCatalog(catalog)).toThrow(/u1\.t1\.c1\.001/);
   });
 
+  it('fails clearly when a collection references an unknown themeId', () => {
+    const catalog = source();
+    catalog.collections[0].themeId = 'unknown.theme';
+    expect(() => buildCatalog(catalog)).toThrow(
+      '[buildCatalog] collection u1.t1.c1 references unknown themeId unknown.theme',
+    );
+  });
+
+  it('normalizes a missing optional subtitle to blank for the Android asset', () => {
+    const catalog = source();
+    delete catalog.affirmations[0].subtitle;
+    const { asset } = buildCatalog(catalog);
+    const row = asset.affirmations.find((affirmation) => affirmation.id === 'cat_u1.t1.c1.001');
+    expect(row.subtitle).toBe('');
+  });
+
   it('fails on a duplicate affirmation id', () => {
     const catalog = source();
     catalog.affirmations[1].id = catalog.affirmations[0].id;

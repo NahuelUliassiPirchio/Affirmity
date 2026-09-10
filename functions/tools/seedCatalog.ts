@@ -80,7 +80,9 @@ export interface SourceAffirmation {
   tone: string;
   semanticAngle: string;
   title: string;
-  subtitle: string;
+  /** Optional (spec "v2 Copy Shape"): absent in the source stays `undefined` here; Firestore
+   *  writes omit the key and `buildCatalog.mjs` normalizes it for Android's non-null read model. */
+  subtitle?: string;
   order: number;
   status: string;
 }
@@ -179,7 +181,9 @@ function affirmationWrite(a: SourceAffirmation, catalogVersion: string): Firesto
     path: `catalogAffirmations/${CATALOG_ID_PREFIX}${a.id}`,
     data: {
       title: a.title,
-      subtitle: a.subtitle,
+      // Omitted entirely (not written as `""`) when the source has no subtitle -- `set(...,
+      // { merge: true })` should never plant a spurious empty field.
+      ...(a.subtitle !== undefined ? { subtitle: a.subtitle } : {}),
       tone: a.tone,
       semanticAngle: a.semanticAngle,
       groupId: a.universeId,
@@ -246,6 +250,10 @@ function requireNonEmptyString(value: unknown, id: string, field: string): strin
   const s = requireString(value, id, field);
   if (s.length === 0) throw new Error(`${id}: field "${field}" must not be empty`);
   return s;
+}
+
+function optionalString(value: unknown, id: string, field: string): string | undefined {
+  return value === undefined ? undefined : requireString(value, id, field);
 }
 
 function requireInt(value: unknown, id: string, field: string): number {
@@ -341,7 +349,7 @@ function parseAffirmation(raw: unknown): SourceAffirmation {
     tone: requireString(a.tone, id, 'tone'),
     semanticAngle: requireString(a.semanticAngle, id, 'semanticAngle'),
     title: requireNonEmptyString(a.title, id, 'title'),
-    subtitle: requireNonEmptyString(a.subtitle, id, 'subtitle'),
+    subtitle: optionalString(a.subtitle, id, 'subtitle'),
     order: requireInt(a.order, id, 'order'),
     status: requireString(a.status, id, 'status'),
   };

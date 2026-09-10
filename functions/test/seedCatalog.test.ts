@@ -189,6 +189,13 @@ describe('buildWritePlan', () => {
     expect(first.data).not.toHaveProperty('legacyText');
   });
 
+  it('omits an optional subtitle that is absent from the source', () => {
+    const catalog = sourceCatalog();
+    delete catalog.affirmations[0].subtitle;
+    const { affirmationWrites } = buildWritePlan(catalog);
+    expect(affirmationWrites[0].data).not.toHaveProperty('subtitle');
+  });
+
   it('collection writes carry title/description and the four tag-id arrays', () => {
     const { taxonomyWrites } = buildWritePlan(sourceCatalog());
     const collectionWrite = taxonomyWrites.find((w) => w.path === 'catalogCollections/u1.t1.c1')!;
@@ -308,6 +315,20 @@ describe('parseSourceCatalog', () => {
     // @ts-expect-error -- intentionally malformed for the RED test
     delete catalog.affirmations[0].title;
     expect(() => parseSourceCatalog(catalog)).toThrow(/u1\.t1\.c1\.001/);
+  });
+
+  it('accepts a missing optional subtitle', () => {
+    const catalog = sourceCatalog();
+    delete catalog.affirmations[0].subtitle;
+    const parsed = parseSourceCatalog(catalog);
+    expect(parsed.affirmations[0].subtitle).toBeUndefined();
+  });
+
+  it('accepts a blank optional subtitle', () => {
+    const catalog = sourceCatalog();
+    catalog.affirmations[0].subtitle = '';
+    const parsed = parseSourceCatalog(catalog);
+    expect(parsed.affirmations[0].subtitle).toBe('');
   });
 
   it('throws naming the affirmation id when tone is not a string', () => {

@@ -31,6 +31,7 @@ export function buildCatalog(source) {
 
   const universeById = new Map(universes.map((u) => [u.id, u]));
   const collectionById = new Map(collections.map((c) => [c.id, c]));
+  const themeById = new Map(themes.map((t) => [t.id, t]));
 
   for (const c of collections) {
     if (c.access.tier === 'free' && c.access.rewardedUnlockHours !== null) {
@@ -40,6 +41,7 @@ export function buildCatalog(source) {
       fail(`collection ${c.id} declares non-positive rewardedUnlockHours`);
     }
     if (!universeById.has(c.universeId)) fail(`collection ${c.id} references unknown universeId ${c.universeId}`);
+    if (!themeById.has(c.themeId)) fail(`collection ${c.id} references unknown themeId ${c.themeId}`);
   }
 
   const catalogGatedGroupIds = new Set();
@@ -65,7 +67,7 @@ export function buildCatalog(source) {
       fail(`affirmation ${a.id} universeId "${a.universeId}" disagrees with resolved collection "${collection.universeId}"`);
     }
 
-    const theme = themes.find((t) => t.id === collection.themeId);
+    const theme = themeById.get(collection.themeId);
     const list = byGroup.get(collection.universeId) ?? [];
     list.push({ a, collection, theme });
     byGroup.set(collection.universeId, list);
@@ -82,7 +84,9 @@ export function buildCatalog(source) {
       outAffirmations.push({
         id: `${CATALOG_ID_PREFIX}${a.id}`,
         title: a.title,
-        subtitle: a.subtitle,
+        // `subtitle` is optional in the source (spec "v2 Copy Shape"); the Android asset always
+        // carries the key, since `CatalogAssetParser.kt` reads it unconditionally.
+        subtitle: a.subtitle ?? '',
         groupId,
         themeId: collection.themeId,
         collectionId: collection.id,
