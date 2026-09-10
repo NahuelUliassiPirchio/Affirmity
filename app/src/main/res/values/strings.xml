@@ -243,6 +243,38 @@
     <string name="guided_meditation_resume_content_description">Reanudar</string>
     <string name="guided_meditation_skip_content_description">Avanzar fase</string>
     <string name="guided_meditation_idle_duration_minutes">%1$d min</string>
+    <string name="meditation_primer_shelf_title">Vale la pena conocerlas</string>
+    <string name="meditation_primer_shelf_subtitle">Prácticas con nombres raros, explicadas simple</string>
+    <string name="meditation_primer_expectations_label">QUÉ ESPERAR</string>
+    <string name="meditation_primer_start_cta">Empezar sesión</string>
+    <string name="meditation_primer_info_content_description">Ver de qué se trata</string>
+
+    <string name="meditation_primer_trataka_plain">Mirada en un punto</string>
+    <string name="meditation_primer_trataka_short">Descansá los ojos en un punto hasta que la mente siga.</string>
+    <string name="meditation_primer_trataka_long">Te sentás frente a un solo punto de luz —una vela, o un punto en la pared— y mantenés los ojos ahí. Cuando la atención se va, la traés de vuelta. Esa es toda la práctica. Aquieta una mente acelerada más rápido que la mayoría de los ejercicios de respiración, y es la indicada para cuando los pensamientos no paran.</string>
+    <string name="meditation_primer_trataka_expect_1">Los ojos van abiertos todo el tiempo</string>
+    <string name="meditation_primer_trataka_expect_2">Funciona mejor con poca luz</string>
+    <string name="meditation_primer_trataka_expect_3">Parpadeá cuando lo necesites</string>
+
+    <string name="meditation_primer_yoganidra_plain">Descanso profundo guiado</string>
+    <string name="meditation_primer_yoganidra_short">Acostate y dejá que una voz te recorra el cuerpo.</string>
+    <string name="meditation_primer_yoganidra_long">Te acostás boca arriba y una voz lleva tu atención por el cuerpo, parte por parte. No estás tratando de dormirte, aunque mucha gente se duerme. Veinte minutos de esto dejan a la mayoría como si hubiera dormido una siesta de una hora.</string>
+    <string name="meditation_primer_yoganidra_expect_1">Se hace acostado, no sentado</string>
+    <string name="meditation_primer_yoganidra_expect_2">Quedarse dormido está bien</string>
+    <string name="meditation_primer_yoganidra_expect_3">No hay nada que hacer, solo escuchar</string>
+
+    <string name="meditation_primer_vipassana_plain">Observar lo que aparece</string>
+    <string name="meditation_primer_vipassana_short">Mirá lo que surge sin corregir nada.</string>
+    <string name="meditation_primer_vipassana_long">Te sentás y notás lo que aparezca —la respiración, un sonido, una molestia, un pensamiento— sin perseguirlo ni empujarlo lejos. Más antigua y más simple de lo que suena, y la base sobre la que se construyen casi todas las demás prácticas.</string>
+    <string name="meditation_primer_vipassana_expect_1">No hay visualización</string>
+    <string name="meditation_primer_vipassana_expect_2">Sentado y con los ojos cerrados</string>
+    <string name="meditation_primer_vipassana_expect_3">La inquietud es parte del asunto</string>
+
+    <string name="meditation_primer_metta_short">Mandá unos buenos deseos, empezando por vos.</string>
+    <string name="meditation_primer_metta_long">Repetís un puñado de deseos simples: que yo esté bien, que yo esté en paz. Después mandás las mismas frases a alguien que querés, a alguien neutral, a alguien difícil. Es la práctica para los días en que estás siendo duro con vos mismo.</string>
+    <string name="meditation_primer_metta_expect_1">Se repiten frases, no se vacía la mente</string>
+    <string name="meditation_primer_metta_expect_2">Empezás por vos</string>
+    <string name="meditation_primer_metta_expect_3">Que al principio no sientas nada es normal</string>
     <string name="guided_meditation_cue_sound_mute_content_description">Silenciar sonido de transición</string>
     <string name="guided_meditation_cue_sound_unmute_content_description">Activar sonido de transición</string>
 

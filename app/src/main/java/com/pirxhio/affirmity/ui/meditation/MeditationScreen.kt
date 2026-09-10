@@ -1,6 +1,7 @@
 package com.pirxhio.affirmity.ui.meditation
 
 import android.media.MediaPlayer
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -25,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -60,6 +62,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.AccessDecision
@@ -150,6 +153,11 @@ private val DISCOVER_LIST_PEEK_HEIGHT = 96.dp
  *  race a decision that could change underneath it while open. */
 private data class AdUnlockRequest(val entry: MeditationCatalogEntry, val policy: AdUnlockPolicy)
 
+/** One open primer sheet. Carries the [AccessDecision] captured at tap time alongside the entry so
+ *  the sheet's Start CTA can emit `meditation_entry_tapped` with the same provenance the card's own
+ *  direct-launch branch would have -- the event keeps meaning "a tap that led to a launch". */
+private data class PrimerRequest(val entry: MeditationCatalogEntry, val decision: AccessDecision)
+
 @Composable
 fun MeditationScreen(
     initialDurationSeconds: Int = 15 * 60,
@@ -236,6 +244,8 @@ fun MeditationScreen(
     // ad-unlockable entry currently has its unlock sheet open.
     var selectedShelfKey by remember { mutableStateOf<String?>(null) }
     var adUnlockRequest by remember { mutableStateOf<AdUnlockRequest?>(null) }
+    var primerRequest by remember { mutableStateOf<PrimerRequest?>(null) }
+    val primerEntries = remember(entries) { entries.filter { it.primer != null } }
 
     // Shelves, one per editorial category -- except the single-entry categories folded into a
     // broader [ShelfGroup] (Item: "agrupar algunas categories porque hay muchas que tienen un
@@ -421,9 +431,30 @@ fun MeditationScreen(
                         onLaunch = onLaunch,
                         onUpgradeClick = onUpgradeClick,
                         onOpenAdUnlock = { entry, policy -> adUnlockRequest = AdUnlockRequest(entry, policy) },
+                        onOpenPrimer = { entry, decision -> primerRequest = PrimerRequest(entry, decision) },
                         adInFlightFor = adInFlightFor,
                         anyAdInFlight = anyAdInFlight,
                         onEvent = onEvent,
+                    )
+                }
+            }
+            // The one shelf that carries a per-card one-liner. Same "Todo"-only condition as
+            // recents above, for the same reason: it deliberately mixes categories.
+            if (primerEntries.isNotEmpty() && selectedShelfKey == null) {
+                item {
+                    MeditationShelf(
+                        label = stringResource(R.string.meditation_primer_shelf_title),
+                        entries = primerEntries,
+                        decisionFor = decisionFor,
+                        onLaunch = onLaunch,
+                        onUpgradeClick = onUpgradeClick,
+                        onOpenAdUnlock = { entry, policy -> adUnlockRequest = AdUnlockRequest(entry, policy) },
+                        onOpenPrimer = { entry, decision -> primerRequest = PrimerRequest(entry, decision) },
+                        adInFlightFor = adInFlightFor,
+                        anyAdInFlight = anyAdInFlight,
+                        onEvent = onEvent,
+                        subtitle = stringResource(R.string.meditation_primer_shelf_subtitle),
+                        showPrimerLine = true,
                     )
                 }
             }
@@ -435,6 +466,7 @@ fun MeditationScreen(
                     onLaunch = onLaunch,
                     onUpgradeClick = onUpgradeClick,
                     onOpenAdUnlock = { entry, policy -> adUnlockRequest = AdUnlockRequest(entry, policy) },
+                    onOpenPrimer = { entry, decision -> primerRequest = PrimerRequest(entry, decision) },
                     adInFlightFor = adInFlightFor,
                     anyAdInFlight = anyAdInFlight,
                     onEvent = onEvent,
@@ -462,6 +494,49 @@ fun MeditationScreen(
         )
     }
 
+    primerRequest?.let { request ->
+        val decision = request.decision
+        MeditationPrimerSheet(
+            entry = request.entry,
+            // The sheet explains any entry, but its CTA is still the access gate: only an unlocked
+            // entry starts from here. A locked one hands off to the very same paywall/ad-unlock
+            // paths its card tap uses, so there is no second, weaker way in.
+            ctaLabelRes = when (decision) {
+                is AccessDecision.Unlocked, is AccessDecision.UnlockedByAd -> R.string.meditation_primer_start_cta
+                is AccessDecision.LockedAdUnlockable -> R.string.meditation_watch_ad_cta
+                AccessDecision.LockedNeedsPro -> R.string.affirmation_group_upgrade_cta
+            },
+            onCta = {
+                primerRequest = null
+                when (decision) {
+                    is AccessDecision.Unlocked, is AccessDecision.UnlockedByAd -> {
+                        onEvent(
+                            AnalyticsEvent.MeditationEntryTapped(
+                                AnalyticsId.of(request.entry),
+                                decision.provenance(),
+                                request.entry.access.adUnlock,
+                            ),
+                        )
+                        onLaunch(request.entry)
+                    }
+                    is AccessDecision.LockedAdUnlockable -> {
+                        adUnlockRequest = AdUnlockRequest(request.entry, decision.policy)
+                    }
+                    AccessDecision.LockedNeedsPro -> {
+                        onEvent(
+                            AnalyticsEvent.ContentLockedTapped(
+                                AnalyticsId.of(request.entry),
+                                AnalyticsContentType.MEDITATION,
+                                decision.provenance(),
+                            ),
+                        )
+                        onUpgradeClick()
+                    }
+                }
+            },
+            onDismiss = { primerRequest = null },
+        )
+    }
 }
 
 /** One calming two-tone gradient per category, picked deterministically from [categoryRes] (a
@@ -544,9 +619,12 @@ private fun MeditationShelf(
     onLaunch: (MeditationCatalogEntry) -> Unit,
     onUpgradeClick: () -> Unit,
     onOpenAdUnlock: (MeditationCatalogEntry, AdUnlockPolicy) -> Unit,
+    onOpenPrimer: (MeditationCatalogEntry, AccessDecision) -> Unit,
     adInFlightFor: (MeditationCatalogEntry) -> Boolean,
     anyAdInFlight: Boolean,
     onEvent: (AnalyticsEvent) -> Unit,
+    subtitle: String? = null,
+    showPrimerLine: Boolean = false,
 ) {
     Column(modifier = Modifier.padding(top = 26.dp)) {
         Text(
@@ -556,6 +634,14 @@ private fun MeditationShelf(
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(horizontal = 24.dp),
         )
+        if (subtitle != null) {
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 24.dp).padding(top = 2.dp),
+            )
+        }
         LazyRow(
             contentPadding = PaddingValues(horizontal = 24.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -568,9 +654,11 @@ private fun MeditationShelf(
                     onLaunch = onLaunch,
                     onUpgradeClick = onUpgradeClick,
                     onOpenAdUnlock = onOpenAdUnlock,
+                    onOpenPrimer = onOpenPrimer,
                     adInFlight = adInFlightFor(entry),
                     anyAdInFlight = anyAdInFlight,
                     onEvent = onEvent,
+                    showPrimerLine = showPrimerLine,
                 )
             }
         }
@@ -589,9 +677,14 @@ private fun MeditationSessionCard(
     onLaunch: (MeditationCatalogEntry) -> Unit,
     onUpgradeClick: () -> Unit,
     onOpenAdUnlock: (MeditationCatalogEntry, AdUnlockPolicy) -> Unit,
+    onOpenPrimer: (MeditationCatalogEntry, AccessDecision) -> Unit,
     adInFlight: Boolean,
     anyAdInFlight: Boolean,
     onEvent: (AnalyticsEvent) -> Unit,
+    /** True only on the "Vale la pena conocerlas" shelf. Elsewhere a primer entry's card stays the
+     *  same height as its neighbours -- one taller card in a category shelf makes the whole row
+     *  ragged, and that raggedness is what made the previous blanket-description attempt fail. */
+    showPrimerLine: Boolean = false,
 ) {
     val locked = isMeditationLocked(decision)
     val badge = deriveMeditationBadge(entry, decision)
@@ -602,8 +695,16 @@ private fun MeditationSessionCard(
     val onCardClick: () -> Unit = when (decision) {
         is AccessDecision.Unlocked, is AccessDecision.UnlockedByAd -> {
             {
-                onEvent(AnalyticsEvent.MeditationEntryTapped(AnalyticsId.of(entry), decision.provenance(), entry.access.adUnlock))
-                onLaunch(entry)
+                // An entry whose name explains nothing gets its explanation sheet first, and the
+                // launch (plus its analytics) happens from that sheet's CTA instead. Only reachable
+                // for an already-unlocked entry: a locked one keeps its paywall/ad-sheet path below
+                // untouched, so this never becomes a way around the access gate.
+                if (entry.primer != null) {
+                    onOpenPrimer(entry, decision)
+                } else {
+                    onEvent(AnalyticsEvent.MeditationEntryTapped(AnalyticsId.of(entry), decision.provenance(), entry.access.adUnlock))
+                    onLaunch(entry)
+                }
             }
         }
         // Item 8 carried over, restyled per design 5a: tapping an ad-unlockable card now opens the
@@ -652,6 +753,24 @@ private fun MeditationSessionCard(
             if (badge != null) {
                 SessionBadge(badge = badge, modifier = Modifier.align(Alignment.BottomStart).padding(5.dp))
             }
+            // Its own tap target, on EVERY primer card and whatever the lock state. All four
+            // primer entries are Pro or ad-gated, so routing the card tap to the paywall left the
+            // explanation unreachable for exactly the free users who need it -- and the icon inert.
+            // Reading what a practice is was never the thing being sold; starting it is, and the
+            // sheet's CTA still honours that.
+            if (entry.primer != null) {
+                IconButton(
+                    onClick = { onOpenPrimer(entry, decision) },
+                    modifier = Modifier.align(Alignment.TopEnd).size(32.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Info,
+                        contentDescription = stringResource(R.string.meditation_primer_info_content_description),
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
         }
         Text(
             text = stringResource(entry.titleRes),
@@ -661,6 +780,16 @@ private fun MeditationSessionCard(
             maxLines = 2,
             modifier = Modifier.padding(top = 7.dp),
         )
+        if (showPrimerLine && entry.primer != null) {
+            Text(
+                text = stringResource(entry.primer.shortRes),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 3.dp),
+            )
+        }
         Text(
             text = stringResource(R.string.guided_meditation_idle_duration_minutes, entry.approxDurationMinutes),
             style = MaterialTheme.typography.labelSmall,
@@ -761,6 +890,113 @@ private fun AdUnlockSheet(
                 Text(stringResource(R.string.affirmation_group_upgrade_cta))
             }
             TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.meditation_ad_unlock_dismiss))
+            }
+        }
+    }
+}
+
+/**
+ * Explanation sheet for an entry whose name says nothing (design turn 6, option 6e). Opened by
+ * tapping such a card instead of launching, and the only place the full [MeditationPrimer.longRes]
+ * text lives -- deliberately NOT on the shelf card, since every line added to a card is paid for by
+ * every card in that shelf.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MeditationPrimerSheet(
+    entry: MeditationCatalogEntry,
+    @StringRes ctaLabelRes: Int,
+    onCta: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val primer = entry.primer ?: return
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .background(gradientBrushForCategory(entry.categoryRes), RoundedCornerShape(13.dp)),
+                ) {
+                    Icon(
+                        imageVector = entry.icon,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp).align(Alignment.Center),
+                    )
+                }
+                Column(modifier = Modifier.padding(start = 14.dp)) {
+                    Text(
+                        text = stringResource(entry.titleRes),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    if (primer.plainNameRes != null) {
+                        Text(
+                            text = stringResource(primer.plainNameRes),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
+                    Text(
+                        text = "${stringResource(R.string.guided_meditation_idle_duration_minutes, entry.approxDurationMinutes)} • ${stringResource(entry.categoryRes)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 3.dp),
+                    )
+                }
+            }
+            Text(
+                text = stringResource(primer.longRes),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 20.dp),
+            )
+            Text(
+                text = stringResource(R.string.meditation_primer_expectations_label),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(top = 22.dp),
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 9.dp)
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(14.dp))
+                    .padding(horizontal = 14.dp, vertical = 4.dp),
+            ) {
+                primer.expectationsRes.forEach { expectationRes ->
+                    Row(
+                        modifier = Modifier.padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .background(MaterialTheme.colorScheme.primary, CircleShape),
+                        )
+                        Text(
+                            text = stringResource(expectationRes),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(start = 11.dp),
+                        )
+                    }
+                }
+            }
+            Button(onClick = onCta, modifier = Modifier.fillMaxWidth().padding(top = 22.dp)) {
+                Text(stringResource(ctaLabelRes))
+            }
+            TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.meditation_ad_unlock_dismiss))
             }
         }
