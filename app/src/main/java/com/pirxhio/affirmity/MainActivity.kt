@@ -434,8 +434,20 @@ internal fun handleGuidedMeditationSessionEnded(
     emit: (AnalyticsEvent) -> Unit = {},
 ) {
     consumePlaybackUnlock(entryId, reason)
-    if (reason == SessionEndReason.Completed) recordMeditationCompleted()
-    val entry = findMeditationCatalogEntry(entryId) ?: return
+    val entry = findMeditationCatalogEntry(entryId)
+    // Anti-skip-abuse gate (audit item #6): a session that never ran at least half its expected
+    // duration doesn't credit the streak, even though it still reached SessionCompleted -- Next/
+    // Skip routes through the exact same exitCurrentPhaseAndAdvance()/EndSession(Completed) path a
+    // natural phase timeout does (MeditationEngine.kt), so without this check mashing skip through
+    // every phase in under a second earned full streak credit. `entry == null` (should never
+    // happen for a real launch) fails open to the pre-existing unconditional behavior rather than
+    // silently dropping a legitimate completion. Analytics below is UNCHANGED by this gate --
+    // MeditationCompleted still fires with the real elapsedSeconds so skip-abuse stays visible in
+    // the data even when it isn't credited.
+    val meetsMinimumElapsed = entry == null ||
+        elapsedSeconds >= entry.approxDurationMinutes * 60 * MEDITATION_COMPLETION_MIN_ELAPSED_FRACTION
+    if (reason == SessionEndReason.Completed && meetsMinimumElapsed) recordMeditationCompleted()
+    if (entry == null) return
     val analyticsId = AnalyticsId.of(entry)
     emit(
         if (reason == SessionEndReason.Completed) {
@@ -1672,6 +1684,12 @@ private fun PaywallHost(
         },
     )
 }
+
+/** Anti-skip-abuse threshold (audit item #6) -- a guided meditation session must run at least this
+ * fraction of its expected duration before it credits [handleGuidedMeditationSessionEnded]'s
+ * `recordMeditationCompleted`/streak. Analytics (`AnalyticsEvent.MeditationCompleted`) still fires
+ * with the real `elapsedSeconds` regardless, so skip-abuse stays visible in the data. */
+private const val MEDITATION_COMPLETION_MIN_ELAPSED_FRACTION = 0.5
 
 /** Play Console product/base-plan id -- part of the Phase 0 user-owned prerequisite (Play Console
  * subscription setup); placeholder until that product exists. */
