@@ -28,6 +28,7 @@ import com.pirxhio.affirmity.data.local.OnboardingGuidePreferences
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
+import com.pirxhio.affirmity.data.local.FeedSources
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.DocWrite
 import com.pirxhio.affirmity.data.remote.FcmTokenRepository
@@ -169,6 +170,10 @@ private fun buildState(
     val trackerPreferences = mock(TrackerPreferences::class.java)
     whenever(trackerPreferences.observeAffirmationsViewedToday())
         .thenReturn(flowOf(DailyViewCount(epochDay = -1L, count = 0)))
+    // Collected in AffirmityAppState's init -- an unstubbed mock returns null, and the plain-Job
+    // scope these tests pass means that NPE cancels every sibling collector.
+    whenever(trackerPreferences.observeHiddenAffirmationIds()).thenReturn(flowOf(emptySet()))
+    whenever(trackerPreferences.observeFeedSources()).thenReturn(flowOf(FeedSources()))
     val notificationDebugLog = mock(NotificationDebugLog::class.java)
     whenever(notificationDebugLog.entries).thenReturn(flowOf(emptyList()))
     val onboardingPreferences = mock(OnboardingPreferences::class.java)

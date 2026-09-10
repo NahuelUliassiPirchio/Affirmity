@@ -1,0 +1,13 @@
+[
+  { "text": "Hola [mundo", "illegalOffsets": [5] },
+  { "text": "Hola] mundo", "illegalOffsets": [4] },
+  { "text": "[]", "illegalOffsets": [0, 1] },
+  { "text": "[[]]", "illegalOffsets": [0, 1, 2, 3] },
+  { "text": "[a[b]", "illegalOffsets": [0] },
+  { "text": "[[a]]", "illegalOffsets": [0, 4] },
+  { "text": "[ ]", "illegalOffsets": [0, 2] },
+  { "text": "Genero [10.000 USD al mes]", "illegalOffsets": [] },
+  { "text": "Hoy voy a [moverme por placer]", "illegalOffsets": [] },
+  { "text": "Hoy elijo [una dirección nueva]", "illegalOffsets": [] },
+  { "text": "Hoy voy a [dar el siguiente paso]", "illegalOffsets": [] }
+]

@@ -38,8 +38,11 @@ data class AffirmationTemplate(val field: TemplateField, val segments: List<Temp
  */
 object AffirmationTemplateParser {
 
-    /** Excludes both bracket chars from the content class (D3): `[a[b]` -> literal `[a` + token `b`. */
-    private val TOKEN_REGEX = Regex("""\[([^\[\]]*)]""")
+    /** Excludes both bracket chars from the content class (D3): `[a[b]` -> literal `[a` + token `b`.
+     *  internal: also consumed by [com.pirxhio.affirmity.data.catalog.CatalogTextSanitizer] (D1) to
+     *  mask legal tokens before flagging residual brackets -- keep in lockstep with
+     *  `tools/catalog/bracketGate.mjs`'s `TOKEN_REGEX`. */
+    internal val TOKEN_REGEX = Regex("""\[([^\[\]]*)]""")
 
     fun parse(field: TemplateField, text: String): AffirmationTemplate {
         val segments = mutableListOf<TemplateSegment>()

@@ -153,7 +153,11 @@ export interface EntitlementDoc {
   autoRenewing: boolean;
   purchaseTokenHash: string;
   lastVerifiedAt: number;
-  source: 'rtdn' | 'sync';
+  // 'sync-ios' is written by `appStoreBilling.ts`'s `resolveIosEntitlement` (App Store Server
+  // Library JWS verification), not by anything in this file -- included here only so the shared
+  // `EntitlementStore.writeEntitlement` port (and the `users/{uid}/entitlements/current` doc
+  // shape it writes) stays a single source of truth for both platforms.
+  source: 'rtdn' | 'sync' | 'sync-ios';
 }
 
 function sha256Hex(input: string): string {

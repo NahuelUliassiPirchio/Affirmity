@@ -1,11 +1,14 @@
 package com.pirxhio.affirmity.ui.affirmations
 
+import android.content.Intent
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,12 +23,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.SelfImprovement
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -51,10 +59,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.graphicsLayer
+import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.Affirmation
 import com.pirxhio.affirmity.data.AffirmationBackground
 import com.pirxhio.affirmity.data.AffirmationTemplateParser
@@ -90,6 +101,7 @@ fun AffirmationsScreen(
     onOverrideCommitted: (affirmationId: String, tokenKey: String, value: String) -> Unit = { _, _, _ -> },
     favoriteIds: Set<String> = emptySet(),
     onToggleFavorite: (affirmationId: String) -> Unit = {},
+    onHideAffirmation: (affirmationId: String) -> Unit = {},
     favoriteGesture: FavoriteGesture = FavoriteGesture.DOUBLE_TAP,
 ) {
     if (affirmations.isEmpty()) {
@@ -129,6 +141,8 @@ fun AffirmationsScreen(
             .collect { onAffirmationViewed() }
     }
 
+    val pagerScope = rememberCoroutineScope()
+
     VerticalPager(
         state = pagerState,
         modifier = Modifier.fillMaxSize()
@@ -139,6 +153,12 @@ fun AffirmationsScreen(
             isFavorite = affirmation.id in favoriteIds,
             onToggleFavorite = { onToggleFavorite(affirmation.id) },
             onOverrideCommitted = { tokenKey, value -> onOverrideCommitted(affirmation.id, tokenKey, value) },
+            onHide = {
+                onHideAffirmation(affirmation.id)
+                // Advances the feed past the just-hidden card immediately, rather than leaving it
+                // lingering until the hidden-ids DataStore flow catches up and re-filters the pool.
+                pagerScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+            },
             favoriteGesture = favoriteGesture,
         )
     }
@@ -150,6 +170,7 @@ private fun AffirmationCard(
     isFavorite: Boolean,
     onToggleFavorite: () -> Unit,
     onOverrideCommitted: (tokenKey: String, value: String) -> Unit,
+    onHide: () -> Unit,
     favoriteGesture: FavoriteGesture,
 ) {
     var cardPositionInRoot by remember(affirmation.id) { mutableStateOf(Offset.Zero) }
@@ -207,6 +228,19 @@ private fun AffirmationCard(
         }
     }
 
+    // Same title/subtitle text the card renders (with any token overrides resolved), used as the
+    // share sheet's body -- built once per affirmation rather than re-parsing the templates a
+    // second time inside TokenizedAffirmationText's own remember blocks below.
+    val shareText = remember(affirmation.id, affirmation.title, affirmation.subtitle, affirmation.overrides) {
+        val titleText = AffirmationTemplateParser.parse(TemplateField.TITLE, affirmation.title)
+            .render(affirmation.overrides)
+        val subtitleText = AffirmationTemplateParser.parse(TemplateField.SUBTITLE, affirmation.subtitle)
+            .render(affirmation.overrides)
+        if (subtitleText.isNotBlank()) "$titleText\n$subtitleText" else titleText
+    }
+    val context = LocalContext.current
+    var showActions by remember(affirmation.id) { mutableStateOf(false) }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -216,9 +250,10 @@ private fun AffirmationCard(
                 cardSize = coordinates.size
             }
             .pointerInput(affirmation.id, favoriteGesture) {
-                detectTapGestures(onDoubleTap = { offset ->
-                    requestLikeBurst(offset)
-                })
+                detectTapGestures(
+                    onDoubleTap = { offset -> requestLikeBurst(offset) },
+                    onLongPress = { showActions = true },
+                )
             }
     ) {
         val background = affirmation.background
@@ -332,6 +367,77 @@ private fun AffirmationCard(
                 tint = Color.White,
             )
         }
+    }
+
+    // Long press, not a corner icon row: MainActivity draws FloatingStatusOverlay (streak + avatar)
+    // over this screen at Alignment.TopEnd, which silently covered an earlier always-visible
+    // share/hide row placed in that same corner. A gesture also keeps the card uncluttered, and
+    // matches the double-tap-to-favorite gesture this screen already teaches.
+    if (showActions) {
+        AffirmationActionsSheet(
+            onShare = {
+                showActions = false
+                val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, shareText)
+                }
+                context.startActivity(Intent.createChooser(sendIntent, null))
+            },
+            onHide = {
+                showActions = false
+                onHide()
+            },
+            onDismiss = { showActions = false },
+        )
+    }
+}
+
+/** Share/hide actions for the affirmation under a long press. Favouriting is deliberately absent:
+ *  it already has two affordances on the card itself (the heart, and double-tap). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AffirmationActionsSheet(
+    onShare: () -> Unit,
+    onHide: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
+            AffirmationActionRow(
+                icon = Icons.Filled.Share,
+                label = stringResource(R.string.affirmation_share_content_description),
+                onClick = onShare,
+            )
+            AffirmationActionRow(
+                icon = Icons.Filled.VisibilityOff,
+                label = stringResource(R.string.affirmation_hide_content_description),
+                onClick = onHide,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AffirmationActionRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(start = 18.dp),
+        )
     }
 }
 

@@ -21,17 +21,25 @@ class CatalogAssetParserTest {
         }
     """.trimIndent()
 
-    private fun row(id: String, collectionId: String, text: String, groupId: String = "self_worth", themeId: String = "self_worth.feeling_enough", sortOrder: Int = 0) = """
-        {"id":"$id","text":"$text","groupId":"$groupId","themeId":"$themeId","collectionId":"$collectionId","sortOrder":$sortOrder}
+    private fun row(
+        id: String,
+        collectionId: String,
+        title: String,
+        subtitle: String = "Subtitulo",
+        groupId: String = "self_worth",
+        themeId: String = "self_worth.feeling_enough",
+        sortOrder: Int = 0,
+    ) = """
+        {"id":"$id","title":"$title","subtitle":"$subtitle","groupId":"$groupId","themeId":"$themeId","collectionId":"$collectionId","sortOrder":$sortOrder}
     """.trimIndent()
 
     @Test
     fun `parses a well-formed 3-row fixture into entities`() {
         val json = validJson(
             listOf(
-                row("cat_self_worth.feeling_enough.intrinsic_worth.001", "self_worth.feeling_enough.intrinsic_worth", "Uno"),
-                row("cat_self_worth.feeling_enough.intrinsic_worth.002", "self_worth.feeling_enough.intrinsic_worth", "Dos", sortOrder = 1),
-                row("cat_self_worth.feeling_enough.intrinsic_worth.003", "self_worth.feeling_enough.intrinsic_worth", "Tres", sortOrder = 2),
+                row("cat_self_worth.feeling_enough.intrinsic_worth.001", "self_worth.feeling_enough.intrinsic_worth", "Uno", "Sub uno"),
+                row("cat_self_worth.feeling_enough.intrinsic_worth.002", "self_worth.feeling_enough.intrinsic_worth", "Dos", "Sub dos", sortOrder = 1),
+                row("cat_self_worth.feeling_enough.intrinsic_worth.003", "self_worth.feeling_enough.intrinsic_worth", "Tres", "Sub tres", sortOrder = 2),
             ).joinToString(","),
         )
 
@@ -43,6 +51,7 @@ class CatalogAssetParserTest {
             CatalogAffirmationEntity(
                 id = "cat_self_worth.feeling_enough.intrinsic_worth.001",
                 text = "Uno",
+                subtitle = "Sub uno",
                 groupId = "self_worth",
                 themeId = "self_worth.feeling_enough",
                 collectionId = "self_worth.feeling_enough.intrinsic_worth",
@@ -50,6 +59,15 @@ class CatalogAssetParserTest {
             ),
             parsed.affirmations[0],
         )
+    }
+
+    @Test
+    fun `parses a legal placeholder token in title without throwing`() {
+        val json = validJson(row("cat_self_worth.feeling_enough.intrinsic_worth.001", "self_worth.feeling_enough.intrinsic_worth", "Genero [10.000 USD al mes]", "Sub"))
+
+        val parsed = CatalogAssetParser.parse(json, validKnownCollectionIds)
+
+        assertEquals("Genero [10.000 USD al mes]", parsed.affirmations[0].text)
     }
 
     @Test
@@ -74,10 +92,33 @@ class CatalogAssetParserTest {
     }
 
     @Test
-    fun `throws naming the offending id on a literal bracket in text`() {
-        val json = validJson(row("cat_x.001", "self_worth.feeling_enough.intrinsic_worth", "Texto [malo]"))
+    fun `throws naming the offending id on a malformed bracket in title`() {
+        val json = validJson(row("cat_x.001", "self_worth.feeling_enough.intrinsic_worth", "Texto [malo"))
 
         val ex = assertThrows(IllegalArgumentException::class.java) { CatalogAssetParser.parse(json, validKnownCollectionIds) }
         assertEquals(true, ex.message?.contains("cat_x.001"))
+    }
+
+    @Test
+    fun `throws naming the offending id on a malformed bracket in subtitle`() {
+        val json = validJson(row("cat_x.001", "self_worth.feeling_enough.intrinsic_worth", "Texto", subtitle = "Sub [malo"))
+
+        val ex = assertThrows(IllegalArgumentException::class.java) { CatalogAssetParser.parse(json, validKnownCollectionIds) }
+        assertEquals(true, ex.message?.contains("cat_x.001"))
+    }
+
+    @Test
+    fun `throws naming the offending id when subtitle is missing`() {
+        val json = """
+            {
+              "version": "1.0.0",
+              "affirmations": [
+                {"id":"cat_x.001","title":"Texto","groupId":"self_worth","themeId":"self_worth.feeling_enough","collectionId":"self_worth.feeling_enough.intrinsic_worth","sortOrder":0}
+              ]
+            }
+        """.trimIndent()
+
+        val ex = assertThrows(org.json.JSONException::class.java) { CatalogAssetParser.parse(json, validKnownCollectionIds) }
+        assertEquals(true, ex.message?.contains("subtitle") == true || ex.message?.contains("cat_x.001") == true)
     }
 }

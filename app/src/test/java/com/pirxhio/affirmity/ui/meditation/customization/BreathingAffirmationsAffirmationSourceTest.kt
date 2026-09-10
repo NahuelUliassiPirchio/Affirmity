@@ -25,7 +25,7 @@ class BreathingAffirmationsAffirmationSourceTest {
     }
 
     private fun affirmation(id: String, groupId: String) =
-        CatalogAffirmationEntity(id = id, text = "text-$id", groupId = groupId, themeId = "theme", collectionId = "collection", sortOrder = 0)
+        CatalogAffirmationEntity(id = id, text = "text-$id", subtitle = "subtitle-$id", groupId = groupId, themeId = "theme", collectionId = "collection", sortOrder = 0)
 
     @Test
     fun `an explicit universe requests exactly that group id and returns up to count texts`() = runBlocking {

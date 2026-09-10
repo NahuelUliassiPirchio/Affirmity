@@ -1,6 +1,7 @@
 package com.pirxhio.affirmity.ui.meditation
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +15,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -34,11 +37,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.pirxhio.affirmity.BuildConfig
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.AccessDecision
+import com.pirxhio.affirmity.access.AccessTier
+import com.pirxhio.affirmity.ads.BannerAdView
 import com.pirxhio.affirmity.analytics.AnalyticsEvent
 import com.pirxhio.affirmity.analytics.AnalyticsId
 import com.pirxhio.affirmity.analytics.provenance
@@ -72,6 +80,10 @@ import com.pirxhio.affirmity.ui.meditation.catalog.isMeditationLocked
 @Composable
 fun GuidedMeditationScreen(
     entry: MeditationCatalogEntry,
+    /** Entitlement read once at screen entry (design D1, resolved — no default). A missing
+     * wire-up at the call site must be a compile error, not a silent fall-through to showing (or
+     * hiding) the free-tier banner ad. */
+    tierAtEntry: () -> AccessTier,
     modifier: Modifier = Modifier,
     /** Confirmed values from the pre-session customization screen, keyed by field id. Populated
      * per-entry based on the meditation's spec-defined customizable fields; empty only for
@@ -94,9 +106,25 @@ fun GuidedMeditationScreen(
     onExit: () -> Unit = {},
     /** Spec 6 emit surface (REQ-5.2) -- fires `meditation_started` at the Start dispatch below. */
     onEvent: (AnalyticsEvent) -> Unit = {},
+    /** Device-local mute for the phase-transition chime (the `SOUND` channel) -- see
+     * [com.pirxhio.affirmity.data.local.TrackerPreferences.observeMeditationCueSoundEnabled].
+     * Read live via [rememberUpdatedState] below so toggling mid-session takes effect immediately
+     * without tearing down and rebuilding [audioExecutor]. */
+    cueSoundEnabled: Boolean = true,
+    onToggleCueSound: () -> Unit = {},
+    /** Fired at the same Start dispatch as [AnalyticsEvent.MeditationStarted], right below --
+     * pre-launch audit item #5's "recent meditations" shortcut counts an entry as recent exactly
+     * when the user presses Start, not on catalog tap or completion, so the caller can persist it
+     * (see [com.pirxhio.affirmity.data.local.TrackerPreferences.recordRecentMeditation]) without
+     * this screen knowing anything about that storage. */
+    onSessionStarted: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // D1 (resolved, no default): frozen for the composition lifetime, exactly like accessAtStart
+    // -- a mid-session tier change must never make the banner appear/disappear mid-meditation.
+    val showBannerAd = remember { shouldShowMeditationBanner(tierAtEntry()) }
 
     // D7: UI-local wall clock, captured at the Start dispatch below and diffed at both terminal
     // paths (Completed LaunchedEffect, Cancelled exit). Measures wall time including pauses --
@@ -114,6 +142,7 @@ fun GuidedMeditationScreen(
     val definition = remember(entry, customization) { entry.definition(customization) }
     val textExecutor = remember(definition) { TextDisplayCommandExecutor() }
     val phaseDurations = remember(definition) { fixedPhaseDurationsById(definition) }
+    val latestCueSoundEnabled = rememberUpdatedState(cueSoundEnabled)
 
     // The engine and audioExecutor/TimerCommandExecutor need each other before either exists —
     // resolved via a lateinit closed over by their sendEvent lambdas, only actually invoked once
@@ -127,6 +156,7 @@ fun GuidedMeditationScreen(
             scope = scope,
             timeSource = AndroidMonotonicTimeSource,
             sendEvent = { event -> engineRef.send(event) },
+            isCueSoundEnabled = { latestCueSoundEnabled.value },
         )
         val clock = RealSessionClock(scope = scope, timeSource = AndroidMonotonicTimeSource)
         val timerExecutor = TimerCommandExecutor(
@@ -206,6 +236,9 @@ fun GuidedMeditationScreen(
         entry = entry,
         customization = customization,
         phaseDurations = phaseDurations,
+        showBannerAd = showBannerAd,
+        cueSoundEnabled = cueSoundEnabled,
+        onToggleCueSound = onToggleCueSound,
         onStart = {
             val currentAccess = accessAtStart()
             if (isMeditationLocked(currentAccess)) {
@@ -214,6 +247,7 @@ fun GuidedMeditationScreen(
                 sessionStartMillis = AndroidMonotonicTimeSource.nowMillis()
                 sessionStartWallMillis = System.currentTimeMillis()
                 onEvent(AnalyticsEvent.MeditationStarted(AnalyticsId.of(entry), currentAccess.provenance()))
+                onSessionStarted()
                 engine.send(MeditationEvent.Start)
             }
         },
@@ -259,6 +293,9 @@ private fun GuidedMeditationContent(
     entry: MeditationCatalogEntry,
     customization: Map<String, String>,
     phaseDurations: Map<String, Long>,
+    showBannerAd: Boolean,
+    cueSoundEnabled: Boolean,
+    onToggleCueSound: () -> Unit,
     onStart: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
@@ -266,14 +303,20 @@ private fun GuidedMeditationContent(
     onRelease: () -> Unit,
     onDone: () -> Unit,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
+    // D3: Column -> Box so the banner can occupy a fixed BottomCenter slot outside the scrollable
+    // content, with the inner Column's bottom padding reserving exactly the banner's measured
+    // height (0.dp while pending/failed, ~50.dp once loaded) instead of overlapping the controls.
+    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        var bannerHeight by remember { mutableStateOf(0.dp) }
+        val density = LocalDensity.current
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 24.dp + bannerHeight),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
         entry.presentation.counters.forEach { counter ->
             val index = state.iterationCounts[counter.repeatId]
             if (index != null && state.status != SessionStatus.Completed) {
@@ -306,7 +349,12 @@ private fun GuidedMeditationContent(
                 .size(240.dp),
             contentAlignment = Alignment.Center,
         ) {
-            if (state.status == SessionStatus.Running || state.status == SessionStatus.Paused) {
+            if (state.status == SessionStatus.Idle) {
+                // Calmer pre-play treatment: a soft breathing-ring backdrop instead of the empty
+                // space this box used to show before Start was tapped. Purely decorative --
+                // Running/Paused keep their own CircularProgressIndicator branch below untouched.
+                IdleBreathingBackdrop(modifier = Modifier.fillMaxSize())
+            } else if (state.status == SessionStatus.Running || state.status == SessionStatus.Paused) {
                 val totalMillis = phaseDurations[state.currentPhaseId]
                 val progress = if (totalMillis != null && totalMillis > 0) {
                     (state.elapsedInPhaseMillis.toFloat() / totalMillis).coerceIn(0f, 1f)
@@ -321,23 +369,47 @@ private fun GuidedMeditationContent(
                     strokeWidth = 4.dp,
                 )
             }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = phaseLabel(currentTextId, currentLiteralText, state.status, entry.presentation.textResources),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
-                )
-                val remainingSeconds = state.remainingInPhaseMillis?.let { (it / 1000L).toInt() + 1 }
-                val showsRemaining = remainingSeconds != null &&
-                    (state.status == SessionStatus.Running || state.status == SessionStatus.Paused)
-                if (showsRemaining) {
+
+            if (state.status == SessionStatus.Idle) {
+                // Real content instead of a void: the meditation's own title, and its duration
+                // when one can be resolved, so this screen reads as a pre-session summary rather
+                // than a blank stage waiting for the play button.
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "${remainingSeconds}s",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp),
+                        text = stringResource(entry.titleRes),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
                     )
+                    val durationMinutes = idleDurationMinutes(phaseDurations, entry.approxDurationMinutes)
+                    if (durationMinutes != null) {
+                        Text(
+                            text = stringResource(R.string.guided_meditation_idle_duration_minutes, durationMinutes),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
+                }
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = phaseLabel(currentTextId, currentLiteralText, state.status, entry.presentation.textResources),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                    )
+                    val remainingSeconds = state.remainingInPhaseMillis?.let { (it / 1000L).toInt() + 1 }
+                    val showsRemaining = remainingSeconds != null &&
+                        (state.status == SessionStatus.Running || state.status == SessionStatus.Paused)
+                    if (showsRemaining) {
+                        Text(
+                            text = "${remainingSeconds}s",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
                 }
             }
         }
@@ -401,6 +473,41 @@ private fun GuidedMeditationContent(
                 SessionStatus.Cancelled -> Unit
             }
         }
+        }
+
+        // Cue-sound mute toggle: subtle by design (small, low-contrast, corner-anchored) per the
+        // feature ask -- this is a quiet utility affordance, not a primary control, so it never
+        // competes with the Start/Pause/Skip row for attention. Unconditional like the banner ad
+        // below (visible from Idle onward) so the user can pre-mute before the first cue ever fires.
+        IconButton(
+            onClick = onToggleCueSound,
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 8.dp).size(40.dp),
+        ) {
+            Icon(
+                imageVector = if (cueSoundEnabled) Icons.Filled.VolumeUp else Icons.Filled.VolumeOff,
+                contentDescription = stringResource(
+                    if (cueSoundEnabled) {
+                        R.string.guided_meditation_cue_sound_mute_content_description
+                    } else {
+                        R.string.guided_meditation_cue_sound_unmute_content_description
+                    },
+                ),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+
+        // D2: last, unconditional child -- never inside an `if (state.status ...)` branch and
+        // never `key()`ed, so its Compose identity (and the LaunchedEffect's one-shot delay+load)
+        // survives every status transition without restarting.
+        if (showBannerAd) {
+            BannerAdView(
+                adUnitId = BuildConfig.ADMOB_BANNER_UNIT,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .onSizeChanged { bannerHeight = with(density) { it.height.toDp() } },
+            )
+        }
     }
 }
 
@@ -417,6 +524,44 @@ private fun RoundIconButton(
             .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
     ) {
         Icon(imageVector = icon, contentDescription = contentDescription, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+    }
+}
+
+/**
+ * Best-effort session length for the Idle summary, in whole minutes. Prefers the sum of this
+ * entry's actually-customized [phaseDurations] (Fixed-duration phases only, per
+ * [com.pirxhio.affirmity.ui.meditation.catalog.fixedPhaseDurationsById]) rounded up, so a
+ * duration/rounds customization the user just picked on the previous screen is reflected here.
+ * Falls back to the catalog-declared [approxDurationMinutes] when no phase in this entry has a
+ * Fixed duration (e.g. an entry driven entirely by manual release or variable-length phases),
+ * and is never null in practice since every entry declares an approximate duration.
+ */
+private fun idleDurationMinutes(phaseDurations: Map<String, Long>, approxDurationMinutes: Int): Int? {
+    val fixedTotalMillis = phaseDurations.values.sum()
+    if (fixedTotalMillis <= 0L) return approxDurationMinutes.takeIf { it > 0 }
+    val wholeMinutesRoundedUp = ((fixedTotalMillis + 59_999L) / 60_000L).toInt()
+    return wholeMinutesRoundedUp.coerceAtLeast(1)
+}
+
+/**
+ * Soft, non-literal pre-play backdrop for [SessionStatus.Idle]: three concentric rings fading
+ * outward from the brand teal, evoking a breathing motif without drawing custom illustration
+ * assets (none exist in this app -- see craft constraints). Purely decorative -- draws behind the
+ * title/duration text and the play button sits just below this box, never on top of it.
+ */
+@Composable
+private fun IdleBreathingBackdrop(modifier: Modifier = Modifier) {
+    val ringColor = MaterialTheme.colorScheme.primary
+    Canvas(modifier = modifier) {
+        val maxRadius = size.minDimension / 2f
+        val ringSpecs = listOf(1f to 0.05f, 0.74f to 0.09f, 0.5f to 0.14f)
+        ringSpecs.forEach { (radiusFraction, alpha) ->
+            drawCircle(
+                color = ringColor.copy(alpha = alpha),
+                radius = maxRadius * radiusFraction,
+                center = center,
+            )
+        }
     }
 }
 

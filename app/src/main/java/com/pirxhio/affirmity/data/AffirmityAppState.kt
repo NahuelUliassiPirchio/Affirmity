@@ -73,6 +73,7 @@ import com.pirxhio.affirmity.data.local.OnboardingGuidePreferences
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
 import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
+import com.pirxhio.affirmity.data.local.FeedSources
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.FcmTokenRepository
 import com.pirxhio.affirmity.data.remote.FirestoreAdUnlockRepository
@@ -204,15 +205,16 @@ private fun AffirmationEntity.toAffirmation(): Affirmation = Affirmation(
     overrides = overrides,
 )
 
-/** Catalog row -> read-model [Affirmation] (design D8/D14): `text` maps to `title`, `subtitle` is
- *  empty (one authored string per affirmation, no split); the background is DERIVED, never stored
- *  (design D4); [overrides] comes from the per-user override map, keyed off the row's own id. */
+/** Catalog row -> read-model [Affirmation] (design D4/D8/D14): `text` maps to `title` (accepted
+ *  naming debt -- the column holds the v2 source's `title`), `subtitle` maps to the row's real
+ *  `subtitle`; the background is DERIVED, never stored (design D4); [overrides] comes from the
+ *  per-user override map, keyed off the row's own id. */
 private fun com.pirxhio.affirmity.data.local.CatalogAffirmationEntity.toAffirmation(
     overrides: Map<String, String>,
 ): Affirmation = Affirmation(
     id = id,
     title = text,
-    subtitle = "",
+    subtitle = subtitle,
     background = com.pirxhio.affirmity.ui.affirmations.forCatalogAffirmation(groupId, id),
     groupId = groupId,
     overrides = overrides,
@@ -462,6 +464,18 @@ class AffirmityAppState(
     var favoriteAffirmationIds = mutableStateOf<Set<String>>(emptySet())
         private set
 
+    /** Catalog affirmation ids the user hid from their rotation (pre-launch audit item #1).
+     * Device-local (see [TrackerPreferences.observeHiddenAffirmationIds]) -- deliberately not
+     * synced through [DataSession]/Firestore, same posture as [meditationDurationSeconds]'s
+     * sibling knobs. */
+    var hiddenAffirmationIds = mutableStateOf<Set<String>>(emptySet())
+        private set
+
+    /** Which optional sources feed the rotation, toggled from Your feed. Device-local, same posture
+     *  as [hiddenAffirmationIds]. */
+    var feedSources = mutableStateOf(FeedSources())
+        private set
+
     private var favoriteOrderedIds = mutableStateOf<List<String>>(emptyList())
     private val favoriteToggleMutex = Mutex()
 
@@ -492,26 +506,67 @@ class AffirmityAppState(
      * behavior of returning `affirmations` unfiltered pre-resolution. */
     val filteredAffirmations: List<Affirmation>
         get() {
-            val ids = selectedThemeIds.value ?: return affirmations
+            val hiddenIds = hiddenAffirmationIds.value
+            val sources = feedSources.value
+            // Own rows are a source the user can switch off entirely ("Mías" in Your feed); hidden
+            // ids are filtered regardless, since hiding is per-affirmation and outranks a source
+            // toggle either way.
+            val own = if (sources.includeOwn) affirmations.filterNot { it.id in hiddenIds } else emptyList()
+            val ownIds = affirmations.mapTo(mutableSetOf()) { it.id }
+            // Pre-resolution the feed is owned-rows-only (see kdoc), so a favourite can only
+            // contribute an owned row here -- never a catalog one, whose access cannot be judged
+            // before the theme selection resolves.
+            val ids = selectedThemeIds.value ?: return (
+                own + favoriteAffirmations.filter {
+                    sources.includeFavorites && it.id in ownIds && it.id !in hiddenIds
+                }
+                ).distinctBy { it.id }
             val collectionsById = catalogCollectionsById()
             val groupsById = catalogUniverseGroups().associateBy { it.id }
             val now = System.currentTimeMillis()
             val tier = entitlementTier.value
             val grants = adUnlockState
-            return affirmations +
-                catalogAffirmations.filter { affirmation ->
-                    val collection = collectionsById[affirmation.collectionId]
-                    collection?.themeId in ids &&
-                        groupsById[affirmation.groupId]?.let { group ->
-                            catalogAccessDecision(
-                                group = group,
-                                collection = collection,
-                                tier = tier,
-                                grants = grants,
-                                nowMillis = now,
-                            ).isUnlocked
-                        } == true
+            // The access rule, applied identically to a themed row and to an injected favourite.
+            fun catalogRowUnlocked(affirmation: Affirmation): Boolean {
+                val collection = collectionsById[affirmation.collectionId]
+                return groupsById[affirmation.groupId]?.let { group ->
+                    catalogAccessDecision(
+                        group = group,
+                        collection = collection,
+                        tier = tier,
+                        grants = grants,
+                        nowMillis = now,
+                    ).isUnlocked
+                } == true
+            }
+            // Favourites bypass the THEME filter when their toggle is on -- never the ACCESS gate.
+            // favoriteAffirmations is deliberately access-unfiltered (a favourite made while Pro
+            // stays visible there after a downgrade), so injecting it raw would put Pro-locked rows
+            // back into a free user's feed. Owned rows need no access check; catalog rows get the
+            // same one a themed row gets.
+            val favorites = if (sources.includeFavorites) {
+                favoriteAffirmations.filter { affirmation ->
+                    affirmation.id !in hiddenIds &&
+                        (affirmation.id in ownIds || catalogRowUnlocked(affirmation))
                 }
+            } else {
+                emptyList()
+            }
+            return (own + favorites + catalogAffirmations.filter { affirmation ->
+                    affirmation.id !in hiddenIds &&
+                        collectionsById[affirmation.collectionId]?.themeId in ids &&
+                        catalogRowUnlocked(affirmation)
+                }).distinctBy { it.id }
+        }
+
+    /** Resolved [Affirmation]s for every hidden id (pre-launch audit item #1's "Manage hidden
+     *  affirmations" screen), reusing the same cross-id-space lookup [favoriteAffirmations] uses --
+     *  no second id-to-text resolution mechanism. A hidden id whose row no longer exists (e.g. a
+     *  removed catalog entry) is silently dropped, same as [favoriteAffirmations]. */
+    val hiddenAffirmations: List<Affirmation>
+        get() {
+            val byId = allAffirmations.associateBy { it.id }
+            return hiddenAffirmationIds.value.mapNotNull(byId::get)
         }
 
     /** Unchanged in shape; now resolves across BOTH id spaces (design D10). Access-unfiltered on
@@ -766,6 +821,9 @@ class AffirmityAppState(
                 NotificationChannelSpec.REMINDER to local.notifications.observe(NotificationChannelSpec.REMINDER).first(),
                 NotificationChannelSpec.REFLECTION to local.notifications.observe(NotificationChannelSpec.REFLECTION).first(),
                 NotificationChannelSpec.MOOD to local.notifications.observe(NotificationChannelSpec.MOOD).first(),
+                NotificationChannelSpec.STREAK to local.notifications.observe(NotificationChannelSpec.STREAK).first(),
+                NotificationChannelSpec.HEALER to local.notifications.observe(NotificationChannelSpec.HEALER).first(),
+                NotificationChannelSpec.MEDITATION_RETURN to local.notifications.observe(NotificationChannelSpec.MEDITATION_RETURN).first(),
             ),
             quietHours = local.notifications.observeQuietHours().first(),
             migratedAt = System.currentTimeMillis(),
@@ -889,6 +947,16 @@ class AffirmityAppState(
         scope.launch {
             trackerPreferences.observeAffirmationsViewedToday().collect { viewed ->
                 affirmationsViewedToday = viewed
+            }
+        }
+        scope.launch {
+            trackerPreferences.observeHiddenAffirmationIds().collect { ids ->
+                hiddenAffirmationIds.value = ids
+            }
+        }
+        scope.launch {
+            trackerPreferences.observeFeedSources().collect { sources ->
+                feedSources.value = sources
             }
         }
         scope.launch {
@@ -1354,7 +1422,33 @@ class AffirmityAppState(
 
     /** Remove-only action for the Favorites screen. Repeated or stale callbacks stay idempotent. */
     fun removeFavorite(id: String) {
-        scope.launch { favorites.remove(id) }
+        scope.launch { favoriteToggleMutex.withLock { favorites.remove(id) } }
+    }
+
+    /** Add-only counterpart to [removeFavorite], for the unfavorite undo snackbar. Deliberately not
+     *  [toggleFavorite]: if the user re-favorited the same affirmation while the snackbar was still
+     *  up, toggling would remove it again -- the opposite of what "undo" promised. */
+    fun restoreFavorite(id: String) {
+        scope.launch {
+            favoriteToggleMutex.withLock { favorites.add(id, System.currentTimeMillis()) }
+        }
+    }
+
+    /** Hides a catalog affirmation from the main feed (pre-launch audit item #1). Device-local,
+     *  fire-and-forget, same convention as every other [trackerPreferences] write from Compose. */
+    fun hideAffirmation(id: String) {
+        scope.launch { trackerPreferences.hideAffirmation(id) }
+    }
+
+    /** Persists a Your-feed source toggle. Fire-and-forget: [feedSources] catches up through the
+     *  DataStore flow collected in init, so there is no second source of truth to keep in step. */
+    fun setFeedSources(sources: FeedSources) {
+        scope.launch { trackerPreferences.saveFeedSources(sources) }
+    }
+
+    /** Reverses [hideAffirmation] from the "Manage hidden affirmations" screen. */
+    fun unhideAffirmation(id: String) {
+        scope.launch { trackerPreferences.unhideAffirmation(id) }
     }
 
     /**

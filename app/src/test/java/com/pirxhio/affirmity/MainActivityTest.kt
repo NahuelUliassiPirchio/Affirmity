@@ -262,20 +262,46 @@ class MainActivityTest {
     // --- handleGuidedMeditationSessionEnded (REQ-5.6, AC6): guided completion records streak -----
 
     @Test
-    fun `handleGuidedMeditationSessionEnded records the streak on Completed`() {
+    fun `handleGuidedMeditationSessionEnded records the streak on Completed when elapsed meets the anti-skip-abuse threshold`() {
         var recordedStreak = false
         val consumedCalls = mutableListOf<Pair<String, SessionEndReason>>()
+        // "calma" is approxDurationMinutes = 5 (300s); the 50% threshold is 150s.
+        val elapsedAboveThreshold = 200L
 
         handleGuidedMeditationSessionEnded(
             entryId = "calma",
             reason = SessionEndReason.Completed,
-            elapsedSeconds = 42L,
+            elapsedSeconds = elapsedAboveThreshold,
             accessDecision = AccessDecision.Unlocked,
             consumePlaybackUnlock = { id, reason -> consumedCalls.add(id to reason) },
             recordMeditationCompleted = { recordedStreak = true },
         )
 
         assertTrue(recordedStreak)
+        assertEquals(listOf("calma" to SessionEndReason.Completed), consumedCalls)
+    }
+
+    @Test
+    fun `handleGuidedMeditationSessionEnded does not record the streak on Completed when elapsed is below the anti-skip-abuse threshold`() {
+        var recordedStreak = false
+        val consumedCalls = mutableListOf<Pair<String, SessionEndReason>>()
+        // "calma" is approxDurationMinutes = 5 (300s); the 50% threshold is 150s -- a skip-mashed
+        // session ending in 42s (audit item #6's abuse path: Next/Skip reaches SessionCompleted the
+        // same way a natural phase timeout does) must not credit the streak.
+        val elapsedBelowThreshold = 42L
+
+        handleGuidedMeditationSessionEnded(
+            entryId = "calma",
+            reason = SessionEndReason.Completed,
+            elapsedSeconds = elapsedBelowThreshold,
+            accessDecision = AccessDecision.Unlocked,
+            consumePlaybackUnlock = { id, reason -> consumedCalls.add(id to reason) },
+            recordMeditationCompleted = { recordedStreak = true },
+        )
+
+        // consumeMeditationPlaybackUnlock is UNAFFECTED by the elapsed-time gate -- it still runs
+        // for every terminal reason, only the streak call is threshold-gated.
+        assertFalse(recordedStreak)
         assertEquals(listOf("calma" to SessionEndReason.Completed), consumedCalls)
     }
 

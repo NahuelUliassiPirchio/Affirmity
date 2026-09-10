@@ -91,6 +91,7 @@ import com.pirxhio.affirmity.ui.compass.CompassAnswerScreen
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
 import com.pirxhio.affirmity.ui.components.FloatingStatusOverlay
 import com.pirxhio.affirmity.ui.favorites.FavoritesScreen
+import com.pirxhio.affirmity.ui.hidden.HiddenAffirmationsScreen
 import com.pirxhio.affirmity.ui.feed.SeeAllThemesScreen
 import com.pirxhio.affirmity.ui.feed.SurfaceDetailBottomSheet
 import com.pirxhio.affirmity.ui.feed.YourFeedSheetContent
@@ -116,6 +117,7 @@ import com.pirxhio.affirmity.ui.settings.NotificationDebugScreen
 import com.pirxhio.affirmity.ui.settings.SettingsScreen
 import com.pirxhio.affirmity.ui.theme.AffirmityTheme
 import com.pirxhio.affirmity.data.local.AffirmityDatabase
+import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.repository.RoomCatalogAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomMeditationCustomizationRepository
 import com.pirxhio.affirmity.ui.meditation.customization.affirmationTextsForBreathingAffirmations
@@ -432,8 +434,20 @@ internal fun handleGuidedMeditationSessionEnded(
     emit: (AnalyticsEvent) -> Unit = {},
 ) {
     consumePlaybackUnlock(entryId, reason)
-    if (reason == SessionEndReason.Completed) recordMeditationCompleted()
-    val entry = findMeditationCatalogEntry(entryId) ?: return
+    val entry = findMeditationCatalogEntry(entryId)
+    // Anti-skip-abuse gate (audit item #6): a session that never ran at least half its expected
+    // duration doesn't credit the streak, even though it still reached SessionCompleted -- Next/
+    // Skip routes through the exact same exitCurrentPhaseAndAdvance()/EndSession(Completed) path a
+    // natural phase timeout does (MeditationEngine.kt), so without this check mashing skip through
+    // every phase in under a second earned full streak credit. `entry == null` (should never
+    // happen for a real launch) fails open to the pre-existing unconditional behavior rather than
+    // silently dropping a legitimate completion. Analytics below is UNCHANGED by this gate --
+    // MeditationCompleted still fires with the real elapsedSeconds so skip-abuse stays visible in
+    // the data even when it isn't credited.
+    val meetsMinimumElapsed = entry == null ||
+        elapsedSeconds >= entry.approxDurationMinutes * 60 * MEDITATION_COMPLETION_MIN_ELAPSED_FRACTION
+    if (reason == SessionEndReason.Completed && meetsMinimumElapsed) recordMeditationCompleted()
+    if (entry == null) return
     val analyticsId = AnalyticsId.of(entry)
     emit(
         if (reason == SessionEndReason.Completed) {
@@ -623,6 +637,9 @@ fun AffirmityApp(
     var showNotificationDebug by rememberSaveable { mutableStateOf(false) }
     var showMyAffirmations by rememberSaveable { mutableStateOf(false) }
     var showFavorites by rememberSaveable { mutableStateOf(false) }
+    // Pre-launch audit item #1's "Manage hidden affirmations" entry point (Settings) -- same
+    // rememberSaveable-boolean-overlay pattern as showMyAffirmations/showFavorites above.
+    var showHiddenAffirmations by rememberSaveable { mutableStateOf(false) }
     // REQ-5.4: replaces the old single-demo boolean. Holds a MeditationCatalogEntry.id so the
     // guided session route is parameterized on which entry to play, not just whether to show one.
     var selectedMeditationEntryId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -677,6 +694,29 @@ fun AffirmityApp(
     val catalogAffirmationRepository = remember {
         RoomCatalogAffirmationRepository(AffirmityDatabase.getInstance(context).catalogAffirmationDao())
     }
+    // Same "device-local, not AffirmityAppState/DataSession" rationale as the repositories above:
+    // whether the guided-meditation phase-transition chime is audible is a per-device knob, not
+    // account data worth syncing across devices.
+    val meditationTrackerPreferences = remember { TrackerPreferences(context) }
+    var meditationCueSoundEnabled by remember { mutableStateOf(true) }
+    LaunchedEffect(meditationTrackerPreferences) {
+        meditationTrackerPreferences.observeMeditationCueSoundEnabled().collect { enabled ->
+            meditationCueSoundEnabled = enabled
+        }
+    }
+    // Pre-launch audit item #5's "recent meditations" shelf. Same device-local posture as
+    // meditationCueSoundEnabled above -- deliberately kept out of AffirmityAppState/DataSession.
+    // Ids that no longer resolve to a catalog entry (e.g. removed in a later version) are silently
+    // dropped here rather than surfacing a broken card.
+    var recentMeditationIds by remember { mutableStateOf<List<String>>(emptyList()) }
+    LaunchedEffect(meditationTrackerPreferences) {
+        meditationTrackerPreferences.observeRecentMeditationIds().collect { ids ->
+            recentMeditationIds = ids
+        }
+    }
+    val recentMeditationEntries = remember(recentMeditationIds) {
+        recentMeditationIds.mapNotNull { id -> findMeditationCatalogEntry(id) }
+    }
 
     // Shared upgrade-CTA routing (design.md D7): signed-out taps route to sign-in, never straight
     // to the paywall -- used by both the group selector sheet's per-row CTA and any other entry
@@ -724,6 +764,8 @@ fun AffirmityApp(
     // for the same LocalContextGetResourceValueCall reason as the ad-unlock messages above.
     val meditationAccessBlockedMessage = stringResource(R.string.meditation_access_blocked_message)
     val paywallSnackbarLapseAction = stringResource(R.string.paywall_snackbar_lapse_action)
+    val unfavoritedMessage = stringResource(R.string.affirmation_unfavorited_snackbar)
+    val unfavoritedUndoAction = stringResource(R.string.affirmation_unfavorited_undo)
     // Fix item 3: shared by BOTH the mid-flow onAccessBlocked callback below AND the
     // composition-time launch re-check further down -- whichever path first notices the access
     // loss shows the SAME snackbar-with-"see plans"-action, instead of the re-check silently
@@ -955,6 +997,33 @@ fun AffirmityApp(
         return
     }
 
+    if (showHiddenAffirmations) {
+        BackHandler { showHiddenAffirmations = false }
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            topBar = {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.hidden_affirmations_title)) },
+                    navigationIcon = {
+                        IconButton(onClick = { showHiddenAffirmations = false }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.nav_back_content_description)
+                            )
+                        }
+                    }
+                )
+            }
+        ) { innerPadding ->
+            HiddenAffirmationsScreen(
+                modifier = Modifier.padding(innerPadding),
+                hidden = appState.hiddenAffirmations,
+                onUnhide = appState::unhideAffirmation,
+            )
+        }
+        return
+    }
+
     val selectedMeditationEntry = resolveSelectedMeditationEntry(selectedMeditationEntryId)
     if (selectedMeditationEntry != null) {
         // Launch-time access re-check (REQ-5.4.1, EC-5): re-resolved at composition time, not
@@ -1102,6 +1171,7 @@ fun AffirmityApp(
                     ) { innerPadding ->
                         GuidedMeditationScreen(
                             entry = selectedMeditationEntry,
+                            tierAtEntry = { appState.entitlementTier.value },
                             modifier = Modifier.padding(innerPadding),
                             customization = sessionCustomization,
                             accessAtStart = {
@@ -1144,6 +1214,19 @@ fun AffirmityApp(
                             },
                             onExit = { selectedMeditationEntryId = null },
                             onEvent = appState::logAnalyticsEvent,
+                            cueSoundEnabled = meditationCueSoundEnabled,
+                            onToggleCueSound = {
+                                val newValue = !meditationCueSoundEnabled
+                                meditationCueSoundEnabled = newValue
+                                snackbarScope.launch {
+                                    meditationTrackerPreferences.saveMeditationCueSoundEnabled(newValue)
+                                }
+                            },
+                            onSessionStarted = {
+                                snackbarScope.launch {
+                                    meditationTrackerPreferences.recordRecentMeditation(selectedMeditationEntry.id)
+                                }
+                            },
                         )
                     }
                 }
@@ -1265,6 +1348,10 @@ fun AffirmityApp(
                     showOnboardingGuide = true
                     showSettings = false
                 },
+                onOpenHiddenAffirmations = {
+                    showHiddenAffirmations = true
+                    showSettings = false
+                },
             )
         }
         return
@@ -1378,6 +1465,8 @@ fun AffirmityApp(
                                     }
                                 },
                                 onFavoritesClick = { showFavorites = true },
+                                feedSources = appState.feedSources.value,
+                                onFeedSourcesChange = appState::setFeedSources,
                             )
                         },
                     ) {
@@ -1386,7 +1475,27 @@ fun AffirmityApp(
                             onAffirmationViewed = { appState.recordAffirmationViewed() },
                             onOverrideCommitted = appState::setTokenOverride,
                             favoriteIds = appState.favoriteAffirmationIds.value,
-                            onToggleFavorite = appState::toggleFavorite,
+                            onToggleFavorite = { id ->
+                                // Undo is offered only in the destructive direction: losing a
+                                // favourite by a stray double-tap is the costly mistake, gaining one
+                                // is not. Strings are resolved above in composable scope, never via
+                                // context.getString inside the coroutine (LocalContextGetResourceValueCall).
+                                val wasFavorite = id in appState.favoriteAffirmationIds.value
+                                appState.toggleFavorite(id)
+                                if (wasFavorite) {
+                                    snackbarScope.launch {
+                                        val result = snackbarHostState.showSnackbar(
+                                            message = unfavoritedMessage,
+                                            actionLabel = unfavoritedUndoAction,
+                                            duration = androidx.compose.material3.SnackbarDuration.Short,
+                                        )
+                                        if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                                            appState.restoreFavorite(id)
+                                        }
+                                    }
+                                }
+                            },
+                            onHideAffirmation = appState::hideAffirmation,
                         )
                     }
 
@@ -1436,6 +1545,7 @@ fun AffirmityApp(
                         appState.logAnalyticsEvent(AnalyticsEvent.FreeTimerCompleted(durationSeconds))
                     },
                     entries = meditationCatalog(),
+                    recentEntries = recentMeditationEntries,
                     decisionFor = { entry ->
                         meditationAccessDecision(
                             entry,
@@ -1618,18 +1728,24 @@ private fun PaywallHost(
     )
 }
 
+/** Anti-skip-abuse threshold (audit item #6) -- a guided meditation session must run at least this
+ * fraction of its expected duration before it credits [handleGuidedMeditationSessionEnded]'s
+ * `recordMeditationCompleted`/streak. Analytics (`AnalyticsEvent.MeditationCompleted`) still fires
+ * with the real `elapsedSeconds` regardless, so skip-abuse stays visible in the data. */
+private const val MEDITATION_COMPLETION_MIN_ELAPSED_FRACTION = 0.5
+
 /** Play Console product/base-plan id -- part of the Phase 0 user-owned prerequisite (Play Console
  * subscription setup); placeholder until that product exists. */
 private const val PRO_SUBSCRIPTION_PRODUCT_ID = "pro"
 
 /** Deployed `syncEntitlement` Cloud Function URL -- part of the Phase 0 user-owned prerequisite
  * (service account + function deploy); placeholder until that deployment exists. */
-private const val SYNC_ENTITLEMENT_URL = ""
+private const val SYNC_ENTITLEMENT_URL = "https://us-central1-affirmity-7ace6.cloudfunctions.net/syncEntitlement"
 
 /** Deployed `answerCompassQuestion` Cloud Function URL (Notifications V2 scope-expansion
  * decision) -- same "user-owned prerequisite" placeholder posture as [SYNC_ENTITLEMENT_URL]
  * above, until that deployment exists. */
-private const val ANSWER_COMPASS_QUESTION_URL = ""
+private const val ANSWER_COMPASS_QUESTION_URL = "https://us-central1-affirmity-7ace6.cloudfunctions.net/answerCompassQuestion"
 
 /** Hosts [com.pirxhio.affirmity.ui.compass.CompassAnswerScreen], wiring it to
  * [CompassAnswerRepository] the same way [PaywallHost] wires [PaywallSheet] to [BillingService]:

@@ -21,6 +21,7 @@ import com.pirxhio.affirmity.data.local.CatalogPreferences
 import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
+import com.pirxhio.affirmity.data.local.FeedSources
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.DocWrite
 import com.pirxhio.affirmity.data.remote.FcmTokenRepository
@@ -276,8 +277,34 @@ class AffirmityAppStateCatalogTest {
         runCurrent()
         advanceUntilIdle()
 
+        // Your feed's "Favoritas" source toggle defaults OFF, so the theme filter is still the only
+        // thing deciding here. The toggle-on case is covered by its own test below.
         assertTrue("cat_free.001" !in stateAfterDeselection.filteredAffirmations.map { it.id })
         assertTrue("cat_free.001" in stateAfterDeselection.favoriteAffirmations.map { it.id })
+    }
+
+    @Test
+    fun `the Favoritas source toggle on brings a deselected favorite back into the feed`() = runTest {
+        val favorites = RecordingFavoritesRepository2(initialIds = listOf("cat_free.001"))
+        val catalog = FakeCatalogAffirmationRepository(
+            listOf(catalogEntity(id = "cat_free.001", collectionId = FREE_COLLECTION_ID)),
+        )
+        val state = buildState(
+            backgroundScope,
+            favorites = favorites,
+            catalog = catalog,
+            knownThemeIds = setOf(THEME_ID, OTHER_THEME_ID),
+            themePreferences = FixedThemeSelectionPreferences(setOf(OTHER_THEME_ID)),
+            feedSources = FeedSources(includeFavorites = true),
+        )
+        runCurrent()
+        advanceUntilIdle()
+
+        // The other half of the rule the deselection test above asserts: with the source on, a
+        // favourite outranks the theme filter. It still never outranks the ACCESS gate -- the
+        // Pro-locked case below is what keeps that from becoming a monetization hole.
+        assertTrue("cat_free.001" in state.filteredAffirmations.map { it.id })
+        assertTrue("cat_free.001" in state.favoriteAffirmations.map { it.id })
     }
 
     @Test
@@ -375,6 +402,7 @@ private class RecordingSeederPrefs(initial: String? = null) : CatalogPreferences
 private fun catalogEntity(id: String, collectionId: String, withToken: Boolean = false) = CatalogAffirmationEntity(
     id = id,
     text = if (withToken) "Text for $id, [name]" else "Text for $id",
+    subtitle = "Subtitle for $id",
     groupId = UNIVERSE_ID,
     themeId = "$UNIVERSE_ID.theme",
     collectionId = collectionId,
@@ -473,10 +501,15 @@ private fun buildState(
     knownThemeIds: Set<String> = setOf(THEME_ID),
     themePreferences: ThemeSelectionPreferences = FixedThemeSelectionPreferences(setOf(THEME_ID)),
     catalogSeeder: CatalogSeeder? = null,
+    feedSources: FeedSources = FeedSources(),
 ): AffirmityAppState {
     val trackerPreferences = mock(TrackerPreferences::class.java)
     whenever(trackerPreferences.observeAffirmationsViewedToday())
         .thenReturn(flowOf(DailyViewCount(epochDay = -1L, count = 0)))
+    // Collected in AffirmityAppState's init -- an unstubbed mock returns null, and the plain-Job
+    // scope these tests pass means that NPE cancels every sibling collector.
+    whenever(trackerPreferences.observeHiddenAffirmationIds()).thenReturn(flowOf(emptySet()))
+    whenever(trackerPreferences.observeFeedSources()).thenReturn(flowOf(feedSources))
     val notificationDebugLog = mock(NotificationDebugLog::class.java)
     whenever(notificationDebugLog.entries).thenReturn(flowOf(emptyList()))
     val onboardingPreferences = mock(OnboardingPreferences::class.java)

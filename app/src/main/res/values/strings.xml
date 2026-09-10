@@ -221,6 +221,13 @@
     <string name="meditation_preset_focus">Focus</string>
     <string name="meditation_preset_sleep">Sleep</string>
     <string name="meditation_discover_header">Descubre más sesiones</string>
+    <string name="meditation_category_all">Todo</string>
+    <string name="meditation_badge_ad_unlock">Anuncio gratis</string>
+    <string name="meditation_ad_unlock_sheet_title">Desbloquear %1$s</string>
+    <string name="meditation_ad_unlock_body_per_use">Mirá un anuncio corto y esta sesión queda disponible ahora mismo.</string>
+    <string name="meditation_ad_unlock_body_one_time_trial">Mirá un anuncio corto para probar esta sesión una vez, sin costo.</string>
+    <string name="meditation_ad_unlock_body_timed">Mirá un anuncio corto y esta sesión queda disponible por %1$d horas.</string>
+    <string name="meditation_ad_unlock_dismiss">Ahora no</string>
 
     <string name="guided_meditation_round_label">Ronda %1$d de %2$d</string>
     <string name="guided_meditation_breath_label">Respiración %1$d de %2$d</string>
@@ -235,6 +242,45 @@
     <string name="guided_meditation_pause_content_description">Pausar</string>
     <string name="guided_meditation_resume_content_description">Reanudar</string>
     <string name="guided_meditation_skip_content_description">Avanzar fase</string>
+    <string name="guided_meditation_idle_duration_minutes">%1$d min</string>
+    <!-- "Vale la pena conocerlas" shelf + primer sheet: plain-words explanations for the four
+         entries whose title tells a newcomer nothing. Deliberately written with no Sanskrit gloss
+         and no "práctica milenaria" framing, because they are meant to be read at a glance. -->
+    <string name="meditation_primer_shelf_title">Vale la pena conocerlas</string>
+    <string name="meditation_primer_shelf_subtitle">Prácticas con nombres raros, explicadas simple</string>
+    <string name="meditation_primer_expectations_label">QUÉ ESPERAR</string>
+    <string name="meditation_primer_start_cta">Empezar sesión</string>
+    <string name="meditation_primer_info_content_description">Ver de qué se trata</string>
+
+    <string name="meditation_primer_trataka_plain">Mirada en un punto</string>
+    <string name="meditation_primer_trataka_short">Descansá los ojos en un punto hasta que la mente siga.</string>
+    <string name="meditation_primer_trataka_long">Te sentás frente a un solo punto de luz —una vela, o un punto en la pared— y mantenés los ojos ahí. Cuando la atención se va, la traés de vuelta. Esa es toda la práctica. Aquieta una mente acelerada más rápido que la mayoría de los ejercicios de respiración, y es la indicada para cuando los pensamientos no paran.</string>
+    <string name="meditation_primer_trataka_expect_1">Los ojos van abiertos todo el tiempo</string>
+    <string name="meditation_primer_trataka_expect_2">Funciona mejor con poca luz</string>
+    <string name="meditation_primer_trataka_expect_3">Parpadeá cuando lo necesites</string>
+
+    <string name="meditation_primer_yoganidra_plain">Descanso profundo guiado</string>
+    <string name="meditation_primer_yoganidra_short">Acostate y dejá que una voz te recorra el cuerpo.</string>
+    <string name="meditation_primer_yoganidra_long">Te acostás boca arriba y una voz lleva tu atención por el cuerpo, parte por parte. No estás tratando de dormirte, aunque mucha gente se duerme. Veinte minutos de esto dejan a la mayoría como si hubiera dormido una siesta de una hora.</string>
+    <string name="meditation_primer_yoganidra_expect_1">Se hace acostado, no sentado</string>
+    <string name="meditation_primer_yoganidra_expect_2">Quedarse dormido está bien</string>
+    <string name="meditation_primer_yoganidra_expect_3">No hay nada que hacer, solo escuchar</string>
+
+    <string name="meditation_primer_vipassana_plain">Observar lo que aparece</string>
+    <string name="meditation_primer_vipassana_short">Mirá lo que surge sin corregir nada.</string>
+    <string name="meditation_primer_vipassana_long">Te sentás y notás lo que aparezca —la respiración, un sonido, una molestia, un pensamiento— sin perseguirlo ni empujarlo lejos. Más antigua y más simple de lo que suena, y la base sobre la que se construyen casi todas las demás prácticas.</string>
+    <string name="meditation_primer_vipassana_expect_1">No hay visualización</string>
+    <string name="meditation_primer_vipassana_expect_2">Sentado y con los ojos cerrados</string>
+    <string name="meditation_primer_vipassana_expect_3">La inquietud es parte del asunto</string>
+
+    <string name="meditation_primer_metta_short">Mandá unos buenos deseos, empezando por vos.</string>
+    <string name="meditation_primer_metta_long">Repetís un puñado de deseos simples: que yo esté bien, que yo esté en paz. Después mandás las mismas frases a alguien que querés, a alguien neutral, a alguien difícil. Es la práctica para los días en que estás siendo duro con vos mismo.</string>
+    <string name="meditation_primer_metta_expect_1">Se repiten frases, no se vacía la mente</string>
+    <string name="meditation_primer_metta_expect_2">Empezás por vos</string>
+    <string name="meditation_primer_metta_expect_3">Que al principio no sientas nada es normal</string>
+
+    <string name="guided_meditation_cue_sound_mute_content_description">Silenciar sonido de transición</string>
+    <string name="guided_meditation_cue_sound_unmute_content_description">Activar sonido de transición</string>
 
     <!-- Meditation catalog (Spec 3, REQ-4.6/4.11) — titles, descriptions, categories for the 7
          shipping entries, and every ShowText cue id their definitions reference. Copy is an
@@ -613,6 +659,21 @@
     <string name="meditation_catalog_category_gratitud">Gratitud</string>
     <string name="meditation_catalog_category_bienestar">Bienestar</string>
 
+    <!-- Merged Discover shelves (Item: "agrupar algunas categories porque hay muchas que tienen
+         un solo elemento", raised to a 3-entry minimum per shelf): combine categories with too
+         few entries into a broader shelf instead of showing a thin one. See
+         categoryShelfGroups in MeditationScreen.kt. -->
+    <string name="meditation_shelf_calm_sleep">Calma y sueño</string>
+    <string name="meditation_shelf_mindfulness">Mindfulness y silencio</string>
+    <string name="meditation_shelf_body">Cuerpo y movimiento</string>
+    <string name="meditation_shelf_energy_focus">Energía y enfoque</string>
+    <string name="meditation_shelf_compassion">Compasión y autocompasión</string>
+    <string name="meditation_shelf_prayer_contemplation">Oración y contemplación</string>
+
+    <!-- Pre-launch audit item #5: "recent meditations" shelf label, shown only against the "Todo"
+         pill (see MeditationScreen.kt's recentEntries visibility condition). -->
+    <string name="meditation_shelf_recent">Recientes</string>
+
     <string name="meditation_visualization_relaxation">Relajá el cuerpo y preparate para imaginar.</string>
     <string name="meditation_visualization_visualization_nature">Imaginá un paisaje natural que te dé calma: el sonido del agua, el aire, la luz.</string>
     <string name="meditation_visualization_visualization_safe_place">Imaginá tu lugar seguro, con todo el detalle posible: qué ves, qué escuchás, cómo te sentís ahí.</string>
@@ -678,6 +739,15 @@
     <string name="favorites_empty_state">Aún no guardaste ninguna afirmación.</string>
     <string name="favorites_empty_hint">Tocá dos veces una afirmación para guardarla acá.</string>
     <string name="favorites_unlike_content_description">Quitar de favoritos</string>
+    <string name="affirmation_share_content_description">Compartir afirmación</string>
+    <string name="affirmation_hide_content_description">Ocultar afirmación</string>
+    <string name="affirmation_unfavorited_snackbar">Quitada de favoritas</string>
+    <string name="affirmation_unfavorited_undo">Deshacer</string>
+    <string name="hidden_affirmations_title">Afirmaciones ocultas</string>
+    <string name="hidden_affirmations_empty_state">No ocultaste ninguna afirmación.</string>
+    <string name="hidden_affirmations_unhide_content_description">Dejar de ocultar</string>
+    <string name="settings_manage_hidden_affirmations">Gestionar afirmaciones ocultas</string>
+    <string name="settings_manage_hidden_affirmations_button">Gestionar</string>
     <string name="affirmation_group_locked_a11y">%1$s (bloqueado)</string>
     <string name="affirmation_group_upgrade_cta">Mejorar a Pro</string>
     <string name="ad_unlock_cta_a11y">Mirá un anuncio para desbloquear %1$s</string>
@@ -686,6 +756,11 @@
     <string name="your_feed_expand">Expandir tu feed</string>
     <string name="your_feed_collapse">Ocultar tu feed</string>
     <string name="your_feed_title">Tu feed</string>
+    <string name="your_feed_sources_title">Qué más entra en tu feed</string>
+    <string name="your_feed_source_favorites">Favoritas</string>
+    <string name="your_feed_source_favorites_description">Aunque su tema no esté elegido</string>
+    <string name="your_feed_source_own">Mías</string>
+    <string name="your_feed_source_own_description">Las que escribiste vos</string>
     <string name="your_feed_done">Listo</string>
     <string name="your_feed_feeding_you_now">Alimentando tu feed ahora</string>
     <string name="your_feed_add_theme_a11y">Agregar temas</string>

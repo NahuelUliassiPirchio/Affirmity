@@ -18,6 +18,7 @@ import com.pirxhio.affirmity.data.local.OnboardingPreferences
 import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
+import com.pirxhio.affirmity.data.local.FeedSources
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.DocWrite
 import com.pirxhio.affirmity.data.remote.FcmTokenRepository
@@ -42,6 +43,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -104,6 +106,28 @@ class AffirmityAppStateFavoritesTest {
 
         assertEquals(listOf("affirmation-1", "affirmation-1"), favorites.removed)
         assertTrue(favorites.added.isEmpty())
+    }
+
+    @Test
+    fun `restoreFavorite waits for an in-flight removeFavorite and preserves the undo`() = runTest {
+        val removeGate = CompletableDeferred<Unit>()
+        val favorites = RecordingFavoritesRepository(
+            initialIds = listOf("affirmation-1"),
+            removeGate = removeGate,
+        )
+        val state = buildState(backgroundScope, favorites)
+        runCurrent()
+
+        state.removeFavorite("affirmation-1")
+        runCurrent()
+        state.restoreFavorite("affirmation-1")
+        runCurrent()
+
+        removeGate.complete(Unit)
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(listOf("affirmation-1"), favorites.observeFavoriteIds().first())
     }
 
     @Test
@@ -242,6 +266,7 @@ class AffirmityAppStateFavoritesTest {
 private class RecordingFavoritesRepository(
     initialIds: List<String> = emptyList(),
     private val firstReadGate: CompletableDeferred<Unit>? = null,
+    private val removeGate: CompletableDeferred<Unit>? = null,
     sharedEvents: MutableList<String> = mutableListOf(),
 ) : FavoriteAffirmationRepository {
     private val ids = MutableStateFlow(initialIds)
@@ -267,6 +292,7 @@ private class RecordingFavoritesRepository(
 
     override suspend fun remove(id: String) {
         events += "remove:$id"
+        removeGate?.await()
         removed += id
         ids.value = ids.value.filterNot { it == id }
     }
@@ -285,6 +311,10 @@ private fun buildState(
     val trackerPreferences = mock(TrackerPreferences::class.java)
     whenever(trackerPreferences.observeAffirmationsViewedToday())
         .thenReturn(flowOf(DailyViewCount(epochDay = -1L, count = 0)))
+    // Collected in AffirmityAppState's init -- an unstubbed mock returns null, and the plain-Job
+    // scope these tests pass means that NPE cancels every sibling collector.
+    whenever(trackerPreferences.observeHiddenAffirmationIds()).thenReturn(flowOf(emptySet()))
+    whenever(trackerPreferences.observeFeedSources()).thenReturn(flowOf(FeedSources()))
     val notificationDebugLog = mock(NotificationDebugLog::class.java)
     whenever(notificationDebugLog.entries).thenReturn(flowOf(emptyList()))
     val onboardingPreferences = mock(OnboardingPreferences::class.java)

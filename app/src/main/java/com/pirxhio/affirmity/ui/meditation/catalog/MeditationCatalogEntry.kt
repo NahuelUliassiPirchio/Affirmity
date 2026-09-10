@@ -44,4 +44,32 @@ data class MeditationCatalogEntry(
      * built. Empty (the default) means the entry launches straight into the session, exactly as
      * before this field existed. */
     val customizationFields: List<CustomizationField> = emptyList(),
+    /** Set only on entries whose [titleRes] tells a newcomer nothing about what they will actually
+     * do ("Trataka", "Yoga Nidra", "Vipassana"). Its presence is the ONLY signal driving all three
+     * of the Discover behaviours below -- there is deliberately no second boolean flag:
+     *  - membership in the "Vale la pena conocerlas" shelf,
+     *  - the one-line [MeditationPrimer.shortRes] rendered on that shelf's cards,
+     *  - tapping the card opening [MeditationPrimer]'s explanation sheet instead of launching.
+     *
+     * Left null for the ~34 entries whose title already explains itself (including "Bondad
+     * amorosa"), because every extra line on a shelf card is paid for by every card in that shelf. */
+    val primer: MeditationPrimer? = null,
+)
+
+/**
+ * Plain-words explanation of a meditation whose name is opaque to a newcomer, shown on the
+ * Discover surface. Copy is authored to be read at a glance: no Sanskrit gloss, no "ancient
+ * practice" framing.
+ */
+data class MeditationPrimer(
+    /** One line, rendered under the title on the "Vale la pena conocerlas" shelf only. */
+    @StringRes val shortRes: Int,
+    /** The full explanation, rendered as the body of the primer sheet. */
+    @StringRes val longRes: Int,
+    /** "Qué esperar" bullets -- concrete, practical expectations (posture, eyes, what counts as
+     *  doing it right), not benefits. */
+    val expectationsRes: List<Int>,
+    /** A plain-language rendering of an impenetrable title ("Mirada en un punto" for Trataka),
+     *  shown under it in the sheet. Null when the title is already plain. */
+    @StringRes val plainNameRes: Int? = null,
 )

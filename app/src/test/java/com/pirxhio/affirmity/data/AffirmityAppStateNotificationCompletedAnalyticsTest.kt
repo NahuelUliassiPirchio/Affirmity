@@ -25,6 +25,7 @@ import com.pirxhio.affirmity.data.local.OnboardingGuidePreferences
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
+import com.pirxhio.affirmity.data.local.FeedSources
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.DocWrite
 import com.pirxhio.affirmity.data.remote.FcmTokenRepository
@@ -168,6 +169,11 @@ class AffirmityAppStateNotificationCompletedAnalyticsTest {
         val trackerPreferences = mock(TrackerPreferences::class.java)
         org.mockito.Mockito.`when`(trackerPreferences.observeAffirmationsViewedToday())
             .thenReturn(flowOf(DailyViewCount(epochDay = -1L, count = 0)))
+        // Collected in AffirmityAppState's init -- an unstubbed mock returns null, and the
+        // plain-Job scope these tests pass means that NPE cancels every sibling collector.
+        org.mockito.Mockito.`when`(trackerPreferences.observeHiddenAffirmationIds())
+            .thenReturn(flowOf(emptySet()))
+        org.mockito.Mockito.`when`(trackerPreferences.observeFeedSources()).thenReturn(flowOf(FeedSources()))
         val notificationDebugLog = mock(NotificationDebugLog::class.java)
         org.mockito.Mockito.`when`(notificationDebugLog.entries).thenReturn(flowOf(emptyList()))
         val onboardingPreferences = mock(OnboardingPreferences::class.java)

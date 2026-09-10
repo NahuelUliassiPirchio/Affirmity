@@ -2,9 +2,12 @@ package com.pirxhio.affirmity.data.local
 
 import android.content.Context
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -13,6 +16,20 @@ private val Context.trackerDataStore by preferencesDataStore(name = "tracker_pre
 
 /** Which day the user last viewed affirmations, and how many they'd viewed by then. */
 data class DailyViewCount(val epochDay: Long, val count: Int)
+
+/**
+ * The two optional sources the main affirmation feed can draw from, on top of the theme selection.
+ *
+ * [includeFavorites] on means a favourited affirmation stays in the rotation even when its theme is
+ * not currently selected -- favouriting it is a stronger signal than the theme filter. It defaults
+ * OFF: that is the behaviour that shipped before the toggle existed, so no existing feed changes
+ * shape until the user asks for it. [includeOwn] defaults on for the same reason -- own rows were
+ * always in the feed.
+ */
+data class FeedSources(
+    val includeFavorites: Boolean = false,
+    val includeOwn: Boolean = true,
+)
 
 /**
  * Non-streak tracker preferences. Streak/weekly derivation lives exclusively in
@@ -45,9 +62,92 @@ class TrackerPreferences(private val context: Context) {
         context.trackerDataStore.edit { it[MEDITATION_DURATION_SECONDS] = seconds }
     }
 
+    /** Whether the short chime played on a guided meditation's phase transitions (the `SOUND`
+     * channel in [com.pirxhio.affirmity.ui.meditation.GuidedMeditationAudioExecutor], e.g.
+     * [com.pirxhio.affirmity.meditation.breathing.BreathingAudio.RETENTION_START]) is audible.
+     * Defaults to on. Device-local by design, same rationale as [MEDITATION_DURATION_SECONDS]'s
+     * sibling knobs -- a mute preference is not account data. */
+    fun observeMeditationCueSoundEnabled(): Flow<Boolean> =
+        context.trackerDataStore.data.map { it[MEDITATION_CUE_SOUND_ENABLED] ?: true }
+
+    suspend fun saveMeditationCueSoundEnabled(enabled: Boolean) {
+        context.trackerDataStore.edit { it[MEDITATION_CUE_SOUND_ENABLED] = enabled }
+    }
+
+    /** Catalog affirmation ids the user has hidden from their rotation (pre-launch audit item #1).
+     * Device-local, same rationale as [MEDITATION_CUE_SOUND_ENABLED] -- a "don't show me this one"
+     * preference is not account data. Defaults to empty. */
+    fun observeHiddenAffirmationIds(): Flow<Set<String>> =
+        context.trackerDataStore.data.map { it[HIDDEN_AFFIRMATION_IDS] ?: emptySet() }
+
+    suspend fun hideAffirmation(id: String) {
+        context.trackerDataStore.edit { prefs ->
+            prefs[HIDDEN_AFFIRMATION_IDS] = (prefs[HIDDEN_AFFIRMATION_IDS] ?: emptySet()) + id
+        }
+    }
+
+    suspend fun unhideAffirmation(id: String) {
+        context.trackerDataStore.edit { prefs ->
+            prefs[HIDDEN_AFFIRMATION_IDS] = (prefs[HIDDEN_AFFIRMATION_IDS] ?: emptySet()) - id
+        }
+    }
+
+    /** Most-recent-first catalog entry ids the user has actually started a guided session for
+     * (pre-launch audit item #5). Device-local, same rationale as [MEDITATION_CUE_SOUND_ENABLED] --
+     * a "jump back into what you were doing" shortcut is a per-device navigation convenience, not
+     * account data worth syncing through DataSession/Firestore. DataStore Preferences has no list
+     * type, so ids are stored newline-joined in a single string (catalog entry ids are slugs like
+     * `breathing_affirmations` -- no newlines, so `"\n"` is a safe delimiter). */
+    fun observeRecentMeditationIds(): Flow<List<String>> =
+        context.trackerDataStore.data.map { prefs ->
+            prefs[RECENT_MEDITATION_IDS]
+                ?.split("\n")
+                ?.filter { it.isNotBlank() }
+                ?: emptyList()
+        }
+
+    suspend fun recordRecentMeditation(id: String) {
+        context.trackerDataStore.edit { prefs ->
+            val existing = prefs[RECENT_MEDITATION_IDS]
+                ?.split("\n")
+                ?.filter { it.isNotBlank() }
+                ?: emptyList()
+            val reordered = listOf(id) + existing.filterNot { it == id }
+            prefs[RECENT_MEDITATION_IDS] = reordered.take(RECENT_MEDITATION_IDS_LIMIT).joinToString("\n")
+        }
+    }
+
+    /** Which optional sources feed the main rotation. Deliberately ONE preference returning both
+     * flags rather than two: every flow collected in [com.pirxhio.affirmity.data.AffirmityAppState]'s
+     * init has to be stubbed in all 8 `AffirmityAppState*Test` helpers, and an unstubbed Mockito
+     * mock returns null there, which throws inside the collector and cancels every sibling. One
+     * method is one stub. */
+    fun observeFeedSources(): Flow<FeedSources> =
+        context.trackerDataStore.data.map { prefs ->
+            FeedSources(
+                includeFavorites = prefs[FEED_INCLUDE_FAVORITES] ?: false,
+                includeOwn = prefs[FEED_INCLUDE_OWN] ?: true,
+            )
+        }
+
+    suspend fun saveFeedSources(sources: FeedSources) {
+        context.trackerDataStore.edit { prefs ->
+            prefs[FEED_INCLUDE_FAVORITES] = sources.includeFavorites
+            prefs[FEED_INCLUDE_OWN] = sources.includeOwn
+        }
+    }
+
     private companion object {
         val AFFIRMATIONS_VIEWED_EPOCH_DAY = longPreferencesKey("affirmations_viewed_epoch_day")
         val AFFIRMATIONS_VIEWED_COUNT = intPreferencesKey("affirmations_viewed_count")
         val MEDITATION_DURATION_SECONDS = intPreferencesKey("meditation_duration_seconds")
+        val FEED_INCLUDE_FAVORITES = booleanPreferencesKey("feed_include_favorites")
+        val FEED_INCLUDE_OWN = booleanPreferencesKey("feed_include_own")
+        val MEDITATION_CUE_SOUND_ENABLED = booleanPreferencesKey("meditation_cue_sound_enabled")
+        val HIDDEN_AFFIRMATION_IDS = stringSetPreferencesKey("hidden_affirmation_ids")
+        val RECENT_MEDITATION_IDS = stringPreferencesKey("recent_meditation_ids")
+        // A "recents" shortcut past a handful of entries stops being a shortcut -- caps the list so
+        // it stays scannable and the stored string stays small.
+        const val RECENT_MEDITATION_IDS_LIMIT = 8
     }
 }

@@ -45,6 +45,8 @@ export interface SourceTheme {
   universeId: string;
   title: string;
   description: string;
+  conceptTagIds: string[];
+  desiredStateIds: string[];
   order: number;
   status: string;
 }
@@ -58,15 +60,29 @@ export interface SourceCollection {
   id: string;
   universeId: string;
   themeId: string;
+  title: string;
+  description: string;
   access: SourceCollectionAccess;
+  conceptTagIds: string[];
+  contextIds: string[];
+  momentIds: string[];
+  desiredStateIds: string[];
   order: number;
   status: string;
 }
 
+/** v2 copy shape: `title` + `subtitle`, no `text`, no `legacyText` (spec "v2 Copy Shape"). */
 export interface SourceAffirmation {
   id: string;
   collectionId: string;
-  text: string;
+  themeId: string;
+  universeId: string;
+  tone: string;
+  semanticAngle: string;
+  title: string;
+  /** Optional (spec "v2 Copy Shape"): absent in the source stays `undefined` here; Firestore
+   *  writes omit the key and `buildCatalog.mjs` normalizes it for Android's non-null read model. */
+  subtitle?: string;
   order: number;
   status: string;
 }
@@ -124,6 +140,8 @@ function themeWrite(t: SourceTheme): FirestoreWrite {
       universeId: t.universeId,
       title: t.title,
       description: t.description,
+      conceptTagIds: t.conceptTagIds,
+      desiredStateIds: t.desiredStateIds,
       order: t.order,
       status: t.status,
     },
@@ -136,27 +154,41 @@ function collectionWrite(c: SourceCollection): FirestoreWrite {
     data: {
       universeId: c.universeId,
       themeId: c.themeId,
+      title: c.title,
+      description: c.description,
       access: {
         tier: c.access.tier,
         rewardedUnlockHours: c.access.rewardedUnlockHours,
       },
+      conceptTagIds: c.conceptTagIds,
+      contextIds: c.contextIds,
+      momentIds: c.momentIds,
+      desiredStateIds: c.desiredStateIds,
       order: c.order,
       status: c.status,
     },
   };
 }
 
+/** v2 copy shape (spec "v2 Copy Shape Across the Pipeline"): `title`+`subtitle`+`tone`+
+ *  `semanticAngle`, never `text`/`legacyText`. `groupId`/`themeId` come from the affirmation's own
+ *  validated `universeId`/`themeId` fields (already cross-checked against the resolved collection
+ *  by [parseSourceCatalog]), not derived from splitting `collectionId`. */
 function affirmationWrite(a: SourceAffirmation, catalogVersion: string): FirestoreWrite {
-  const collection = a.collectionId;
   // Design D3: catalog id = `cat_` + the source dotted id, verbatim. Same scheme Room uses, so an
   // id maps 1:1 between the local cache and the shared Firestore document.
   return {
     path: `catalogAffirmations/${CATALOG_ID_PREFIX}${a.id}`,
     data: {
-      text: a.text,
-      groupId: a.collectionId.split('.')[0],
-      themeId: a.collectionId.split('.').slice(0, 2).join('.'),
-      collectionId: collection,
+      title: a.title,
+      // Omitted entirely (not written as `""`) when the source has no subtitle -- `set(...,
+      // { merge: true })` should never plant a spurious empty field.
+      ...(a.subtitle !== undefined ? { subtitle: a.subtitle } : {}),
+      tone: a.tone,
+      semanticAngle: a.semanticAngle,
+      groupId: a.universeId,
+      themeId: a.themeId,
+      collectionId: a.collectionId,
       sortOrder: a.order,
       status: a.status,
       catalogVersion,
@@ -200,6 +232,173 @@ export async function seedCatalog(catalog: SourceCatalog, committer: BatchCommit
   await committer.commit([versionWrite]);
 }
 
+// --- Runtime shape validation (D2) ---------------------------------------------------------
+//
+// Hand-rolled instead of a schema library (zod is absent from functions/package.json -- adding
+// it for a dev-only script would put a runtime dependency in the deployed Functions bundle).
+// Every helper throws an `Error` naming the offending document id, mirroring
+// `CatalogAssetParser.kt`'s `require(...) { "$id ..." }` convention.
+
+function requireString(value: unknown, id: string, field: string): string {
+  if (typeof value !== 'string') {
+    throw new Error(`${id}: expected string field "${field}", got ${typeof value}`);
+  }
+  return value;
+}
+
+function requireNonEmptyString(value: unknown, id: string, field: string): string {
+  const s = requireString(value, id, field);
+  if (s.length === 0) throw new Error(`${id}: field "${field}" must not be empty`);
+  return s;
+}
+
+function optionalString(value: unknown, id: string, field: string): string | undefined {
+  return value === undefined ? undefined : requireString(value, id, field);
+}
+
+function requireInt(value: unknown, id: string, field: string): number {
+  if (typeof value !== 'number' || !Number.isInteger(value)) {
+    throw new Error(`${id}: expected integer field "${field}", got ${typeof value}`);
+  }
+  return value;
+}
+
+function requireStringArray(value: unknown, id: string, field: string): string[] {
+  if (!Array.isArray(value) || !value.every((v) => typeof v === 'string')) {
+    throw new Error(`${id}: expected string[] field "${field}"`);
+  }
+  return value;
+}
+
+function requireEnum<T extends string>(value: unknown, id: string, field: string, allowed: readonly T[]): T {
+  const s = requireString(value, id, field);
+  if (!(allowed as readonly string[]).includes(s)) {
+    throw new Error(`${id}: field "${field}" must be one of ${allowed.join('|')}, got "${s}"`);
+  }
+  return s as T;
+}
+
+function parseUniverse(raw: unknown): SourceUniverse {
+  const u = raw as Record<string, unknown>;
+  const id = requireNonEmptyString(u.id, '<universe>', 'id');
+  return {
+    id,
+    title: requireNonEmptyString(u.title, id, 'title'),
+    description: requireString(u.description, id, 'description'),
+    coreNeed: requireString(u.coreNeed, id, 'coreNeed'),
+    order: requireInt(u.order, id, 'order'),
+    status: requireString(u.status, id, 'status'),
+  };
+}
+
+function parseTheme(raw: unknown): SourceTheme {
+  const t = raw as Record<string, unknown>;
+  const id = requireNonEmptyString(t.id, '<theme>', 'id');
+  return {
+    id,
+    universeId: requireNonEmptyString(t.universeId, id, 'universeId'),
+    title: requireNonEmptyString(t.title, id, 'title'),
+    description: requireString(t.description, id, 'description'),
+    conceptTagIds: requireStringArray(t.conceptTagIds, id, 'conceptTagIds'),
+    desiredStateIds: requireStringArray(t.desiredStateIds, id, 'desiredStateIds'),
+    order: requireInt(t.order, id, 'order'),
+    status: requireString(t.status, id, 'status'),
+  };
+}
+
+function parseCollection(raw: unknown): SourceCollection {
+  const c = raw as Record<string, unknown>;
+  const id = requireNonEmptyString(c.id, '<collection>', 'id');
+  const accessRaw = c.access as Record<string, unknown> | undefined;
+  if (typeof accessRaw !== 'object' || accessRaw === null) {
+    throw new Error(`${id}: missing "access" object`);
+  }
+  const tier = requireEnum(accessRaw.tier, id, 'access.tier', ['free', 'pro'] as const);
+  const rewardedUnlockHours =
+    accessRaw.rewardedUnlockHours === null ? null : requireInt(accessRaw.rewardedUnlockHours, id, 'access.rewardedUnlockHours');
+  if (tier === 'free' && rewardedUnlockHours !== null) {
+    throw new Error(`${id}: declares tier=free with non-null rewardedUnlockHours`);
+  }
+  if (rewardedUnlockHours !== null && rewardedUnlockHours <= 0) {
+    throw new Error(`${id}: declares non-positive rewardedUnlockHours`);
+  }
+  return {
+    id,
+    universeId: requireNonEmptyString(c.universeId, id, 'universeId'),
+    themeId: requireNonEmptyString(c.themeId, id, 'themeId'),
+    title: requireNonEmptyString(c.title, id, 'title'),
+    description: requireString(c.description, id, 'description'),
+    access: { tier, rewardedUnlockHours },
+    conceptTagIds: requireStringArray(c.conceptTagIds, id, 'conceptTagIds'),
+    contextIds: requireStringArray(c.contextIds, id, 'contextIds'),
+    momentIds: requireStringArray(c.momentIds, id, 'momentIds'),
+    desiredStateIds: requireStringArray(c.desiredStateIds, id, 'desiredStateIds'),
+    order: requireInt(c.order, id, 'order'),
+    status: requireString(c.status, id, 'status'),
+  };
+}
+
+function parseAffirmation(raw: unknown): SourceAffirmation {
+  const a = raw as Record<string, unknown>;
+  const id = requireNonEmptyString(a.id, '<affirmation>', 'id');
+  return {
+    id,
+    collectionId: requireNonEmptyString(a.collectionId, id, 'collectionId'),
+    themeId: requireNonEmptyString(a.themeId, id, 'themeId'),
+    universeId: requireNonEmptyString(a.universeId, id, 'universeId'),
+    tone: requireString(a.tone, id, 'tone'),
+    semanticAngle: requireString(a.semanticAngle, id, 'semanticAngle'),
+    title: requireNonEmptyString(a.title, id, 'title'),
+    subtitle: optionalString(a.subtitle, id, 'subtitle'),
+    order: requireInt(a.order, id, 'order'),
+    status: requireString(a.status, id, 'status'),
+  };
+}
+
+/**
+ * Runtime parse boundary for the v2 source catalog (design D2). Validates every field's presence
+ * and type, the free/rewardedUnlockHours invariant, affirmation id uniqueness, that every
+ * `affirmation.collectionId` resolves to a known collection, and that the affirmation's own
+ * (denormalized) `themeId`/`universeId` agree with the resolved collection's -- throwing an
+ * `Error` naming the offending id on the FIRST violation found. Never silently writes `undefined`.
+ */
+export function parseSourceCatalog(raw: unknown): SourceCatalog {
+  const root = raw as Record<string, unknown>;
+  const catalogVersion = requireNonEmptyString(root.catalogVersion, '<catalog>', 'catalogVersion');
+
+  if (!Array.isArray(root.universes)) throw new Error('<catalog>: expected array field "universes"');
+  if (!Array.isArray(root.themes)) throw new Error('<catalog>: expected array field "themes"');
+  if (!Array.isArray(root.collections)) throw new Error('<catalog>: expected array field "collections"');
+  if (!Array.isArray(root.affirmations)) throw new Error('<catalog>: expected array field "affirmations"');
+
+  const universes = root.universes.map(parseUniverse);
+  const themes = root.themes.map(parseTheme);
+  const collections = root.collections.map(parseCollection);
+  const affirmations = root.affirmations.map(parseAffirmation);
+
+  const collectionById = new Map(collections.map((c) => [c.id, c]));
+  const seenAffirmationIds = new Set<string>();
+  for (const a of affirmations) {
+    if (seenAffirmationIds.has(a.id)) {
+      throw new Error(`${a.id}: duplicate affirmation id`);
+    }
+    seenAffirmationIds.add(a.id);
+
+    const collection = collectionById.get(a.collectionId);
+    if (!collection) {
+      throw new Error(`${a.id}: references unknown collectionId ${a.collectionId}`);
+    }
+    if (a.themeId !== collection.themeId) {
+      throw new Error(`${a.id}: themeId "${a.themeId}" disagrees with resolved collection "${collection.themeId}"`);
+    }
+    if (a.universeId !== collection.universeId) {
+      throw new Error(`${a.id}: universeId "${a.universeId}" disagrees with resolved collection "${collection.universeId}"`);
+    }
+  }
+
+  return { catalogVersion, universes, themes, collections, affirmations };
+}
+
 function parseArgs(argv: string[]): { catalogPath: string } {
   const flagIndex = argv.indexOf('--catalog');
   if (flagIndex === -1 || flagIndex === argv.length - 1) {
@@ -217,7 +416,7 @@ async function main(): Promise<void> {
   const { getFirestore } = await import('firebase-admin/firestore');
 
   const { catalogPath } = parseArgs(process.argv.slice(2));
-  const catalog = JSON.parse(readFileSync(catalogPath, 'utf8')) as SourceCatalog;
+  const catalog = parseSourceCatalog(JSON.parse(readFileSync(catalogPath, 'utf8')));
 
   initializeApp();
   const db = getFirestore();
