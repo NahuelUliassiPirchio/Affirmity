@@ -1422,7 +1422,7 @@ class AffirmityAppState(
 
     /** Remove-only action for the Favorites screen. Repeated or stale callbacks stay idempotent. */
     fun removeFavorite(id: String) {
-        scope.launch { favorites.remove(id) }
+        scope.launch { favoriteToggleMutex.withLock { favorites.remove(id) } }
     }
 
     /** Add-only counterpart to [removeFavorite], for the unfavorite undo snackbar. Deliberately not

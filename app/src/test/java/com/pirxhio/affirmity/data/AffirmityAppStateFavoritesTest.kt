@@ -43,6 +43,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -105,6 +106,28 @@ class AffirmityAppStateFavoritesTest {
 
         assertEquals(listOf("affirmation-1", "affirmation-1"), favorites.removed)
         assertTrue(favorites.added.isEmpty())
+    }
+
+    @Test
+    fun `restoreFavorite waits for an in-flight removeFavorite and preserves the undo`() = runTest {
+        val removeGate = CompletableDeferred<Unit>()
+        val favorites = RecordingFavoritesRepository(
+            initialIds = listOf("affirmation-1"),
+            removeGate = removeGate,
+        )
+        val state = buildState(backgroundScope, favorites)
+        runCurrent()
+
+        state.removeFavorite("affirmation-1")
+        runCurrent()
+        state.restoreFavorite("affirmation-1")
+        runCurrent()
+
+        removeGate.complete(Unit)
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(listOf("affirmation-1"), favorites.observeFavoriteIds().first())
     }
 
     @Test
@@ -243,6 +266,7 @@ class AffirmityAppStateFavoritesTest {
 private class RecordingFavoritesRepository(
     initialIds: List<String> = emptyList(),
     private val firstReadGate: CompletableDeferred<Unit>? = null,
+    private val removeGate: CompletableDeferred<Unit>? = null,
     sharedEvents: MutableList<String> = mutableListOf(),
 ) : FavoriteAffirmationRepository {
     private val ids = MutableStateFlow(initialIds)
@@ -268,6 +292,7 @@ private class RecordingFavoritesRepository(
 
     override suspend fun remove(id: String) {
         events += "remove:$id"
+        removeGate?.await()
         removed += id
         ids.value = ids.value.filterNot { it == id }
     }
