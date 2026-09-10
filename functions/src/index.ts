@@ -674,7 +674,9 @@ const IOS_BUNDLE_ID = process.env.IOS_BUNDLE_ID ?? 'com.pirxhio.affirmity';
 // exists in App Store Connect; the iOS app has not shipped yet, so this is very likely unset in
 // every environment today. Left unset, `appStoreVerifier()` below constructs Sandbox-only, and any
 // Production-environment JWS from a real App Store purchase will fail verification with 401 --
-// this is a deliberate "not required now" gap, not a bug, until the user supplies this value.
+// deliberately *not* a hard failure here: TestFlight/Sandbox verification must keep working today,
+// pre-launch, with no Apple ID configured yet. `productionVerifier()` logs a warning the first
+// time this happens so the gap stays observable instead of silent.
 const IOS_APP_APPLE_ID = process.env.IOS_APP_APPLE_ID ? Number(process.env.IOS_APP_APPLE_ID) : undefined;
 
 let appleRootCertificatesCache: Buffer[] | null = null;
@@ -700,6 +702,15 @@ let sandboxVerifierCache: SignedDataVerifier | null = null;
  * per function instance, same pattern as `playApiClient()`. */
 function productionVerifier(): SignedDataVerifier | null {
   if (productionVerifierCache === undefined) {
+    if (IOS_APP_APPLE_ID === undefined) {
+      // Loud, not silent: a real Production-environment JWS hitting this instance will now fail
+      // Sandbox-only verification with INVALID_ENVIRONMENT and get mapped to a 401 for a
+      // legitimate paying user -- this log line is what makes that failure mode visible instead
+      // of indistinguishable from a forged receipt.
+      console.warn(
+        '[appStoreVerifier] IOS_APP_APPLE_ID is not configured -- Production App Store transactions cannot be verified; only Sandbox JWS will succeed.',
+      );
+    }
     productionVerifierCache =
       IOS_APP_APPLE_ID !== undefined
         ? new SignedDataVerifier(appleRootCertificates(), true, AppStoreEnvironment.PRODUCTION, IOS_BUNDLE_ID, IOS_APP_APPLE_ID)
