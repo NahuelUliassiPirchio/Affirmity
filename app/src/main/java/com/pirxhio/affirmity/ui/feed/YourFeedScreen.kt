@@ -184,11 +184,11 @@ private fun FeedSourceCard(
     // where a switch would sit.
     val container = if (checked) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow
     val onContainer = if (checked) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-    val secondary = if (checked) {
-        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    // No alpha on the "on" description: onPrimaryContainer only clears the 4.5:1 text minimum
+    // against primaryContainer at full opacity (see ContrastRatioTest), and fading it was exactly
+    // what made an enabled tile hard to read. The "off" tile can afford onSurfaceVariant because it
+    // sits on the much lighter surfaceContainerLow.
+    val secondary = if (checked) onContainer else MaterialTheme.colorScheme.onSurfaceVariant
     Card(
         modifier = modifier
             .aspectRatio(1f)

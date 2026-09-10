@@ -61,6 +61,24 @@ class ContrastRatioTest {
         assertTrue("expected >= 4.5, was $ratio", ratio >= 4.5)
     }
 
+    /** Your feed's source tiles ("Favoritas"/"Mías") fill with primaryContainer when on and draw
+     *  BOTH their label and their description in onPrimaryContainer. The description used to be
+     *  faded to 75% alpha, which pushed it under the text minimum and made an enabled tile hard to
+     *  read; these two lock the full-opacity pairing that replaced it. */
+    @Test
+    fun `light onPrimaryContainer clears the 4-5 to 1 text minimum against primaryContainer`() {
+        // TealPrimaryContainerLight / OnPrimaryContainerLight in Color.kt.
+        val ratio = wcagContrastRatio(0xFF00494D, 0xFF5BBCC3)
+        assertTrue("expected >= 4.5, was $ratio", ratio >= 4.5)
+    }
+
+    @Test
+    fun `dark onPrimaryContainer clears the 4-5 to 1 text minimum against primaryContainer`() {
+        // OnPrimaryContainerDark / PrimaryContainerDark in Color.kt.
+        val ratio = wcagContrastRatio(0xFF00252A, 0xFF5BBCC3)
+        assertTrue("expected >= 4.5, was $ratio", ratio >= 4.5)
+    }
+
     @Test
     fun `the dark outline clears the 3 to 1 UI-component minimum against background`() {
         val ratio = wcagContrastRatio(OutlineDarkArgb, BackgroundDarkArgb)
