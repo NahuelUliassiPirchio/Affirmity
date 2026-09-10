@@ -15,6 +15,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -104,6 +106,12 @@ fun GuidedMeditationScreen(
     onExit: () -> Unit = {},
     /** Spec 6 emit surface (REQ-5.2) -- fires `meditation_started` at the Start dispatch below. */
     onEvent: (AnalyticsEvent) -> Unit = {},
+    /** Device-local mute for the phase-transition chime (the `SOUND` channel) -- see
+     * [com.pirxhio.affirmity.data.local.TrackerPreferences.observeMeditationCueSoundEnabled].
+     * Read live via [rememberUpdatedState] below so toggling mid-session takes effect immediately
+     * without tearing down and rebuilding [audioExecutor]. */
+    cueSoundEnabled: Boolean = true,
+    onToggleCueSound: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -128,6 +136,7 @@ fun GuidedMeditationScreen(
     val definition = remember(entry, customization) { entry.definition(customization) }
     val textExecutor = remember(definition) { TextDisplayCommandExecutor() }
     val phaseDurations = remember(definition) { fixedPhaseDurationsById(definition) }
+    val latestCueSoundEnabled = rememberUpdatedState(cueSoundEnabled)
 
     // The engine and audioExecutor/TimerCommandExecutor need each other before either exists —
     // resolved via a lateinit closed over by their sendEvent lambdas, only actually invoked once
@@ -141,6 +150,7 @@ fun GuidedMeditationScreen(
             scope = scope,
             timeSource = AndroidMonotonicTimeSource,
             sendEvent = { event -> engineRef.send(event) },
+            isCueSoundEnabled = { latestCueSoundEnabled.value },
         )
         val clock = RealSessionClock(scope = scope, timeSource = AndroidMonotonicTimeSource)
         val timerExecutor = TimerCommandExecutor(
@@ -221,6 +231,8 @@ fun GuidedMeditationScreen(
         customization = customization,
         phaseDurations = phaseDurations,
         showBannerAd = showBannerAd,
+        cueSoundEnabled = cueSoundEnabled,
+        onToggleCueSound = onToggleCueSound,
         onStart = {
             val currentAccess = accessAtStart()
             if (isMeditationLocked(currentAccess)) {
@@ -275,6 +287,8 @@ private fun GuidedMeditationContent(
     customization: Map<String, String>,
     phaseDurations: Map<String, Long>,
     showBannerAd: Boolean,
+    cueSoundEnabled: Boolean,
+    onToggleCueSound: () -> Unit,
     onStart: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
@@ -452,6 +466,28 @@ private fun GuidedMeditationContent(
                 SessionStatus.Cancelled -> Unit
             }
         }
+        }
+
+        // Cue-sound mute toggle: subtle by design (small, low-contrast, corner-anchored) per the
+        // feature ask -- this is a quiet utility affordance, not a primary control, so it never
+        // competes with the Start/Pause/Skip row for attention. Unconditional like the banner ad
+        // below (visible from Idle onward) so the user can pre-mute before the first cue ever fires.
+        IconButton(
+            onClick = onToggleCueSound,
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 8.dp).size(40.dp),
+        ) {
+            Icon(
+                imageVector = if (cueSoundEnabled) Icons.Filled.VolumeUp else Icons.Filled.VolumeOff,
+                contentDescription = stringResource(
+                    if (cueSoundEnabled) {
+                        R.string.guided_meditation_cue_sound_mute_content_description
+                    } else {
+                        R.string.guided_meditation_cue_sound_unmute_content_description
+                    },
+                ),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
         }
 
         // D2: last, unconditional child -- never inside an `if (state.status ...)` branch and

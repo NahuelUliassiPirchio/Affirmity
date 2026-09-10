@@ -116,6 +116,7 @@ import com.pirxhio.affirmity.ui.settings.NotificationDebugScreen
 import com.pirxhio.affirmity.ui.settings.SettingsScreen
 import com.pirxhio.affirmity.ui.theme.AffirmityTheme
 import com.pirxhio.affirmity.data.local.AffirmityDatabase
+import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.repository.RoomCatalogAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomMeditationCustomizationRepository
 import com.pirxhio.affirmity.ui.meditation.customization.affirmationTextsForBreathingAffirmations
@@ -677,6 +678,16 @@ fun AffirmityApp(
     val catalogAffirmationRepository = remember {
         RoomCatalogAffirmationRepository(AffirmityDatabase.getInstance(context).catalogAffirmationDao())
     }
+    // Same "device-local, not AffirmityAppState/DataSession" rationale as the repositories above:
+    // whether the guided-meditation phase-transition chime is audible is a per-device knob, not
+    // account data worth syncing across devices.
+    val meditationTrackerPreferences = remember { TrackerPreferences(context) }
+    var meditationCueSoundEnabled by remember { mutableStateOf(true) }
+    LaunchedEffect(meditationTrackerPreferences) {
+        meditationTrackerPreferences.observeMeditationCueSoundEnabled().collect { enabled ->
+            meditationCueSoundEnabled = enabled
+        }
+    }
 
     // Shared upgrade-CTA routing (design.md D7): signed-out taps route to sign-in, never straight
     // to the paywall -- used by both the group selector sheet's per-row CTA and any other entry
@@ -1145,6 +1156,14 @@ fun AffirmityApp(
                             },
                             onExit = { selectedMeditationEntryId = null },
                             onEvent = appState::logAnalyticsEvent,
+                            cueSoundEnabled = meditationCueSoundEnabled,
+                            onToggleCueSound = {
+                                val newValue = !meditationCueSoundEnabled
+                                meditationCueSoundEnabled = newValue
+                                snackbarScope.launch {
+                                    meditationTrackerPreferences.saveMeditationCueSoundEnabled(newValue)
+                                }
+                            },
                         )
                     }
                 }

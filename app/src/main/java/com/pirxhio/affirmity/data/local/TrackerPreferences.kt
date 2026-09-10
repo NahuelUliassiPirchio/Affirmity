@@ -2,6 +2,7 @@ package com.pirxhio.affirmity.data.local
 
 import android.content.Context
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
@@ -45,9 +46,22 @@ class TrackerPreferences(private val context: Context) {
         context.trackerDataStore.edit { it[MEDITATION_DURATION_SECONDS] = seconds }
     }
 
+    /** Whether the short chime played on a guided meditation's phase transitions (the `SOUND`
+     * channel in [com.pirxhio.affirmity.ui.meditation.GuidedMeditationAudioExecutor], e.g.
+     * [com.pirxhio.affirmity.meditation.breathing.BreathingAudio.RETENTION_START]) is audible.
+     * Defaults to on. Device-local by design, same rationale as [MEDITATION_DURATION_SECONDS]'s
+     * sibling knobs -- a mute preference is not account data. */
+    fun observeMeditationCueSoundEnabled(): Flow<Boolean> =
+        context.trackerDataStore.data.map { it[MEDITATION_CUE_SOUND_ENABLED] ?: true }
+
+    suspend fun saveMeditationCueSoundEnabled(enabled: Boolean) {
+        context.trackerDataStore.edit { it[MEDITATION_CUE_SOUND_ENABLED] = enabled }
+    }
+
     private companion object {
         val AFFIRMATIONS_VIEWED_EPOCH_DAY = longPreferencesKey("affirmations_viewed_epoch_day")
         val AFFIRMATIONS_VIEWED_COUNT = intPreferencesKey("affirmations_viewed_count")
         val MEDITATION_DURATION_SECONDS = intPreferencesKey("meditation_duration_seconds")
+        val MEDITATION_CUE_SOUND_ENABLED = booleanPreferencesKey("meditation_cue_sound_enabled")
     }
 }

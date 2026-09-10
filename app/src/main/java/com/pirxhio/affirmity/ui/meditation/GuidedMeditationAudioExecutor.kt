@@ -49,6 +49,10 @@ class GuidedMeditationAudioExecutor(
     private val scope: CoroutineScope,
     private val timeSource: MonotonicTimeSource,
     private val sendEvent: (MeditationEvent) -> Unit = {},
+    /** Read live on every [PlayAudio] dispatch (never cached) so toggling the cue-sound preference
+     * mid-session takes effect on the very next phase transition. Only gates the one-shot `SOUND`
+     * channel ([playSound]) -- [PlayVoice] guidance and the [StartAmbient] bed are unaffected. */
+    private val isCueSoundEnabled: () -> Boolean = { true },
 ) : MeditationCommandExecutor {
     private val players = mutableMapOf<String, MediaPlayer>()
 
@@ -98,6 +102,7 @@ class GuidedMeditationAudioExecutor(
     // --- One-shot sound (unchanged behaviour from the original executor, now channel-tagged) ----
 
     private fun playSound(audioId: String) {
+        if (!isCueSoundEnabled()) return
         val player = resolvePlayer(audioId) ?: return
         channelOf[audioId] = AudioChannel.SOUND
         player.seekTo(0)

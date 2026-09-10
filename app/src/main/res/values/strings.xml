@@ -236,6 +236,8 @@
     <string name="guided_meditation_resume_content_description">Reanudar</string>
     <string name="guided_meditation_skip_content_description">Avanzar fase</string>
     <string name="guided_meditation_idle_duration_minutes">%1$d min</string>
+    <string name="guided_meditation_cue_sound_mute_content_description">Silenciar sonido de transición</string>
+    <string name="guided_meditation_cue_sound_unmute_content_description">Activar sonido de transición</string>
 
     <!-- Meditation catalog (Spec 3, REQ-4.6/4.11) — titles, descriptions, categories for the 7
          shipping entries, and every ShowText cue id their definitions reference. Copy is an
