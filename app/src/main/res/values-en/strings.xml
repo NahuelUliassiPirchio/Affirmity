@@ -368,4 +368,77 @@
     <string name="meditation_access_blocked_message">You no longer have access to this session.</string>
     <string name="settings_subscription_title">Subscription</string>
     <string name="settings_subscription_manage_button">Manage subscription</string>
+
+    <!-- Discover shelves, ad-unlock sheet and category pills. -->
+    <string name="meditation_category_all">All</string>
+    <string name="meditation_badge_ad_unlock">Free with ad</string>
+    <string name="meditation_shelf_calm_sleep">Calm and sleep</string>
+    <string name="meditation_shelf_mindfulness">Mindfulness and silence</string>
+    <string name="meditation_shelf_body">Body and movement</string>
+    <string name="meditation_shelf_energy_focus">Energy and focus</string>
+    <string name="meditation_shelf_compassion">Compassion and self-compassion</string>
+    <string name="meditation_shelf_prayer_contemplation">Prayer and contemplation</string>
+    <string name="meditation_shelf_recent">Recent</string>
+    <string name="meditation_ad_unlock_sheet_title">Unlock %1$s</string>
+    <string name="meditation_ad_unlock_body_one_time_trial">Watch a short ad to try this session once, free.</string>
+    <string name="meditation_ad_unlock_body_per_use">Watch a short ad and this session is available right now.</string>
+    <string name="meditation_ad_unlock_body_timed">Watch a short ad and this session stays available for %1$d hours.</string>
+    <string name="meditation_ad_unlock_dismiss">Not now</string>
+
+    <!-- "Worth learning" shelf and the primer sheet. Plain words, no Sanskrit gloss and no
+         "ancient practice" framing, because they are meant to be read at a glance. -->
+    <string name="meditation_primer_shelf_title">Worth learning</string>
+    <string name="meditation_primer_shelf_subtitle">Practices with unfamiliar names, in plain words</string>
+    <string name="meditation_primer_expectations_label">WHAT TO EXPECT</string>
+    <string name="meditation_primer_start_cta">Start session</string>
+    <string name="meditation_primer_info_content_description">See what this is</string>
+
+    <string name="meditation_primer_trataka_plain">Candle gazing</string>
+    <string name="meditation_primer_trataka_short">Rest your eyes on one point until your mind follows.</string>
+    <string name="meditation_primer_trataka_long">You sit with a single point of light — a candle, or a dot on the wall — and keep your eyes there. When your attention drifts you bring it back. That\'s the whole practice. It settles a busy mind faster than most breathing work, and it\'s the one to reach for when thoughts won\'t stop moving.</string>
+    <string name="meditation_primer_trataka_expect_1">Eyes open the whole time</string>
+    <string name="meditation_primer_trataka_expect_2">Works best in a dim room</string>
+    <string name="meditation_primer_trataka_expect_3">Blink whenever you need to</string>
+
+    <string name="meditation_primer_yoganidra_plain">Guided deep rest</string>
+    <string name="meditation_primer_yoganidra_short">Lie down and be talked slowly through the body.</string>
+    <string name="meditation_primer_yoganidra_long">You lie on your back and a voice moves your attention through the body, one part at a time. You are not trying to sleep, though many people do. Twenty minutes of it leaves most people feeling like they napped for an hour.</string>
+    <string name="meditation_primer_yoganidra_expect_1">Lying down, not seated</string>
+    <string name="meditation_primer_yoganidra_expect_2">Falling asleep is fine</string>
+    <string name="meditation_primer_yoganidra_expect_3">Nothing to do but listen</string>
+
+    <string name="meditation_primer_vipassana_plain">Noticing what\'s there</string>
+    <string name="meditation_primer_vipassana_short">Watch what arises without fixing any of it.</string>
+    <string name="meditation_primer_vipassana_long">You sit and notice whatever shows up — the breath, a sound, an ache, a thought — without chasing or pushing it away. Older and plainer than it sounds, and the base most other practices are built on.</string>
+    <string name="meditation_primer_vipassana_expect_1">No visualisation</string>
+    <string name="meditation_primer_vipassana_expect_2">Sitting still, eyes closed</string>
+    <string name="meditation_primer_vipassana_expect_3">Restlessness is part of it</string>
+
+    <string name="meditation_primer_metta_short">Send a few good wishes — starting with yourself.</string>
+    <string name="meditation_primer_metta_long">You repeat a handful of simple wishes: may I be well, may I be at ease. Then you send the same lines to someone you love, someone neutral, someone difficult. It\'s the practice for days when you\'re being hard on yourself.</string>
+    <string name="meditation_primer_metta_expect_1">Repeating phrases, not clearing the mind</string>
+    <string name="meditation_primer_metta_expect_2">Start with yourself</string>
+    <string name="meditation_primer_metta_expect_3">Feeling nothing at first is normal</string>
+
+    <!-- Guided session cue-sound toggle. -->
+    <string name="guided_meditation_cue_sound_mute_content_description">Mute transition sound</string>
+    <string name="guided_meditation_cue_sound_unmute_content_description">Unmute transition sound</string>
+
+    <!-- Affirmation long-press actions, unfavorite undo, and the hidden-affirmations screen. -->
+    <string name="affirmation_share_content_description">Share affirmation</string>
+    <string name="affirmation_hide_content_description">Hide affirmation</string>
+    <string name="affirmation_unfavorited_snackbar">Removed from favorites</string>
+    <string name="affirmation_unfavorited_undo">Undo</string>
+    <string name="hidden_affirmations_title">Hidden affirmations</string>
+    <string name="hidden_affirmations_empty_state">You haven\'t hidden any affirmations.</string>
+    <string name="hidden_affirmations_unhide_content_description">Unhide</string>
+    <string name="settings_manage_hidden_affirmations">Manage hidden affirmations</string>
+    <string name="settings_manage_hidden_affirmations_button">Manage</string>
+
+    <!-- Your feed source toggles. -->
+    <string name="your_feed_sources_title">What else goes in your feed</string>
+    <string name="your_feed_source_favorites">Favorites</string>
+    <string name="your_feed_source_favorites_description">Even when their theme isn\'t selected</string>
+    <string name="your_feed_source_own">Mine</string>
+    <string name="your_feed_source_own_description">The ones you wrote</string>
 </resources>
