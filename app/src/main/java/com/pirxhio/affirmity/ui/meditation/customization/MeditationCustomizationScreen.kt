@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -76,10 +77,12 @@ fun MeditationCustomizationScreen(
 
     Column(
         modifier = modifier
-            .fillMaxWidth()
+            .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
+        Column(
+            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 40.dp, bottom = 20.dp),
+        ) {
             Text(
                 text = stringResource(entry.titleRes),
                 style = MaterialTheme.typography.headlineSmall,
@@ -94,7 +97,7 @@ fun MeditationCustomizationScreen(
         }
 
         LazyColumn(
-            modifier = Modifier.weight(1f, fill = false),
+            modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
