@@ -3,10 +3,13 @@ import { describe, expect, it } from 'vitest';
 import {
   buildWritePlan,
   chunk,
+  createFirestoreCommitter,
+  findOrphanCatalogDocIds,
   MAX_OPS_PER_BATCH,
   parseSourceCatalog,
   seedCatalog,
   type BatchCommitter,
+  type FirestoreLike,
   type FirestoreWrite,
   type SourceCatalog,
 } from '../tools/seedCatalog';
@@ -266,7 +269,7 @@ describe('seedCatalog', () => {
     expect(lastTaxonomyIndex).toBeLessThan(firstAffirmationIndex);
   });
 
-  it('a second run is a no-op-equivalent -- identical writes, safe to re-apply via merge:true', async () => {
+  it('a second run is a no-op-equivalent -- identical writes, safe to re-apply as a full replace', async () => {
     const catalog = sourceCatalog();
     const first = new RecordingCommitter();
     const second = new RecordingCommitter();
@@ -372,5 +375,86 @@ describe('parseSourceCatalog', () => {
     const catalog = sourceCatalog();
     catalog.affirmations[0].universeId = 'some-other-universe';
     expect(() => parseSourceCatalog(catalog)).toThrow(/u1\.t1\.c1\.001/);
+  });
+});
+
+// Fix 5: `{ merge: true }` left stale v1-only fields (e.g. old flat `text`) on documents migrated
+// to v2's `title`+`subtitle` shape. Every write built by `buildWritePlan` already carries that doc
+// type's COMPLETE v2 field set, so a full replace (no merge option) is exactly as idempotent as
+// merge was for this catalog, without the staleness risk.
+describe('createFirestoreCommitter (Fix 5: full replace, not merge)', () => {
+  function fakeDb(): FirestoreLike & { setCalls: Array<{ path: string; data: Record<string, unknown>; options?: unknown }> } {
+    const setCalls: Array<{ path: string; data: Record<string, unknown>; options?: unknown }> = [];
+    let pendingCommitWrites: Array<{ path: string; data: Record<string, unknown>; options?: unknown }> = [];
+    return {
+      setCalls,
+      doc(path: string) {
+        return { path };
+      },
+      batch() {
+        const batchWrites: Array<{ path: string; data: Record<string, unknown>; options?: unknown }> = [];
+        return {
+          set(ref: unknown, data: Record<string, unknown>, options?: unknown) {
+            const entry = { path: (ref as { path: string }).path, data, options };
+            batchWrites.push(entry);
+          },
+          async commit() {
+            pendingCommitWrites = batchWrites;
+            setCalls.push(...pendingCommitWrites);
+          },
+        };
+      },
+    };
+  }
+
+  it('writes without a merge option -- a full document replace, not a partial merge', async () => {
+    const db = fakeDb();
+    const committer = createFirestoreCommitter(db);
+
+    await committer.commit([{ path: 'catalogAffirmations/cat_a1', data: { title: 'T', tone: 'x' } }]);
+
+    expect(db.setCalls).toHaveLength(1);
+    expect(db.setCalls[0].path).toBe('catalogAffirmations/cat_a1');
+    expect(db.setCalls[0].data).toEqual({ title: 'T', tone: 'x' });
+    // No merge option passed -- `set(ref, data)` with exactly 2 args is a full replace.
+    expect(db.setCalls[0].options).toBeUndefined();
+  });
+
+  it('commits every write in the batch', async () => {
+    const db = fakeDb();
+    const committer = createFirestoreCommitter(db);
+
+    await committer.commit([
+      { path: 'catalogUniverses/u1', data: { title: 'U1' } },
+      { path: 'catalogUniverses/u2', data: { title: 'U2' } },
+    ]);
+
+    expect(db.setCalls.map((c) => c.path)).toEqual(['catalogUniverses/u1', 'catalogUniverses/u2']);
+  });
+});
+
+// Fix 5: documents present in Firestore but absent from the new catalog (orphans left behind by a
+// migration/removal) were previously silently left in place with no signal at all. No dry-run/plan
+// mode exists in this file to build on, so this is detection-only (a loud warning), not deletion --
+// deleting live catalog docs without a safety net is a separate, deliberate decision.
+describe('findOrphanCatalogDocIds (Fix 5: orphan detection)', () => {
+  it('returns ids present in Firestore but absent from the new catalog', () => {
+    const orphans = findOrphanCatalogDocIds(
+      ['cat_a1', 'cat_a2', 'cat_a3'],
+      ['cat_a1', 'cat_a3'],
+    );
+    expect(orphans).toEqual(['cat_a2']);
+  });
+
+  it('returns an empty array when every existing id is still present in the new catalog', () => {
+    expect(findOrphanCatalogDocIds(['cat_a1', 'cat_a2'], ['cat_a1', 'cat_a2', 'cat_a3'])).toEqual([]);
+  });
+
+  it('returns an empty array when there are no existing docs', () => {
+    expect(findOrphanCatalogDocIds([], ['cat_a1'])).toEqual([]);
+  });
+
+  it('treats every existing id as orphaned when the new catalog is empty', () => {
+    expect(findOrphanCatalogDocIds(['cat_a1', 'cat_a2'], [])).toEqual(['cat_a1', 'cat_a2']);
   });
 });
