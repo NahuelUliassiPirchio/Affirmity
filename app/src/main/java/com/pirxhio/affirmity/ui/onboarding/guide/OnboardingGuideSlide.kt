@@ -22,7 +22,13 @@ data class OnboardingGuideSlide(
     @StringRes val iconContentDescriptionRes: Int,
 )
 
-/** Exactly 4 slides, in fixed order (spec R3): affirmations, meditations, mood, streak+healer. */
+/**
+ * Four focused slides in fixed order: feed essentials, meditations, mood, then streak + healer.
+ * The first slide covers the user-controlled surface/theme selection and favorite/own feed sources;
+ * notification settings stay out because they are optional, account-dependent configuration.
+ * Together the slides explain the core daily loop before the survey without turning first launch
+ * into an exhaustive feature tour.
+ */
 fun onboardingGuideSlides(): List<OnboardingGuideSlide> = listOf(
     OnboardingGuideSlide(
         icon = Icons.Filled.AutoAwesome,

@@ -163,9 +163,9 @@
     <string name="healer_granted_icon_content_description">Streak healer icon</string>
     <string name="progress_weekly_streak_format">Streak: %1$d days</string>
 
-    <!-- Post-survey onboarding guide (spec R3, design D6) -->
-    <string name="onboarding_guide_slide1_title">Affirmations, your way</string>
-    <string name="onboarding_guide_slide1_body">Your affirmations show up as swipeable cards, organized into themed groups like Wellbeing or Willpower, plus a Personalized group where you write your own. Some groups require Pro.</string>
+    <!-- Onboarding product guide (spec R3, design D6) -->
+    <string name="onboarding_guide_slide1_title">Build your affirmation feed</string>
+    <string name="onboarding_guide_slide1_body">In Your feed, explore areas and choose the themes you want to see. Swipe through cards, save favorites with the heart or a double tap, and choose whether to include your favorites and your own affirmations. Some themes require Pro.</string>
     <string name="onboarding_guide_slide1_icon_content_description">Affirmations icon</string>
     <string name="onboarding_guide_slide2_title">Meditations for every moment</string>
     <string name="onboarding_guide_slide2_body">Guided sessions are organized by category —sleep, calm, focus— and show an approximate duration. There\'s also a free timer to meditate at your own pace. Some sessions are Pro or unlock by watching an ad.</string>

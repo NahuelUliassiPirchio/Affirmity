@@ -82,8 +82,10 @@ import com.pirxhio.affirmity.data.AdRequestNotice
 import com.pirxhio.affirmity.data.Affirmation
 import com.pirxhio.affirmity.data.GuideGateResolution
 import com.pirxhio.affirmity.data.MOOD_MAX
+import com.pirxhio.affirmity.data.PreSurveyGuideResolution
 import com.pirxhio.affirmity.data.rememberAffirmityAppState
 import com.pirxhio.affirmity.data.resolveGuideGate
+import com.pirxhio.affirmity.data.resolvePreSurveyGuideGate
 import com.pirxhio.affirmity.meditation.SessionEndReason
 import com.pirxhio.affirmity.notifications.NotificationCanceller
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
@@ -634,6 +636,7 @@ fun AffirmityApp(
     // D4: manual re-entry state, distinct from `appState.shouldShowOnboardingGuide` (the one-time
     // auto-arm flag) -- reopening from Settings must never re-arm the auto flag (spec R5.4).
     var showOnboardingGuide by rememberSaveable { mutableStateOf(false) }
+    var hasRequestedSurvey by rememberSaveable { mutableStateOf(false) }
     var showNotificationDebug by rememberSaveable { mutableStateOf(false) }
     var showMyAffirmations by rememberSaveable { mutableStateOf(false) }
     var showFavorites by rememberSaveable { mutableStateOf(false) }
@@ -861,19 +864,39 @@ fun AffirmityApp(
         }
     }
 
-    LaunchedEffect(appState.hasCompletedOnboarding.value) {
-        if (appState.hasCompletedOnboarding.value != null) onOnboardingStateResolved()
+    LaunchedEffect(appState.isInitialContentResolved.value) {
+        if (appState.isInitialContentResolved.value) onOnboardingStateResolved()
     }
 
     if (appState.hasCompletedOnboarding.value == false) {
-        OnboardingScreen(
-            modifier = Modifier.fillMaxSize(),
-            authState = appState.authState.value,
-            authError = appState.authError.value,
-            onSignInClicked = { appState.signIn(context) },
-            onFinished = { appState.completeOnboarding() },
-            onCheckReturningAccount = { uid -> appState.hasRemoteOnboardingCompleted(uid) },
+        val preSurveyGuideResolution = resolvePreSurveyGuideGate(
+            guideSeen = appState.hasSeenOnboardingGuide.value,
+            surveyRequested = hasRequestedSurvey,
         )
+        if (preSurveyGuideResolution == PreSurveyGuideResolution.WAITING) return
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            OnboardingScreen(
+                modifier = Modifier.fillMaxSize(),
+                authState = appState.authState.value,
+                authError = appState.authError.value,
+                onSignInClicked = { appState.signIn(context) },
+                onFinished = { appState.completeOnboarding() },
+                onCheckReturningAccount = { uid ->
+                    appState.hasRemoteOnboardingCompleted(uid).also { returningAccount ->
+                        if (returningAccount) appState.markOnboardingGuideSeen()
+                    }
+                },
+                resumeAtQuestions = preSurveyGuideResolution == PreSurveyGuideResolution.QUESTIONS,
+                onStartSurvey = { hasRequestedSurvey = true },
+            )
+            if (preSurveyGuideResolution == PreSurveyGuideResolution.GUIDE) {
+                OnboardingGuideScreen(
+                    modifier = Modifier.fillMaxSize(),
+                    onDismiss = remember(appState) { { appState.markOnboardingGuideSeen() } },
+                )
+            }
+        }
         return
     }
 
@@ -890,9 +913,9 @@ fun AffirmityApp(
     )
 
     if (guideGateResolution == GuideGateResolution.AUTO_GUIDE) {
-        // R6.1: positioned immediately after the splash branch, before EVERY other overlay gate
-        // (including healerJustGranted below) -- this is the continuation of first-run onboarding
-        // and must own the first post-survey frame (design D3).
+        // R6.1: persisted auto-guide debt still takes precedence over every other overlay gate
+        // (including healerJustGranted below). The pre-survey path never arms new debt; this branch
+        // remains intact for any previously armed state.
         OnboardingGuideScreen(
             modifier = Modifier.fillMaxSize(),
             onDismiss = remember(appState) {

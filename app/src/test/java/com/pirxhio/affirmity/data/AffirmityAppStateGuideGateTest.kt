@@ -22,10 +22,10 @@ class AffirmityAppStateGuideGateTest {
     }
 
     @Test
-    fun `fresh install mid-survey -- guideSeen null and hasCompletedOnboarding false stays null`() {
+    fun `fresh install before survey -- guideSeen null resolves to guide needed`() {
         val resolved = resolveGuideBackfill(guideSeen = null, hasCompletedOnboarding = false)
 
-        assertEquals(null, resolved)
+        assertEquals(false, resolved)
     }
 
     @Test
@@ -55,9 +55,18 @@ class AffirmityAppStateGuideGateTest {
     }
 
     @Test
-    fun `shouldShowGuide is false when resolved guideSeen is true, null, or backfilled to true`() {
+    fun `shouldShowGuide is false when resolved guideSeen is true or unresolved`() {
         assertFalse(shouldShowGuide(resolveGuideBackfill(guideSeen = true, hasCompletedOnboarding = true)))
-        assertFalse(shouldShowGuide(resolveGuideBackfill(guideSeen = null, hasCompletedOnboarding = false)))
+        assertFalse(shouldShowGuide(resolveGuideBackfill(guideSeen = null, hasCompletedOnboarding = null)))
         assertFalse(shouldShowGuide(resolveGuideBackfill(guideSeen = null, hasCompletedOnboarding = true)))
+    }
+
+    @Test
+    fun `first content stays unresolved until onboarding and guide inputs are both resolved`() {
+        assertFalse(areInitialContentInputsResolved(hasCompletedOnboarding = null, guideSeen = null))
+        assertFalse(areInitialContentInputsResolved(hasCompletedOnboarding = false, guideSeen = null))
+        assertFalse(areInitialContentInputsResolved(hasCompletedOnboarding = null, guideSeen = false))
+        assertTrue(areInitialContentInputsResolved(hasCompletedOnboarding = false, guideSeen = false))
+        assertTrue(areInitialContentInputsResolved(hasCompletedOnboarding = true, guideSeen = true))
     }
 }

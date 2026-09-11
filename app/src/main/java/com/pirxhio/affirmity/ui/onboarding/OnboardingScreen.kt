@@ -42,6 +42,9 @@ import com.pirxhio.affirmity.auth.AuthState
  *
  * Step numbering: 0 = intro, 1..[onboardingQuestions].size = questions, size+1 = final auth step
  * (skipped when the intro shortcut already recognized the account, per [skipFinalAuthStep]).
+ * [onStartSurvey] lets the parent interpose a pre-survey gate after the intro without removing
+ * this composable, while [resumeAtQuestions] restores the question step after that gate has been
+ * persisted across process recreation.
  */
 @Composable
 fun OnboardingScreen(
@@ -50,17 +53,24 @@ fun OnboardingScreen(
     onSignInClicked: () -> Unit,
     onFinished: () -> Unit,
     onCheckReturningAccount: suspend (uid: String) -> Boolean,
+    resumeAtQuestions: Boolean = false,
+    onStartSurvey: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    var step by rememberSaveable { mutableIntStateOf(0) }
+    var step by rememberSaveable(resumeAtQuestions) {
+        mutableIntStateOf(if (resumeAtQuestions) 1 else 0)
+    }
     var awaitingAccountCheck by rememberSaveable { mutableStateOf(false) }
-    var skipFinalAuthStep by rememberSaveable { mutableStateOf(false) }
+    var skipFinalAuthStep by rememberSaveable(resumeAtQuestions) {
+        mutableStateOf(resumeAtQuestions && authState is AuthState.SignedIn)
+    }
     val answers = remember { mutableStateMapOf<String, String>() }
     val lastQuestionStep = onboardingQuestions.size
     val totalSteps = onboardingQuestions.size + 2
 
-    LaunchedEffect(authState) {
+    LaunchedEffect(authState, resumeAtQuestions) {
         if (authState !is AuthState.SignedIn) return@LaunchedEffect
+        if (resumeAtQuestions) skipFinalAuthStep = true
         if (awaitingAccountCheck) {
             awaitingAccountCheck = false
             if (onCheckReturningAccount(authState.uid)) {
@@ -68,6 +78,7 @@ fun OnboardingScreen(
             } else {
                 skipFinalAuthStep = true
                 step = 1
+                onStartSurvey()
             }
         } else if (step == lastQuestionStep + 1) {
             onFinished()
@@ -101,6 +112,7 @@ fun OnboardingScreen(
                     onStartClicked = {
                         awaitingAccountCheck = false
                         step = 1
+                        onStartSurvey()
                     },
                     modifier = Modifier.weight(1f),
                 )
