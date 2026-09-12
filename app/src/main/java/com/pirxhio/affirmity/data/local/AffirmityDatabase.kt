@@ -188,6 +188,18 @@ val MIGRATION_10_11 = object : androidx.room.migration.Migration(10, 11) {
     }
 }
 
+/** Additive: adds `tone`/`semanticAngle` to `catalog_affirmations` (spec catalog-tone-metadata,
+ * design D1). Both nullable, no DEFAULT -- every pre-existing row backfills to `NULL`, which is
+ * transient by construction: the bumped bundled-asset version (`buildCatalog.mjs`'s
+ * `ANDROID_ASSET_SCHEMA_REVISION`) makes `CatalogSeeder` full-replace the table on next sync,
+ * overwriting the nulls with the real v2 tone/semanticAngle for free (mirrors `MIGRATION_10_11`). */
+val MIGRATION_11_12 = object : androidx.room.migration.Migration(11, 12) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `catalog_affirmations` ADD COLUMN `tone` TEXT")
+        db.execSQL("ALTER TABLE `catalog_affirmations` ADD COLUMN `semanticAngle` TEXT")
+    }
+}
+
 @Database(
     entities = [
         AffirmationEntity::class,
@@ -201,7 +213,7 @@ val MIGRATION_10_11 = object : androidx.room.migration.Migration(10, 11) {
         CatalogOverrideEntity::class,
         MeditationCustomizationEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
 )
 @androidx.room.TypeConverters(OverridesConverters::class)
@@ -238,6 +250,7 @@ abstract class AffirmityDatabase : RoomDatabase() {
                     MIGRATION_8_9,
                     MIGRATION_9_10,
                     MIGRATION_10_11,
+                    MIGRATION_11_12,
                 ).build().also { instance = it }
             }
     }

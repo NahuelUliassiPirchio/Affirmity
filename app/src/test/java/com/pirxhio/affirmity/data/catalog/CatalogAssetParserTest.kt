@@ -29,9 +29,15 @@ class CatalogAssetParserTest {
         groupId: String = "self_worth",
         themeId: String = "self_worth.feeling_enough",
         sortOrder: Int = 0,
-    ) = """
-        {"id":"$id","title":"$title","subtitle":"$subtitle","groupId":"$groupId","themeId":"$themeId","collectionId":"$collectionId","sortOrder":$sortOrder}
-    """.trimIndent()
+        tone: String? = "powerful",
+        semanticAngle: String? = "identity",
+    ): String {
+        val toneField = if (tone != null) ""","tone":"$tone"""" else ""
+        val semanticAngleField = if (semanticAngle != null) ""","semanticAngle":"$semanticAngle"""" else ""
+        return """
+        {"id":"$id","title":"$title","subtitle":"$subtitle","groupId":"$groupId","themeId":"$themeId","collectionId":"$collectionId","sortOrder":$sortOrder$toneField$semanticAngleField}
+        """.trimIndent()
+    }
 
     @Test
     fun `parses a well-formed 3-row fixture into entities`() {
@@ -56,9 +62,65 @@ class CatalogAssetParserTest {
                 themeId = "self_worth.feeling_enough",
                 collectionId = "self_worth.feeling_enough.intrinsic_worth",
                 sortOrder = 0,
+                tone = "powerful",
+                semanticAngle = "identity",
             ),
             parsed.affirmations[0],
         )
+    }
+
+    @Test
+    fun `missing tone and semanticAngle degrade to null instead of throwing`() {
+        val json = validJson(
+            row(
+                "cat_self_worth.feeling_enough.intrinsic_worth.001",
+                "self_worth.feeling_enough.intrinsic_worth",
+                "Uno",
+                tone = null,
+                semanticAngle = null,
+            ),
+        )
+
+        val parsed = CatalogAssetParser.parse(json, validKnownCollectionIds)
+
+        assertEquals(null, parsed.affirmations[0].tone)
+        assertEquals(null, parsed.affirmations[0].semanticAngle)
+    }
+
+    @Test
+    fun `explicit JSON null tone and semanticAngle degrade to null, not the literal string null`() {
+        // buildCatalog.mjs emits `"tone":null` (key present, JSON null) for catalog gap rows --
+        // distinct from an omitted key. Android's bundled org.json makes optString() return the
+        // literal string "null" for this case (unlike the JSON-java test dependency), so this must
+        // be asserted against JSONObject.isNull(), not merely exercised via an omitted key.
+        val json = validJson(
+            """
+            {"id":"cat_self_worth.feeling_enough.intrinsic_worth.001","title":"Uno","subtitle":"Sub","groupId":"self_worth","themeId":"self_worth.feeling_enough","collectionId":"self_worth.feeling_enough.intrinsic_worth","sortOrder":0,"tone":null,"semanticAngle":null}
+            """.trimIndent(),
+        )
+
+        val parsed = CatalogAssetParser.parse(json, validKnownCollectionIds)
+
+        assertEquals(null, parsed.affirmations[0].tone)
+        assertEquals(null, parsed.affirmations[0].semanticAngle)
+    }
+
+    @Test
+    fun `blank tone and semanticAngle degrade to null`() {
+        val json = validJson(
+            row(
+                "cat_self_worth.feeling_enough.intrinsic_worth.001",
+                "self_worth.feeling_enough.intrinsic_worth",
+                "Uno",
+                tone = "",
+                semanticAngle = "  ",
+            ),
+        )
+
+        val parsed = CatalogAssetParser.parse(json, validKnownCollectionIds)
+
+        assertEquals(null, parsed.affirmations[0].tone)
+        assertEquals(null, parsed.affirmations[0].semanticAngle)
     }
 
     @Test
