@@ -1,14 +1,10 @@
 package com.pirxhio.affirmity.personalization
 
 import com.pirxhio.affirmity.data.local.PersonalizationSignalDao
-import com.pirxhio.affirmity.data.local.PersonalizationSignalEntity
 import com.pirxhio.affirmity.personalization.goals.GoalCatalog
 import com.pirxhio.affirmity.personalization.goals.UserGoalsStore
 import com.pirxhio.affirmity.personalization.scoring.PersonalizationProfile
 import com.pirxhio.affirmity.personalization.scoring.PersonalizationScoring
-import com.pirxhio.affirmity.personalization.signal.PersonalizationSignal
-import com.pirxhio.affirmity.personalization.signal.SignalType
-import kotlinx.coroutines.flow.first
 
 /**
  * One-shot I/O boundary that assembles the pure scoring engine's inputs from device-local stores.
@@ -18,17 +14,12 @@ suspend fun loadPersonalizationProfile(
     signalDao: PersonalizationSignalDao,
     userGoalsStore: UserGoalsStore,
     nowMillis: Long = System.currentTimeMillis(),
-): PersonalizationProfile = PersonalizationScoring.profile(
-    signals = signalDao.getAll().map { it.toPersonalizationSignal() },
-    declaredGoalIds = userGoalsStore.observeGoalIds().first().orEmpty(),
-    goalThemes = GoalCatalog.themeIdsByGoalId,
-    nowMillis = nowMillis,
-)
-
-private fun PersonalizationSignalEntity.toPersonalizationSignal() = PersonalizationSignal(
-    type = SignalType.valueOf(signalType),
-    themeId = themeId,
-    groupId = groupId,
-    tone = tone,
-    occurredAtMillis = occurredAtMillis,
-)
+): PersonalizationProfile {
+    val inputs = loadPersonalizationInputs(signalDao, userGoalsStore)
+    return PersonalizationScoring.profile(
+        signals = inputs.signals,
+        declaredGoalIds = inputs.declaredGoalIds,
+        goalThemes = GoalCatalog.themeIdsByGoalId,
+        nowMillis = nowMillis,
+    )
+}

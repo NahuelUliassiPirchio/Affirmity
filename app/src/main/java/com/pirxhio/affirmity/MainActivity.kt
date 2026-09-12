@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.setContent
@@ -97,6 +98,7 @@ import com.pirxhio.affirmity.ui.hidden.HiddenAffirmationsScreen
 import com.pirxhio.affirmity.ui.feed.SeeAllThemesScreen
 import com.pirxhio.affirmity.ui.feed.SurfaceDetailBottomSheet
 import com.pirxhio.affirmity.ui.feed.YourFeedSheetContent
+import com.pirxhio.affirmity.ui.feed.DivergenceSuggestionCard
 import com.pirxhio.affirmity.ui.feed.defaultRecommendedSurfaces
 import com.pirxhio.affirmity.ui.feed.resolveRecommendedSurfaces
 import com.pirxhio.affirmity.ui.groups.catalogThemesById
@@ -125,12 +127,17 @@ import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.repository.RoomCatalogAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomMeditationCustomizationRepository
 import com.pirxhio.affirmity.personalization.loadPersonalizationProfile
+import com.pirxhio.affirmity.personalization.divergence.DivergenceSuggestion
+import com.pirxhio.affirmity.personalization.divergence.addDivergenceSuggestedGoal
+import com.pirxhio.affirmity.personalization.divergence.dismissDivergenceSuggestion
+import com.pirxhio.affirmity.personalization.divergence.loadDivergenceSuggestion
 import com.pirxhio.affirmity.personalization.goals.UserGoalsPreferences
 import com.pirxhio.affirmity.personalization.scoring.PersonalizationFlags
 import com.pirxhio.affirmity.ui.meditation.customization.affirmationTextsForBreathingAffirmations
 import com.pirxhio.affirmity.meditation.customization.resolvedValues
 import com.pirxhio.affirmity.ui.meditation.customization.MeditationCustomizationScreen
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /** Extra key a launcher (e.g. the home-screen widget) sets to pick the initial [AppDestinations]. */
@@ -1486,6 +1493,10 @@ fun AffirmityApp(
                     var recommendedSurfaces by remember {
                         mutableStateOf(defaultRecommendedSurfaces())
                     }
+                    var divergenceSuggestion by remember {
+                        mutableStateOf<DivergenceSuggestion?>(null)
+                    }
+                    var divergenceActionInFlight by remember { mutableStateOf(false) }
                     LaunchedEffect(personalizationSignalDao, userGoalsStore) {
                         recommendedSurfaces = resolveRecommendedSurfaces(
                             rankedSurfacesEnabled = PersonalizationFlags.RANKED_SURFACES_ENABLED,
@@ -1496,6 +1507,27 @@ fun AffirmityApp(
                                 )
                             },
                         )
+                    }
+                    LaunchedEffect(personalizationSignalDao, userGoalsStore) {
+                        val promptAtMillis = System.currentTimeMillis()
+                        try {
+                            loadDivergenceSuggestion(
+                                signalDao = personalizationSignalDao,
+                                userGoalsStore = userGoalsStore,
+                                nowMillis = promptAtMillis,
+                            )?.let { suggestion ->
+                                // Record exposure before rendering so the rolling-quarter cap is
+                                // independent of which action the user eventually chooses.
+                                userGoalsStore.recordDivergencePromptShown(promptAtMillis)
+                                divergenceSuggestion = suggestion
+                            }
+                        } catch (cancellation: CancellationException) {
+                            throw cancellation
+                        } catch (error: Throwable) {
+                            // Personalization is optional: a corrupt signal or preferences read
+                            // must never take down the affirmations feed.
+                            Log.e("DivergencePrompt", "loading divergence suggestion failed", error)
+                        }
                     }
                     val accessDecisionFor: (String) -> AccessDecision = { themeId ->
                         themeAccessDecision(
@@ -1556,34 +1588,89 @@ fun AffirmityApp(
                             )
                         },
                     ) {
-                        AffirmationsScreen(
-                            affirmations = appState.filteredAffirmations,
-                            onAffirmationViewed = { appState.recordAffirmationViewed() },
-                            onOverrideCommitted = appState::setTokenOverride,
-                            favoriteIds = appState.favoriteAffirmationIds.value,
-                            onToggleFavorite = { id ->
-                                // Undo is offered only in the destructive direction: losing a
-                                // favourite by a stray double-tap is the costly mistake, gaining one
-                                // is not. Strings are resolved above in composable scope, never via
-                                // context.getString inside the coroutine (LocalContextGetResourceValueCall).
-                                val wasFavorite = id in appState.favoriteAffirmationIds.value
-                                appState.toggleFavorite(id)
-                                if (wasFavorite) {
-                                    snackbarScope.launch {
-                                        val result = snackbarHostState.showSnackbar(
-                                            message = unfavoritedMessage,
-                                            actionLabel = unfavoritedUndoAction,
-                                            duration = androidx.compose.material3.SnackbarDuration.Short,
-                                        )
-                                        if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
-                                            appState.restoreFavorite(id)
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            AffirmationsScreen(
+                                affirmations = appState.filteredAffirmations,
+                                onAffirmationViewed = { appState.recordAffirmationViewed() },
+                                onOverrideCommitted = appState::setTokenOverride,
+                                favoriteIds = appState.favoriteAffirmationIds.value,
+                                onToggleFavorite = { id ->
+                                    // Undo is offered only in the destructive direction: losing a
+                                    // favourite by a stray double-tap is the costly mistake, gaining one
+                                    // is not. Strings are resolved above in composable scope, never via
+                                    // context.getString inside the coroutine (LocalContextGetResourceValueCall).
+                                    val wasFavorite = id in appState.favoriteAffirmationIds.value
+                                    appState.toggleFavorite(id)
+                                    if (wasFavorite) {
+                                        snackbarScope.launch {
+                                            val result = snackbarHostState.showSnackbar(
+                                                message = unfavoritedMessage,
+                                                actionLabel = unfavoritedUndoAction,
+                                                duration = androidx.compose.material3.SnackbarDuration.Short,
+                                            )
+                                            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                                                appState.restoreFavorite(id)
+                                            }
                                         }
                                     }
-                                }
-                            },
-                            onHideAffirmation = appState::hideAffirmation,
-                            onAffirmationShared = appState::recordAffirmationShared,
-                        )
+                                },
+                                onHideAffirmation = appState::hideAffirmation,
+                                onAffirmationShared = appState::recordAffirmationShared,
+                            )
+                            divergenceSuggestion?.let { suggestion ->
+                                DivergenceSuggestionCard(
+                                    suggestedGoalId = suggestion.suggestedGoalId,
+                                    onAdd = {
+                                        if (!divergenceActionInFlight) {
+                                            divergenceActionInFlight = true
+                                            // Screen-level scope: destination navigation does not
+                                            // cancel an explicit persistence action mid-write.
+                                            snackbarScope.launch {
+                                                try {
+                                                    addDivergenceSuggestedGoal(
+                                                        store = userGoalsStore,
+                                                        currentGoalIds = suggestion.currentGoalIds,
+                                                        suggestedGoalId = suggestion.suggestedGoalId,
+                                                    )
+                                                    divergenceSuggestion = null
+                                                } catch (cancellation: CancellationException) {
+                                                    throw cancellation
+                                                } catch (error: Throwable) {
+                                                    Log.e("DivergencePrompt", "adding suggested goal failed", error)
+                                                } finally {
+                                                    divergenceActionInFlight = false
+                                                }
+                                            }
+                                        }
+                                    },
+                                    onDismiss = {
+                                        if (!divergenceActionInFlight) {
+                                            divergenceActionInFlight = true
+                                            snackbarScope.launch {
+                                                try {
+                                                    dismissDivergenceSuggestion(
+                                                        store = userGoalsStore,
+                                                        suggestedGoalId = suggestion.suggestedGoalId,
+                                                        atMillis = System.currentTimeMillis(),
+                                                    )
+                                                    divergenceSuggestion = null
+                                                } catch (cancellation: CancellationException) {
+                                                    throw cancellation
+                                                } catch (error: Throwable) {
+                                                    Log.e("DivergencePrompt", "dismissing suggestion failed", error)
+                                                } finally {
+                                                    divergenceActionInFlight = false
+                                                }
+                                            }
+                                        }
+                                    },
+                                    actionsEnabled = !divergenceActionInFlight,
+                                    modifier = Modifier
+                                        .align(Alignment.TopCenter)
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                )
+                            }
+                        }
                     }
 
                     val openSurface = openSurfaceId?.let { id -> recommendedSurfaces.firstOrNull { it.id == id } }

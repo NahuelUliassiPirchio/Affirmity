@@ -41,6 +41,8 @@ private class RecordingUserGoalsStore(initialGoalIds: Set<String>?) : UserGoalsS
 
     override fun observeUsageMoments(): Flow<Set<String>?> = MutableStateFlow(null)
 
+    override fun observeDivergenceState(): Flow<DivergenceState> = MutableStateFlow(DivergenceState())
+
     override suspend fun saveGoalIds(ids: Set<String>) {
         goalWrites++
         goals.value = ids
@@ -49,4 +51,8 @@ private class RecordingUserGoalsStore(initialGoalIds: Set<String>?) : UserGoalsS
     override suspend fun saveOnboardingAnswers(answers: OnboardingAnswers) {
         goals.value = answers.goalIds
     }
+
+    override suspend fun recordDivergencePromptShown(atMillis: Long) = Unit
+
+    override suspend fun recordDivergenceDismissal(goalId: String, atMillis: Long) = Unit
 }

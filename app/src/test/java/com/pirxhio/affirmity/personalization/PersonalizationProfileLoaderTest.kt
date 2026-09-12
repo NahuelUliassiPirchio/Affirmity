@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.personalization
 import com.pirxhio.affirmity.data.local.PersonalizationSignalDao
 import com.pirxhio.affirmity.data.local.PersonalizationSignalEntity
 import com.pirxhio.affirmity.personalization.goals.GoalCatalog
+import com.pirxhio.affirmity.personalization.goals.DivergenceState
 import com.pirxhio.affirmity.personalization.goals.OnboardingAnswers
 import com.pirxhio.affirmity.personalization.goals.UserGoalsStore
 import com.pirxhio.affirmity.personalization.scoring.PersonalizationProfile
@@ -89,7 +90,13 @@ private class FakeUserGoalsStore(
 
     override fun observeUsageMoments(): Flow<Set<String>?> = flowOf(null)
 
+    override fun observeDivergenceState(): Flow<DivergenceState> = flowOf(DivergenceState())
+
     override suspend fun saveGoalIds(ids: Set<String>) = Unit
 
     override suspend fun saveOnboardingAnswers(answers: OnboardingAnswers) = Unit
+
+    override suspend fun recordDivergencePromptShown(atMillis: Long) = Unit
+
+    override suspend fun recordDivergenceDismissal(goalId: String, atMillis: Long) = Unit
 }

@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.pirxhio.affirmity.personalization.goals.DivergenceState
 import com.pirxhio.affirmity.personalization.goals.OnboardingAnswers
 import com.pirxhio.affirmity.personalization.goals.UserGoalsStore
 import kotlinx.coroutines.flow.Flow
@@ -48,6 +49,8 @@ private class RecordingGoalsStore(initialGoalIds: Set<String>?) : UserGoalsStore
 
     override fun observeUsageMoments(): Flow<Set<String>?> = MutableStateFlow(null)
 
+    override fun observeDivergenceState(): Flow<DivergenceState> = MutableStateFlow(DivergenceState())
+
     override suspend fun saveGoalIds(ids: Set<String>) {
         saveCalls++
         savedGoalIds = ids
@@ -57,4 +60,8 @@ private class RecordingGoalsStore(initialGoalIds: Set<String>?) : UserGoalsStore
     override suspend fun saveOnboardingAnswers(answers: OnboardingAnswers) {
         goals.value = answers.goalIds
     }
+
+    override suspend fun recordDivergencePromptShown(atMillis: Long) = Unit
+
+    override suspend fun recordDivergenceDismissal(goalId: String, atMillis: Long) = Unit
 }
