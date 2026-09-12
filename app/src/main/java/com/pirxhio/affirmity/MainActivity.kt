@@ -98,6 +98,7 @@ import com.pirxhio.affirmity.ui.feed.SeeAllThemesScreen
 import com.pirxhio.affirmity.ui.feed.SurfaceDetailBottomSheet
 import com.pirxhio.affirmity.ui.feed.YourFeedSheetContent
 import com.pirxhio.affirmity.ui.feed.defaultRecommendedSurfaces
+import com.pirxhio.affirmity.ui.feed.resolveRecommendedSurfaces
 import com.pirxhio.affirmity.ui.groups.catalogThemesById
 import com.pirxhio.affirmity.ui.groups.isThemeToggleable
 import com.pirxhio.affirmity.ui.groups.themeAccessDecision
@@ -123,7 +124,9 @@ import com.pirxhio.affirmity.data.local.AffirmityDatabase
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.repository.RoomCatalogAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomMeditationCustomizationRepository
+import com.pirxhio.affirmity.personalization.loadPersonalizationProfile
 import com.pirxhio.affirmity.personalization.goals.UserGoalsPreferences
+import com.pirxhio.affirmity.personalization.scoring.PersonalizationFlags
 import com.pirxhio.affirmity.ui.meditation.customization.affirmationTextsForBreathingAffirmations
 import com.pirxhio.affirmity.meditation.customization.resolvedValues
 import com.pirxhio.affirmity.ui.meditation.customization.MeditationCustomizationScreen
@@ -693,15 +696,17 @@ fun AffirmityApp(
     // Device-local by design: goals survive account changes and never enter AffirmityAppState's
     // DataSession/Firestore swap boundary.
     val userGoalsStore = remember(context) { UserGoalsPreferences(context.applicationContext) }
+    val database = remember(context) { AffirmityDatabase.getInstance(context.applicationContext) }
+    val personalizationSignalDao = remember(database) { database.personalizationSignalDao() }
     // Local-only, deliberately outside AffirmityAppState/DataSession (see
     // RoomMeditationCustomizationRepository's doc) -- a per-device knob position, not account data.
     val meditationCustomizationRepository = remember {
-        RoomMeditationCustomizationRepository(AffirmityDatabase.getInstance(context).meditationCustomizationDao())
+        RoomMeditationCustomizationRepository(database.meditationCustomizationDao())
     }
     // Only ever read by the "breathing_affirmations" hybrid entry's own enrichment step below --
     // every other entry never touches this repository (see decideMeditationLaunchStep's doc).
     val catalogAffirmationRepository = remember {
-        RoomCatalogAffirmationRepository(AffirmityDatabase.getInstance(context).catalogAffirmationDao())
+        RoomCatalogAffirmationRepository(database.catalogAffirmationDao())
     }
     // Same "device-local, not AffirmityAppState/DataSession" rationale as the repositories above:
     // whether the guided-meditation phase-transition chime is audible is a per-device knob, not
@@ -1478,7 +1483,20 @@ fun AffirmityApp(
                     // hosting YourFeedSheetContent instead of the old flat group list.
                     var openSurfaceId by remember { mutableStateOf<String?>(null) }
                     var showSeeAllThemes by remember { mutableStateOf(false) }
-                    val recommendedSurfaces = remember { defaultRecommendedSurfaces() }
+                    var recommendedSurfaces by remember {
+                        mutableStateOf(defaultRecommendedSurfaces())
+                    }
+                    LaunchedEffect(personalizationSignalDao, userGoalsStore) {
+                        recommendedSurfaces = resolveRecommendedSurfaces(
+                            rankedSurfacesEnabled = PersonalizationFlags.RANKED_SURFACES_ENABLED,
+                            profileLoader = {
+                                loadPersonalizationProfile(
+                                    signalDao = personalizationSignalDao,
+                                    userGoalsStore = userGoalsStore,
+                                )
+                            },
+                        )
+                    }
                     val accessDecisionFor: (String) -> AccessDecision = { themeId ->
                         themeAccessDecision(
                             themeId,

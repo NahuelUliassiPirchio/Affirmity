@@ -4,6 +4,7 @@ import android.util.Log
 import com.pirxhio.affirmity.data.local.PersonalizationSignalDao
 import com.pirxhio.affirmity.data.local.PersonalizationSignalEntity
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -19,7 +20,8 @@ private const val TAG = "PersonalizationSignal"
  * frozen shape as `AnalyticsLogger`) -- writes on [Dispatchers.IO] via the injected [scope], so
  * call sites (Slice 2) stay one line with no coroutine plumbing of their own. Failures are caught
  * and logged, never rethrown: this is a best-effort side channel that must never crash the app or
- * cancel the shared [scope] for the rest of its lifetime.
+ * cancel the shared [scope] for the rest of its lifetime -- except [CancellationException] itself,
+ * which is always rethrown so cooperative cancellation of [scope] still works correctly.
  *
  * Retention (design D7): opportunistically prunes rows older than [RETENTION_MAX_AGE_DAYS] days
  * and trims to the newest [RETENTION_MAX_ROWS], every [PRUNE_EVERY_N_INSERTS]th insert -- no
@@ -44,10 +46,14 @@ class RoomPersonalizationSignalRecorder(
 
     override fun record(signal: PersonalizationSignal) {
         scope.launch(Dispatchers.IO) {
-            runCatching {
+            try {
                 dao.insert(signal.toEntity())
                 maybePrune()
-            }.onFailure { error -> Log.e(TAG, "failed to record personalization signal", error) }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Log.e(TAG, "failed to record personalization signal", error)
+            }
         }
     }
 
