@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -110,6 +112,11 @@ import com.pirxhio.affirmity.notifications.NotificationCanceller
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
 import com.pirxhio.affirmity.notifications.FcmTokenOwnershipCoordinator
+import com.pirxhio.affirmity.personalization.signal.NoOpPersonalizationSignalRecorder
+import com.pirxhio.affirmity.personalization.signal.PersonalizationSignal
+import com.pirxhio.affirmity.personalization.signal.PersonalizationSignalRecorder
+import com.pirxhio.affirmity.personalization.signal.RoomPersonalizationSignalRecorder
+import com.pirxhio.affirmity.personalization.signal.SignalType
 import com.pirxhio.affirmity.notifications.processFcmTokenOwnershipCoordinator
 import com.pirxhio.affirmity.data.catalog.AndroidCatalogAssetReader
 import com.pirxhio.affirmity.data.catalog.CATALOG_ID_PREFIX
@@ -167,6 +174,9 @@ data class Affirmation(
     val source: AffirmationSource = AffirmationSource.OWNED,
     /** The access unit for CATALOG rows (design D5/D6). Always null for OWNED rows. */
     val collectionId: String? = null,
+    /** Catalog v2 tone metadata (Slice 0), read by personalization signal emission (Slice 2).
+     *  Always null for OWNED rows -- user-authored affirmations carry no catalog tone. */
+    val tone: String? = null,
 )
 
 /** See [Affirmation.source] (design D14). */
@@ -220,6 +230,7 @@ private fun com.pirxhio.affirmity.data.local.CatalogAffirmationEntity.toAffirmat
     overrides = overrides,
     source = AffirmationSource.CATALOG,
     collectionId = collectionId,
+    tone = tone,
 )
 
 private fun Affirmation.toEntity(): AffirmationEntity = AffirmationEntity(
@@ -297,15 +308,16 @@ internal fun isDraftThemeSelectionValid(draftThemeIds: Set<String>): Boolean = d
  * - `guideSeen == null && hasCompletedOnboarding == true`: a pre-existing install from before this
  *   change shipped -- backfills to `true` (seen) so the auto-show gate can never retroactively
  *   fire for it (R1.3's locked decision).
- * - `guideSeen == null && hasCompletedOnboarding != true` (`false` or still-unresolved `null`):
- *   either onboarding is genuinely mid-flow or not yet resolved -- stays `null` (unresolved); the
- *   auto-show flag only ever gets armed explicitly by [AffirmityAppState.completeOnboarding]'s
- *   `arm()` call, never by this backfill.
+ * - `guideSeen == null && hasCompletedOnboarding == false`: a fresh install that has not entered
+ *   the survey yet -- resolves to `false` so the pre-survey guide is required.
+ * - `guideSeen == null && hasCompletedOnboarding == null`: onboarding is still unresolved, so the
+ *   guide gate remains unresolved as well.
  */
 fun resolveGuideBackfill(guideSeen: Boolean?, hasCompletedOnboarding: Boolean?): Boolean? =
     when {
         guideSeen != null -> guideSeen
         hasCompletedOnboarding == true -> true
+        hasCompletedOnboarding == false -> false
         else -> null
     }
 
@@ -313,6 +325,27 @@ fun resolveGuideBackfill(guideSeen: Boolean?, hasCompletedOnboarding: Boolean?):
  * resolved state is explicitly armed (`false`). `null` (unresolved) and `true` (seen) both mean
  * "don't show". */
 fun shouldShowGuide(resolvedGuideSeen: Boolean?): Boolean = resolvedGuideSeen == false
+
+fun areInitialContentInputsResolved(
+    hasCompletedOnboarding: Boolean?,
+    guideSeen: Boolean?,
+): Boolean = hasCompletedOnboarding != null && guideSeen != null
+
+/** Resolves the first-launch surface without hiding the existing-account shortcut behind the
+ * guide. A fresh user stays on the onboarding intro until they explicitly enter the survey; only
+ * then does the required guide block the question steps. A persisted seen checkpoint resumes the
+ * question flow directly after process recreation. */
+enum class PreSurveyGuideResolution { WAITING, ONBOARDING_INTRO, GUIDE, QUESTIONS }
+
+fun resolvePreSurveyGuideGate(
+    guideSeen: Boolean?,
+    surveyRequested: Boolean,
+): PreSurveyGuideResolution = when {
+    guideSeen == null -> PreSurveyGuideResolution.WAITING
+    guideSeen -> PreSurveyGuideResolution.QUESTIONS
+    surveyRequested -> PreSurveyGuideResolution.GUIDE
+    else -> PreSurveyGuideResolution.ONBOARDING_INTRO
+}
 
 /**
  * Gate-precedence helper (spec R6.2, design D3), extracted so [MainActivity]'s ordering can be
@@ -449,6 +482,10 @@ class AffirmityAppState(
      *  injection convention as [adUnlockSource]. The composition root swaps this once for the
      *  real, consent-gated instance ([ConsentGatedAnalyticsLogger]) -- the one-line kill switch. */
     private val analytics: AnalyticsLogger = NoOpAnalyticsLogger,
+    /** Slice 2's injected seam (design D3/spec "Emission via injected recorder") -- functional,
+     *  NEVER wrapped by [analytics]'s consent gate. Defaulted to [NoOpPersonalizationSignalRecorder],
+     *  the same injection convention as [analytics]/[adUnlockSource]. */
+    private val personalizationSignalRecorder: PersonalizationSignalRecorder = NoOpPersonalizationSignalRecorder,
 ) {
     val affirmations = mutableStateListOf<Affirmation>()
 
@@ -746,18 +783,26 @@ class AffirmityAppState(
     var hasCompletedOnboarding = mutableStateOf<Boolean?>(null)
         private set
 
-    /** True only when the post-survey onboarding guide is armed and not yet seen (spec R1.2, R1.3;
-     * design D2/D3) -- drives [MainActivity]'s auto-show gate, positioned before every other
-     * overlay gate. Resolved via [resolveGuideBackfill]/[shouldShowGuide] from the raw tri-state
-     * DataStore read, never re-evaluated once true (see [markOnboardingGuideSeen]). */
-    var shouldShowOnboardingGuide = mutableStateOf(false)
+    /** Resolved guide checkpoint: `null` while either persisted gate input is unresolved, `false`
+     * when the guide is required, and `true` once seen. This is the single source of truth for
+     * both the pre-survey route and the legacy post-survey auto gate. */
+    var hasSeenOnboardingGuide = mutableStateOf<Boolean?>(null)
         private set
+
+    val shouldShowOnboardingGuide: State<Boolean> =
+        derivedStateOf { hasSeenOnboardingGuide.value == false }
+
+    /** The native splash can leave only after both inputs that choose the first content surface
+     * have emitted. Keeping this derived in app state prevents composition-local readiness races. */
+    val isInitialContentResolved: State<Boolean> = derivedStateOf {
+        areInitialContentInputsResolved(hasCompletedOnboarding.value, hasSeenOnboardingGuide.value)
+    }
 
     /** Commits the guide as seen (spec R2.3, R4.2/R4.3) -- called by both the auto and manual
      * dismiss paths. Never re-arms the auto flag (R5.3/R5.4: the manual gate is a separate state
      * variable owned by [MainActivity]). */
     fun markOnboardingGuideSeen() {
-        shouldShowOnboardingGuide.value = false
+        hasSeenOnboardingGuide.value = true
         scope.launch { onboardingGuidePreferences.markSeen() }
     }
 
@@ -1069,13 +1114,26 @@ class AffirmityAppState(
             // leave a legacy install
             // (guide-seen key absent, onboarding already complete) stuck unresolved -- see
             // resolveGuideBackfill's KDoc for the full truth table.
+            var hasEmittedGuidePreference = false
             combine(
-                onboardingGuidePreferences.observeHasSeenGuide(),
+                onboardingGuidePreferences.observeHasSeenGuide()
+                    .map { rawGuideSeen ->
+                        hasEmittedGuidePreference = true
+                        rawGuideSeen
+                    }
+                    .catch { error ->
+                        Log.e(TAG, "onboarding guide preference flow failed", error)
+                        // A failed first read is treated like an absent key. `combine` retains this
+                        // value and resolves it once onboarding emits: unfinished -> required;
+                        // completed -> legacy-seen. After a successful read, retain the last known
+                        // checkpoint instead of regressing it because of a later stream failure.
+                        if (!hasEmittedGuidePreference) emit(null)
+                    },
                 snapshotFlow { hasCompletedOnboarding.value },
             ) { rawGuideSeen, completedOnboarding -> rawGuideSeen to completedOnboarding }
                 .collect { (rawGuideSeen, completedOnboarding) ->
                     val resolved = resolveGuideBackfill(rawGuideSeen, completedOnboarding)
-                    shouldShowOnboardingGuide.value = shouldShowGuide(resolved)
+                    hasSeenOnboardingGuide.value = resolved
                 }
         }
         scope.launch {
@@ -1176,10 +1234,12 @@ class AffirmityAppState(
                 runCatching { onboardingRepository.markCompleted(uid) }
             }
         }
-        // R1.1/R7.1: arms the guide auto-show flag as one atomic addition to survey completion --
-        // the ONLY code path allowed to arm it (spec R1.1). Fire-and-forget like the other writes
-        // in this method; the collector above picks up the write once it lands.
-        scope.launch { onboardingGuidePreferences.arm() }
+        if (hasSeenOnboardingGuide.value != true) {
+            // Backward-compatible safety for callers that somehow complete the survey without
+            // traversing the pre-survey guide. The normal route is already `true`, so completion
+            // cannot overwrite the seen checkpoint or add a second write after dismissal.
+            scope.launch { onboardingGuidePreferences.arm() }
+        }
     }
 
     /** Used by the onboarding flow's "I already have an account" shortcut, right after sign-in,
@@ -1304,6 +1364,7 @@ class AffirmityAppState(
             // REQ-5.5/17: emitted after insert() succeeds -- creation_method is the entire
             // payload, never affirmation text (REQ-4.8).
             analytics.log(AnalyticsEvent.CustomAffirmationCreated(CreationMethod.COLOR))
+            recordPersonalizedSignal()
         }
     }
 
@@ -1342,6 +1403,7 @@ class AffirmityAppState(
             ).toEntity()
         )
         analytics.log(AnalyticsEvent.CustomAffirmationCreated(method))
+        recordPersonalizedSignal()
     }
 
     fun importAffirmationsFromJson(json: String, replaceExisting: Boolean) {
@@ -1415,6 +1477,10 @@ class AffirmityAppState(
                     favorites.remove(id)
                 } else {
                     favorites.add(id, System.currentTimeMillis())
+                    // spec "Signal emission at existing feature call sites" -- only the ADD
+                    // direction counts as "saved" (design D3); removing a favorite is not a
+                    // negative signal, it just emits nothing.
+                    recordPersonalizationSignal(SignalType.AFFIRMATION_SAVED, id)
                 }
             }
         }
@@ -1432,12 +1498,71 @@ class AffirmityAppState(
         scope.launch {
             favoriteToggleMutex.withLock { favorites.add(id, System.currentTimeMillis()) }
         }
+        // Same "add" direction as toggleFavorite's add branch (spec "Signal emission at existing
+        // feature call sites") -- an undo-restore is still the user choosing to keep this favorited.
+        recordPersonalizationSignal(SignalType.AFFIRMATION_SAVED, id)
     }
 
     /** Hides a catalog affirmation from the main feed (pre-launch audit item #1). Device-local,
      *  fire-and-forget, same convention as every other [trackerPreferences] write from Compose. */
     fun hideAffirmation(id: String) {
         scope.launch { trackerPreferences.hideAffirmation(id) }
+    }
+
+    /** Spec "Signal emission at existing feature call sites" -- the share sheet lives in Compose
+     *  UI (design D3: call sites invoke the recorder directly, no Room/DAO logic at the call site),
+     *  so this is a thin pass-through the UI calls right before firing the OS share [Intent]. */
+    fun recordAffirmationShared(id: String) {
+        recordPersonalizationSignal(SignalType.AFFIRMATION_SHARED, id)
+    }
+
+    /** Spec "Signal emission at existing feature call sites" -- fired when a "Your feed" discovery
+     *  surface is opened. Surfaces are 1:1 with a universe ([SurfaceUiModel.id], not a theme), so
+     *  this is recorded as [PersonalizationSignal.groupId], never [PersonalizationSignal.themeId]. */
+    fun recordSurfaceOpened(surfaceId: String) {
+        personalizationSignalRecorder.record(
+            PersonalizationSignal(
+                type = SignalType.SURFACE_OPENED,
+                themeId = null,
+                groupId = surfaceId,
+                tone = null,
+                occurredAtMillis = System.currentTimeMillis(),
+            )
+        )
+    }
+
+    /** Resolves [id] against [allAffirmations] to derive `themeId`/`groupId`, then emits [type].
+     *  An id with no matching affirmation (e.g. a race with deletion) still emits with null
+     *  themeId/groupId rather than silently dropping the signal. */
+    private fun recordPersonalizationSignal(type: SignalType, id: String) {
+        val affirmation = allAffirmations.firstOrNull { it.id == id }
+        val themeId = affirmation?.collectionId?.let { collectionId ->
+            catalogCollectionsById()[collectionId]?.themeId
+        }
+        personalizationSignalRecorder.record(
+            PersonalizationSignal(
+                type = type,
+                themeId = themeId,
+                groupId = affirmation?.groupId,
+                tone = affirmation?.tone,
+                occurredAtMillis = System.currentTimeMillis(),
+            )
+        )
+    }
+
+    /** Custom-affirmation creation/edit (spec "personalization-signals — emission", `AFFIRMATION_PERSONALIZED`).
+     *  Owned rows have no `collectionId`, so `themeId` is always null here -- only [PersonalizationSignal.groupId]
+     *  (always [PERSONALIZADAS_GROUP_ID] for owned rows) is meaningful. */
+    private fun recordPersonalizedSignal() {
+        personalizationSignalRecorder.record(
+            PersonalizationSignal(
+                type = SignalType.AFFIRMATION_PERSONALIZED,
+                themeId = null,
+                groupId = PERSONALIZADAS_GROUP_ID,
+                tone = null,
+                occurredAtMillis = System.currentTimeMillis(),
+            )
+        )
     }
 
     /** Persists a Your-feed source toggle. Fire-and-forget: [feedSources] catches up through the
@@ -1733,6 +1858,10 @@ class AffirmityAppState(
     fun applyThemeSelection(): Boolean {
         if (!isDraftThemeSelectionValid) return false
         val committed = draftThemeIds.value
+        // spec "personalization-signals -- emission", THEME_ADDED: only newly-committed theme ids
+        // count as "added" -- a theme already selected before this commit emits nothing again, and
+        // a theme dropped from the draft is a removal, not a signal-worthy event.
+        val newlyAddedThemeIds = committed - selectedThemeIds.value.orEmpty()
         selectedThemeIds.value = committed
         // design §0/§4b: a PER_USE unlock on an affirmation group is spent the moment its group
         // leaves the committed selection -- derived from the committed THEME ids, since grants are
@@ -1744,6 +1873,17 @@ class AffirmityAppState(
         val selectedUniverseIds = committed.mapNotNull { themesById[it]?.universeId }.toSet()
         sessionAdUnlocks.value = retainSelectionScopedUnlocks(sessionAdUnlocks.value, selectedUniverseIds)
         scope.launch { themePreferences.saveSelectedThemeIds(committed) }
+        for (themeId in newlyAddedThemeIds) {
+            personalizationSignalRecorder.record(
+                PersonalizationSignal(
+                    type = SignalType.THEME_ADDED,
+                    themeId = themeId,
+                    groupId = themesById[themeId]?.universeId,
+                    tone = null,
+                    occurredAtMillis = System.currentTimeMillis(),
+                )
+            )
+        }
         return true
     }
 
@@ -1897,6 +2037,10 @@ fun rememberAffirmityAppState(): AffirmityAppState {
                 // (design D5) -- swapping this whole `analytics` argument for NoOpAnalyticsLogger
                 // is the one-line kill switch (design D1/REQ-4.6).
                 consentState = { AnalyticsConsentState.UNKNOWN },
+            ),
+            personalizationSignalRecorder = RoomPersonalizationSignalRecorder(
+                dao = database.personalizationSignalDao(),
+                scope = scope,
             ),
         )
     }

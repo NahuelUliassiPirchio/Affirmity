@@ -28,4 +28,9 @@ data class CatalogAffirmationEntity(
     /** The access unit (design D5). Joined against `catalogCollectionsById()` in memory. */
     val collectionId: String,
     val sortOrder: Int,
+    /** Nullable: pre-migration rows and catalog gaps have no tone (spec catalog-tone-metadata),
+     * added via `MIGRATION_11_12`. */
+    val tone: String? = null,
+    /** Nullable: pre-migration rows and catalog gaps have no semantic angle. */
+    val semanticAngle: String? = null,
 )

@@ -102,6 +102,7 @@ fun AffirmationsScreen(
     favoriteIds: Set<String> = emptySet(),
     onToggleFavorite: (affirmationId: String) -> Unit = {},
     onHideAffirmation: (affirmationId: String) -> Unit = {},
+    onAffirmationShared: (affirmationId: String) -> Unit = {},
     favoriteGesture: FavoriteGesture = FavoriteGesture.DOUBLE_TAP,
 ) {
     if (affirmations.isEmpty()) {
@@ -159,6 +160,7 @@ fun AffirmationsScreen(
                 // lingering until the hidden-ids DataStore flow catches up and re-filters the pool.
                 pagerScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
             },
+            onShared = { onAffirmationShared(affirmation.id) },
             favoriteGesture = favoriteGesture,
         )
     }
@@ -171,6 +173,7 @@ private fun AffirmationCard(
     onToggleFavorite: () -> Unit,
     onOverrideCommitted: (tokenKey: String, value: String) -> Unit,
     onHide: () -> Unit,
+    onShared: () -> Unit,
     favoriteGesture: FavoriteGesture,
 ) {
     var cardPositionInRoot by remember(affirmation.id) { mutableStateOf(Offset.Zero) }
@@ -382,6 +385,7 @@ private fun AffirmationCard(
                     putExtra(Intent.EXTRA_TEXT, shareText)
                 }
                 context.startActivity(Intent.createChooser(sendIntent, null))
+                onShared()
             },
             onHide = {
                 showActions = false

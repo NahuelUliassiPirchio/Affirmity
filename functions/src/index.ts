@@ -69,8 +69,12 @@ import {
 } from './billing';
 import {
   AppStoreVerificationError,
+  isSandboxEntitlementsAllowed,
   resolveIosEntitlement,
+  type AppStoreEntitlementDoc,
   type AppStoreVerifier,
+  type ClaimAndWriteOutcome,
+  type IosEntitlementStore,
 } from './appStoreBilling';
 
 export * from './schedule';
@@ -613,6 +617,50 @@ function firestoreEntitlementStore(): EntitlementStore {
   };
 }
 
+/** Global ledger doc claiming which uid a given App Store `transactionId` belongs to -- Fix 1
+ * (cross-account transaction replay). Collection-scoped by transactionId, NOT per-uid, so the
+ * atomic transaction below can check "does ANY uid already own this transactionId" in one read. */
+function iosTransactionClaimRef(transactionId: string) {
+  return getFirestore().doc(`iosTransactionClaims/${transactionId}`);
+}
+
+/**
+ * Real `IosEntitlementStore`: wraps the transaction-claim check (Fix 1) and the entitlement
+ * freshness check + write in a single Firestore `runTransaction`, so two concurrent
+ * `syncEntitlementIOS` calls for the same transactionId (legitimate uid vs. a replay attempt under
+ * a different uid) can never both observe "unclaimed" and both proceed to write -- Firestore
+ * aborts and retries the loser's transaction instead.
+ */
+function iosEntitlementStore(): IosEntitlementStore {
+  return {
+    async claimAndWriteEntitlement(uid, transactionId, doc: AppStoreEntitlementDoc): Promise<ClaimAndWriteOutcome> {
+      const db = getFirestore();
+      const claimRef = iosTransactionClaimRef(transactionId);
+      const entitlementRef = entitlementDocRef(uid);
+      return db.runTransaction(async (tx) => {
+        const claimSnapshot = await tx.get(claimRef);
+        const claimantUid = claimSnapshot.exists ? (claimSnapshot.data()?.uid as string | undefined) : undefined;
+        if (claimantUid && claimantUid !== uid) {
+          return 'claimed-by-other-uid';
+        }
+
+        const entitlementSnapshot = await tx.get(entitlementRef);
+        const lastVerifiedAt = entitlementSnapshot.data()?.lastVerifiedAt;
+        const isStale = typeof lastVerifiedAt === 'number' && doc.lastVerifiedAt <= lastVerifiedAt;
+
+        if (!claimantUid) {
+          tx.set(claimRef, { uid, transactionId, claimedAt: FieldValue.serverTimestamp() });
+        }
+        if (isStale) {
+          return 'dropped-stale';
+        }
+        tx.set(entitlementRef, { ...doc, updatedAt: FieldValue.serverTimestamp() });
+        return 'written';
+      });
+    },
+  };
+}
+
 let playApiClientPromise: Promise<PlayApiClient> | null = null;
 
 /** Lazily-built Play Developer API client (design D1 step 5 -- the sole source of purchase
@@ -678,6 +726,13 @@ const IOS_BUNDLE_ID = process.env.IOS_BUNDLE_ID ?? 'com.pirxhio.affirmity';
 // pre-launch, with no Apple ID configured yet. `productionVerifier()` logs a warning the first
 // time this happens so the gap stays observable instead of silent.
 const IOS_APP_APPLE_ID = process.env.IOS_APP_APPLE_ID ? Number(process.env.IOS_APP_APPLE_ID) : undefined;
+
+// Fix 3 (HIGH finding): without this gate, `appStoreVerifier()` always fell back from Production to
+// Sandbox verification, so anyone could create a free Apple Sandbox account, generate a Sandbox
+// transaction, and get a real Production Pro entitlement for zero payment. Default OFF (unset ->
+// disabled). This should stay enabled in dev/staging Firebase projects -- where there is no shipped
+// Production build to test against yet -- and be turned OFF once the app is live in production.
+const IOS_ALLOW_SANDBOX_ENTITLEMENTS = isSandboxEntitlementsAllowed(process.env.IOS_ALLOW_SANDBOX_ENTITLEMENTS);
 
 let appleRootCertificatesCache: Buffer[] | null = null;
 
@@ -747,8 +802,18 @@ function appStoreVerifier(): AppStoreVerifier {
           if (!(err instanceof VerificationException) || err.status !== VerificationStatus.INVALID_ENVIRONMENT) {
             throw mapVerificationError(err);
           }
-          // Fall through to Sandbox below.
+          // Production verification says this JWS was minted for Sandbox -- Fix 3: only fall
+          // through to Sandbox verification when IOS_ALLOW_SANDBOX_ENTITLEMENTS is explicitly on.
+          if (!IOS_ALLOW_SANDBOX_ENTITLEMENTS) {
+            throw new AppStoreVerificationError(err.message || 'Apple JWS verification failed');
+          }
         }
+      } else if (!IOS_ALLOW_SANDBOX_ENTITLEMENTS) {
+        // No Production verifier configured (no IOS_APP_APPLE_ID) AND Sandbox entitlements are
+        // disabled -- refuse rather than silently verifying against Sandbox only.
+        throw new AppStoreVerificationError(
+          'Production App Store verification is not configured and Sandbox entitlements are disabled',
+        );
       }
       try {
         return await sandboxVerifier().verifyAndDecodeTransaction(signedTransaction);
@@ -806,9 +871,16 @@ export const syncEntitlementIOS = onRequest(async (req, res) => {
   }
 
   try {
-    const result = await resolveIosEntitlement(appStoreVerifier(), firestoreEntitlementStore(), uid, signedTransaction, Date.now());
+    const result = await resolveIosEntitlement(appStoreVerifier(), iosEntitlementStore(), uid, signedTransaction, Date.now());
     if (result.outcome === 'invalid') {
       res.status(401).send('Unauthorized');
+      return;
+    }
+    if (result.outcome === 'claimed-by-other-uid') {
+      // Fix 1: this transactionId already belongs to a different uid -- a replayed/foreign JWS,
+      // not a server error and not a success. 409 Conflict, distinct from 401 (bad signature) and
+      // 200 (written/dropped-stale).
+      res.status(409).send('Transaction already claimed by another account');
       return;
     }
     res.status(200).json({ outcome: result.outcome });

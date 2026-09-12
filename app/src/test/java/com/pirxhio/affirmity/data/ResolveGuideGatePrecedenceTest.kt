@@ -11,6 +11,34 @@ import org.junit.Test
 class ResolveGuideGatePrecedenceTest {
 
     @Test
+    fun `fresh user sees onboarding intro before the required pre-survey guide`() {
+        val resolution = resolvePreSurveyGuideGate(guideSeen = false, surveyRequested = false)
+
+        assertEquals(PreSurveyGuideResolution.ONBOARDING_INTRO, resolution)
+    }
+
+    @Test
+    fun `starting a fresh survey activates the required guide before questions`() {
+        val resolution = resolvePreSurveyGuideGate(guideSeen = false, surveyRequested = true)
+
+        assertEquals(PreSurveyGuideResolution.GUIDE, resolution)
+    }
+
+    @Test
+    fun `persisted guide completion resumes at questions without replaying the intro`() {
+        val resolution = resolvePreSurveyGuideGate(guideSeen = true, surveyRequested = false)
+
+        assertEquals(PreSurveyGuideResolution.QUESTIONS, resolution)
+    }
+
+    @Test
+    fun `unresolved guide state does not choose a first content surface`() {
+        val resolution = resolvePreSurveyGuideGate(guideSeen = null, surveyRequested = false)
+
+        assertEquals(PreSurveyGuideResolution.WAITING, resolution)
+    }
+
+    @Test
     fun `auto-show guide takes precedence over healerJustGranted when both are true`() {
         val resolution = resolveGuideGate(autoShow = true, manualShow = false, healerJustGranted = true)
 

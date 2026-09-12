@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.pirxhio.affirmity.personalization.scoring.PersonalizationProfile
 import com.pirxhio.affirmity.ui.groups.catalogThemes
 import com.pirxhio.affirmity.ui.groups.catalogUniverseGroups
 
@@ -56,6 +57,34 @@ fun defaultRecommendedSurfaces(): List<SurfaceUiModel> {
         )
     }
 }
+
+/**
+ * Pure personalization seam (design D4): ranks the default catalog-derived surfaces and their
+ * suggested themes without reading storage or mutating state. Missing or tied scores preserve the
+ * original catalog order, so an empty [profile] is identical to [defaultRecommendedSurfaces].
+ */
+fun rankedRecommendedSurfaces(profile: PersonalizationProfile): List<SurfaceUiModel> =
+    defaultRecommendedSurfaces()
+        .withIndex()
+        .sortedWith(
+            compareByDescending<IndexedValue<SurfaceUiModel>> {
+                profile.universeScores[it.value.id] ?: 0.0
+            }.thenBy { it.index },
+        )
+        .map { indexedSurface ->
+            val surface = indexedSurface.value
+            surface.copy(
+                recommendedThemeIds = surface.themeIds
+                    .withIndex()
+                    .sortedWith(
+                        compareByDescending<IndexedValue<String>> {
+                            profile.themeScores[it.value] ?: 0.0
+                        }.thenBy { it.index },
+                    )
+                    .take(3)
+                    .map { it.value },
+            )
+        }
 
 /**
  * Curated per-universe icons (feedback: the generated catalog emits the same
