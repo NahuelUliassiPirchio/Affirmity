@@ -80,6 +80,7 @@
     <string name="onboarding_back_button">Back</string>
     <string name="onboarding_next_button">Next</string>
     <string name="onboarding_continue_without_account_button">Continue without an account</string>
+    <string name="onboarding_completion_error">We couldn\'t save your answers. Please try again.</string>
     <string name="onboarding_auth_title">Almost done</string>
     <string name="onboarding_auth_subtitle">Sign in to save your progress in the cloud, or continue without an account.</string>
     <string name="onboarding_auth_signed_in">Done! You\'re signed in.</string>

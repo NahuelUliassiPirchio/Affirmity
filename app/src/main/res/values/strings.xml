@@ -80,6 +80,7 @@
     <string name="onboarding_back_button">Atrás</string>
     <string name="onboarding_next_button">Siguiente</string>
     <string name="onboarding_continue_without_account_button">Continuar sin cuenta</string>
+    <string name="onboarding_completion_error">No pudimos guardar tus respuestas. Probá de nuevo.</string>
     <string name="onboarding_auth_title">Ya casi terminamos</string>
     <string name="onboarding_auth_subtitle">Iniciá sesión para guardar tu progreso en la nube, o continuá sin cuenta.</string>
     <string name="onboarding_auth_signed_in">¡Listo! Sesión iniciada.</string>

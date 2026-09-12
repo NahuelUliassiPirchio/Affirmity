@@ -888,6 +888,7 @@ fun AffirmityApp(
                 authError = appState.authError.value,
                 onSignInClicked = { appState.signIn(context) },
                 onFinished = { appState.completeOnboarding() },
+                onSurveyCompleted = userGoalsStore::saveOnboardingAnswers,
                 onCheckReturningAccount = { uid ->
                     appState.hasRemoteOnboardingCompleted(uid).also { returningAccount ->
                         if (returningAccount) appState.markOnboardingGuideSeen()
