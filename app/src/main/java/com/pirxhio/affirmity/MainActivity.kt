@@ -116,12 +116,14 @@ import com.pirxhio.affirmity.ui.onboarding.guide.OnboardingGuideScreen
 import com.pirxhio.affirmity.ui.paywall.PaywallSheet
 import com.pirxhio.affirmity.ui.progress.ProgressScreen
 import com.pirxhio.affirmity.ui.settings.NotificationDebugScreen
+import com.pirxhio.affirmity.ui.settings.MyGoalsScreen
 import com.pirxhio.affirmity.ui.settings.SettingsScreen
 import com.pirxhio.affirmity.ui.theme.AffirmityTheme
 import com.pirxhio.affirmity.data.local.AffirmityDatabase
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.repository.RoomCatalogAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomMeditationCustomizationRepository
+import com.pirxhio.affirmity.personalization.goals.UserGoalsPreferences
 import com.pirxhio.affirmity.ui.meditation.customization.affirmationTextsForBreathingAffirmations
 import com.pirxhio.affirmity.meditation.customization.resolvedValues
 import com.pirxhio.affirmity.ui.meditation.customization.MeditationCustomizationScreen
@@ -638,6 +640,7 @@ fun AffirmityApp(
     var showOnboardingGuide by rememberSaveable { mutableStateOf(false) }
     var hasRequestedSurvey by rememberSaveable { mutableStateOf(false) }
     var showNotificationDebug by rememberSaveable { mutableStateOf(false) }
+    var showMyGoals by rememberSaveable { mutableStateOf(false) }
     var showMyAffirmations by rememberSaveable { mutableStateOf(false) }
     var showFavorites by rememberSaveable { mutableStateOf(false) }
     // Pre-launch audit item #1's "Manage hidden affirmations" entry point (Settings) -- same
@@ -687,6 +690,9 @@ fun AffirmityApp(
         )?.let { appState.logAnalyticsEvent(it) }
     }
     val context = LocalContext.current
+    // Device-local by design: goals survive account changes and never enter AffirmityAppState's
+    // DataSession/Firestore swap boundary.
+    val userGoalsStore = remember(context) { UserGoalsPreferences(context.applicationContext) }
     // Local-only, deliberately outside AffirmityAppState/DataSession (see
     // RoomMeditationCustomizationRepository's doc) -- a per-device knob position, not account data.
     val meditationCustomizationRepository = remember {
@@ -922,6 +928,37 @@ fun AffirmityApp(
                 { appState.markOnboardingGuideSeen() }
             },
         )
+        return
+    }
+
+    if (showMyGoals) {
+        val closeMyGoals = {
+            showMyGoals = false
+            showSettings = true
+        }
+        BackHandler(onBack = closeMyGoals)
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            topBar = {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.my_goals_screen_title)) },
+                    navigationIcon = {
+                        IconButton(onClick = closeMyGoals) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.nav_back_content_description),
+                            )
+                        }
+                    },
+                )
+            },
+        ) { innerPadding ->
+            MyGoalsScreen(
+                store = userGoalsStore,
+                modifier = Modifier.padding(innerPadding),
+                onSaved = closeMyGoals,
+            )
+        }
         return
     }
 
@@ -1369,6 +1406,10 @@ fun AffirmityApp(
                 },
                 onOpenOnboardingGuide = {
                     showOnboardingGuide = true
+                    showSettings = false
+                },
+                onOpenMyGoals = {
+                    showMyGoals = true
                     showSettings = false
                 },
                 onOpenHiddenAffirmations = {

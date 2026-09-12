@@ -434,6 +434,13 @@
     <string name="hidden_affirmations_unhide_content_description">Unhide</string>
     <string name="settings_manage_hidden_affirmations">Manage hidden affirmations</string>
     <string name="settings_manage_hidden_affirmations_button">Manage</string>
+    <string name="settings_my_goals_title">My goals</string>
+    <string name="settings_my_goals_edit_button">Edit</string>
+    <string name="my_goals_screen_title">My goals</string>
+    <string name="my_goals_headline">What would help you most right now?</string>
+    <string name="my_goals_subtitle">Your goals can change. This just decides what Affirmity prioritizes for you.</string>
+    <string name="my_goals_save_button">Update my goals</string>
+    <string name="my_goals_save_error">We couldn\'t save your goals. Please try again.</string>
 
     <!-- Your feed source toggles. -->
     <string name="your_feed_sources_title">What else goes in your feed</string>
