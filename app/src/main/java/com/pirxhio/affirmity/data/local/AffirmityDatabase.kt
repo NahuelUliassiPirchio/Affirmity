@@ -200,6 +200,31 @@ val MIGRATION_11_12 = object : androidx.room.migration.Migration(11, 12) {
     }
 }
 
+/** Additive: creates `personalization_signals` empty (spec personalization-signals "Local signal
+ * storage", design D7). Append-only log, no backfill -- inferred-behavior tracking starts from
+ * this version. `id` is autogenerate INTEGER PK; the index on `occurredAtMillis` backs both the
+ * age-based prune (`deleteOlderThan`) and the ORDER BY used by `trimToNewest`. */
+val MIGRATION_12_13 = object : androidx.room.migration.Migration(12, 13) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `personalization_signals` (
+                `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                `signalType` TEXT NOT NULL,
+                `themeId` TEXT,
+                `groupId` TEXT,
+                `tone` TEXT,
+                `occurredAtMillis` INTEGER NOT NULL
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_personalization_signals_occurredAtMillis` " +
+                "ON `personalization_signals` (`occurredAtMillis`)",
+        )
+    }
+}
+
 @Database(
     entities = [
         AffirmationEntity::class,
@@ -212,8 +237,9 @@ val MIGRATION_11_12 = object : androidx.room.migration.Migration(11, 12) {
         CatalogAffirmationEntity::class,
         CatalogOverrideEntity::class,
         MeditationCustomizationEntity::class,
+        PersonalizationSignalEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = true,
 )
 @androidx.room.TypeConverters(OverridesConverters::class)
@@ -228,6 +254,7 @@ abstract class AffirmityDatabase : RoomDatabase() {
     abstract fun catalogAffirmationDao(): CatalogAffirmationDao
     abstract fun catalogOverrideDao(): CatalogOverrideDao
     abstract fun meditationCustomizationDao(): MeditationCustomizationDao
+    abstract fun personalizationSignalDao(): PersonalizationSignalDao
 
     companion object {
         @Volatile
@@ -251,6 +278,7 @@ abstract class AffirmityDatabase : RoomDatabase() {
                     MIGRATION_9_10,
                     MIGRATION_10_11,
                     MIGRATION_11_12,
+                    MIGRATION_12_13,
                 ).build().also { instance = it }
             }
     }
