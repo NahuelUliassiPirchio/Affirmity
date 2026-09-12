@@ -112,6 +112,11 @@ import com.pirxhio.affirmity.notifications.NotificationCanceller
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
 import com.pirxhio.affirmity.notifications.FcmTokenOwnershipCoordinator
+import com.pirxhio.affirmity.personalization.signal.NoOpPersonalizationSignalRecorder
+import com.pirxhio.affirmity.personalization.signal.PersonalizationSignal
+import com.pirxhio.affirmity.personalization.signal.PersonalizationSignalRecorder
+import com.pirxhio.affirmity.personalization.signal.RoomPersonalizationSignalRecorder
+import com.pirxhio.affirmity.personalization.signal.SignalType
 import com.pirxhio.affirmity.notifications.processFcmTokenOwnershipCoordinator
 import com.pirxhio.affirmity.data.catalog.AndroidCatalogAssetReader
 import com.pirxhio.affirmity.data.catalog.CATALOG_ID_PREFIX
@@ -169,6 +174,9 @@ data class Affirmation(
     val source: AffirmationSource = AffirmationSource.OWNED,
     /** The access unit for CATALOG rows (design D5/D6). Always null for OWNED rows. */
     val collectionId: String? = null,
+    /** Catalog v2 tone metadata (Slice 0), read by personalization signal emission (Slice 2).
+     *  Always null for OWNED rows -- user-authored affirmations carry no catalog tone. */
+    val tone: String? = null,
 )
 
 /** See [Affirmation.source] (design D14). */
@@ -222,6 +230,7 @@ private fun com.pirxhio.affirmity.data.local.CatalogAffirmationEntity.toAffirmat
     overrides = overrides,
     source = AffirmationSource.CATALOG,
     collectionId = collectionId,
+    tone = tone,
 )
 
 private fun Affirmation.toEntity(): AffirmationEntity = AffirmationEntity(
@@ -473,6 +482,10 @@ class AffirmityAppState(
      *  injection convention as [adUnlockSource]. The composition root swaps this once for the
      *  real, consent-gated instance ([ConsentGatedAnalyticsLogger]) -- the one-line kill switch. */
     private val analytics: AnalyticsLogger = NoOpAnalyticsLogger,
+    /** Slice 2's injected seam (design D3/spec "Emission via injected recorder") -- functional,
+     *  NEVER wrapped by [analytics]'s consent gate. Defaulted to [NoOpPersonalizationSignalRecorder],
+     *  the same injection convention as [analytics]/[adUnlockSource]. */
+    private val personalizationSignalRecorder: PersonalizationSignalRecorder = NoOpPersonalizationSignalRecorder,
 ) {
     val affirmations = mutableStateListOf<Affirmation>()
 
@@ -1351,6 +1364,7 @@ class AffirmityAppState(
             // REQ-5.5/17: emitted after insert() succeeds -- creation_method is the entire
             // payload, never affirmation text (REQ-4.8).
             analytics.log(AnalyticsEvent.CustomAffirmationCreated(CreationMethod.COLOR))
+            recordPersonalizedSignal()
         }
     }
 
@@ -1389,6 +1403,7 @@ class AffirmityAppState(
             ).toEntity()
         )
         analytics.log(AnalyticsEvent.CustomAffirmationCreated(method))
+        recordPersonalizedSignal()
     }
 
     fun importAffirmationsFromJson(json: String, replaceExisting: Boolean) {
@@ -1462,6 +1477,10 @@ class AffirmityAppState(
                     favorites.remove(id)
                 } else {
                     favorites.add(id, System.currentTimeMillis())
+                    // spec "Signal emission at existing feature call sites" -- only the ADD
+                    // direction counts as "saved" (design D3); removing a favorite is not a
+                    // negative signal, it just emits nothing.
+                    recordPersonalizationSignal(SignalType.AFFIRMATION_SAVED, id)
                 }
             }
         }
@@ -1479,12 +1498,71 @@ class AffirmityAppState(
         scope.launch {
             favoriteToggleMutex.withLock { favorites.add(id, System.currentTimeMillis()) }
         }
+        // Same "add" direction as toggleFavorite's add branch (spec "Signal emission at existing
+        // feature call sites") -- an undo-restore is still the user choosing to keep this favorited.
+        recordPersonalizationSignal(SignalType.AFFIRMATION_SAVED, id)
     }
 
     /** Hides a catalog affirmation from the main feed (pre-launch audit item #1). Device-local,
      *  fire-and-forget, same convention as every other [trackerPreferences] write from Compose. */
     fun hideAffirmation(id: String) {
         scope.launch { trackerPreferences.hideAffirmation(id) }
+    }
+
+    /** Spec "Signal emission at existing feature call sites" -- the share sheet lives in Compose
+     *  UI (design D3: call sites invoke the recorder directly, no Room/DAO logic at the call site),
+     *  so this is a thin pass-through the UI calls right before firing the OS share [Intent]. */
+    fun recordAffirmationShared(id: String) {
+        recordPersonalizationSignal(SignalType.AFFIRMATION_SHARED, id)
+    }
+
+    /** Spec "Signal emission at existing feature call sites" -- fired when a "Your feed" discovery
+     *  surface is opened. Surfaces are 1:1 with a universe ([SurfaceUiModel.id], not a theme), so
+     *  this is recorded as [PersonalizationSignal.groupId], never [PersonalizationSignal.themeId]. */
+    fun recordSurfaceOpened(surfaceId: String) {
+        personalizationSignalRecorder.record(
+            PersonalizationSignal(
+                type = SignalType.SURFACE_OPENED,
+                themeId = null,
+                groupId = surfaceId,
+                tone = null,
+                occurredAtMillis = System.currentTimeMillis(),
+            )
+        )
+    }
+
+    /** Resolves [id] against [allAffirmations] to derive `themeId`/`groupId`, then emits [type].
+     *  An id with no matching affirmation (e.g. a race with deletion) still emits with null
+     *  themeId/groupId rather than silently dropping the signal. */
+    private fun recordPersonalizationSignal(type: SignalType, id: String) {
+        val affirmation = allAffirmations.firstOrNull { it.id == id }
+        val themeId = affirmation?.collectionId?.let { collectionId ->
+            catalogCollectionsById()[collectionId]?.themeId
+        }
+        personalizationSignalRecorder.record(
+            PersonalizationSignal(
+                type = type,
+                themeId = themeId,
+                groupId = affirmation?.groupId,
+                tone = affirmation?.tone,
+                occurredAtMillis = System.currentTimeMillis(),
+            )
+        )
+    }
+
+    /** Custom-affirmation creation/edit (spec "personalization-signals — emission", `AFFIRMATION_PERSONALIZED`).
+     *  Owned rows have no `collectionId`, so `themeId` is always null here -- only [PersonalizationSignal.groupId]
+     *  (always [PERSONALIZADAS_GROUP_ID] for owned rows) is meaningful. */
+    private fun recordPersonalizedSignal() {
+        personalizationSignalRecorder.record(
+            PersonalizationSignal(
+                type = SignalType.AFFIRMATION_PERSONALIZED,
+                themeId = null,
+                groupId = PERSONALIZADAS_GROUP_ID,
+                tone = null,
+                occurredAtMillis = System.currentTimeMillis(),
+            )
+        )
     }
 
     /** Persists a Your-feed source toggle. Fire-and-forget: [feedSources] catches up through the
@@ -1780,6 +1858,10 @@ class AffirmityAppState(
     fun applyThemeSelection(): Boolean {
         if (!isDraftThemeSelectionValid) return false
         val committed = draftThemeIds.value
+        // spec "personalization-signals -- emission", THEME_ADDED: only newly-committed theme ids
+        // count as "added" -- a theme already selected before this commit emits nothing again, and
+        // a theme dropped from the draft is a removal, not a signal-worthy event.
+        val newlyAddedThemeIds = committed - selectedThemeIds.value.orEmpty()
         selectedThemeIds.value = committed
         // design §0/§4b: a PER_USE unlock on an affirmation group is spent the moment its group
         // leaves the committed selection -- derived from the committed THEME ids, since grants are
@@ -1791,6 +1873,17 @@ class AffirmityAppState(
         val selectedUniverseIds = committed.mapNotNull { themesById[it]?.universeId }.toSet()
         sessionAdUnlocks.value = retainSelectionScopedUnlocks(sessionAdUnlocks.value, selectedUniverseIds)
         scope.launch { themePreferences.saveSelectedThemeIds(committed) }
+        for (themeId in newlyAddedThemeIds) {
+            personalizationSignalRecorder.record(
+                PersonalizationSignal(
+                    type = SignalType.THEME_ADDED,
+                    themeId = themeId,
+                    groupId = themesById[themeId]?.universeId,
+                    tone = null,
+                    occurredAtMillis = System.currentTimeMillis(),
+                )
+            )
+        }
         return true
     }
 
@@ -1944,6 +2037,10 @@ fun rememberAffirmityAppState(): AffirmityAppState {
                 // (design D5) -- swapping this whole `analytics` argument for NoOpAnalyticsLogger
                 // is the one-line kill switch (design D1/REQ-4.6).
                 consentState = { AnalyticsConsentState.UNKNOWN },
+            ),
+            personalizationSignalRecorder = RoomPersonalizationSignalRecorder(
+                dao = database.personalizationSignalDao(),
+                scope = scope,
             ),
         )
     }

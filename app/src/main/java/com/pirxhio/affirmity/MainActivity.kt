@@ -1470,7 +1470,10 @@ fun AffirmityApp(
                                 recommendedSurfaces = recommendedSurfaces,
                                 accessDecisionFor = accessDecisionFor,
                                 onRemoveTheme = { themeId -> appState.toggleTheme(themeId, toggleable = true) },
-                                onOpenSurface = { surfaceId -> openSurfaceId = surfaceId },
+                                onOpenSurface = { surfaceId ->
+                                    openSurfaceId = surfaceId
+                                    appState.recordSurfaceOpened(surfaceId)
+                                },
                                 onSeeAllThemes = { showSeeAllThemes = true },
                                 onUpdateFeed = {
                                     if (appState.applyThemeSelection()) {
@@ -1519,6 +1522,7 @@ fun AffirmityApp(
                                 }
                             },
                             onHideAffirmation = appState::hideAffirmation,
+                            onAffirmationShared = appState::recordAffirmationShared,
                         )
                     }
 
