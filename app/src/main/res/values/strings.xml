@@ -243,6 +243,7 @@
     <string name="guided_meditation_resume_content_description">Reanudar</string>
     <string name="guided_meditation_skip_content_description">Avanzar fase</string>
     <string name="guided_meditation_idle_duration_minutes">%1$d min</string>
+    <string name="guided_meditation_idle_duration_minutes_adjustable">~%1$d min</string>
     <!-- "Vale la pena conocerlas" shelf + primer sheet: plain-words explanations for the four
          entries whose title tells a newcomer nothing. Deliberately written with no Sanskrit gloss
          and no "práctica milenaria" framing, because they are meant to be read at a glance. -->

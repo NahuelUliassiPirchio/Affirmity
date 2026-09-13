@@ -2,6 +2,7 @@ package com.pirxhio.affirmity.ui.meditation.catalog
 
 import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.ContentAccess
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.customization.CustomizationField
@@ -55,6 +56,21 @@ data class MeditationCatalogEntry(
      * amorosa"), because every extra line on a shelf card is paid for by every card in that shelf. */
     val primer: MeditationPrimer? = null,
 )
+
+/** [R.string.guided_meditation_idle_duration_minutes] normally, or the "~"-prefixed
+ *  [R.string.guided_meditation_idle_duration_minutes_adjustable] variant when this entry has
+ *  pre-session customization fields -- [approxDurationMinutes] is only accurate for this entry's
+ *  *default* configuration (pinned by a catalog test), and every shipped [CustomizationField] lets
+ *  the user pick a session length materially different from that default (round counts, per-phase
+ *  seconds, or a duration-in-minutes picker). Showing the plain, unqualified string on these cards
+ *  reads as a promise the app doesn't keep once the user customizes the session. */
+@get:StringRes
+val MeditationCatalogEntry.durationLabelRes: Int
+    get() = if (customizationFields.isEmpty()) {
+        R.string.guided_meditation_idle_duration_minutes
+    } else {
+        R.string.guided_meditation_idle_duration_minutes_adjustable
+    }
 
 /**
  * Plain-words explanation of a meditation whose name is opaque to a newcomer, shown on the

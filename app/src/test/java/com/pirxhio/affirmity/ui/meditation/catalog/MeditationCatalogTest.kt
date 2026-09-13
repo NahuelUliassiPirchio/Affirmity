@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.ui.meditation.catalog
 
+import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.ContentAccess
 import com.pirxhio.affirmity.access.ContentKey
 import com.pirxhio.affirmity.access.ContentType
@@ -313,5 +314,19 @@ class MeditationCatalogTest {
             assertEquals(entry, findMeditationCatalogEntry(entry.id))
         }
         assertNull(findMeditationCatalogEntry("does_not_exist"))
+    }
+
+    // --- 13. durationLabelRes guards against false-precision on customizable entries ---------------
+
+    @Test
+    fun `13 - durationLabelRes is the adjustable variant iff the entry has customization fields`() {
+        meditationCatalog().forEach { entry ->
+            val expected = if (entry.customizationFields.isEmpty()) {
+                R.string.guided_meditation_idle_duration_minutes
+            } else {
+                R.string.guided_meditation_idle_duration_minutes_adjustable
+            }
+            assertEquals("${entry.id}: durationLabelRes", expected, entry.durationLabelRes)
+        }
     }
 }
