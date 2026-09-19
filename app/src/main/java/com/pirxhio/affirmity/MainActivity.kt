@@ -37,11 +37,18 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.runtime.DisposableEffect
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import com.pirxhio.affirmity.ui.affirmations.CleanScreenChrome
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -752,6 +759,28 @@ fun AffirmityApp(
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Clean (immersive) mode is owned here because the chrome it hides lives in this composable.
+    var isCleanScreen by rememberSaveable { mutableStateOf(false) }
+    val chrome = CleanScreenChrome.resolve(
+        isCleanScreen = isCleanScreen,
+        isFeedDestination = currentDestination == AppDestinations.AFIRMACIONES,
+    )
+    val cleanScreenContext = LocalContext.current
+    DisposableEffect(chrome.showSystemBars) {
+        val window = generateSequence(cleanScreenContext) { (it as? android.content.ContextWrapper)?.baseContext }
+            .filterIsInstance<android.app.Activity>()
+            .firstOrNull()?.window
+        val controller = window?.let { WindowCompat.getInsetsController(it, it.decorView) }
+        if (chrome.showSystemBars) {
+            controller?.show(WindowInsetsCompat.Type.systemBars())
+        } else {
+            controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller?.hide(WindowInsetsCompat.Type.systemBars())
+        }
+        // Bars must never stay hidden once this composition leaves or clean mode ends.
+        onDispose { controller?.show(WindowInsetsCompat.Type.systemBars()) }
+    }
     val snackbarScope = rememberCoroutineScope()
     // Explicit in-app lapse notice (design.md D8, spec's "Explicit in-app lapse notice"): a live
     // Pro -> Free entitlement transition shows an indefinite snackbar with a "View plans" action
@@ -1461,6 +1490,11 @@ fun AffirmityApp(
     }
 
     NavigationSuiteScaffold(
+        layoutType = if (chrome.showNavigation) {
+            NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfo())
+        } else {
+            NavigationSuiteType.None
+        },
         navigationSuiteItems = {
             AppDestinations.entries.forEach {
                 item(
@@ -1479,7 +1513,7 @@ fun AffirmityApp(
     ) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
-            snackbarHost = { SnackbarHost(snackbarHostState) },
+            snackbarHost = { if (chrome.showSnackbar) SnackbarHost(snackbarHostState) },
         ) { innerPadding ->
             Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
             when (currentDestination) {
@@ -1550,7 +1584,8 @@ fun AffirmityApp(
 
                     BottomSheetScaffold(
                         scaffoldState = yourFeedScaffoldState,
-                        sheetPeekHeight = 64.dp,
+                        // 0.dp (not removed from composition) keeps the sheet state and its drafts intact.
+                        sheetPeekHeight = if (chrome.showFeedSheet) 64.dp else 0.dp,
                         sheetDragHandle = null,
                         sheetContent = {
                             YourFeedSheetContent(
@@ -1616,8 +1651,10 @@ fun AffirmityApp(
                                 },
                                 onHideAffirmation = appState::hideAffirmation,
                                 onAffirmationShared = appState::recordAffirmationShared,
+                                isCleanScreen = isCleanScreen,
+                                onCleanScreenChange = { isCleanScreen = it },
                             )
-                            divergenceSuggestion?.let { suggestion ->
+                            if (chrome.showSuggestionCard) divergenceSuggestion?.let { suggestion ->
                                 DivergenceSuggestionCard(
                                     suggestedGoalId = suggestion.suggestedGoalId,
                                     onAdd = {
@@ -1760,9 +1797,9 @@ fun AffirmityApp(
 
             val showsRacha = currentDestination == AppDestinations.AFIRMACIONES ||
                 currentDestination == AppDestinations.MEDITAR
-            if (showsRacha ||
+            if (chrome.showStatusOverlay && (showsRacha ||
                 currentDestination == AppDestinations.ANIMO ||
-                currentDestination == AppDestinations.PROGRESO
+                currentDestination == AppDestinations.PROGRESO)
             ) {
                 FloatingStatusOverlay(
                     modifier = Modifier

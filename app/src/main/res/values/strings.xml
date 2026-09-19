@@ -740,8 +740,9 @@
     <string name="favorites_empty_state">Aún no guardaste ninguna afirmación.</string>
     <string name="favorites_empty_hint">Tocá dos veces una afirmación para guardarla acá.</string>
     <string name="favorites_unlike_content_description">Quitar de favoritos</string>
-    <string name="affirmation_share_content_description">Compartir afirmación</string>
     <string name="affirmation_hide_content_description">Ocultar afirmación</string>
+    <string name="affirmation_clean_screen_content_description">Pantalla limpia</string>
+    <string name="affirmation_exit_clean_screen_content_description">Salir de pantalla limpia</string>
     <string name="affirmation_unfavorited_snackbar">Quitada de favoritas</string>
     <string name="affirmation_unfavorited_undo">Deshacer</string>
     <string name="hidden_affirmations_title">Afirmaciones ocultas</string>
@@ -887,4 +888,6 @@
     <string name="meditation_customization_affirmation_count_5">5 afirmaciones</string>
     <string name="meditation_customization_affirmation_count_7">7 afirmaciones</string>
     <string name="meditation_customization_affirmation_count_10">10 afirmaciones</string>
+    <string name="affirmation_share_image_content_description">Compartir como imagen</string>
+    <string name="affirmation_share_image_error">No se pudo crear la imagen</string>
 </resources>

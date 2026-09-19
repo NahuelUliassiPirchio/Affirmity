@@ -426,8 +426,9 @@
     <string name="guided_meditation_cue_sound_unmute_content_description">Unmute transition sound</string>
 
     <!-- Affirmation long-press actions, unfavorite undo, and the hidden-affirmations screen. -->
-    <string name="affirmation_share_content_description">Share affirmation</string>
     <string name="affirmation_hide_content_description">Hide affirmation</string>
+    <string name="affirmation_clean_screen_content_description">Clean screen</string>
+    <string name="affirmation_exit_clean_screen_content_description">Exit clean screen</string>
     <string name="affirmation_unfavorited_snackbar">Removed from favorites</string>
     <string name="affirmation_unfavorited_undo">Undo</string>
     <string name="hidden_affirmations_title">Hidden affirmations</string>
@@ -460,4 +461,6 @@
     <string name="your_feed_source_favorites_description">Even when their theme isn\'t selected</string>
     <string name="your_feed_source_own">Mine</string>
     <string name="your_feed_source_own_description">The ones you wrote</string>
+    <string name="affirmation_share_image_content_description">Share as image</string>
+    <string name="affirmation_share_image_error">Could not create the image</string>
 </resources>

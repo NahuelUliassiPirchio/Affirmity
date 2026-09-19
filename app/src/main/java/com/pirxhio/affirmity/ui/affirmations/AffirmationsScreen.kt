@@ -1,12 +1,24 @@
 package com.pirxhio.affirmity.ui.affirmations
 
-import android.content.Intent
+import android.widget.Toast
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.ui.graphics.toArgb
+import java.io.File
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,7 +35,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.SelfImprovement
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -104,6 +115,8 @@ fun AffirmationsScreen(
     onHideAffirmation: (affirmationId: String) -> Unit = {},
     onAffirmationShared: (affirmationId: String) -> Unit = {},
     favoriteGesture: FavoriteGesture = FavoriteGesture.DOUBLE_TAP,
+    isCleanScreen: Boolean = false,
+    onCleanScreenChange: (Boolean) -> Unit = {},
 ) {
     if (affirmations.isEmpty()) {
         Box(
@@ -144,6 +157,10 @@ fun AffirmationsScreen(
 
     val pagerScope = rememberCoroutineScope()
 
+    // Clean mode belongs to the feed, not to one card, so it survives swiping between pages.
+    BackHandler(enabled = isCleanScreen) { onCleanScreenChange(false) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
     VerticalPager(
         state = pagerState,
         modifier = Modifier.fillMaxSize()
@@ -162,7 +179,29 @@ fun AffirmationsScreen(
             },
             onShared = { onAffirmationShared(affirmation.id) },
             favoriteGesture = favoriteGesture,
+            isCleanScreen = isCleanScreen,
+            onEnterCleanScreen = { onCleanScreenChange(true) },
         )
+    }
+    if (isCleanScreen) {
+        // Sits above the pager so it stays put while swiping; safeDrawing keeps it clear of the
+        // display cutout and of the transient system bars that swipe back in.
+        IconButton(
+            onClick = { onCleanScreenChange(false) },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .padding(8.dp)
+                .size(48.dp)
+                .background(Color.Black.copy(alpha = 0.4f), CircleShape),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.FullscreenExit,
+                contentDescription = stringResource(R.string.affirmation_exit_clean_screen_content_description),
+                tint = Color.White,
+            )
+        }
+    }
     }
 }
 
@@ -175,6 +214,8 @@ private fun AffirmationCard(
     onHide: () -> Unit,
     onShared: () -> Unit,
     favoriteGesture: FavoriteGesture,
+    isCleanScreen: Boolean,
+    onEnterCleanScreen: () -> Unit,
 ) {
     var cardPositionInRoot by remember(affirmation.id) { mutableStateOf(Offset.Zero) }
     var cardSize by remember(affirmation.id) { mutableStateOf(IntSize.Zero) }
@@ -231,17 +272,10 @@ private fun AffirmationCard(
         }
     }
 
-    // Same title/subtitle text the card renders (with any token overrides resolved), used as the
-    // share sheet's body -- built once per affirmation rather than re-parsing the templates a
-    // second time inside TokenizedAffirmationText's own remember blocks below.
-    val shareText = remember(affirmation.id, affirmation.title, affirmation.subtitle, affirmation.overrides) {
-        val titleText = AffirmationTemplateParser.parse(TemplateField.TITLE, affirmation.title)
-            .render(affirmation.overrides)
-        val subtitleText = AffirmationTemplateParser.parse(TemplateField.SUBTITLE, affirmation.subtitle)
-            .render(affirmation.overrides)
-        if (subtitleText.isNotBlank()) "$titleText\n$subtitleText" else titleText
-    }
     val context = LocalContext.current
+    val iconTint = MaterialTheme.colorScheme.primary.toArgb()
+    val appName = stringResource(R.string.app_name)
+    val shareErrorText = stringResource(R.string.affirmation_share_image_error)
     var showActions by remember(affirmation.id) { mutableStateOf(false) }
 
     Box(
@@ -267,13 +301,7 @@ private fun AffirmationCard(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.6f),
-                            Color.Black.copy(alpha = 0.2f),
-                            Color.Black.copy(alpha = 0.8f),
-                        )
-                    )
+                    Brush.verticalGradient(colors = AffirmationScrimColors)
                 ),
             contentAlignment = Alignment.Center
         ) {
@@ -285,11 +313,19 @@ private fun AffirmationCard(
                 AffirmationTemplateParser.parse(TemplateField.SUBTITLE, affirmation.subtitle)
             }
             Column(
-                modifier = Modifier
-                    .padding(24.dp)
-                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
-                    .padding(24.dp)
-                    .imePadding(),
+                modifier = if (isCleanScreen) {
+                    // No boxed card: the text uses nearly the whole screen over the scrim.
+                    Modifier
+                        .windowInsetsPadding(WindowInsets.displayCutout)
+                        .padding(12.dp)
+                        .imePadding()
+                } else {
+                    Modifier
+                        .padding(24.dp)
+                        .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                        .padding(24.dp)
+                        .imePadding()
+                },
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Icon(
@@ -343,7 +379,7 @@ private fun AffirmationCard(
             onBurstFinished = { burstId -> bursts.removeAll { it.id == burstId } },
             modifier = Modifier.fillMaxSize(),
         )
-        IconButton(
+        if (!isCleanScreen) IconButton(
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(24.dp)
@@ -378,45 +414,65 @@ private fun AffirmationCard(
     // matches the double-tap-to-favorite gesture this screen already teaches.
     if (showActions) {
         AffirmationActionsSheet(
-            onShare = {
+            onShareImage = {
                 showActions = false
-                val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, shareText)
+                coroutineScope.launch {
+                    val file = withContext(Dispatchers.IO) {
+                        runCatching {
+                            val target = ShareImageCache(File(context.cacheDir, ShareImageCache.SUBDIR))
+                                .prepare(affirmation.id)
+                            renderAffirmationShareImage(
+                                context, affirmation, affirmation.icon(), iconTint, appName, target,
+                            )
+                            target
+                        }.getOrNull()
+                    }
+                    val started = file != null && runCatching {
+                        context.startActivity(buildShareImageIntent(context, file))
+                    }.isSuccess
+                    if (started) onShared() else Toast.makeText(context, shareErrorText, Toast.LENGTH_SHORT).show()
                 }
-                context.startActivity(Intent.createChooser(sendIntent, null))
-                onShared()
             },
             onHide = {
                 showActions = false
                 onHide()
+            },
+            onCleanScreen = {
+                showActions = false
+                onEnterCleanScreen()
             },
             onDismiss = { showActions = false },
         )
     }
 }
 
-/** Share/hide actions for the affirmation under a long press. Favouriting is deliberately absent:
+/** Share-as-image/hide/clean-screen actions for the affirmation under a long press. Favouriting is deliberately absent:
  *  it already has two affordances on the card itself (the heart, and double-tap). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AffirmationActionsSheet(
-    onShare: () -> Unit,
+    onShareImage: () -> Unit,
     onHide: () -> Unit,
+    onCleanScreen: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
             AffirmationActionRow(
-                icon = Icons.Filled.Share,
-                label = stringResource(R.string.affirmation_share_content_description),
-                onClick = onShare,
+                icon = Icons.Filled.Image,
+                label = stringResource(R.string.affirmation_share_image_content_description),
+                onClick = onShareImage,
             )
             AffirmationActionRow(
                 icon = Icons.Filled.VisibilityOff,
                 label = stringResource(R.string.affirmation_hide_content_description),
                 onClick = onHide,
+            )
+            AffirmationActionRow(
+                icon = Icons.Filled.Fullscreen,
+                label = stringResource(R.string.affirmation_clean_screen_content_description),
+                onClick = onCleanScreen,
             )
         }
     }
@@ -463,7 +519,7 @@ private fun AffirmationImageBackground(localPath: String) {
 }
 
 /** Stable pseudo-random icon per affirmation, matching the variety used in the mockup cards. */
-private fun Affirmation.icon(): ImageVector {
+internal fun Affirmation.icon(): ImageVector {
     val icons = listOf(
         Icons.Filled.SelfImprovement,
         Icons.Filled.WaterDrop,
