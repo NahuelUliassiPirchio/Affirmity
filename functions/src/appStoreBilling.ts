@@ -20,7 +20,7 @@
 
 import { createHash } from 'node:crypto';
 
-import type { EntitlementDoc, EntitlementStore, EntitlementTier } from './billing';
+import type { EntitlementDoc, EntitlementTier } from './billing';
 
 // ---------------------------------------------------------------------------------------------
 // Decoded App Store transaction -> entitlement-doc mapping.
@@ -34,7 +34,18 @@ export interface AppStoreTransactionPayload {
   productId?: string;
   expiresDate?: number;
   revocationDate?: number;
+  /** StoreKit 2's transaction `type` (e.g. `"Auto-Renewable Subscription"`, `"Non-Consumable"`,
+   * `"Consumable"`, `"Non-Renewing Subscription"` -- mirrors
+   * `@apple/app-store-server-library`'s `Type` enum values without importing the real SDK type,
+   * same convention as the rest of this interface). Always present on a real, verified StoreKit 2
+   * transaction JWS. */
+  type?: string;
 }
+
+/** The only `AppStoreTransactionPayload.type` value this app grants Pro for -- see Fix 2 doc
+ * comment on `toAppStoreEntitlement` below. Mirrors
+ * `@apple/app-store-server-library`'s `Type.AUTO_RENEWABLE_SUBSCRIPTION`. */
+const AUTO_RENEWABLE_SUBSCRIPTION_TYPE = 'Auto-Renewable Subscription';
 
 export type AppStoreEntitlementDoc = EntitlementDoc & {
   /** Plaintext App Store transaction id, kept alongside `purchaseTokenHash` for support/debugging
@@ -63,6 +74,18 @@ export function toAppStoreEntitlement(
   // onto the same `purchaseTokenHash` and defeat any dedup/fraud-correlation use of that field.
   if (!payload.transactionId) {
     throw new AppStoreVerificationError('Apple transaction payload missing transactionId');
+  }
+  // Fix 2 (HIGH finding): without this check, ANY unrevoked Apple product -- a Consumable, a
+  // Non-Consumable, a Non-Renewing Subscription, not just the app's actual auto-renewable Pro
+  // subscription -- was mapped to permanent `pro`, with no real expiry tie-in (`expiresDate` is
+  // only meaningful for auto-renewable subscriptions in the first place). A missing `type` is
+  // rejected too, not treated as "assume subscription": a real StoreKit 2 transaction JWS always
+  // carries this field, so its absence means either a malformed/forged payload or a payload shape
+  // this function doesn't understand -- never a reason to grant Pro.
+  if (payload.type !== AUTO_RENEWABLE_SUBSCRIPTION_TYPE) {
+    throw new AppStoreVerificationError(
+      `Apple transaction payload has non-subscription type "${payload.type ?? 'undefined'}" -- Pro is only granted for auto-renewable subscriptions`,
+    );
   }
   const tier: EntitlementTier = payload.revocationDate ? 'free' : 'pro';
   const transactionId = payload.transactionId;
@@ -105,27 +128,71 @@ export interface AppStoreVerifier {
  * uses for Play. */
 export class AppStoreVerificationError extends Error {}
 
+/** Outcome of the atomic claim-and-write decision (Fix 1 + Fix 5's partial fix -- see
+ * `IosEntitlementStore.claimAndWriteEntitlement` below):
+ *  - `written`: the transactionId was unclaimed or already claimed by this same uid, and this
+ *    verification is newer than (or there was no) previously stored entitlement for this uid.
+ *  - `dropped-stale`: same claim outcome, but this verification is not newer -- idempotent
+ *    redelivery, identical policy to `resolveEntitlement`'s for Play.
+ *  - `claimed-by-other-uid`: the transactionId is already claimed by a DIFFERENT uid -- a replayed
+ *    (e.g. leaked/intercepted) JWS being presented by an account that never made this purchase.
+ *    Nothing is written; that other uid's entitlement is left untouched. */
+export type ClaimAndWriteOutcome = 'written' | 'dropped-stale' | 'claimed-by-other-uid';
+
+/** Port-agnostic App Store entitlement store. Unlike Play's `EntitlementStore` (separate
+ * `getLastVerifiedAt` read + `writeEntitlement` write, safe there because a purchase token/
+ * subscriptionId always resolves to the SAME uid via Play's own `externalAccountIdentifiers`),
+ * iOS trusts the caller's own uid (see this file's top-of-file doc comment) -- so the
+ * transaction-claim ledger check and the entitlement write MUST happen as a single atomic
+ * operation, or two concurrent requests for the same transactionId under different uids could both
+ * pass a read-then-write race. The real implementation (`iosEntitlementStore()` in `index.ts`)
+ * wraps this in one Firestore `runTransaction` over `iosTransactionClaims/{transactionId}` +
+ * `users/{uid}/entitlements/current`. */
+export interface IosEntitlementStore {
+  claimAndWriteEntitlement(
+    uid: string,
+    transactionId: string,
+    doc: AppStoreEntitlementDoc,
+  ): Promise<ClaimAndWriteOutcome>;
+}
+
 export interface ResolveIosEntitlementResult {
-  outcome: 'written' | 'dropped-stale' | 'invalid';
+  outcome: ClaimAndWriteOutcome | 'invalid';
   doc?: AppStoreEntitlementDoc;
 }
 
+/** Fix 3 (HIGH finding): parses the `IOS_ALLOW_SANDBOX_ENTITLEMENTS` env var (same
+ * `process.env.X ?? default` convention as `IOS_BUNDLE_ID`/`IOS_APP_APPLE_ID` in `index.ts`).
+ * Default OFF -- only the exact literal `"true"` enables Sandbox-verification fallback. Without
+ * this gate, anyone can create a free Apple Sandbox account, generate a Sandbox transaction, and
+ * get a real Production Pro entitlement for zero payment. This should stay enabled in dev/staging
+ * Firebase projects (where there is no shipped Production build yet) and be turned OFF once the
+ * app is live in production. */
+export function isSandboxEntitlementsAllowed(envValue: string | undefined): boolean {
+  return envValue === 'true';
+}
+
 /**
- * Verifies `signedTransaction` and writes the resulting entitlement, unless it is stale
- * (idempotency: last-write-wins keyed by `lastVerifiedAt`, identical policy to
- * `resolveEntitlement`'s for Play -- same store, same `users/{uid}/entitlements/current` doc).
+ * Verifies `signedTransaction` and atomically claims + writes the resulting entitlement via
+ * `store.claimAndWriteEntitlement` (Fix 1: rejects a transactionId already claimed by a different
+ * uid; Fix 5-adjacent: the freshness check happens inside that same atomic operation, not as a
+ * separate racy read here).
  */
 export async function resolveIosEntitlement(
   verifier: AppStoreVerifier,
-  store: EntitlementStore,
+  store: IosEntitlementStore,
   uid: string,
   signedTransaction: string,
   nowMillis: number,
 ): Promise<ResolveIosEntitlementResult> {
   let doc: AppStoreEntitlementDoc;
+  let transactionId: string;
   try {
     const payload = await verifier.verifyTransaction(signedTransaction);
     doc = toAppStoreEntitlement(payload, nowMillis);
+    // Guaranteed non-null: toAppStoreEntitlement throws AppStoreVerificationError above when
+    // payload.transactionId is missing, so a successfully-returned doc always carries one.
+    transactionId = doc.transactionId as string;
   } catch (err) {
     if (err instanceof AppStoreVerificationError) {
       return { outcome: 'invalid' };
@@ -133,11 +200,21 @@ export async function resolveIosEntitlement(
     throw err;
   }
 
-  const lastVerifiedAt = await store.getLastVerifiedAt(uid);
-  if (lastVerifiedAt !== null && doc.lastVerifiedAt <= lastVerifiedAt) {
-    return { outcome: 'dropped-stale', doc };
-  }
+  const outcome = await store.claimAndWriteEntitlement(uid, transactionId, doc);
+  return { outcome, doc };
+}
 
-  await store.writeEntitlement(uid, doc);
-  return { outcome: 'written', doc };
+/**
+ * Parses the `IOS_APP_APPLE_ID` env value. Returns a positive safe integer, or undefined when
+ * unset/empty (silent) or malformed (logged, value not echoed) so callers fail closed.
+ */
+export function parseAppleAppId(raw: string | undefined): number | undefined {
+  const trimmed = raw?.trim();
+  if (!trimmed) return undefined;
+  const parsed = /^\d+$/.test(trimmed) ? Number(trimmed) : NaN;
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    console.error('[appStoreVerifier] IOS_APP_APPLE_ID is set but malformed (expected a positive integer); treating as unset.');
+    return undefined;
+  }
+  return parsed;
 }

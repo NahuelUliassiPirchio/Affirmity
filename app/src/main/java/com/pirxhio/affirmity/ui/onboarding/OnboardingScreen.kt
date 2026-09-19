@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.ui.onboarding
 
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,7 +11,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -24,24 +27,32 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.auth.AuthError
 import com.pirxhio.affirmity.auth.AuthState
+import com.pirxhio.affirmity.personalization.goals.OnboardingAnswers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 /**
  * First-launch flow: an intro step ("I already have an account") to let a returning account skip
  * straight past the questions, then [onboardingQuestions] one at a time, then a final sign-in
- * step. Question answers are kept in memory only for now — nothing downstream reads them yet
- * (D: content/wiring TBD).
+ * step. Question answers stay in memory until the survey's final completion action, when
+ * [onSurveyCompleted] persists the complete answer set before [onFinished] advances the app.
  *
  * Step numbering: 0 = intro, 1..[onboardingQuestions].size = questions, size+1 = final auth step
  * (skipped when the intro shortcut already recognized the account, per [skipFinalAuthStep]).
+ * [onStartSurvey] lets the parent interpose a pre-survey gate after the intro without removing
+ * this composable, while [resumeAtQuestions] restores the question step after that gate has been
+ * persisted across process recreation.
  */
 @Composable
 fun OnboardingScreen(
@@ -50,17 +61,47 @@ fun OnboardingScreen(
     onSignInClicked: () -> Unit,
     onFinished: () -> Unit,
     onCheckReturningAccount: suspend (uid: String) -> Boolean,
+    onSurveyCompleted: suspend (OnboardingAnswers) -> Unit = {},
+    resumeAtQuestions: Boolean = false,
+    onStartSurvey: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    var step by rememberSaveable { mutableIntStateOf(0) }
+    var step by rememberSaveable(resumeAtQuestions) {
+        mutableIntStateOf(if (resumeAtQuestions) 1 else 0)
+    }
     var awaitingAccountCheck by rememberSaveable { mutableStateOf(false) }
-    var skipFinalAuthStep by rememberSaveable { mutableStateOf(false) }
-    val answers = remember { mutableStateMapOf<String, String>() }
+    // Not rememberSaveable: this only guards the in-flight completeOnce() coroutine in THIS
+    // composition. Persisting it across process death left the Finish button permanently disabled
+    // if the process died mid-save, with no coroutine left alive to ever reset it back to false.
+    var completionInProgress by remember { mutableStateOf(false) }
+    var completionError by remember { mutableStateOf(false) }
+    var skipFinalAuthStep by rememberSaveable(resumeAtQuestions) {
+        mutableStateOf(resumeAtQuestions && authState is AuthState.SignedIn)
+    }
+    val answers = remember { mutableStateMapOf<String, Set<String>>() }
+    val coroutineScope = rememberCoroutineScope()
     val lastQuestionStep = onboardingQuestions.size
     val totalSteps = onboardingQuestions.size + 2
 
-    LaunchedEffect(authState) {
+    suspend fun completeOnce() {
+        if (completionInProgress) return
+        completionInProgress = true
+        completionError = false
+        try {
+            completeSurvey(answers, onSurveyCompleted, onFinished)
+        } catch (cancellation: CancellationException) {
+            completionInProgress = false
+            throw cancellation
+        } catch (error: Throwable) {
+            Log.e(TAG, "onboarding survey completion failed", error)
+            completionInProgress = false
+            completionError = true
+        }
+    }
+
+    LaunchedEffect(authState, resumeAtQuestions) {
         if (authState !is AuthState.SignedIn) return@LaunchedEffect
+        if (resumeAtQuestions) skipFinalAuthStep = true
         if (awaitingAccountCheck) {
             awaitingAccountCheck = false
             if (onCheckReturningAccount(authState.uid)) {
@@ -68,9 +109,10 @@ fun OnboardingScreen(
             } else {
                 skipFinalAuthStep = true
                 step = 1
+                onStartSurvey()
             }
-        } else if (step == lastQuestionStep + 1) {
-            onFinished()
+        } else if (step == lastQuestionStep + 1 && !completionInProgress) {
+            completeOnce()
         }
     }
 
@@ -101,6 +143,7 @@ fun OnboardingScreen(
                     onStartClicked = {
                         awaitingAccountCheck = false
                         step = 1
+                        onStartSurvey()
                     },
                     modifier = Modifier.weight(1f),
                 )
@@ -109,8 +152,14 @@ fun OnboardingScreen(
                     val question = onboardingQuestions[step - 1]
                     QuestionStep(
                         question = question,
-                        selectedOption = answers[question.id],
-                        onOptionSelected = { answers[question.id] = it },
+                        selectedOptions = answers[question.id].orEmpty(),
+                        onOptionSelected = { optionId ->
+                            answers[question.id] = toggleSelection(
+                                current = answers[question.id].orEmpty(),
+                                optionId = optionId,
+                                maxSelections = question.maxSelections,
+                            )
+                        },
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -137,25 +186,37 @@ fun OnboardingScreen(
                         Button(
                             onClick = {
                                 if (step == lastQuestionStep && skipFinalAuthStep) {
-                                    onFinished()
+                                    coroutineScope.launch { completeOnce() }
                                 } else {
                                     step += 1
                                 }
                             },
-                            enabled = answers.containsKey(question.id),
+                            enabled = answers[question.id].orEmpty().isNotEmpty() && !completionInProgress,
                         ) {
                             Text(stringResource(id = R.string.onboarding_next_button))
                         }
                     } else {
-                        TextButton(onClick = onFinished) {
+                        TextButton(onClick = {
+                            coroutineScope.launch { completeOnce() }
+                        }, enabled = !completionInProgress) {
                             Text(stringResource(id = R.string.onboarding_continue_without_account_button))
                         }
                     }
                 }
             }
+
+            if (completionError) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(id = R.string.onboarding_completion_error),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
     }
 }
+
+private const val TAG = "OnboardingScreen"
 
 @Composable
 private fun IntroStep(
@@ -201,27 +262,51 @@ private fun IntroStep(
 @Composable
 private fun QuestionStep(
     question: OnboardingQuestion,
-    selectedOption: String?,
+    selectedOptions: Set<String>,
     onOptionSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text(text = question.question, style = MaterialTheme.typography.headlineSmall)
 
-        Column(modifier = Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(
+            modifier = if (question.maxSelections == 1) Modifier.selectableGroup() else Modifier,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             question.options.forEach { option ->
+                val selected = option.id in selectedOptions
+                val enabled = selected || selectedOptions.size < question.maxSelections
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .selectable(
-                            selected = option == selectedOption,
-                            onClick = { onOptionSelected(option) },
+                    modifier = (if (question.maxSelections == 1) {
+                        Modifier.selectable(
+                            selected = selected,
+                            onClick = { onOptionSelected(option.id) },
                         )
-                        .padding(vertical = 8.dp),
+                    } else {
+                        Modifier.toggleable(
+                            value = selected,
+                            enabled = enabled,
+                            role = Role.Checkbox,
+                            onValueChange = { onOptionSelected(option.id) },
+                        )
+                    }).fillMaxWidth().padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    RadioButton(selected = option == selectedOption, onClick = { onOptionSelected(option) })
-                    Text(text = option, modifier = Modifier.padding(start = 8.dp))
+                    if (question.maxSelections == 1) {
+                        RadioButton(selected = selected, onClick = { onOptionSelected(option.id) })
+                    } else {
+                        Checkbox(
+                            checked = selected,
+                            enabled = enabled,
+                            onCheckedChange = { onOptionSelected(option.id) },
+                        )
+                    }
+                    Column(modifier = Modifier.padding(start = 8.dp)) {
+                        Text(text = option.label)
+                        option.example?.let { example ->
+                            Text(text = example, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                 }
             }
         }

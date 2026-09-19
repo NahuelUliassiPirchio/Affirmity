@@ -34,12 +34,36 @@ const TAXONOMY_OUT = join(
   "app/src/main/java/com/pirxhio/affirmity/ui/groups/CatalogTaxonomy.kt",
 );
 
+/** Thrown (not `console.error` + `process.exit`) so `runBracketGate`/`main` stay callable -- and
+ * therefore testable -- from a plain function call; `main()` below is the only place this process
+ * actually exits. */
 function fail(message) {
-  console.error(`[generate-catalog] FAILED: ${message}`);
-  process.exit(1);
+  throw new Error(`[generate-catalog] FAILED: ${message}`);
 }
 
-function runBracketGate({ universes, themes, collections, affirmations }) {
+/** Fix 6: title fields (`universe.title`, `theme.title`, `collection.title`,
+ * `affirmation.title`) are REQUIRED, non-empty strings -- unlike `description`/`subtitle`, which
+ * can legitimately be absent/blank. The bracket-gate loop below silently `continue`s past any
+ * non-string value (which is correct for those optional fields), so a non-string `title` must be
+ * rejected HERE, before that loop, or it skips validation entirely and reaches
+ * `buildCatalog`/the bundled asset with a bad shape -- surfacing only later, at runtime, on a
+ * user's device (`CatalogAssetParser.kt`'s non-null `title` read, per this fix's task description).
+ */
+function requireStringTitles(field, entries) {
+  for (const entry of entries) {
+    const { id, title } = entry;
+    if (typeof title !== "string" || title.trim().length === 0) {
+      fail(`${field} (id=${id ?? "<unknown>"}): expected non-empty string "title", got ${typeof title}`);
+    }
+  }
+}
+
+export function runBracketGate({ universes, themes, collections, affirmations }) {
+  requireStringTitles("universe.title", universes);
+  requireStringTitles("theme.title", themes);
+  requireStringTitles("collection.title", collections);
+  requireStringTitles("affirmation.title", affirmations);
+
   const textFields = [
     ...universes.flatMap((u) => [
       ["universe.title", u.id, u.title],
@@ -72,13 +96,13 @@ function main() {
   const raw = readFileSync(sourcePath, "utf8");
   const source = JSON.parse(raw);
 
-  runBracketGate(source);
-
   let result;
   try {
+    runBracketGate(source);
     result = buildCatalog(source);
   } catch (error) {
-    fail(error.message);
+    console.error(error.message.startsWith("[generate-catalog] FAILED:") ? error.message : `[generate-catalog] FAILED: ${error.message}`);
+    process.exit(1);
     return;
   }
 
@@ -101,4 +125,11 @@ function main() {
   console.log(`[generate-catalog] wrote ${TAXONOMY_OUT}`);
 }
 
-main();
+// ESM equivalent of CommonJS's `require.main === module` -- only run `main()` when this file is
+// executed directly (`node tools/catalog/generate-catalog.mjs ...`), never when it's `import`ed
+// (e.g. by `runBracketGate`'s vitest suite). Before this guard, importing this module for testing
+// ran the real publish pipeline as a side effect -- including overwriting the bundled
+// `catalog.v1.json`/`CatalogTaxonomy.kt` from whatever the default source path resolved to.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main();
+}

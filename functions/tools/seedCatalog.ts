@@ -21,8 +21,11 @@
  * Discipline mirrored from `MigrationPlan.chunkWithMarkerLast` (Kotlin, app-side): chunk writes so
  * no single commit exceeds Firestore's 500-write batch limit, publish taxonomy before affirmations,
  * and write the `catalogMeta/version` marker STRICTLY LAST -- its presence/value is the "seeded
- * through" signal a client's delta-fetch reads (design D2). Idempotent: every write is
- * `set(..., { merge: true })`, so a re-run (including a re-run after a partial failure) is safe.
+ * through" signal a client's delta-fetch reads (design D2). Idempotent: every write is a FULL
+ * document replace (`set(ref, data)`, no `{ merge: true }` -- see `createFirestoreCommitter`'s doc
+ * comment for why merge was wrong here), so a re-run (including a re-run after a partial failure)
+ * produces the identical document either way, and never leaves stale fields from a prior schema
+ * version behind.
  */
 
 export const CATALOG_ID_PREFIX = 'cat_';
@@ -106,6 +109,50 @@ export interface FirestoreWrite {
 export interface BatchCommitter {
   /** Commits exactly one batch (<= [MAX_OPS_PER_BATCH] writes). Never called with an empty array. */
   commit(writes: FirestoreWrite[]): Promise<void>;
+}
+
+/** Minimal duck-typed shape of the Admin SDK pieces [createFirestoreCommitter] needs -- lets this
+ *  stay testable with a fake, without an Admin SDK app (same discipline as [BatchCommitter] itself
+ *  and [FirestoreWrite]). */
+export interface FirestoreLike {
+  doc(path: string): unknown;
+  batch(): {
+    set(ref: unknown, data: Record<string, unknown>): unknown;
+    commit(): Promise<unknown>;
+  };
+}
+
+/**
+ * Real [BatchCommitter]: writes each doc as a FULL replace (`set(ref, data)`, no `{ merge: true }`)
+ * instead of a partial merge. `merge: true` left stale v1-only fields (e.g. an old flat `text`) on
+ * documents migrated to v2's `title`+`subtitle` shape, because a merge only ever adds/overwrites
+ * the fields present in the write -- it never removes a field the new shape dropped. Every write
+ * built by [buildWritePlan] already carries that doc type's COMPLETE v2 field set, so a full
+ * replace is exactly as idempotent as merge was here (re-running produces the identical document),
+ * without the staleness risk.
+ */
+export function createFirestoreCommitter(db: FirestoreLike): BatchCommitter {
+  return {
+    async commit(writes) {
+      const batch = db.batch();
+      for (const write of writes) {
+        batch.set(db.doc(write.path), write.data);
+      }
+      await batch.commit();
+    },
+  };
+}
+
+/**
+ * Fix 5: documents present in Firestore ([existingIds]) but absent from the new catalog
+ * ([newIds]) -- orphans left behind by a migration/removal that a `merge`-only publish would
+ * silently leave in place forever. Pure/testable; the caller (`main()` below) is responsible for
+ * fetching [existingIds] from Firestore and deciding what to do with the result (currently: log a
+ * warning, never auto-delete -- see the comment at that call site).
+ */
+export function findOrphanCatalogDocIds(existingIds: readonly string[], newIds: readonly string[]): string[] {
+  const newIdSet = new Set(newIds);
+  return existingIds.filter((id) => !newIdSet.has(id));
 }
 
 /** Splits [items] into chunks of at most [size], preserving order. The LAST chunk may be smaller
@@ -421,15 +468,23 @@ async function main(): Promise<void> {
   initializeApp();
   const db = getFirestore();
 
-  const committer: BatchCommitter = {
-    async commit(writes) {
-      const batch = db.batch();
-      for (const write of writes) {
-        batch.set(db.doc(write.path), write.data, { merge: true });
-      }
-      await batch.commit();
-    },
-  };
+  // Fix 5: orphan detection (log-only, no deletion -- see findOrphanCatalogDocIds's doc comment).
+  // Only catalogAffirmations is checked: universes/themes/collections are small, hand-authored
+  // taxonomy that rarely gets removed wholesale, while affirmations are the bulk of what a catalog
+  // migration actually drops.
+  const { affirmationWrites } = buildWritePlan(catalog);
+  const newAffirmationIds = affirmationWrites.map((w) => w.path.split('/')[1]);
+  const existingSnapshot = await db.collection('catalogAffirmations').listDocuments();
+  const existingAffirmationIds = existingSnapshot.map((ref) => ref.id);
+  const orphanIds = findOrphanCatalogDocIds(existingAffirmationIds, newAffirmationIds);
+  if (orphanIds.length > 0) {
+    console.warn(
+      `[seedCatalog] WARNING: ${orphanIds.length} catalogAffirmations doc(s) exist in Firestore but are absent ` +
+        `from this catalog (not deleted -- review and remove manually if intentional): ${orphanIds.join(', ')}`,
+    );
+  }
+
+  const committer = createFirestoreCommitter(db);
 
   await seedCatalog(catalog, committer);
   console.log(

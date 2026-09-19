@@ -96,6 +96,7 @@ fun SettingsScreen(
     onQuietHoursWindowChanged: (startMinute: Int, endMinute: Int) -> Unit,
     onOpenNotificationDebug: () -> Unit,
     onOpenOnboardingGuide: () -> Unit,
+    onOpenMyGoals: () -> Unit,
     onOpenHiddenAffirmations: () -> Unit,
     onSignInClicked: () -> Unit,
     onSignOutClicked: () -> Unit,
@@ -198,6 +199,21 @@ fun SettingsScreen(
                 onUpgradeClick = onUpgradeClick,
                 onManageSubscriptionClick = onManageSubscriptionClick,
             )
+        }
+
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(text = stringResource(id = R.string.settings_my_goals_title), style = MaterialTheme.typography.titleMedium)
+                    TextButton(onClick = onOpenMyGoals) { Text(stringResource(id = R.string.settings_my_goals_edit_button)) }
+                }
+            }
         }
 
         item {

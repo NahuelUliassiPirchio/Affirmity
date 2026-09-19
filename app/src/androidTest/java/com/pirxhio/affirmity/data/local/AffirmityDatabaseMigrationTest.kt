@@ -267,6 +267,74 @@ class AffirmityDatabaseMigrationTest {
         }
     }
 
+    /** Covers spec catalog-tone-metadata (design D1/MIGRATION_11_12): `tone`/`semanticAngle` are
+     * added additively as nullable columns, every pre-existing row backfills both to `NULL`
+     * (no crash, no DEFAULT), and every other column/table is byte-for-byte untouched. */
+    @Test
+    fun migrate11To12_addsToneAndSemanticAngleColumnsDefaultingToNullAndLeavesExistingRowsUntouched() {
+        helper.createDatabase(TEST_DB, 11).apply {
+            execSQL(
+                "INSERT INTO catalog_affirmations " +
+                    "(id, text, subtitle, groupId, themeId, collectionId, sortOrder) " +
+                    "VALUES ('cat_id-1', 'Title', 'Subtitle', 'self_worth', 'self_worth.t1', 'self_worth.t1.c1', 0)",
+            )
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(TEST_DB, 12, true, MIGRATION_11_12)
+
+        migrated.query(
+            "SELECT text, subtitle, groupId, themeId, collectionId, sortOrder, tone, semanticAngle " +
+                "FROM catalog_affirmations WHERE id = 'cat_id-1'",
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("Title", cursor.getString(0))
+            assertEquals("Subtitle", cursor.getString(1))
+            assertEquals("self_worth", cursor.getString(2))
+            assertEquals("self_worth.t1", cursor.getString(3))
+            assertEquals("self_worth.t1.c1", cursor.getString(4))
+            assertEquals(0, cursor.getInt(5))
+            assertTrue(cursor.isNull(6))
+            assertTrue(cursor.isNull(7))
+        }
+    }
+
+    /** Covers spec personalization-signals "Migration applies cleanly" (design D7/MIGRATION_12_13):
+     * `personalization_signals` is created empty, no existing table/data is touched, and the new
+     * table is immediately queryable. */
+    @Test
+    fun migrate12To13_createsPersonalizationSignalsTableEmptyAndQueryable() {
+        helper.createDatabase(TEST_DB, 12).apply {
+            execSQL(
+                "INSERT INTO catalog_affirmations " +
+                    "(id, text, subtitle, groupId, themeId, collectionId, sortOrder) " +
+                    "VALUES ('cat_id-1', 'Title', 'Subtitle', 'self_worth', 'self_worth.t1', 'self_worth.t1.c1', 0)",
+            )
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(TEST_DB, 13, true, MIGRATION_12_13)
+
+        migrated.query("SELECT COUNT(*) FROM personalization_signals").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0))
+        }
+        migrated.query("SELECT COUNT(*) FROM catalog_affirmations WHERE id = 'cat_id-1'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(1, cursor.getInt(0))
+        }
+
+        migrated.execSQL(
+            "INSERT INTO personalization_signals " +
+                "(signalType, themeId, groupId, tone, occurredAtMillis) " +
+                "VALUES ('AFFIRMATION_SAVED', 'self_worth.t1', 'self_worth', 'powerful', 1000)",
+        )
+        migrated.query("SELECT signalType FROM personalization_signals").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("AFFIRMATION_SAVED", cursor.getString(0))
+        }
+    }
+
     private companion object {
         const val TEST_DB = "migration-test"
     }

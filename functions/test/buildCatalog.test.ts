@@ -72,7 +72,7 @@ function source(overrides = {}) {
 }
 
 describe('buildCatalog', () => {
-  it('emits the v2 row shape: id, title, subtitle, groupId, themeId, collectionId, sortOrder', () => {
+  it('emits the v2 row shape: id, title, subtitle, groupId, themeId, collectionId, sortOrder, tone, semanticAngle', () => {
     const { asset } = buildCatalog(source());
     expect(asset.affirmations[0]).toEqual({
       id: 'cat_u1.t1.c1.002',
@@ -82,7 +82,15 @@ describe('buildCatalog', () => {
       themeId: 'u1.t1',
       collectionId: 'u1.t1.c1',
       sortOrder: 0,
+      tone: 'powerful',
+      semanticAngle: 'identity',
     });
+  });
+
+  it('bumps the emitted asset version relative to the source catalogVersion so CatalogSeeder reseeds', () => {
+    const { asset } = buildCatalog(source());
+    expect(asset.version).not.toBe('2.0.0');
+    expect(asset.version.startsWith('2.0.0')).toBe(true);
   });
 
   it('assigns a dense per-group sortOrder ordered by (theme.order, collection.order, affirmation.order)', () => {

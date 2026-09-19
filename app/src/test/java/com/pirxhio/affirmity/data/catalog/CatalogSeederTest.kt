@@ -20,7 +20,8 @@ private fun catalogJson(version: String, rowCount: Int = 1) = buildString {
         if (i > 1) append(",")
         append(
             """{"id":"cat_$COLLECTION_ID.00$i","title":"Texto $i","subtitle":"Subtexto $i","groupId":"self_worth",""" +
-                """"themeId":"self_worth.feeling_enough","collectionId":"$COLLECTION_ID","sortOrder":${i - 1}}""",
+                """"themeId":"self_worth.feeling_enough","collectionId":"$COLLECTION_ID","sortOrder":${i - 1},""" +
+                """"tone":"powerful","semanticAngle":"identity"}""",
         )
     }
     append("]}")
@@ -75,6 +76,22 @@ class CatalogSeederTest {
         assertEquals(listOf("replaceAll"), dao.calls)
         assertEquals(1, dao.lastReplaced.size)
         assertEquals("1.0.0", prefs.observeSeededCatalogVersion().value())
+    }
+
+    /** Covers spec catalog-tone-metadata + design D1: a version-bumped reseed backfills the new
+     * nullable `tone`/`semanticAngle` columns for existing installs "for free" via the full
+     * replace -- no separate backfill code path needed. */
+    @Test
+    fun `a version-bumped reseed backfills tone and semanticAngle via the full replace`() = runBlocking {
+        val dao = RecordingFakeDao()
+        val prefs = RecordingFakePrefs(initial = "0.9.0")
+        val seeder = CatalogSeeder({ catalogJson("1.0.0") }, dao, prefs) { KNOWN_COLLECTION_IDS }
+
+        seeder.seedIfNeeded()
+
+        assertEquals(listOf("replaceAll"), dao.calls)
+        assertEquals("powerful", dao.lastReplaced.single().tone)
+        assertEquals("identity", dao.lastReplaced.single().semanticAngle)
     }
 
     @Test

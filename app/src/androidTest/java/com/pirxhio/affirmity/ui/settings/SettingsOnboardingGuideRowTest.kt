@@ -58,6 +58,7 @@ class SettingsOnboardingGuideRowTest {
                 onQuietHoursWindowChanged = { _, _ -> },
                 onOpenNotificationDebug = {},
                 onOpenOnboardingGuide = { opened = true },
+                onOpenMyGoals = {},
                 onOpenHiddenAffirmations = {},
                 onSignInClicked = {},
                 onSignOutClicked = {},

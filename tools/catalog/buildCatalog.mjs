@@ -11,6 +11,16 @@
 
 const CATALOG_ID_PREFIX = 'cat_';
 
+/**
+ * Bumped on every Android asset shape change (Slice 0: adds `tone`/`semanticAngle`). Appended to
+ * the source `catalogVersion` -- never replaces it -- so `CatalogSeeder.seedIfNeeded()` (which
+ * compares this string verbatim) detects the new shape and full-replaces `catalog_affirmations`
+ * even when the source `catalogVersion` itself hasn't changed (design D1: "a version bump makes
+ * the backfill free"). Deterministic and pure: same source + same buildCatalog.mjs always emits
+ * the same asset version, so regenerating twice from the same source is a no-op for seeding.
+ */
+const ANDROID_ASSET_SCHEMA_REVISION = '+android.1';
+
 function fail(message) {
   throw new Error(`[buildCatalog] ${message}`);
 }
@@ -91,11 +101,19 @@ export function buildCatalog(source) {
         themeId: collection.themeId,
         collectionId: collection.id,
         sortOrder: index,
+        // `tone`/`semanticAngle` are required in the v2 source (`seedCatalog.ts:83-84,396-397`)
+        // but pass through as optional here (catalog-tone-metadata spec) so a source row missing
+        // either field degrades to `null` for `CatalogAssetParser.kt` instead of failing the build.
+        tone: a.tone ?? null,
+        semanticAngle: a.semanticAngle ?? null,
       });
     });
   }
 
-  const asset = { version: catalogVersion, affirmations: outAffirmations };
+  const asset = {
+    version: `${catalogVersion}${ANDROID_ASSET_SCHEMA_REVISION}`,
+    affirmations: outAffirmations,
+  };
 
   // --- Kotlin taxonomy source ---
   const universesSorted = [...universes].sort((a, b) => a.order - b.order);

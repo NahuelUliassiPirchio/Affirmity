@@ -13,7 +13,7 @@ data class ParsedCatalog(val version: String, val affirmations: List<CatalogAffi
  * asset, not just a bad source drop.
  *
  * The bundled asset carries no `access` field (design.md: the affirmation record shape is
- * `id/text/groupId/themeId/collectionId/sortOrder`), so the `free`+non-null-hours invariant is
+ * `id/text/groupId/themeId/collectionId/sortOrder/tone/semanticAngle`), so the `free`+non-null-hours invariant is
  * validated once, at generation time, against the source's `collections[].access` -- there is
  * nothing to re-check here. [knownCollectionIds] is the reference set (normally
  * `com.pirxhio.affirmity.ui.groups.catalogCollectionsById().keys`), passed in rather than imported
@@ -59,6 +59,12 @@ object CatalogAssetParser {
                 themeId = row.getString("themeId"),
                 collectionId = collectionId,
                 sortOrder = row.getInt("sortOrder"),
+                tone = if (row.isNull("tone")) null else row.optString("tone").ifBlank { null },
+                semanticAngle = if (row.isNull("semanticAngle")) {
+                    null
+                } else {
+                    row.optString("semanticAngle").ifBlank { null }
+                },
             )
         }
 

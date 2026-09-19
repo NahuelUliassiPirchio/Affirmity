@@ -80,6 +80,7 @@
     <string name="onboarding_back_button">Back</string>
     <string name="onboarding_next_button">Next</string>
     <string name="onboarding_continue_without_account_button">Continue without an account</string>
+    <string name="onboarding_completion_error">We couldn\'t save your answers. Please try again.</string>
     <string name="onboarding_auth_title">Almost done</string>
     <string name="onboarding_auth_subtitle">Sign in to save your progress in the cloud, or continue without an account.</string>
     <string name="onboarding_auth_signed_in">Done! You\'re signed in.</string>
@@ -163,9 +164,9 @@
     <string name="healer_granted_icon_content_description">Streak healer icon</string>
     <string name="progress_weekly_streak_format">Streak: %1$d days</string>
 
-    <!-- Post-survey onboarding guide (spec R3, design D6) -->
-    <string name="onboarding_guide_slide1_title">Affirmations, your way</string>
-    <string name="onboarding_guide_slide1_body">Your affirmations show up as swipeable cards, organized into themed groups like Wellbeing or Willpower, plus a Personalized group where you write your own. Some groups require Pro.</string>
+    <!-- Onboarding product guide (spec R3, design D6) -->
+    <string name="onboarding_guide_slide1_title">Build your affirmation feed</string>
+    <string name="onboarding_guide_slide1_body">In Your feed, explore areas and choose the themes you want to see. Swipe through cards, save favorites with the heart or a double tap, and choose whether to include your favorites and your own affirmations. Some themes require Pro.</string>
     <string name="onboarding_guide_slide1_icon_content_description">Affirmations icon</string>
     <string name="onboarding_guide_slide2_title">Meditations for every moment</string>
     <string name="onboarding_guide_slide2_body">Guided sessions are organized by category —sleep, calm, focus— and show an approximate duration. There\'s also a free timer to meditate at your own pace. Some sessions are Pro or unlock by watching an ad.</string>
@@ -434,6 +435,24 @@
     <string name="hidden_affirmations_unhide_content_description">Unhide</string>
     <string name="settings_manage_hidden_affirmations">Manage hidden affirmations</string>
     <string name="settings_manage_hidden_affirmations_button">Manage</string>
+    <string name="settings_my_goals_title">My goals</string>
+    <string name="settings_my_goals_edit_button">Edit</string>
+    <string name="my_goals_screen_title">My goals</string>
+    <string name="my_goals_headline">What would help you most right now?</string>
+    <string name="my_goals_subtitle">Your goals can change. This just decides what Affirmity prioritizes for you.</string>
+    <string name="my_goals_save_button">Update my goals</string>
+    <string name="my_goals_save_error">We couldn\'t save your goals. Please try again.</string>
+    <string name="divergence_prompt_title">Have your needs changed lately?</string>
+    <string name="divergence_prompt_suggested_goal">Suggested goal: %1$s</string>
+    <string name="divergence_prompt_add">Add</string>
+    <string name="divergence_prompt_dismiss">Not now</string>
+    <string name="divergence_goal_calm">Find calm</string>
+    <string name="divergence_goal_confidence">Build my confidence</string>
+    <string name="divergence_goal_self_love">Treat myself with more love</string>
+    <string name="divergence_goal_motivation">Regain motivation</string>
+    <string name="divergence_goal_connection">Feel more connected</string>
+    <string name="divergence_goal_change">Navigate change</string>
+    <string name="divergence_goal_direction">Find direction</string>
 
     <!-- Your feed source toggles. -->
     <string name="your_feed_sources_title">What else goes in your feed</string>

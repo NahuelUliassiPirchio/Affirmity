@@ -993,4 +993,75 @@ class AffirmityAppStateSwapTest {
 
         scope.cancel()
     }
+
+    @Test
+    fun `guide dismissal flips state synchronously and persists seen exactly once`() = runBlocking {
+        val events = mutableListOf<String>()
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val onboardingPreferences = mock(OnboardingPreferences::class.java)
+        whenever(onboardingPreferences.observeHasCompletedOnboarding())
+            .thenReturn(EventedFlow("onboarding-completed", mutableListOf(), listOf(false)))
+        val onboardingGuidePreferences = mock(OnboardingGuidePreferences::class.java)
+        whenever(onboardingGuidePreferences.observeHasSeenGuide())
+            .thenReturn(EventedFlow("onboarding-guide-seen", mutableListOf(), listOf(null)))
+        val state = buildState(
+            local = fakeLocal(events, id = "local-guide-dismiss"),
+            remote = { fakeRemote("uid-guide-dismiss", events) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = FakeAuthRepository(),
+            scope = scope,
+            onboardingPreferencesOverride = onboardingPreferences,
+            onboardingGuidePreferencesOverride = onboardingGuidePreferences,
+        )
+        delay(50)
+
+        assertTrue(state.shouldShowOnboardingGuide.value)
+        state.markOnboardingGuideSeen()
+
+        assertFalse("dismissal must hide the guide before persistence completes", state.shouldShowOnboardingGuide.value)
+        assertEquals(true, state.hasSeenOnboardingGuide.value)
+        org.mockito.Mockito.verify(onboardingGuidePreferences, org.mockito.Mockito.times(1)).markSeen()
+
+        state.completeOnboarding()
+        delay(50)
+
+        org.mockito.Mockito.verify(onboardingGuidePreferences, org.mockito.Mockito.times(1)).markSeen()
+        org.mockito.Mockito.verify(onboardingGuidePreferences, org.mockito.Mockito.never()).arm()
+
+        scope.cancel()
+    }
+
+    @Test
+    fun `guide preference read failure resolves safely for unfinished and legacy-completed onboarding`() = runBlocking {
+        listOf(
+            false to false,
+            true to true,
+        ).forEachIndexed { index, (completedOnboarding, expectedGuideSeen) ->
+            val events = mutableListOf<String>()
+            val scope = CoroutineScope(Dispatchers.Unconfined)
+            val onboardingPreferences = mock(OnboardingPreferences::class.java)
+            whenever(onboardingPreferences.observeHasCompletedOnboarding()).thenReturn(
+                EventedFlow("onboarding-completed", mutableListOf(), listOf(completedOnboarding)),
+            )
+            val onboardingGuidePreferences = mock(OnboardingGuidePreferences::class.java)
+            whenever(onboardingGuidePreferences.observeHasSeenGuide()).thenReturn(
+                kotlinx.coroutines.flow.flow { throw IllegalStateException("guide read failed") },
+            )
+            val state = buildState(
+                local = fakeLocal(events, id = "local-guide-read-failure-$index"),
+                remote = { fakeRemote("uid-guide-read-failure-$index", events) },
+                migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+                authRepository = FakeAuthRepository(),
+                scope = scope,
+                onboardingPreferencesOverride = onboardingPreferences,
+                onboardingGuidePreferencesOverride = onboardingGuidePreferences,
+            )
+            delay(50)
+
+            assertEquals(expectedGuideSeen, state.hasSeenOnboardingGuide.value)
+            assertTrue("the splash gate must resolve after a guide read failure", state.isInitialContentResolved.value)
+
+            scope.cancel()
+        }
+    }
 }
