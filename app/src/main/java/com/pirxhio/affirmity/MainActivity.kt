@@ -41,9 +41,6 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.runtime.DisposableEffect
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import com.pirxhio.affirmity.ui.affirmations.CleanScreenChrome
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -100,6 +97,7 @@ import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.ui.compass.CompassAnswerScreen
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
 import com.pirxhio.affirmity.ui.components.FloatingStatusOverlay
+import com.pirxhio.affirmity.ui.components.SystemBarsEffect
 import com.pirxhio.affirmity.ui.favorites.FavoritesScreen
 import com.pirxhio.affirmity.ui.hidden.HiddenAffirmationsScreen
 import com.pirxhio.affirmity.ui.feed.SeeAllThemesScreen
@@ -766,21 +764,7 @@ fun AffirmityApp(
         isCleanScreen = isCleanScreen,
         isFeedDestination = currentDestination == AppDestinations.AFIRMACIONES,
     )
-    val cleanScreenContext = LocalContext.current
-    DisposableEffect(chrome.showSystemBars) {
-        val window = generateSequence(cleanScreenContext) { (it as? android.content.ContextWrapper)?.baseContext }
-            .filterIsInstance<android.app.Activity>()
-            .firstOrNull()?.window
-        val controller = window?.let { WindowCompat.getInsetsController(it, it.decorView) }
-        if (chrome.showSystemBars) {
-            controller?.show(WindowInsetsCompat.Type.systemBars())
-        } else {
-            controller?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            controller?.hide(WindowInsetsCompat.Type.systemBars())
-        }
-        // Bars must never stay hidden once this composition leaves or clean mode ends.
-        onDispose { controller?.show(WindowInsetsCompat.Type.systemBars()) }
-    }
+    SystemBarsEffect(visible = chrome.showSystemBars)
     val snackbarScope = rememberCoroutineScope()
     // Explicit in-app lapse notice (design.md D8, spec's "Explicit in-app lapse notice"): a live
     // Pro -> Free entitlement transition shows an indefinite snackbar with a "View plans" action

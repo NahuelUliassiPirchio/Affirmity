@@ -161,47 +161,47 @@ fun AffirmationsScreen(
     BackHandler(enabled = isCleanScreen) { onCleanScreenChange(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
-    VerticalPager(
-        state = pagerState,
-        modifier = Modifier.fillMaxSize()
-    ) { page ->
-        val affirmation = affirmations[page % affirmations.size]
-        AffirmationCard(
-            affirmation = affirmation,
-            isFavorite = affirmation.id in favoriteIds,
-            onToggleFavorite = { onToggleFavorite(affirmation.id) },
-            onOverrideCommitted = { tokenKey, value -> onOverrideCommitted(affirmation.id, tokenKey, value) },
-            onHide = {
-                onHideAffirmation(affirmation.id)
-                // Advances the feed past the just-hidden card immediately, rather than leaving it
-                // lingering until the hidden-ids DataStore flow catches up and re-filters the pool.
-                pagerScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
-            },
-            onShared = { onAffirmationShared(affirmation.id) },
-            favoriteGesture = favoriteGesture,
-            isCleanScreen = isCleanScreen,
-            onEnterCleanScreen = { onCleanScreenChange(true) },
-        )
-    }
-    if (isCleanScreen) {
-        // Sits above the pager so it stays put while swiping; safeDrawing keeps it clear of the
-        // display cutout and of the transient system bars that swipe back in.
-        IconButton(
-            onClick = { onCleanScreenChange(false) },
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(8.dp)
-                .size(48.dp)
-                .background(Color.Black.copy(alpha = 0.4f), CircleShape),
-        ) {
-            Icon(
-                imageVector = Icons.Filled.FullscreenExit,
-                contentDescription = stringResource(R.string.affirmation_exit_clean_screen_content_description),
-                tint = Color.White,
+        VerticalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+            val affirmation = affirmations[page % affirmations.size]
+            AffirmationCard(
+                affirmation = affirmation,
+                isFavorite = affirmation.id in favoriteIds,
+                onToggleFavorite = { onToggleFavorite(affirmation.id) },
+                onOverrideCommitted = { tokenKey, value -> onOverrideCommitted(affirmation.id, tokenKey, value) },
+                onHide = {
+                    onHideAffirmation(affirmation.id)
+                    // Advances the feed past the just-hidden card immediately, rather than leaving it
+                    // lingering until the hidden-ids DataStore flow catches up and re-filters the pool.
+                    pagerScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+                },
+                onShared = { onAffirmationShared(affirmation.id) },
+                favoriteGesture = favoriteGesture,
+                isCleanScreen = isCleanScreen,
+                onEnterCleanScreen = { onCleanScreenChange(true) },
             )
         }
-    }
+        if (isCleanScreen) {
+            // Sits above the pager so it stays put while swiping; safeDrawing keeps it clear of the
+            // display cutout and of the transient system bars that swipe back in.
+            IconButton(
+                onClick = { onCleanScreenChange(false) },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .padding(8.dp)
+                    .size(48.dp)
+                    .background(Color.Black.copy(alpha = 0.4f), CircleShape),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.FullscreenExit,
+                    contentDescription = stringResource(R.string.affirmation_exit_clean_screen_content_description),
+                    tint = Color.White,
+                )
+            }
+        }
     }
 }
 
@@ -226,6 +226,8 @@ private fun AffirmationCard(
     val bursts = remember(affirmation.id) { mutableStateListOf<LikeBurst>() }
     val favoriteScale = remember(affirmation.id) { Animatable(1f) }
     val coroutineScope = rememberCoroutineScope()
+    // One share render in flight per card: a second request while rendering is ignored.
+    var sharing by remember(affirmation.id) { mutableStateOf(false) }
 
     suspend fun playLikeBurst(origin: Offset) {
         bursts += createLikeBurst(origin)
@@ -379,32 +381,34 @@ private fun AffirmationCard(
             onBurstFinished = { burstId -> bursts.removeAll { it.id == burstId } },
             modifier = Modifier.fillMaxSize(),
         )
-        if (!isCleanScreen) IconButton(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(24.dp)
-                .onGloballyPositioned { coordinates ->
-                    favoritePositionInRoot = coordinates.positionInRoot()
-                    favoriteSize = coordinates.size
-                }
-                .graphicsLayer {
-                    scaleX = favoriteScale.value
-                    scaleY = favoriteScale.value
-                },
-            onClick = {
-                requestFavoriteToggle(
-                    favoritePositionInRoot - cardPositionInRoot + Offset(
-                        favoriteSize.width / 2f,
-                        favoriteSize.height / 2f,
+        if (!isCleanScreen) {
+            IconButton(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(24.dp)
+                    .onGloballyPositioned { coordinates ->
+                        favoritePositionInRoot = coordinates.positionInRoot()
+                        favoriteSize = coordinates.size
+                    }
+                    .graphicsLayer {
+                        scaleX = favoriteScale.value
+                        scaleY = favoriteScale.value
+                    },
+                onClick = {
+                    requestFavoriteToggle(
+                        favoritePositionInRoot - cardPositionInRoot + Offset(
+                            favoriteSize.width / 2f,
+                            favoriteSize.height / 2f,
+                        )
                     )
+                },
+            ) {
+                Icon(
+                    imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                    contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                    tint = Color.White,
                 )
-            },
-        ) {
-            Icon(
-                imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
-                tint = Color.White,
-            )
+            }
         }
     }
 
@@ -416,21 +420,26 @@ private fun AffirmationCard(
         AffirmationActionsSheet(
             onShareImage = {
                 showActions = false
-                coroutineScope.launch {
-                    val file = withContext(Dispatchers.IO) {
-                        runCatching {
-                            val target = ShareImageCache(File(context.cacheDir, ShareImageCache.SUBDIR))
-                                .prepare(affirmation.id)
-                            renderAffirmationShareImage(
-                                context, affirmation, affirmation.icon(), iconTint, appName, target,
-                            )
-                            target
-                        }.getOrNull()
+                if (!sharing) coroutineScope.launch {
+                    sharing = true
+                    try {
+                        val file = withContext(Dispatchers.IO) {
+                            runCatching {
+                                val target = ShareImageCache(File(context.cacheDir, ShareImageCache.SUBDIR))
+                                    .prepare(affirmation.id)
+                                renderAffirmationShareImage(
+                                    context, affirmation, affirmation.icon(), iconTint, appName, target,
+                                )
+                                target
+                            }.getOrNull()
+                        }
+                        val started = file != null && runCatching {
+                            context.startActivity(buildShareImageIntent(context, file))
+                        }.isSuccess
+                        if (started) onShared() else Toast.makeText(context, shareErrorText, Toast.LENGTH_SHORT).show()
+                    } finally {
+                        sharing = false
                     }
-                    val started = file != null && runCatching {
-                        context.startActivity(buildShareImageIntent(context, file))
-                    }.isSuccess
-                    if (started) onShared() else Toast.makeText(context, shareErrorText, Toast.LENGTH_SHORT).show()
                 }
             },
             onHide = {

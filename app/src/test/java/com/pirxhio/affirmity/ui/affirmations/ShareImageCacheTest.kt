@@ -9,18 +9,32 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class ShareImageCacheTest {
+    private companion object {
+        const val NOW = 1_700_000_000_000L
+    }
+
     @get:Rule
     val tmp = TemporaryFolder()
 
     @Test
-    fun prepareDeletesPreviousSharesButKeepsDirectory() {
+    fun prepareDeletesStaleSharesButKeepsDirectory() {
         val dir = tmp.newFolder("shared_images")
-        val old = File(dir, "affirmity_old.png").apply { writeText("x") }
-        val target = ShareImageCache(dir).prepare("abc")
+        val old = File(dir, "affirmity_old.png").apply { writeText("x"); setLastModified(NOW - ShareImageCache.STALE_AFTER_MS - 1_000) }
+        val target = ShareImageCache(dir) { NOW }.prepare("abc")
         assertFalse(old.exists())
         assertTrue(dir.isDirectory)
         assertEquals(dir, target.parentFile)
         assertEquals("png", target.extension)
+    }
+
+    @Test
+    fun prepareKeepsFreshSharesSoAnInFlightChooserCanStillReadThem() {
+        val dir = tmp.newFolder("fresh")
+        val fresh = File(dir, "affirmity_fresh.png").apply { writeText("x"); setLastModified(NOW - 1_000) }
+        val stale = File(dir, "affirmity_stale.png").apply { writeText("x"); setLastModified(NOW - ShareImageCache.STALE_AFTER_MS - 1_000) }
+        ShareImageCache(dir) { NOW }.prepare("abc")
+        assertTrue(fresh.exists())
+        assertFalse(stale.exists())
     }
 
     @Test

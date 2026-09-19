@@ -13,6 +13,7 @@ import android.graphics.Typeface
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
+import android.text.TextUtils
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.toArgb
@@ -51,6 +52,33 @@ private const val HEIGHT = 1920
 private const val SIDE_PADDING = 96
 private const val MAX_TITLE_HEIGHT = 820
 private const val MAX_SUBTITLE_HEIGHT = 420
+
+/** Layout metrics in px on the 1080x1920 canvas. Content and footer share these so they cannot drift apart. */
+private object ShareImageLayout {
+    const val ICON_SIZE = 96
+    const val ICON_GAP = 40
+    const val DIVIDER_MARGIN = 48
+    const val DIVIDER_THICKNESS = 4
+    const val DIVIDER_WIDTH = 96
+    const val DIVIDER_ALPHA = 0x80
+
+    /** Bottom band kept free of content for the footer. */
+    const val FOOTER_RESERVED_HEIGHT = 200
+
+    /** Footer logo top, measured down from the top of the reserved band. */
+    const val FOOTER_TOP_IN_BAND = 60
+    const val FOOTER_TOP = HEIGHT - FOOTER_RESERVED_HEIGHT + FOOTER_TOP_IN_BAND
+    const val FOOTER_LOGO_SIZE = 72
+    const val FOOTER_GAP = 20f
+    const val FOOTER_NAME_TEXT_SIZE = 40f
+
+    const val TITLE_MAX_SIZE = 96f
+    const val TITLE_MIN_SIZE = 44f
+    const val TITLE_SIZE_STEP = 4f
+    const val SUBTITLE_MAX_SIZE = 52f
+    const val SUBTITLE_MIN_SIZE = 28f
+    const val SUBTITLE_SIZE_STEP = 2f
+}
 
 /**
  * Renders the affirmation to a fixed 1080x1920 PNG. Deliberately drawn with android.graphics
@@ -113,20 +141,34 @@ private fun decodeSampled(path: String): Bitmap? = runCatching {
     BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
 }.getOrNull()
 
-private fun textLayout(text: String, paint: TextPaint): StaticLayout =
+private fun textLayout(text: String, paint: TextPaint, maxLines: Int = Int.MAX_VALUE): StaticLayout =
     StaticLayout.Builder.obtain(text, 0, text.length, paint, WIDTH - 2 * SIDE_PADDING)
         .setAlignment(Layout.Alignment.ALIGN_CENTER)
         .setLineSpacing(0f, 1.1f)
+        .setMaxLines(maxLines)
+        .setEllipsize(TextUtils.TruncateAt.END)
         .build()
 
-/** Largest size whose layout fits [maxHeight]; the smallest size is used as-is (clipped by nothing, just tiny). */
+/**
+ * Largest size whose layout fits [maxHeight]. If even the smallest size does not fit, that
+ * smallest size is used and the text is truncated with an ellipsis to as many whole lines as
+ * fit in [maxHeight], so it can never grow into the footer zone.
+ */
 private fun fitLayout(text: String, paint: TextPaint, sizes: List<Float>, maxHeight: Int): StaticLayout {
     val size = fitTextSize(sizes) { s ->
         paint.textSize = s
         textLayout(text, paint).height <= maxHeight
     }
     paint.textSize = size
-    return textLayout(text, paint)
+    val full = textLayout(text, paint)
+    if (full.height <= maxHeight) return full
+    // Measured, not estimated from an average line height: line spacing rounds per line, so an
+    // estimate can allow one line too many. One line is the floor even if that still overflows.
+    return (full.lineCount - 1 downTo 1)
+        .asSequence()
+        .map { lines -> textLayout(text, paint, maxLines = lines) }
+        .firstOrNull { it.height <= maxHeight }
+        ?: textLayout(text, paint, maxLines = 1)
 }
 
 private fun drawContent(canvas: Canvas, affirmation: Affirmation, icon: ImageVector, iconTint: Int) {
@@ -135,30 +177,47 @@ private fun drawContent(canvas: Canvas, affirmation: Affirmation, icon: ImageVec
         color = android.graphics.Color.WHITE
         typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
     }
-    val titleLayout = fitLayout(title, titlePaint, shareTextSizeCandidates(96f, 44f, 4f), MAX_TITLE_HEIGHT)
+    val titleLayout = fitLayout(title, titlePaint, shareTextSizeCandidates(
+        largest = ShareImageLayout.TITLE_MAX_SIZE,
+        smallest = ShareImageLayout.TITLE_MIN_SIZE,
+        step = ShareImageLayout.TITLE_SIZE_STEP,
+    ), MAX_TITLE_HEIGHT)
     val subtitleLayout = if (subtitle.isNotBlank()) {
         val p = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xFFCCCCCC.toInt()
             typeface = Typeface.SANS_SERIF
         }
-        fitLayout(subtitle, p, shareTextSizeCandidates(52f, 28f, 2f), MAX_SUBTITLE_HEIGHT)
+        fitLayout(subtitle, p, shareTextSizeCandidates(
+                largest = ShareImageLayout.SUBTITLE_MAX_SIZE,
+                smallest = ShareImageLayout.SUBTITLE_MIN_SIZE,
+                step = ShareImageLayout.SUBTITLE_SIZE_STEP,
+            ), MAX_SUBTITLE_HEIGHT)
     } else null
 
-    val iconSize = 96
-    val gap = 40
-    val dividerBlock = if (subtitleLayout != null) 48 + 4 + 48 else 0
+    val iconSize = ShareImageLayout.ICON_SIZE
+    val gap = ShareImageLayout.ICON_GAP
+    val dividerMargin = ShareImageLayout.DIVIDER_MARGIN
+    val dividerBlock = if (subtitleLayout != null) {
+        dividerMargin + ShareImageLayout.DIVIDER_THICKNESS + dividerMargin
+    } else 0
     val total = iconSize + gap + titleLayout.height + dividerBlock + (subtitleLayout?.height ?: 0)
-    var y = (HEIGHT - 200 - total) / 2f // footer reserves the bottom 200px
+    var y = (HEIGHT - ShareImageLayout.FOOTER_RESERVED_HEIGHT - total) / 2f
 
     drawIcon(canvas, icon, iconTint, (WIDTH - iconSize) / 2f, y, iconSize.toFloat())
     y += iconSize + gap
     canvas.save(); canvas.translate(SIDE_PADDING.toFloat(), y); titleLayout.draw(canvas); canvas.restore()
     y += titleLayout.height
     if (subtitleLayout != null) {
-        y += 48
-        val divider = Paint().apply { color = (iconTint and 0x00FFFFFF) or (0x80 shl 24) }
-        canvas.drawRect((WIDTH - 96) / 2f, y, (WIDTH + 96) / 2f, y + 4f, divider)
-        y += 4 + 48
+        y += dividerMargin
+        val divider = Paint().apply {
+            color = (iconTint and 0x00FFFFFF) or (ShareImageLayout.DIVIDER_ALPHA shl 24)
+        }
+        val halfDivider = ShareImageLayout.DIVIDER_WIDTH / 2f
+        canvas.drawRect(
+            WIDTH / 2f - halfDivider, y, WIDTH / 2f + halfDivider,
+            y + ShareImageLayout.DIVIDER_THICKNESS, divider,
+        )
+        y += ShareImageLayout.DIVIDER_THICKNESS + dividerMargin
         canvas.save(); canvas.translate(SIDE_PADDING.toFloat(), y); subtitleLayout.draw(canvas); canvas.restore()
     }
 }
@@ -182,18 +241,18 @@ private fun drawIcon(canvas: Canvas, icon: ImageVector, tint: Int, x: Float, y: 
 }
 
 private fun drawFooter(canvas: Canvas, context: Context, appName: String) {
-    val logoSize = 72
+    val logoSize = ShareImageLayout.FOOTER_LOGO_SIZE
     val namePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = android.graphics.Color.WHITE
         alpha = 179
-        textSize = 40f
+        textSize = ShareImageLayout.FOOTER_NAME_TEXT_SIZE
         typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
         letterSpacing = 0.08f
     }
     val nameWidth = namePaint.measureText(appName)
-    val gap = 20f
+    val gap = ShareImageLayout.FOOTER_GAP
     val startX = (WIDTH - (logoSize + gap + nameWidth)) / 2f
-    val top = HEIGHT - 140f
+    val top = ShareImageLayout.FOOTER_TOP.toFloat()
     // Adaptive-icon foreground is 108dp with only the central 72dp guaranteed visible: crop the
     // safe zone (inset 1/6 per side) so the logo is not surrounded by transparent padding.
     val logo = runCatching {
