@@ -70,6 +70,7 @@ import {
 import {
   AppStoreVerificationError,
   isSandboxEntitlementsAllowed,
+  parseAppleAppId,
   resolveIosEntitlement,
   type AppStoreEntitlementDoc,
   type AppStoreVerifier,
@@ -725,7 +726,7 @@ const IOS_BUNDLE_ID = process.env.IOS_BUNDLE_ID ?? 'com.pirxhio.affirmity';
 // deliberately *not* a hard failure here: TestFlight/Sandbox verification must keep working today,
 // pre-launch, with no Apple ID configured yet. `productionVerifier()` logs a warning the first
 // time this happens so the gap stays observable instead of silent.
-const IOS_APP_APPLE_ID = process.env.IOS_APP_APPLE_ID ? Number(process.env.IOS_APP_APPLE_ID) : undefined;
+const IOS_APP_APPLE_ID = parseAppleAppId(process.env.IOS_APP_APPLE_ID);
 
 // Fix 3 (HIGH finding): without this gate, `appStoreVerifier()` always fell back from Production to
 // Sandbox verification, so anyone could create a free Apple Sandbox account, generate a Sandbox
@@ -885,7 +886,8 @@ export const syncEntitlementIOS = onRequest(async (req, res) => {
     }
     res.status(200).json({ outcome: result.outcome });
   } catch (err) {
-    res.status(500).send(err instanceof Error ? err.message : 'unknown-error');
+    console.error('[internal-error]', err);
+    res.status(500).send('internal-error');
   }
 });
 
@@ -967,7 +969,8 @@ export const syncEntitlement = onRequest(async (req, res) => {
     );
     res.status(200).json({ outcome: result.outcome });
   } catch (err) {
-    res.status(500).send(err instanceof Error ? err.message : 'unknown-error');
+    console.error('[internal-error]', err);
+    res.status(500).send('internal-error');
   }
 });
 
@@ -1035,6 +1038,7 @@ export const answerCompassQuestion = onRequest(async (req, res) => {
     await db.doc(`users/${uid}/compassAnswers/${localDay}`).set(doc);
     res.status(200).json({ localDay });
   } catch (err) {
-    res.status(500).send(err instanceof Error ? err.message : 'unknown-error');
+    console.error('[internal-error]', err);
+    res.status(500).send('internal-error');
   }
 });

@@ -203,3 +203,18 @@ export async function resolveIosEntitlement(
   const outcome = await store.claimAndWriteEntitlement(uid, transactionId, doc);
   return { outcome, doc };
 }
+
+/**
+ * Parses the `IOS_APP_APPLE_ID` env value. Returns a positive safe integer, or undefined when
+ * unset/empty (silent) or malformed (logged, value not echoed) so callers fail closed.
+ */
+export function parseAppleAppId(raw: string | undefined): number | undefined {
+  const trimmed = raw?.trim();
+  if (!trimmed) return undefined;
+  const parsed = /^\d+$/.test(trimmed) ? Number(trimmed) : NaN;
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    console.error('[appStoreVerifier] IOS_APP_APPLE_ID is set but malformed (expected a positive integer); treating as unset.');
+    return undefined;
+  }
+  return parsed;
+}

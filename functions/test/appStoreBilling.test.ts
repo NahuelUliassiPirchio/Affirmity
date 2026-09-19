@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   AppStoreVerificationError,
   isSandboxEntitlementsAllowed,
+  parseAppleAppId,
   resolveIosEntitlement,
   toAppStoreEntitlement,
   type AppStoreEntitlementDoc,
@@ -276,5 +277,33 @@ describe('resolveIosEntitlement', () => {
       expect(resync.outcome).toBe('written');
       expect(store.entitlements.get(UID)?.lastVerifiedAt).toBe(2000);
     });
+  });
+});
+
+describe('parseAppleAppId', () => {
+  it('parses a positive integer string', () => {
+    expect(parseAppleAppId('1234567890')).toBe(1234567890);
+    expect(parseAppleAppId(' 42 ')).toBe(42);
+  });
+
+  it.each([undefined, '', '   ', 'abc', 'NaN', '-5', '0', '1.5', '12abc', '1e3', 'Infinity', '9007199254740993'])(
+    'returns undefined for %j',
+    (raw) => {
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      expect(parseAppleAppId(raw as string | undefined)).toBeUndefined();
+      spy.mockRestore();
+    },
+  );
+
+  it('logs an error only when the value is set but malformed', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    parseAppleAppId(undefined);
+    parseAppleAppId('');
+    expect(spy).not.toHaveBeenCalled();
+    parseAppleAppId('abc');
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(String(spy.mock.calls[0][0])).toContain('malformed');
+    expect(String(spy.mock.calls[0][0])).not.toContain('abc');
+    spy.mockRestore();
   });
 });
