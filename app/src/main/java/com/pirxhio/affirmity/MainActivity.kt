@@ -112,6 +112,7 @@ import com.pirxhio.affirmity.ui.groups.themeAccessDecision
 import com.pirxhio.affirmity.ui.healer.StreakHealerGrantedScreen
 import com.pirxhio.affirmity.ui.meditation.GuidedMeditationScreen
 import com.pirxhio.affirmity.ui.meditation.MeditationScreen
+import com.pirxhio.affirmity.ui.meditation.catalog.expectedDurationMillis
 import com.pirxhio.affirmity.ui.meditation.catalog.findMeditationCatalogEntry
 import com.pirxhio.affirmity.ui.meditation.catalog.isMeditationLocked
 import com.pirxhio.affirmity.ui.meditation.catalog.meditationAccessDecision
@@ -434,6 +435,16 @@ internal fun decideMeditationLaunchStep(
     }
 
 /**
+ * Anti-skip-abuse streak gate: true when [elapsedSeconds] covers at least
+ * [MEDITATION_COMPLETION_MIN_ELAPSED_FRACTION] of [expectedDurationMillis] (inclusive). Compared
+ * explicitly in Double so the Long-to-Double promotion is visible rather than implicit; both
+ * operands are far below 2^53, so no precision is lost.
+ */
+internal fun meetsCompletionThreshold(elapsedSeconds: Long, expectedDurationMillis: Long): Boolean =
+    (elapsedSeconds * MILLIS_PER_SECOND).toDouble() >=
+        expectedDurationMillis.toDouble() * MEDITATION_COMPLETION_MIN_ELAPSED_FRACTION
+
+/**
  * Guided-completion streak bookkeeping (REQ-5.6, AC6). Extracted out of [AffirmityApp]'s
  * `onSessionEnded` callback so a plain JUnit test can prove [recordMeditationCompleted] is
  * invoked if and only if [reason] is [SessionEndReason.Completed], while [consumePlaybackUnlock]
@@ -442,11 +453,17 @@ internal fun decideMeditationLaunchStep(
  * Spec 6 (D7, REQ-5.2): [elapsedSeconds] and [emit] are appended, existing call order preserved
  * EXACTLY -- [consumePlaybackUnlock] first, then [recordMeditationCompleted] only for `Completed`,
  * [emit] always last so a thrown analytics call can never reorder or skip either existing effect.
+ *
+ * [expectedDurationMillis] is the length of the definition actually played (customization
+ * included), computed by the caller via `expectedDurationMillis(...)`. It drives the streak-credit
+ * rule: `Completed` credits [recordMeditationCompleted] only if [meetsCompletionThreshold] holds
+ * (at least half of it elapsed). Analytics is never affected by that gate.
  */
 internal fun handleGuidedMeditationSessionEnded(
     entryId: String,
     reason: SessionEndReason,
     elapsedSeconds: Long,
+    expectedDurationMillis: Long,
     accessDecision: AccessDecision,
     consumePlaybackUnlock: (String, SessionEndReason) -> Unit,
     recordMeditationCompleted: () -> Unit,
@@ -463,8 +480,10 @@ internal fun handleGuidedMeditationSessionEnded(
     // silently dropping a legitimate completion. Analytics below is UNCHANGED by this gate --
     // MeditationCompleted still fires with the real elapsedSeconds so skip-abuse stays visible in
     // the data even when it isn't credited.
-    val meetsMinimumElapsed = entry == null ||
-        elapsedSeconds >= entry.approxDurationMinutes * 60 * MEDITATION_COMPLETION_MIN_ELAPSED_FRACTION
+    // The [expectedDurationMillis] PARAMETER (computed at the call site from the played,
+    // customized definition) is the base, so a shortened session that fully runs is credited and
+    // a lengthened one cannot be skipped through at half the catalog-declared time.
+    val meetsMinimumElapsed = entry == null || meetsCompletionThreshold(elapsedSeconds, expectedDurationMillis)
     if (reason == SessionEndReason.Completed && meetsMinimumElapsed) recordMeditationCompleted()
     if (entry == null) return
     val analyticsId = AnalyticsId.of(entry)
@@ -1287,6 +1306,10 @@ fun AffirmityApp(
                                     entryId = selectedMeditationEntry.id,
                                     reason = reason,
                                     elapsedSeconds = elapsedSeconds,
+                                    expectedDurationMillis = expectedDurationMillis(
+                                        selectedMeditationEntry.definition(sessionCustomization),
+                                        selectedMeditationEntry.approxDurationMinutes,
+                                    ),
                                     accessDecision = meditationAccessDecision(
                                         selectedMeditationEntry,
                                         appState.entitlementTier.value,
@@ -1928,6 +1951,8 @@ private fun PaywallHost(
  * `recordMeditationCompleted`/streak. Analytics (`AnalyticsEvent.MeditationCompleted`) still fires
  * with the real `elapsedSeconds` regardless, so skip-abuse stays visible in the data. */
 private const val MEDITATION_COMPLETION_MIN_ELAPSED_FRACTION = 0.5
+
+private const val MILLIS_PER_SECOND = 1000L
 
 /** Play Console product/base-plan id -- part of the Phase 0 user-owned prerequisite (Play Console
  * subscription setup); placeholder until that product exists. */

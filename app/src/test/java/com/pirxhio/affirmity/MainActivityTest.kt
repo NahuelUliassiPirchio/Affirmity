@@ -3,6 +3,7 @@ package com.pirxhio.affirmity
 import com.pirxhio.affirmity.access.AccessDecision
 import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.access.AdUnlockState
+import com.pirxhio.affirmity.analytics.AccessDecisionValue
 import com.pirxhio.affirmity.analytics.AnalyticsEvent
 import com.pirxhio.affirmity.analytics.AnalyticsId
 import com.pirxhio.affirmity.analytics.NotificationDestinationValue
@@ -10,6 +11,7 @@ import com.pirxhio.affirmity.analytics.NotificationFamilyValue
 import com.pirxhio.affirmity.analytics.NotificationLocaleValue
 import com.pirxhio.affirmity.meditation.SessionEndReason
 import androidx.lifecycle.Lifecycle
+import com.pirxhio.affirmity.ui.meditation.catalog.expectedDurationMillis
 import com.pirxhio.affirmity.ui.meditation.catalog.findMeditationCatalogEntry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -272,6 +274,7 @@ class MainActivityTest {
             entryId = "calma",
             reason = SessionEndReason.Completed,
             elapsedSeconds = elapsedAboveThreshold,
+            expectedDurationMillis = CALMA_EXPECTED_MILLIS,
             accessDecision = AccessDecision.Unlocked,
             consumePlaybackUnlock = { id, reason -> consumedCalls.add(id to reason) },
             recordMeditationCompleted = { recordedStreak = true },
@@ -294,6 +297,7 @@ class MainActivityTest {
             entryId = "calma",
             reason = SessionEndReason.Completed,
             elapsedSeconds = elapsedBelowThreshold,
+            expectedDurationMillis = CALMA_EXPECTED_MILLIS,
             accessDecision = AccessDecision.Unlocked,
             consumePlaybackUnlock = { id, reason -> consumedCalls.add(id to reason) },
             recordMeditationCompleted = { recordedStreak = true },
@@ -314,6 +318,7 @@ class MainActivityTest {
             entryId = "calma",
             reason = SessionEndReason.Cancelled,
             elapsedSeconds = 7L,
+            expectedDurationMillis = CALMA_EXPECTED_MILLIS,
             accessDecision = AccessDecision.Unlocked,
             consumePlaybackUnlock = { id, reason -> consumedCalls.add(id to reason) },
             recordMeditationCompleted = { recordedStreak = true },
@@ -335,6 +340,7 @@ class MainActivityTest {
             entryId = "calma",
             reason = SessionEndReason.Completed,
             elapsedSeconds = 123L,
+            expectedDurationMillis = CALMA_EXPECTED_MILLIS,
             accessDecision = AccessDecision.Unlocked,
             consumePlaybackUnlock = { _, _ -> },
             recordMeditationCompleted = {},
@@ -346,7 +352,7 @@ class MainActivityTest {
             listOf(
                 AnalyticsEvent.MeditationCompleted(
                     AnalyticsId.of(entry),
-                    com.pirxhio.affirmity.analytics.AccessDecisionValue.UNLOCKED,
+                    AccessDecisionValue.UNLOCKED,
                     123L,
                 ),
             ),
@@ -362,6 +368,7 @@ class MainActivityTest {
             entryId = "calma",
             reason = SessionEndReason.Cancelled,
             elapsedSeconds = 9L,
+            expectedDurationMillis = CALMA_EXPECTED_MILLIS,
             accessDecision = AccessDecision.LockedNeedsPro,
             consumePlaybackUnlock = { _, _ -> },
             recordMeditationCompleted = {},
@@ -370,5 +377,105 @@ class MainActivityTest {
 
         val entry = requireNotNull(findMeditationCatalogEntry("calma"))
         assertEquals(listOf(AnalyticsEvent.MeditationCancelled(AnalyticsId.of(entry), 9L)), emitted)
+    }
+
+    // --- Completion gate uses the PLAYED (customized) duration, not the catalog-declared one -------
+
+    private fun runGate(
+        elapsedSeconds: Long,
+        expectedDurationMillis: Long,
+        entryId: String = "calma",
+        reason: SessionEndReason = SessionEndReason.Completed,
+        emitted: MutableList<AnalyticsEvent> = mutableListOf(),
+    ): Boolean {
+        var credited = false
+        handleGuidedMeditationSessionEnded(
+            entryId = entryId,
+            reason = reason,
+            elapsedSeconds = elapsedSeconds,
+            expectedDurationMillis = expectedDurationMillis,
+            accessDecision = AccessDecision.Unlocked,
+            consumePlaybackUnlock = { _, _ -> },
+            recordMeditationCompleted = { credited = true },
+            emit = emitted::add,
+        )
+        return credited
+    }
+
+    @Test
+    fun `a customized-shorter session that fully completes is credited`() {
+        // "calma" declares 5 min (150s threshold); customized to 2 min the user plays 120s.
+        assertTrue(runGate(elapsedSeconds = 120L, expectedDurationMillis = TWO_MINUTES_MILLIS))
+    }
+
+    @Test
+    fun `a customized-longer session skipped at half the declared time is not credited`() {
+        // Customized to 20 min: 200s beats the declared 150s threshold but not the played 600s one.
+        assertFalse(runGate(elapsedSeconds = 200L, expectedDurationMillis = TWENTY_MINUTES_MILLIS))
+    }
+
+    @Test
+    fun `the threshold is inclusive at exactly half the expected duration`() {
+        assertTrue(runGate(elapsedSeconds = 60L, expectedDurationMillis = TWO_MINUTES_MILLIS))
+        assertFalse(runGate(elapsedSeconds = 59L, expectedDurationMillis = TWO_MINUTES_MILLIS))
+    }
+
+    // Regression guard for existing behavior (also passes on the pre-gate-change logic).
+    @Test
+    fun `a missing catalog entry fails open by crediting the streak and emits nothing`() {
+        val emitted = mutableListOf<AnalyticsEvent>()
+        assertTrue(runGate(entryId = "no-such-entry", elapsedSeconds = 0L, expectedDurationMillis = TEN_MINUTES_MILLIS, emitted = emitted))
+        assertTrue(emitted.isEmpty())
+    }
+
+    // Regression guard for existing behavior (also passes on the pre-gate-change logic).
+    @Test
+    fun `non-Completed reasons never credit even far above the threshold`() {
+        assertFalse(runGate(reason = SessionEndReason.Cancelled, elapsedSeconds = 10_000L, expectedDurationMillis = TWO_MINUTES_MILLIS))
+    }
+
+    @Test
+    fun `analytics still emits the real elapsed seconds when the gate denies credit`() {
+        val emitted = mutableListOf<AnalyticsEvent>()
+        val credited = runGate(elapsedSeconds = 100L, expectedDurationMillis = TWENTY_MINUTES_MILLIS, emitted = emitted)
+        assertFalse(credited)
+        val entry = requireNotNull(findMeditationCatalogEntry("calma"))
+        assertEquals(
+            listOf(
+                AnalyticsEvent.MeditationCompleted(
+                    AnalyticsId.of(entry),
+                    AccessDecisionValue.UNLOCKED,
+                    100L,
+                ),
+            ),
+            emitted,
+        )
+    }
+
+    @Test
+    fun `a real customized catalog entry flows through expectedDurationMillis into the gate`() {
+        // coherent_breathing declares 5 min; customized to 2 min it plays ~120s. The old
+        // declared-duration gate needed 150s and would have denied a full 2-minute session.
+        val entry = requireNotNull(findMeditationCatalogEntry("coherent_breathing"))
+        val customization = mapOf("durationMinutes" to "2", "breathsPerMinute" to "5")
+        val expected = expectedDurationMillis(entry.definition(customization), entry.approxDurationMinutes)
+        assertTrue(expected < entry.approxDurationMinutes * 60_000L)
+        assertTrue(runGate(entryId = entry.id, elapsedSeconds = expected / 1000L, expectedDurationMillis = expected))
+    }
+
+    @Test
+    fun `meetsCompletionThreshold is inclusive at half, false just below, and true at zero expected`() {
+        assertTrue(meetsCompletionThreshold(elapsedSeconds = 60L, expectedDurationMillis = TWO_MINUTES_MILLIS))
+        assertFalse(meetsCompletionThreshold(elapsedSeconds = 59L, expectedDurationMillis = TWO_MINUTES_MILLIS))
+        assertTrue(meetsCompletionThreshold(elapsedSeconds = 0L, expectedDurationMillis = 0L))
+        assertFalse(meetsCompletionThreshold(elapsedSeconds = 0L, expectedDurationMillis = TWO_MINUTES_MILLIS))
+    }
+
+    private companion object {
+        /** "calma" declares 5 minutes. */
+        const val CALMA_EXPECTED_MILLIS = 300_000L
+        const val TWO_MINUTES_MILLIS = 120_000L
+        const val TWENTY_MINUTES_MILLIS = 1_200_000L
+        const val TEN_MINUTES_MILLIS = 600_000L
     }
 }

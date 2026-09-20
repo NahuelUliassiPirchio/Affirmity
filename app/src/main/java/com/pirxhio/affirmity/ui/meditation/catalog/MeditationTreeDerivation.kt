@@ -45,16 +45,27 @@ private const val HALF_MINUTE_MILLIS = MILLIS_PER_MINUTE / 2
 
 /**
  * Session length shown to the user, in whole minutes — the single source of truth for both the
- * catalog list and the guided-meditation detail screen. Sums [definition]'s Fixed phase durations
- * with [Repeat] counts applied (see [fixedTotalMillis]), rounded to the nearest minute (30 s
- * rounds up), minimum 1, clamped to [Int.MAX_VALUE]. Falls back to the catalog-declared
- * [approxDurationMinutes] (clamped to at least 1) when the definition has no Fixed time.
+ * catalog list and the guided-meditation detail screen. Derived from [expectedDurationMillis] (so
+ * the "no fixed time -> declared approx" rule lives in exactly one place), rounded to the nearest
+ * minute (30 s rounds up), minimum 1, clamped to [Int.MAX_VALUE].
  */
 fun displayDurationMinutes(definition: MeditationDefinition, approxDurationMinutes: Int): Int {
-    val fixedTotalMillis = fixedTotalMillis(definition)
-    if (fixedTotalMillis <= 0L) return approxDurationMinutes.coerceAtLeast(1)
-    val minutes = (fixedTotalMillis + HALF_MINUTE_MILLIS) / MILLIS_PER_MINUTE
+    val expectedMillis = expectedDurationMillis(definition, approxDurationMinutes)
+    val minutes = (expectedMillis + HALF_MINUTE_MILLIS) / MILLIS_PER_MINUTE
     return minutes.coerceIn(1L, Int.MAX_VALUE.toLong()).toInt()
+}
+
+/**
+ * Expected wall-clock length of the session actually played, in millis: [fixedTotalMillis] of
+ * [definition] (customization and [Repeat] counts included), falling back to the catalog-declared
+ * [approxDurationMinutes] only when the definition has no Fixed time (e.g. manual-only phases).
+ * A mixed Manual + Fixed definition counts only its Fixed phases (theoretical today: no catalog
+ * entry uses Manual phases). Exact millis rather than [displayDurationMinutes] so a completion
+ * threshold is not biased by minute rounding (up to 30 s on short sessions).
+ */
+fun expectedDurationMillis(definition: MeditationDefinition, approxDurationMinutes: Int): Long {
+    val fixedMillis = fixedTotalMillis(definition)
+    return if (fixedMillis > 0L) fixedMillis else approxDurationMinutes.coerceAtLeast(1) * MILLIS_PER_MINUTE
 }
 
 /**

@@ -161,6 +161,26 @@ class DisplayDurationMinutesTest {
     }
 
     @Test
+    fun `expectedDurationMillis is the exact fixed total, not minute-rounded`() {
+        assertEquals(89_000L, expectedDurationMillis(singlePhase(89_000), approxDurationMinutes = 9))
+    }
+
+    @Test
+    fun `expectedDurationMillis applies Repeat counts`() {
+        val definition = MeditationDefinition(
+            id = "r",
+            root = Repeat("r", Phase(id = "a", duration = PhaseDuration.Fixed(10_000)), FixedCountRepetition(3)),
+        )
+        assertEquals(30_000L, expectedDurationMillis(definition, approxDurationMinutes = 9))
+    }
+
+    @Test
+    fun `expectedDurationMillis falls back to declared approx when there is no fixed time`() {
+        val definition = definitionOf(Phase(id = "m", duration = PhaseDuration.Manual))
+        assertEquals(420_000L, expectedDurationMillis(definition, approxDurationMinutes = 7))
+    }
+
+    @Test
     fun `every catalog entry declares a positive approx duration`() {
         meditationCatalog().forEach { entry ->
             assertTrue("${entry.id}: approxDurationMinutes must be > 0", entry.approxDurationMinutes > 0)
