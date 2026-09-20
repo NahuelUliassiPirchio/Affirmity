@@ -58,7 +58,9 @@ import com.pirxhio.affirmity.meditation.MeditationEvent
 import com.pirxhio.affirmity.meditation.MeditationRuntimeState
 import com.pirxhio.affirmity.meditation.RealSessionClock
 import com.pirxhio.affirmity.meditation.SessionEndReason
+import com.pirxhio.affirmity.meditation.SessionEndSummary
 import com.pirxhio.affirmity.meditation.SessionStatus
+import com.pirxhio.affirmity.meditation.SessionTracker
 import com.pirxhio.affirmity.meditation.TextDisplayCommandExecutor
 import com.pirxhio.affirmity.meditation.TimerCommandExecutor
 import com.pirxhio.affirmity.ui.meditation.catalog.CounterEmphasis
@@ -97,12 +99,14 @@ fun GuidedMeditationScreen(
     /** Routes an action-time denial through the caller's existing blocked-screen path. */
     onAccessBlocked: () -> Unit = {},
     /** Fired exactly once per playback session that reaches a terminal state, carrying the
-     * UI-local wall-clock elapsed duration (design D7 -- the engine tracks no session-wide
-     * elapsed) and the wall-clock instant the session started (for day-of-completion attribution
-     * across a local-midnight crossing, see [DayClock.attributedEpochDay]). Never fired when the
+     * a [SessionEndSummary]: the UI-local wall-clock elapsed duration (design D7 -- the engine
+     * tracks no session-wide elapsed), the ACTIVE elapsed seconds with paused time excluded (used
+     * by the streak-credit gate), and the wall-clock instant the session started (for
+     * day-of-completion attribution across a local-midnight crossing, see
+     * [DayClock.attributedEpochDay]). Never fired when the
      * screen is disposed from [SessionStatus.Idle] (EC-1) — a user who never pressed Start has not
      * spent anything. */
-    onSessionEnded: (SessionEndReason, elapsedSeconds: Long, startWallMillis: Long) -> Unit = { _, _, _ -> },
+    onSessionEnded: (SessionEndReason, SessionEndSummary) -> Unit = { _, _ -> },
     /** Called after any cancellation bookkeeping, to leave the screen. Owned by the caller. */
     onExit: () -> Unit = {},
     /** Spec 6 emit surface (REQ-5.2) -- fires `meditation_started` at the Start dispatch below. */
@@ -127,17 +131,13 @@ fun GuidedMeditationScreen(
     // -- a mid-session tier change must never make the banner appear/disappear mid-meditation.
     val showBannerAd = remember { shouldShowMeditationBanner(tierAtEntry()) }
 
-    // D7: UI-local wall clock, captured at the Start dispatch below and diffed at both terminal
-    // paths (Completed LaunchedEffect, Cancelled exit). Measures wall time including pauses --
-    // the honest engagement number, and zero engine change.
-    var sessionStartMillis by remember { mutableStateOf<Long?>(null) }
-    // Wall-clock (System.currentTimeMillis()), captured alongside sessionStartMillis but never used
-    // for duration math -- only to attribute the session to a calendar day (DayClock.
-    // attributedEpochDay), which the monotonic elapsedRealtime-based sessionStartMillis can't do.
-    var sessionStartWallMillis by remember { mutableStateOf<Long?>(null) }
-    fun elapsedSecondsSinceStart(): Long {
-        val start = sessionStartMillis ?: return 0L
-        return ((AndroidMonotonicTimeSource.nowMillis() - start) / 1000L).coerceAtLeast(0L)
+    // D7: UI-local session clocks, started at the Start dispatch below and summarised at both
+    // terminal paths (Completed LaunchedEffect, Cancelled exit). Wall elapsed includes pauses --
+    // the honest engagement number for analytics -- while active elapsed excludes them, so the
+    // streak-credit gate cannot be satisfied by pausing. The wall-clock start instant is only for
+    // calendar-day attribution (DayClock.attributedEpochDay). Zero engine change.
+    val sessionTracker = remember {
+        SessionTracker(monotonicTimeSource = AndroidMonotonicTimeSource, wallClockMillis = System::currentTimeMillis)
     }
 
     val definition = remember(entry, customization) { entry.definition(customization) }
@@ -184,7 +184,7 @@ fun GuidedMeditationScreen(
     // reaching Completed.
     LaunchedEffect(state.status) {
         if (state.status == SessionStatus.Completed) {
-            onSessionEnded(SessionEndReason.Completed, elapsedSecondsSinceStart(), sessionStartWallMillis ?: System.currentTimeMillis())
+            onSessionEnded(SessionEndReason.Completed, sessionTracker.summary())
         }
     }
 
@@ -204,7 +204,7 @@ fun GuidedMeditationScreen(
                 status = engine.state.value.status,
                 cancel = { engine.send(MeditationEvent.Cancel) },
                 onSessionEnded = { reason ->
-                    onSessionEnded(reason, elapsedSecondsSinceStart(), sessionStartWallMillis ?: System.currentTimeMillis())
+                    onSessionEnded(reason, sessionTracker.summary())
                 },
                 onExit = onExit,
             )
@@ -249,15 +249,20 @@ fun GuidedMeditationScreen(
             if (isMeditationLocked(currentAccess)) {
                 onAccessBlocked()
             } else {
-                sessionStartMillis = AndroidMonotonicTimeSource.nowMillis()
-                sessionStartWallMillis = System.currentTimeMillis()
+                sessionTracker.start()
                 onEvent(AnalyticsEvent.MeditationStarted(AnalyticsId.of(entry), currentAccess.provenance()))
                 onSessionStarted()
                 engine.send(MeditationEvent.Start)
             }
         },
-        onPause = { engine.send(MeditationEvent.Pause) },
-        onResume = { engine.send(MeditationEvent.Resume) },
+        onPause = {
+            sessionTracker.pause()
+            engine.send(MeditationEvent.Pause)
+        },
+        onResume = {
+            sessionTracker.resume()
+            engine.send(MeditationEvent.Resume)
+        },
         onSkip = { engine.send(MeditationEvent.Next) },
         onRelease = { engine.send(MeditationEvent.UserAction()) },
         // Item 13: session-complete had no visible exit affordance -- wired to the same single

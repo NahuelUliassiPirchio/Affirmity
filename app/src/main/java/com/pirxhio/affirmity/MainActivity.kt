@@ -435,13 +435,14 @@ internal fun decideMeditationLaunchStep(
     }
 
 /**
- * Anti-skip-abuse streak gate: true when [elapsedSeconds] covers at least
+ * Anti-skip-abuse streak gate: true when [activeElapsedSeconds] (ACTIVE time, paused time
+ * excluded -- never the wall-clock elapsed) covers at least
  * [MEDITATION_COMPLETION_MIN_ELAPSED_FRACTION] of [expectedDurationMillis] (inclusive). Compared
  * explicitly in Double so the Long-to-Double promotion is visible rather than implicit; both
  * operands are far below 2^53, so no precision is lost.
  */
-internal fun meetsCompletionThreshold(elapsedSeconds: Long, expectedDurationMillis: Long): Boolean =
-    (elapsedSeconds * MILLIS_PER_SECOND).toDouble() >=
+internal fun meetsCompletionThreshold(activeElapsedSeconds: Long, expectedDurationMillis: Long): Boolean =
+    (activeElapsedSeconds * MILLIS_PER_SECOND).toDouble() >=
         expectedDurationMillis.toDouble() * MEDITATION_COMPLETION_MIN_ELAPSED_FRACTION
 
 /**
@@ -450,19 +451,21 @@ internal fun meetsCompletionThreshold(elapsedSeconds: Long, expectedDurationMill
  * invoked if and only if [reason] is [SessionEndReason.Completed], while [consumePlaybackUnlock]
  * runs for every terminal reason -- without needing a Compose test harness.
  *
- * Spec 6 (D7, REQ-5.2): [elapsedSeconds] and [emit] are appended, existing call order preserved
+ * Spec 6 (D7, REQ-5.2): [wallElapsedSeconds] and [emit] are appended, existing call order preserved
  * EXACTLY -- [consumePlaybackUnlock] first, then [recordMeditationCompleted] only for `Completed`,
  * [emit] always last so a thrown analytics call can never reorder or skip either existing effect.
  *
  * [expectedDurationMillis] is the length of the definition actually played (customization
  * included), computed by the caller via `expectedDurationMillis(...)`. It drives the streak-credit
  * rule: `Completed` credits [recordMeditationCompleted] only if [meetsCompletionThreshold] holds
- * (at least half of it elapsed). Analytics is never affected by that gate.
+ * (at least half of it ACTIVELY elapsed, i.e. [activeElapsedSeconds], which excludes paused time).
+ * Analytics keeps reporting the wall-clock [wallElapsedSeconds] and is never affected by that gate.
  */
 internal fun handleGuidedMeditationSessionEnded(
     entryId: String,
     reason: SessionEndReason,
-    elapsedSeconds: Long,
+    wallElapsedSeconds: Long,
+    activeElapsedSeconds: Long,
     expectedDurationMillis: Long,
     accessDecision: AccessDecision,
     consumePlaybackUnlock: (String, SessionEndReason) -> Unit,
@@ -478,20 +481,21 @@ internal fun handleGuidedMeditationSessionEnded(
     // every phase in under a second earned full streak credit. `entry == null` (should never
     // happen for a real launch) fails open to the pre-existing unconditional behavior rather than
     // silently dropping a legitimate completion. Analytics below is UNCHANGED by this gate --
-    // MeditationCompleted still fires with the real elapsedSeconds so skip-abuse stays visible in
+    // MeditationCompleted still fires with the real wallElapsedSeconds so skip-abuse stays visible in
     // the data even when it isn't credited.
-    // The [expectedDurationMillis] PARAMETER (computed at the call site from the played,
-    // customized definition) is the base, so a shortened session that fully runs is credited and
-    // a lengthened one cannot be skipped through at half the catalog-declared time.
-    val meetsMinimumElapsed = entry == null || meetsCompletionThreshold(elapsedSeconds, expectedDurationMillis)
+    // The gate compares ACTIVE elapsed time (paused time excluded) against the
+    // [expectedDurationMillis] PARAMETER (computed at the call site from the played, customized
+    // definition), so a shortened session that fully runs is credited, a lengthened one cannot be
+    // skipped through at half the catalog-declared time, and pausing cannot pad the elapsed time.
+    val meetsMinimumElapsed = entry == null || meetsCompletionThreshold(activeElapsedSeconds, expectedDurationMillis)
     if (reason == SessionEndReason.Completed && meetsMinimumElapsed) recordMeditationCompleted()
     if (entry == null) return
     val analyticsId = AnalyticsId.of(entry)
     emit(
         if (reason == SessionEndReason.Completed) {
-            AnalyticsEvent.MeditationCompleted(analyticsId, accessDecision.provenance(), elapsedSeconds)
+            AnalyticsEvent.MeditationCompleted(analyticsId, accessDecision.provenance(), wallElapsedSeconds)
         } else {
-            AnalyticsEvent.MeditationCancelled(analyticsId, elapsedSeconds)
+            AnalyticsEvent.MeditationCancelled(analyticsId, wallElapsedSeconds)
         },
     )
 }
@@ -1301,11 +1305,12 @@ fun AffirmityApp(
                             // call site. consumeMeditationPlaybackUnlock runs for BOTH terminal
                             // reasons (an ad watched and then abandoned mid-session is still a
                             // use); recordMeditationCompleted only for Completed.
-                            onSessionEnded = { reason, elapsedSeconds, startWallMillis ->
+                            onSessionEnded = { reason, summary ->
                                 handleGuidedMeditationSessionEnded(
                                     entryId = selectedMeditationEntry.id,
                                     reason = reason,
-                                    elapsedSeconds = elapsedSeconds,
+                                    wallElapsedSeconds = summary.wallElapsedSeconds,
+                                    activeElapsedSeconds = summary.activeElapsedSeconds,
                                     expectedDurationMillis = expectedDurationMillis(
                                         selectedMeditationEntry.definition(sessionCustomization),
                                         selectedMeditationEntry.approxDurationMinutes,
@@ -1317,7 +1322,7 @@ fun AffirmityApp(
                                         System.currentTimeMillis(),
                                     ),
                                     consumePlaybackUnlock = appState::consumeMeditationPlaybackUnlock,
-                                    recordMeditationCompleted = { appState.recordMeditationCompleted(startWallMillis) },
+                                    recordMeditationCompleted = { appState.recordMeditationCompleted(summary.startWallMillis) },
                                     emit = appState::logAnalyticsEvent,
                                 )
                             },

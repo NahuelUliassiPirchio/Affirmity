@@ -273,7 +273,8 @@ class MainActivityTest {
         handleGuidedMeditationSessionEnded(
             entryId = "calma",
             reason = SessionEndReason.Completed,
-            elapsedSeconds = elapsedAboveThreshold,
+            wallElapsedSeconds = elapsedAboveThreshold,
+            activeElapsedSeconds = elapsedAboveThreshold,
             expectedDurationMillis = CALMA_EXPECTED_MILLIS,
             accessDecision = AccessDecision.Unlocked,
             consumePlaybackUnlock = { id, reason -> consumedCalls.add(id to reason) },
@@ -296,7 +297,8 @@ class MainActivityTest {
         handleGuidedMeditationSessionEnded(
             entryId = "calma",
             reason = SessionEndReason.Completed,
-            elapsedSeconds = elapsedBelowThreshold,
+            wallElapsedSeconds = elapsedBelowThreshold,
+            activeElapsedSeconds = elapsedBelowThreshold,
             expectedDurationMillis = CALMA_EXPECTED_MILLIS,
             accessDecision = AccessDecision.Unlocked,
             consumePlaybackUnlock = { id, reason -> consumedCalls.add(id to reason) },
@@ -317,7 +319,8 @@ class MainActivityTest {
         handleGuidedMeditationSessionEnded(
             entryId = "calma",
             reason = SessionEndReason.Cancelled,
-            elapsedSeconds = 7L,
+            wallElapsedSeconds = 7L,
+            activeElapsedSeconds = 7L,
             expectedDurationMillis = CALMA_EXPECTED_MILLIS,
             accessDecision = AccessDecision.Unlocked,
             consumePlaybackUnlock = { id, reason -> consumedCalls.add(id to reason) },
@@ -339,7 +342,8 @@ class MainActivityTest {
         handleGuidedMeditationSessionEnded(
             entryId = "calma",
             reason = SessionEndReason.Completed,
-            elapsedSeconds = 123L,
+            wallElapsedSeconds = 123L,
+            activeElapsedSeconds = 123L,
             expectedDurationMillis = CALMA_EXPECTED_MILLIS,
             accessDecision = AccessDecision.Unlocked,
             consumePlaybackUnlock = { _, _ -> },
@@ -367,7 +371,8 @@ class MainActivityTest {
         handleGuidedMeditationSessionEnded(
             entryId = "calma",
             reason = SessionEndReason.Cancelled,
-            elapsedSeconds = 9L,
+            wallElapsedSeconds = 9L,
+            activeElapsedSeconds = 9L,
             expectedDurationMillis = CALMA_EXPECTED_MILLIS,
             accessDecision = AccessDecision.LockedNeedsPro,
             consumePlaybackUnlock = { _, _ -> },
@@ -382,7 +387,8 @@ class MainActivityTest {
     // --- Completion gate uses the PLAYED (customized) duration, not the catalog-declared one -------
 
     private fun runGate(
-        elapsedSeconds: Long,
+        wallElapsedSeconds: Long,
+        activeElapsedSeconds: Long,
         expectedDurationMillis: Long,
         entryId: String = "calma",
         reason: SessionEndReason = SessionEndReason.Completed,
@@ -392,7 +398,8 @@ class MainActivityTest {
         handleGuidedMeditationSessionEnded(
             entryId = entryId,
             reason = reason,
-            elapsedSeconds = elapsedSeconds,
+            wallElapsedSeconds = wallElapsedSeconds,
+            activeElapsedSeconds = activeElapsedSeconds,
             expectedDurationMillis = expectedDurationMillis,
             accessDecision = AccessDecision.Unlocked,
             consumePlaybackUnlock = { _, _ -> },
@@ -405,39 +412,39 @@ class MainActivityTest {
     @Test
     fun `a customized-shorter session that fully completes is credited`() {
         // "calma" declares 5 min (150s threshold); customized to 2 min the user plays 120s.
-        assertTrue(runGate(elapsedSeconds = 120L, expectedDurationMillis = TWO_MINUTES_MILLIS))
+        assertTrue(runGate(wallElapsedSeconds = 120L, activeElapsedSeconds = 120L, expectedDurationMillis = TWO_MINUTES_MILLIS))
     }
 
     @Test
     fun `a customized-longer session skipped at half the declared time is not credited`() {
         // Customized to 20 min: 200s beats the declared 150s threshold but not the played 600s one.
-        assertFalse(runGate(elapsedSeconds = 200L, expectedDurationMillis = TWENTY_MINUTES_MILLIS))
+        assertFalse(runGate(wallElapsedSeconds = 200L, activeElapsedSeconds = 200L, expectedDurationMillis = TWENTY_MINUTES_MILLIS))
     }
 
     @Test
     fun `the threshold is inclusive at exactly half the expected duration`() {
-        assertTrue(runGate(elapsedSeconds = 60L, expectedDurationMillis = TWO_MINUTES_MILLIS))
-        assertFalse(runGate(elapsedSeconds = 59L, expectedDurationMillis = TWO_MINUTES_MILLIS))
+        assertTrue(runGate(wallElapsedSeconds = 60L, activeElapsedSeconds = 60L, expectedDurationMillis = TWO_MINUTES_MILLIS))
+        assertFalse(runGate(wallElapsedSeconds = 59L, activeElapsedSeconds = 59L, expectedDurationMillis = TWO_MINUTES_MILLIS))
     }
 
     // Regression guard for existing behavior (also passes on the pre-gate-change logic).
     @Test
     fun `a missing catalog entry fails open by crediting the streak and emits nothing`() {
         val emitted = mutableListOf<AnalyticsEvent>()
-        assertTrue(runGate(entryId = "no-such-entry", elapsedSeconds = 0L, expectedDurationMillis = TEN_MINUTES_MILLIS, emitted = emitted))
+        assertTrue(runGate(entryId = "no-such-entry", wallElapsedSeconds = 0L, activeElapsedSeconds = 0L, expectedDurationMillis = TEN_MINUTES_MILLIS, emitted = emitted))
         assertTrue(emitted.isEmpty())
     }
 
     // Regression guard for existing behavior (also passes on the pre-gate-change logic).
     @Test
     fun `non-Completed reasons never credit even far above the threshold`() {
-        assertFalse(runGate(reason = SessionEndReason.Cancelled, elapsedSeconds = 10_000L, expectedDurationMillis = TWO_MINUTES_MILLIS))
+        assertFalse(runGate(reason = SessionEndReason.Cancelled, wallElapsedSeconds = 10_000L, activeElapsedSeconds = 10_000L, expectedDurationMillis = TWO_MINUTES_MILLIS))
     }
 
     @Test
     fun `analytics still emits the real elapsed seconds when the gate denies credit`() {
         val emitted = mutableListOf<AnalyticsEvent>()
-        val credited = runGate(elapsedSeconds = 100L, expectedDurationMillis = TWENTY_MINUTES_MILLIS, emitted = emitted)
+        val credited = runGate(wallElapsedSeconds = 100L, activeElapsedSeconds = 100L, expectedDurationMillis = TWENTY_MINUTES_MILLIS, emitted = emitted)
         assertFalse(credited)
         val entry = requireNotNull(findMeditationCatalogEntry("calma"))
         assertEquals(
@@ -460,15 +467,35 @@ class MainActivityTest {
         val customization = mapOf("durationMinutes" to "2", "breathsPerMinute" to "5")
         val expected = expectedDurationMillis(entry.definition(customization), entry.approxDurationMinutes)
         assertTrue(expected < entry.approxDurationMinutes * 60_000L)
-        assertTrue(runGate(entryId = entry.id, elapsedSeconds = expected / 1000L, expectedDurationMillis = expected))
+        assertTrue(runGate(entryId = entry.id, wallElapsedSeconds = expected / 1000L, activeElapsedSeconds = expected / 1000L, expectedDurationMillis = expected))
     }
 
     @Test
     fun `meetsCompletionThreshold is inclusive at half, false just below, and true at zero expected`() {
-        assertTrue(meetsCompletionThreshold(elapsedSeconds = 60L, expectedDurationMillis = TWO_MINUTES_MILLIS))
-        assertFalse(meetsCompletionThreshold(elapsedSeconds = 59L, expectedDurationMillis = TWO_MINUTES_MILLIS))
-        assertTrue(meetsCompletionThreshold(elapsedSeconds = 0L, expectedDurationMillis = 0L))
-        assertFalse(meetsCompletionThreshold(elapsedSeconds = 0L, expectedDurationMillis = TWO_MINUTES_MILLIS))
+        assertTrue(meetsCompletionThreshold(activeElapsedSeconds = 60L, expectedDurationMillis = TWO_MINUTES_MILLIS))
+        assertFalse(meetsCompletionThreshold(activeElapsedSeconds = 59L, expectedDurationMillis = TWO_MINUTES_MILLIS))
+        assertTrue(meetsCompletionThreshold(activeElapsedSeconds = 0L, expectedDurationMillis = 0L))
+        assertFalse(meetsCompletionThreshold(activeElapsedSeconds = 0L, expectedDurationMillis = TWO_MINUTES_MILLIS))
+    }
+
+    @Test
+    fun `time spent paused does not count toward the gate`() {
+        // 300 s of wall clock, of which only 20 s was active; the 120 s session needs 60 s active.
+        val credited = runGate(wallElapsedSeconds = 300L, activeElapsedSeconds = 20L, expectedDurationMillis = TWO_MINUTES_MILLIS)
+        assertFalse(credited)
+    }
+
+    @Test
+    fun `analytics keeps reporting wall elapsed seconds when paused time denies the gate`() {
+        val emitted = mutableListOf<AnalyticsEvent>()
+        runGate(wallElapsedSeconds = 300L, activeElapsedSeconds = 20L, expectedDurationMillis = TWO_MINUTES_MILLIS, emitted = emitted)
+        val event = emitted.single() as AnalyticsEvent.MeditationCompleted
+        assertEquals(300L, event.elapsedSeconds)
+    }
+
+    @Test
+    fun `active time alone meets the gate even when wall elapsed is huge`() {
+        assertTrue(runGate(wallElapsedSeconds = 900L, activeElapsedSeconds = 60L, expectedDurationMillis = TWO_MINUTES_MILLIS))
     }
 
     private companion object {

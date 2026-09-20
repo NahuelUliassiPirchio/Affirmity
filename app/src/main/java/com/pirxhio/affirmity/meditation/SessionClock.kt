@@ -120,3 +120,42 @@ class RealSessionClock(
         }
     }
 }
+
+/**
+ * Session-wide ACTIVE elapsed time: like a stopwatch that [pause] freezes and [resume] continues,
+ * so time spent paused never counts. Pure and timestamp-based over an injected
+ * [MonotonicTimeSource]; redundant [pause]/[resume] calls and calls before [start] are ignored.
+ * [start] resets accumulation to zero and restarts the timer, so calling it again begins afresh.
+ * Feeds the streak-credit gate; analytics keeps its own wall-clock elapsed.
+ */
+class ActiveElapsedTimer(private val timeSource: MonotonicTimeSource) {
+    private var started = false
+    private var running = false
+    private var runningSinceMillis = 0L
+    private var accumulatedMillis = 0L
+
+    fun start() {
+        started = true
+        running = true
+        accumulatedMillis = 0L
+        runningSinceMillis = timeSource.nowMillis()
+    }
+
+    fun pause() {
+        if (!started || !running) return
+        accumulatedMillis = elapsedMillis()
+        running = false
+    }
+
+    fun resume() {
+        if (!started || running) return
+        runningSinceMillis = timeSource.nowMillis()
+        running = true
+    }
+
+    fun elapsedMillis(): Long = when {
+        !started -> 0L
+        running -> accumulatedMillis + (timeSource.nowMillis() - runningSinceMillis).coerceAtLeast(0L)
+        else -> accumulatedMillis
+    }
+}
