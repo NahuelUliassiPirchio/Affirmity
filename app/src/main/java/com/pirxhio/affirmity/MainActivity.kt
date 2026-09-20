@@ -112,6 +112,7 @@ import com.pirxhio.affirmity.ui.groups.themeAccessDecision
 import com.pirxhio.affirmity.ui.healer.StreakHealerGrantedScreen
 import com.pirxhio.affirmity.ui.meditation.GuidedMeditationScreen
 import com.pirxhio.affirmity.ui.meditation.MeditationScreen
+import com.pirxhio.affirmity.ui.meditation.shouldShowMeditationBanner
 import com.pirxhio.affirmity.ui.meditation.catalog.expectedDurationMillis
 import com.pirxhio.affirmity.ui.meditation.catalog.findMeditationCatalogEntry
 import com.pirxhio.affirmity.ui.meditation.catalog.isMeditationLocked
@@ -1761,6 +1762,7 @@ fun AffirmityApp(
                 }
 
                 AppDestinations.MEDITAR -> MeditationScreen(
+                    showBannerAd = shouldShowMeditationBanner(appState.entitlementTier.value),
                     initialDurationSeconds = appState.meditationDurationSeconds.value ?: (15 * 60),
                     onDurationSelected = { seconds -> appState.recordMeditationDurationSelected(seconds) },
                     onSessionCompleted = { durationSeconds, startWallMillis ->

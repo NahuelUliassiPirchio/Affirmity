@@ -64,7 +64,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.pirxhio.affirmity.BuildConfig
 import com.pirxhio.affirmity.R
+import com.pirxhio.affirmity.ads.BannerAdView
 import com.pirxhio.affirmity.access.AccessDecision
 import com.pirxhio.affirmity.access.AdUnlockPolicy
 import com.pirxhio.affirmity.analytics.AnalyticsContentType
@@ -182,6 +184,9 @@ fun MeditationScreen(
     /** Spec 6 emit surface (REQ-5.2/5.4) -- fires `meditation_entry_tapped` and
      *  `content_locked_tapped` from the Discover shelves. */
     onEvent: (AnalyticsEvent) -> Unit = {},
+    /** Resolved by the caller via [shouldShowMeditationBanner]; the banner itself only mounts
+     *  once a free session has been started. */
+    showBannerAd: Boolean = false,
 ) {
     var durationSeconds by remember { mutableIntStateOf(initialDurationSeconds) }
     var secondsRemaining by remember { mutableIntStateOf(initialDurationSeconds) }
@@ -478,6 +483,15 @@ fun MeditationScreen(
             item {
                 Spacer(modifier = Modifier.height(16.dp))
             }
+        }
+
+        // Keyed on hasStarted (true across pause/resume), not isRunning: pausing must not tear
+        // down and re-request the banner. Overlaid, so the timer layout never shifts on load.
+        if (showBannerAd && hasStarted) {
+            BannerAdView(
+                adUnitId = BuildConfig.ADMOB_BANNER_UNIT,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
         }
     }
 
