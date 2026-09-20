@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.ui.meditation.catalog
 
+import com.pirxhio.affirmity.meditation.FixedCountRepetition
 import com.pirxhio.affirmity.meditation.MeditationCommand
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationNode
@@ -38,3 +39,35 @@ fun fixedPhaseDurationsById(definition: MeditationDefinition): Map<String, Long>
     collectPhases(definition.root)
         .mapNotNull { phase -> (phase.duration as? PhaseDuration.Fixed)?.let { phase.id to it.millis } }
         .toMap()
+
+private const val MILLIS_PER_MINUTE = 60_000L
+private const val HALF_MINUTE_MILLIS = MILLIS_PER_MINUTE / 2
+
+/**
+ * Session length shown to the user, in whole minutes — the single source of truth for both the
+ * catalog list and the guided-meditation detail screen. Sums [definition]'s Fixed phase durations
+ * with [Repeat] counts applied (see [fixedTotalMillis]), rounded to the nearest minute (30 s
+ * rounds up), minimum 1, clamped to [Int.MAX_VALUE]. Falls back to the catalog-declared
+ * [approxDurationMinutes] (clamped to at least 1) when the definition has no Fixed time.
+ */
+fun displayDurationMinutes(definition: MeditationDefinition, approxDurationMinutes: Int): Int {
+    val fixedTotalMillis = fixedTotalMillis(definition)
+    if (fixedTotalMillis <= 0L) return approxDurationMinutes.coerceAtLeast(1)
+    val minutes = (fixedTotalMillis + HALF_MINUTE_MILLIS) / MILLIS_PER_MINUTE
+    return minutes.coerceIn(1L, Int.MAX_VALUE.toLong()).toInt()
+}
+
+/**
+ * Total Fixed-phase time of [definition] with [Repeat] iteration counts applied: a
+ * [FixedCountRepetition] multiplies its child's total by its count (nested repeats multiply
+ * through); any other strategy is counted once, as its length is not knowable statically.
+ * Unlike [fixedPhaseDurationsById] this never collapses same-id phases. [PhaseDuration.Manual]
+ * phases contribute nothing.
+ */
+internal fun fixedTotalMillis(definition: MeditationDefinition): Long = nodeFixedTotalMillis(definition.root)
+
+private fun nodeFixedTotalMillis(node: MeditationNode): Long = when (node) {
+    is Phase -> (node.duration as? PhaseDuration.Fixed)?.millis ?: 0L
+    is MeditationSequence -> node.children.sumOf(::nodeFixedTotalMillis)
+    is Repeat -> nodeFixedTotalMillis(node.child) * ((node.strategy as? FixedCountRepetition)?.times ?: 1)
+}

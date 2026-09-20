@@ -13,7 +13,7 @@ fun interface RepetitionStrategy {
     fun shouldContinue(completedIterationIndex: Int, context: MeditationRuntimeState): Boolean
 }
 
-class FixedCountRepetition(private val times: Int) : RepetitionStrategy {
+class FixedCountRepetition(val times: Int) : RepetitionStrategy {
     init {
         require(times > 0) { "times must be > 0, got $times" }
     }

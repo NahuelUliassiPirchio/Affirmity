@@ -63,6 +63,7 @@ import com.pirxhio.affirmity.meditation.TextDisplayCommandExecutor
 import com.pirxhio.affirmity.meditation.TimerCommandExecutor
 import com.pirxhio.affirmity.ui.meditation.catalog.CounterEmphasis
 import com.pirxhio.affirmity.ui.meditation.catalog.MeditationCatalogEntry
+import com.pirxhio.affirmity.ui.meditation.catalog.displayDurationMinutes
 import com.pirxhio.affirmity.ui.meditation.catalog.fixedPhaseDurationsById
 import com.pirxhio.affirmity.ui.meditation.catalog.isMeditationLocked
 
@@ -142,6 +143,9 @@ fun GuidedMeditationScreen(
     val definition = remember(entry, customization) { entry.definition(customization) }
     val textExecutor = remember(definition) { TextDisplayCommandExecutor() }
     val phaseDurations = remember(definition) { fixedPhaseDurationsById(definition) }
+    val idleDurationMinutes = remember(definition, entry.approxDurationMinutes) {
+        displayDurationMinutes(definition, entry.approxDurationMinutes)
+    }
     val latestCueSoundEnabled = rememberUpdatedState(cueSoundEnabled)
 
     // The engine and audioExecutor/TimerCommandExecutor need each other before either exists —
@@ -236,6 +240,7 @@ fun GuidedMeditationScreen(
         entry = entry,
         customization = customization,
         phaseDurations = phaseDurations,
+        idleDurationMinutes = idleDurationMinutes,
         showBannerAd = showBannerAd,
         cueSoundEnabled = cueSoundEnabled,
         onToggleCueSound = onToggleCueSound,
@@ -293,6 +298,7 @@ private fun GuidedMeditationContent(
     entry: MeditationCatalogEntry,
     customization: Map<String, String>,
     phaseDurations: Map<String, Long>,
+    idleDurationMinutes: Int,
     showBannerAd: Boolean,
     cueSoundEnabled: Boolean,
     onToggleCueSound: () -> Unit,
@@ -381,15 +387,12 @@ private fun GuidedMeditationContent(
                         color = MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.Center,
                     )
-                    val durationMinutes = idleDurationMinutes(phaseDurations, entry.approxDurationMinutes)
-                    if (durationMinutes != null) {
-                        Text(
-                            text = stringResource(R.string.guided_meditation_idle_duration_minutes, durationMinutes),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 8.dp),
-                        )
-                    }
+                    Text(
+                        text = stringResource(R.string.guided_meditation_idle_duration_minutes, idleDurationMinutes),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
                 }
             } else {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -525,22 +528,6 @@ private fun RoundIconButton(
     ) {
         Icon(imageVector = icon, contentDescription = contentDescription, tint = MaterialTheme.colorScheme.onPrimaryContainer)
     }
-}
-
-/**
- * Best-effort session length for the Idle summary, in whole minutes. Prefers the sum of this
- * entry's actually-customized [phaseDurations] (Fixed-duration phases only, per
- * [com.pirxhio.affirmity.ui.meditation.catalog.fixedPhaseDurationsById]) rounded up, so a
- * duration/rounds customization the user just picked on the previous screen is reflected here.
- * Falls back to the catalog-declared [approxDurationMinutes] when no phase in this entry has a
- * Fixed duration (e.g. an entry driven entirely by manual release or variable-length phases),
- * and is never null in practice since every entry declares an approximate duration.
- */
-private fun idleDurationMinutes(phaseDurations: Map<String, Long>, approxDurationMinutes: Int): Int? {
-    val fixedTotalMillis = phaseDurations.values.sum()
-    if (fixedTotalMillis <= 0L) return approxDurationMinutes.takeIf { it > 0 }
-    val wholeMinutesRoundedUp = ((fixedTotalMillis + 59_999L) / 60_000L).toInt()
-    return wholeMinutesRoundedUp.coerceAtLeast(1)
 }
 
 /**

@@ -77,6 +77,7 @@ import com.pirxhio.affirmity.meditation.RealSessionClock
 import com.pirxhio.affirmity.ui.groups.GroupBadge
 import com.pirxhio.affirmity.ui.meditation.catalog.MeditationCatalogEntry
 import com.pirxhio.affirmity.ui.meditation.catalog.deriveMeditationBadge
+import com.pirxhio.affirmity.ui.meditation.catalog.displayDurationMinutes
 import com.pirxhio.affirmity.ui.meditation.catalog.isMeditationLocked
 import com.pirxhio.affirmity.ui.theme.OnPremiumContainerDark
 import com.pirxhio.affirmity.ui.theme.OnPremiumContainerLight
@@ -791,7 +792,7 @@ private fun MeditationSessionCard(
             )
         }
         Text(
-            text = stringResource(R.string.guided_meditation_idle_duration_minutes, entry.approxDurationMinutes),
+            text = stringResource(R.string.guided_meditation_idle_duration_minutes, remember(entry) { listDurationMinutes(entry) }),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 2.dp),
@@ -947,7 +948,7 @@ private fun MeditationPrimerSheet(
                         )
                     }
                     Text(
-                        text = "${stringResource(R.string.guided_meditation_idle_duration_minutes, entry.approxDurationMinutes)} • ${stringResource(entry.categoryRes)}",
+                        text = "${stringResource(R.string.guided_meditation_idle_duration_minutes, remember(entry) { listDurationMinutes(entry) })} • ${stringResource(entry.categoryRes)}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 3.dp),
@@ -1008,3 +1009,7 @@ private fun formatTime(totalSeconds: Int): String {
     val s = totalSeconds % 60
     return "%02d:%02d".format(m, s)
 }
+
+/** List-row duration from the entry's default (uncustomized) definition, matching the detail screen. */
+private fun listDurationMinutes(entry: MeditationCatalogEntry): Int =
+    displayDurationMinutes(entry.definition(emptyMap()), entry.approxDurationMinutes)

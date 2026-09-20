@@ -35,8 +35,8 @@ data class MeditationPresentation(
  */
 data class MeditationCounter(
     val repeatId: String,
-    /** Denominator. Declared rather than derived because `FixedCountRepetition.times` is private
-     * and widening it is forbidden by DC-1a. */
+    /** Denominator. Declared here rather than read from the tree's `FixedCountRepetition.times`,
+     * so the counter label stays editorial and independent of how the tree is built. */
     val total: Int,
     /** Two-arg label, e.g. `R.string.guided_meditation_round_label` = "Ronda %1$d de %2$d". */
     @StringRes val labelRes: Int,

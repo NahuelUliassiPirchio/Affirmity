@@ -58,7 +58,8 @@ sealed interface PhaseDuration {
  * The whole meditation: a stable [id] plus the root of its node tree. [variables] are the
  * meditation's configurable inputs (e.g. rounds, breaths per round) — carried into
  * [MeditationRuntimeState.variables] for strategies/future dynamic behavior to read, even though
- * the current [FixedCountRepetition] captures its count directly rather than reading it back out.
+ * the current [FixedCountRepetition] captures its count directly (exposed as
+ * [FixedCountRepetition.times]) rather than reading it back out of these variables.
  */
 data class MeditationDefinition(
     val id: String,
