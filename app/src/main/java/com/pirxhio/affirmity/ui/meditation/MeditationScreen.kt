@@ -201,7 +201,9 @@ fun MeditationScreen(
     val context = LocalContext.current
     val gongPlayer = remember { MediaPlayer.create(context, R.raw.meditation_gong) }
     DisposableEffect(Unit) {
-        onDispose { gongPlayer.release() }
+        // Not released outright: a streak-healer grant can replace the whole UI right after
+        // completion, and releasing here would cut the gong that was just started.
+        onDispose { releaseAfterPlayback(gongPlayer.asReleasablePlayer()) }
     }
 
     val scope = rememberCoroutineScope()
