@@ -143,6 +143,21 @@ fun AffirmationsScreen(
         pageCount = { virtualPageCount }
     )
 
+    // VerticalPager's pageCount lambda re-evaluates live on every recomposition (so it already
+    // reflects a shrunk/grown `affirmations` after a "Your feed" update), but the library does NOT
+    // reclaim `currentPage` when pageCount shrinks below it: if the user was deep into the virtual
+    // range and the feed then shrinks enough that their absolute page is now >= the new
+    // virtualPageCount, there are no higher-indexed pages left to scroll forward into -- forward
+    // swipes look permanently stuck while backward swipes keep working (plenty of lower-indexed
+    // virtual pages remain). Only re-centers when that's actually happened, so a feed update that
+    // leaves the current page safely in range never disturbs the user's position.
+    LaunchedEffect(virtualPageCount) {
+        if (pagerState.currentPage >= virtualPageCount) {
+            val safePage = virtualPageCount / 2 - (virtualPageCount / 2) % affirmations.size
+            pagerState.scrollToPage(safePage)
+        }
+    }
+
     // Counts as "viewed" once the swipe settles on a new page, matching what a user
     // would perceive as having actually read that affirmation (vs. a mid-swipe frame).
     // drop(1): snapshotFlow emits the current settledPage immediately on collection, before any
