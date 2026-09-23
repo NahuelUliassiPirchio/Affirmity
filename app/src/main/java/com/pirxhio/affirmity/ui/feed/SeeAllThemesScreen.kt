@@ -21,15 +21,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -49,10 +46,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.AccessDecision
-import com.pirxhio.affirmity.analytics.AnalyticsContentType
 import com.pirxhio.affirmity.analytics.AnalyticsEvent
-import com.pirxhio.affirmity.analytics.AnalyticsId
-import com.pirxhio.affirmity.analytics.provenance
 import com.pirxhio.affirmity.ui.groups.AffirmationGroup
 import com.pirxhio.affirmity.ui.groups.CatalogTheme
 import com.pirxhio.affirmity.ui.groups.catalogThemes
@@ -412,55 +406,6 @@ private fun AccentIcon(group: AffirmationGroup, accent: Color, ink: Color) {
             contentDescription = null,
             tint = ink,
             modifier = Modifier.size(26.dp),
-        )
-    }
-}
-
-/** One theme as a chip: a selectable [InputChip] when unlocked (tap toggles it in/out of the
- *  draft feed), or a muted, lock-icon [AssistChip] when locked -- tapping a locked chip fires the
- *  same [AnalyticsEvent.ContentLockedTapped] the old `PremiumThemeRow` fired, then routes to
- *  upgrade. No trailing close icon here (unlike [CurrentFeedSection]'s chips): this is
- *  add/remove-by-tap on the whole chip, not a dedicated remove action. */
-@Composable
-private fun CatalogThemeChip(
-    theme: CatalogTheme,
-    checked: Boolean,
-    decision: AccessDecision,
-    onToggleTheme: (themeId: String) -> Unit,
-    onUpgradeClick: () -> Unit,
-    onEvent: (AnalyticsEvent) -> Unit,
-) {
-    if (isThemeToggleable(decision)) {
-        InputChip(
-            selected = checked,
-            onClick = { onToggleTheme(theme.id) },
-            label = { Text(theme.label) },
-        )
-    } else {
-        AssistChip(
-            onClick = {
-                onEvent(
-                    AnalyticsEvent.ContentLockedTapped(
-                        AnalyticsId.of(theme),
-                        AnalyticsContentType.AFFIRMATION_GROUP,
-                        decision.provenance(),
-                    ),
-                )
-                onUpgradeClick()
-            },
-            label = { Text(theme.label) },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Filled.Lock,
-                    contentDescription = stringResource(R.string.your_feed_locked_theme_a11y),
-                    modifier = Modifier.size(AssistChipDefaults.IconSize),
-                )
-            },
-            colors = AssistChipDefaults.assistChipColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                leadingIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
         )
     }
 }
