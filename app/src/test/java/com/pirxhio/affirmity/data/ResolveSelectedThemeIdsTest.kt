@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.data
 
+import com.pirxhio.affirmity.data.local.FeedSources
 import com.pirxhio.affirmity.ui.groups.catalogThemes
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -122,13 +123,38 @@ class ResolveSelectedThemeIdsTest {
     }
 
     @Test
-    fun `an empty draft is never valid, regardless of custom affirmations -- personalizadas never factors in`() {
-        assertFalse(isDraftThemeSelectionValid(emptySet()))
+    fun `an empty draft with no feed sources on is never valid, regardless of custom affirmations -- personalizadas never factors in`() {
+        assertFalse(
+            isDraftThemeSelectionValid(
+                emptySet(),
+                FeedSources(includeFavorites = false, includeOwn = false),
+            ),
+        )
     }
 
     @Test
     fun `a non-empty draft is valid`() {
-        assertTrue(isDraftThemeSelectionValid(setOf("u1.t1")))
+        assertTrue(isDraftThemeSelectionValid(setOf("u1.t1"), FeedSources()))
+    }
+
+    @Test
+    fun `an empty draft is valid when favorites alone is on`() {
+        assertTrue(
+            isDraftThemeSelectionValid(
+                emptySet(),
+                FeedSources(includeFavorites = true, includeOwn = false),
+            ),
+        )
+    }
+
+    @Test
+    fun `an empty draft is valid when own affirmations alone is on`() {
+        assertTrue(
+            isDraftThemeSelectionValid(
+                emptySet(),
+                FeedSources(includeFavorites = false, includeOwn = true),
+            ),
+        )
     }
 
     // --- Wiring sanity: every catalog theme resolves to a non-blank derived label -------------

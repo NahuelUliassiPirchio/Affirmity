@@ -292,9 +292,14 @@ fun resolveSelectedThemeIds(
 }
 
 /** Minimum-selection rule used by the "Your feed" screen before it commits a draft: at least one
- *  theme must be selected. `personalizadas` never factors in here (scope decision #2) -- it is no
- *  longer part of the toggleable theme selection at all, so it can't satisfy or violate this. */
-internal fun isDraftThemeSelectionValid(draftThemeIds: Set<String>): Boolean = draftThemeIds.isNotEmpty()
+ *  theme must be selected, UNLESS an independent feed source ([FeedSources.includeFavorites] or
+ *  [FeedSources.includeOwn]) is on -- both already contribute rows to [filteredAffirmations] with
+ *  zero themes selected (see its kdoc), so requiring a theme on top of that blocked users from
+ *  running a feed made entirely of favourites and/or their own affirmations. `personalizadas`
+ *  itself never factors in here (scope decision #2) -- it is no longer part of the toggleable
+ *  theme selection at all, so it can't satisfy or violate this. */
+internal fun isDraftThemeSelectionValid(draftThemeIds: Set<String>, feedSources: FeedSources): Boolean =
+    draftThemeIds.isNotEmpty() || feedSources.includeFavorites || feedSources.includeOwn
 
 /**
  * Pure migration-default resolution for the onboarding guide's tri-state "seen" flag (spec R1.3,
@@ -529,10 +534,11 @@ class AffirmityAppState(
 
     private var themeDraftInitialized = false
 
-    /** True when [draftThemeIds] is non-empty. Unlike the old group-level rule, `personalizadas`
-     * never factors in (scope decision #2) -- there is nothing to carve out for it. */
+    /** True when [draftThemeIds] is non-empty, or when [feedSources] can carry the feed on its own
+     * (Favorites and/or Mine). Unlike the old group-level rule, `personalizadas` never factors in
+     * (scope decision #2) -- there is nothing to carve out for it. */
     val isDraftThemeSelectionValid: Boolean
-        get() = isDraftThemeSelectionValid(draftThemeIds.value)
+        get() = isDraftThemeSelectionValid(draftThemeIds.value, feedSources.value)
 
     /** The feed's list: every OWNED (`personalizadas`) affirmation unconditionally (scope decision
      * #2), plus every CATALOG affirmation whose theme is in the committed selection AND still
