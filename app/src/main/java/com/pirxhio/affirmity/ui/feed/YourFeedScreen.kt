@@ -62,6 +62,7 @@ fun YourFeedScreen(
     recommendedSurfaces: List<SurfaceUiModel>,
     accessDecisionFor: (themeId: String) -> AccessDecision,
     onRemoveTheme: (themeId: String) -> Unit,
+    onRemoveGroup: (universeId: String) -> Unit,
     onOpenSurface: (surfaceId: String) -> Unit,
     onSeeAllThemes: () -> Unit,
     onUpdateFeed: () -> Unit,
@@ -103,6 +104,7 @@ fun YourFeedScreen(
             CurrentFeedSection(
                 selectedThemes = selectedThemes,
                 onRemoveTheme = onRemoveTheme,
+                onRemoveGroup = onRemoveGroup,
                 onSeeAllThemes = onSeeAllThemes,
                 modifier = Modifier.padding(bottom = 16.dp),
             )
@@ -322,6 +324,7 @@ fun YourFeedSheetContent(
     recommendedSurfaces: List<SurfaceUiModel>,
     accessDecisionFor: (themeId: String) -> AccessDecision,
     onRemoveTheme: (themeId: String) -> Unit,
+    onRemoveGroup: (universeId: String) -> Unit,
     onOpenSurface: (surfaceId: String) -> Unit,
     onSeeAllThemes: () -> Unit,
     onUpdateFeed: () -> Unit,
@@ -348,6 +351,7 @@ fun YourFeedSheetContent(
                 recommendedSurfaces = recommendedSurfaces,
                 accessDecisionFor = accessDecisionFor,
                 onRemoveTheme = onRemoveTheme,
+                onRemoveGroup = onRemoveGroup,
                 onOpenSurface = onOpenSurface,
                 onSeeAllThemes = onSeeAllThemes,
                 onUpdateFeed = onUpdateFeed,

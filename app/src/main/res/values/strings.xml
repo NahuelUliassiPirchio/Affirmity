@@ -785,6 +785,13 @@
     <string name="your_feed_feeding_you_now">Alimentando tu feed ahora</string>
     <string name="your_feed_add_theme_a11y">Agregar temas</string>
     <string name="your_feed_remove_theme_a11y">Quitar %1$s</string>
+    <string name="your_feed_group_theme_count">%1$s · %2$d</string>
+    <string name="your_feed_remove_group_a11y">Quitar todos los temas de %1$s</string>
+    <string name="your_feed_more_chip">+%1$d más</string>
+    <string name="your_feed_expand_group_a11y">Mostrar todos los temas de %1$s</string>
+    <string name="your_feed_collapse_group_a11y">Mostrar menos temas de %1$s</string>
+    <string name="your_feed_show_all_groups">Mostrar los %1$d grupos</string>
+    <string name="your_feed_show_fewer_groups">Mostrar menos grupos</string>
     <string name="your_feed_see_all_themes">Ver todos los temas</string>
     <string name="your_feed_update_button">Actualizar mi feed</string>
     <string name="your_feed_selected_count">%1$d de %2$d seleccionados</string>
@@ -796,6 +803,7 @@
     <string name="your_feed_filter_selected">Seleccionados</string>
     <string name="your_feed_filter_free">Gratis</string>
     <string name="your_feed_filter_premium">Premium</string>
+    <string name="your_feed_locked_theme_a11y">Bloqueado</string>
     <string name="ad_unlock_earned_message">¡Listo! Ya podés usar esta sesión.</string>
     <string name="ad_unlock_dismissed_message">Cerraste el anuncio antes de terminar, así que no se desbloqueó nada.</string>
     <string name="ad_unlock_unavailable_message">No hay anuncios disponibles en este momento. Probá de nuevo más tarde.</string>

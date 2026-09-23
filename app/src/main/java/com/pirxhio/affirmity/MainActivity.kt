@@ -1610,6 +1610,7 @@ fun AffirmityApp(
                                 recommendedSurfaces = recommendedSurfaces,
                                 accessDecisionFor = accessDecisionFor,
                                 onRemoveTheme = { themeId -> appState.toggleTheme(themeId, toggleable = true) },
+                                onRemoveGroup = { universeId -> appState.removeThemesInUniverse(universeId) },
                                 onOpenSurface = { surfaceId ->
                                     openSurfaceId = surfaceId
                                     appState.recordSurfaceOpened(surfaceId)

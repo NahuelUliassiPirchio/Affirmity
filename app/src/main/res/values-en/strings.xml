@@ -345,6 +345,13 @@
     <string name="your_feed_feeding_you_now">Feeding you now</string>
     <string name="your_feed_add_theme_a11y">Add themes</string>
     <string name="your_feed_remove_theme_a11y">Remove %1$s</string>
+    <string name="your_feed_group_theme_count">%1$s · %2$d</string>
+    <string name="your_feed_remove_group_a11y">Remove all %1$s themes</string>
+    <string name="your_feed_more_chip">+%1$d more</string>
+    <string name="your_feed_expand_group_a11y">Show all %1$s themes</string>
+    <string name="your_feed_collapse_group_a11y">Show fewer %1$s themes</string>
+    <string name="your_feed_show_all_groups">Show all %1$d groups</string>
+    <string name="your_feed_show_fewer_groups">Show fewer groups</string>
     <string name="your_feed_see_all_themes">See all themes</string>
     <string name="your_feed_update_button">Update my feed</string>
     <string name="your_feed_selected_count">%1$d of %2$d selected</string>
@@ -356,6 +363,7 @@
     <string name="your_feed_filter_selected">Selected</string>
     <string name="your_feed_filter_free">Free</string>
     <string name="your_feed_filter_premium">Premium</string>
+    <string name="your_feed_locked_theme_a11y">Locked</string>
     <string name="ad_unlock_earned_message">Done! You can now use this session.</string>
     <string name="ad_unlock_dismissed_message">You closed the ad before it finished, so nothing was unlocked.</string>
     <string name="ad_unlock_unavailable_message">No ads are available right now. Try again later.</string>

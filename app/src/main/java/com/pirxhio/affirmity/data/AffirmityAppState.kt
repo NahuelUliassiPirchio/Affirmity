@@ -1852,6 +1852,14 @@ class AffirmityAppState(
         }
     }
 
+    /** Removes every draft theme id belonging to [universeId] from [draftThemeIds] in one shot --
+     * backs the "Feeding you now" group-level remove control, so clearing a whole surface no
+     * longer requires one tap per theme. No-op if the universe has no themes in the draft. */
+    fun removeThemesInUniverse(universeId: String) {
+        val themesById = catalogThemesById()
+        draftThemeIds.value = draftThemeIds.value.filterNot { themesById[it]?.universeId == universeId }.toSet()
+    }
+
     /** Commits [draftThemeIds] as [selectedThemeIds] and persists it, unless the draft violates
      * the minimum-selection invariant — in which case nothing is committed or persisted. Returns
      * whether the commit happened, so the caller can decide whether to close "Your feed". */
