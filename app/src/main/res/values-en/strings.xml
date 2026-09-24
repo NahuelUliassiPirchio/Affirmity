@@ -403,31 +403,86 @@
     <string name="meditation_primer_info_content_description">See what this is</string>
 
     <string name="meditation_primer_trataka_plain">Candle gazing</string>
-    <string name="meditation_primer_trataka_short">Rest your eyes on one point until your mind follows.</string>
+    <string name="meditation_primer_trataka_card_headline">Fixed gaze</string>
     <string name="meditation_primer_trataka_long">You sit with a single point of light — a candle, or a dot on the wall — and keep your eyes there. When your attention drifts you bring it back. That\'s the whole practice. It settles a busy mind faster than most breathing work, and it\'s the one to reach for when thoughts won\'t stop moving.</string>
     <string name="meditation_primer_trataka_expect_1">Eyes open the whole time</string>
     <string name="meditation_primer_trataka_expect_2">Works best in a dim room</string>
     <string name="meditation_primer_trataka_expect_3">Blink whenever you need to</string>
 
     <string name="meditation_primer_yoganidra_plain">Guided deep rest</string>
-    <string name="meditation_primer_yoganidra_short">Lie down and be talked slowly through the body.</string>
+    <string name="meditation_primer_yoganidra_card_headline">Guided rest</string>
     <string name="meditation_primer_yoganidra_long">You lie on your back and a voice moves your attention through the body, one part at a time. You are not trying to sleep, though many people do. Twenty minutes of it leaves most people feeling like they napped for an hour.</string>
     <string name="meditation_primer_yoganidra_expect_1">Lying down, not seated</string>
     <string name="meditation_primer_yoganidra_expect_2">Falling asleep is fine</string>
     <string name="meditation_primer_yoganidra_expect_3">Nothing to do but listen</string>
 
     <string name="meditation_primer_vipassana_plain">Noticing what\'s there</string>
-    <string name="meditation_primer_vipassana_short">Watch what arises without fixing any of it.</string>
+    <string name="meditation_primer_vipassana_card_headline">Just noticing</string>
     <string name="meditation_primer_vipassana_long">You sit and notice whatever shows up — the breath, a sound, an ache, a thought — without chasing or pushing it away. Older and plainer than it sounds, and the base most other practices are built on.</string>
     <string name="meditation_primer_vipassana_expect_1">No visualisation</string>
     <string name="meditation_primer_vipassana_expect_2">Sitting still, eyes closed</string>
     <string name="meditation_primer_vipassana_expect_3">Restlessness is part of it</string>
 
-    <string name="meditation_primer_metta_short">Send a few good wishes — starting with yourself.</string>
     <string name="meditation_primer_metta_long">You repeat a handful of simple wishes: may I be well, may I be at ease. Then you send the same lines to someone you love, someone neutral, someone difficult. It\'s the practice for days when you\'re being hard on yourself.</string>
     <string name="meditation_primer_metta_expect_1">Repeating phrases, not clearing the mind</string>
     <string name="meditation_primer_metta_expect_2">Start with yourself</string>
     <string name="meditation_primer_metta_expect_3">Feeling nothing at first is normal</string>
+
+    <string name="meditation_primer_bhramari_plain">Humming breath</string>
+    <string name="meditation_primer_bhramari_card_headline">Humming breath</string>
+    <string name="meditation_primer_bhramari_long">You inhale normally, then hum through a long exhale with your mouth closed, like a soft engine. You repeat this several times in a row. The sound fills your head just enough to turn the thoughts down.</string>
+    <string name="meditation_primer_bhramari_expect_1">Inhale in silence, then hum on the exhale</string>
+    <string name="meditation_primer_bhramari_expect_2">It repeats several rounds in a row</string>
+    <string name="meditation_primer_bhramari_expect_3">It doesn\'t need to sound \"good\", the hum is enough</string>
+
+    <string name="meditation_primer_kapalabhati_plain">Fast, forceful breathing</string>
+    <string name="meditation_primer_kapalabhati_card_headline">Forceful breathing</string>
+    <string name="meditation_primer_kapalabhati_long">Sitting with a straight back, you exhale sharp and short through the nose, over and over, letting the inhale happen passively between exhales. It\'s done in rounds, with a rest between each one. This is active, not relaxed — you\'ll feel your belly working.</string>
+    <string name="meditation_primer_kapalabhati_expect_1">Done seated, not lying down</string>
+    <string name="meditation_primer_kapalabhati_expect_2">The inhale is passive, the effort is in the exhale</string>
+    <string name="meditation_primer_kapalabhati_expect_3">There\'s a rest between each round</string>
+
+    <string name="meditation_primer_zazen_plain">Sitting in silence</string>
+    <string name="meditation_primer_zazen_card_headline">Silent sitting</string>
+    <string name="meditation_primer_zazen_long">It opens with a bell, a short posture cue — straight back, still hands — then silence, no spoken guidance or music. It closes with another bell. There\'s no special breathing technique or anything to visualize: just posture and time seated.</string>
+    <string name="meditation_primer_zazen_expect_1">Opens and closes with a bell</string>
+    <string name="meditation_primer_zazen_expect_2">The middle is total silence, no voice guiding you</string>
+    <string name="meditation_primer_zazen_expect_3">Hands stay still</string>
+
+    <string name="meditation_primer_so_hum_plain">Mantra timed to your breath</string>
+    <string name="meditation_primer_so_hum_card_headline">Breath mantra</string>
+    <string name="meditation_primer_so_hum_long">On each inhale you think (or whisper) the syllable \"So\", and on each exhale \"Hum\". It repeats like that, breath after breath, for the whole session. There\'s nothing to understand or translate — it\'s just a simple anchor for the mind while you breathe.</string>
+    <string name="meditation_primer_so_hum_expect_1">\"So\" goes with the inhale, \"Hum\" with the exhale</string>
+    <string name="meditation_primer_so_hum_expect_2">You can think it, whisper it, or say it out loud</string>
+    <string name="meditation_primer_so_hum_expect_3">It repeats the whole time, it doesn\'t change</string>
+
+    <string name="meditation_primer_dhikr_plain">Repeating a phrase, out loud or silently</string>
+    <string name="meditation_primer_dhikr_card_headline">Repeating a phrase</string>
+    <string name="meditation_primer_dhikr_long">You set an intention, then repeat a short phrase — your own, or one you pick — a fixed number of times (11, 33, or 99). It ends in silence. The app counts the repetitions, but you choose the phrase.</string>
+    <string name="meditation_primer_dhikr_expect_1">You choose (or write) the phrase you repeat</string>
+    <string name="meditation_primer_dhikr_expect_2">You can say it aloud, under your breath, or just think it</string>
+    <string name="meditation_primer_dhikr_expect_3">It ends in silence, no spoken closing</string>
+
+    <string name="meditation_primer_muraqabah_plain">Silent inward attention</string>
+    <string name="meditation_primer_muraqabah_card_headline">Inner attention</string>
+    <string name="meditation_primer_muraqabah_long">It opens with a moment to set an intention, then a stretch to settle into your breath, then an extended silence for contemplation — no guidance, no phrases to repeat. It\'s closer to zazen\'s silence than to a guided meditation.</string>
+    <string name="meditation_primer_muraqabah_expect_1">Most of the session is unguided silence</string>
+    <string name="meditation_primer_muraqabah_expect_2">It opens with a brief intention and breath-settling, not straight into silence</string>
+    <string name="meditation_primer_muraqabah_expect_3">No phrases to repeat, nothing to visualize</string>
+
+    <string name="meditation_primer_hitbodedut_plain">Talking to God in your own words</string>
+    <string name="meditation_primer_hitbodedut_card_headline">Talking to God</string>
+    <string name="meditation_primer_hitbodedut_long">After a moment to arrive, the session offers you topics — gratitude, worries, requests, relationships, purpose, forgiveness, whichever you pick — and for each one you speak in your own words, like a conversation. It ends with a stretch of free personal prayer and silence.</string>
+    <string name="meditation_primer_hitbodedut_expect_1">You speak out loud, not silently or in writing</string>
+    <string name="meditation_primer_hitbodedut_expect_2">There\'s no fixed phrase to repeat, you improvise</string>
+    <string name="meditation_primer_hitbodedut_expect_3">You choose which topics to cover before you start</string>
+
+    <string name="meditation_primer_lectio_divina_plain">Reading a sacred text in four steps</string>
+    <string name="meditation_primer_lectio_divina_card_headline">Sacred reading</string>
+    <string name="meditation_primer_lectio_divina_long">It\'s done in four steps with a text you choose and bring yourself (the app doesn\'t provide one): first you read it slowly without analyzing it, then you reflect on what stood out, then you respond to God in your own words, and it ends in silent contemplation. Each step has its own time.</string>
+    <string name="meditation_primer_lectio_divina_expect_1">You need your own text ready before you start</string>
+    <string name="meditation_primer_lectio_divina_expect_2">The first three steps have spoken guidance, the last one is silence</string>
+    <string name="meditation_primer_lectio_divina_expect_3">No need to analyze the text, just notice what stands out</string>
 
     <!-- Guided session cue-sound toggle. -->
     <string name="guided_meditation_cue_sound_mute_content_description">Mute transition sound</string>

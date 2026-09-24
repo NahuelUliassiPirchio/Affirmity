@@ -48,11 +48,11 @@ data class MeditationCatalogEntry(
      * do ("Trataka", "Yoga Nidra", "Vipassana"). Its presence is the ONLY signal driving all three
      * of the Discover behaviours below -- there is deliberately no second boolean flag:
      *  - membership in the "Vale la pena conocerlas" shelf,
-     *  - the one-line [MeditationPrimer.shortRes] rendered on that shelf's cards,
+     *  - the card's headline swapping to [MeditationPrimer.cardHeadlineRes] (design 6a) in every
+     *    shelf the entry appears in, not just that one,
      *  - tapping the card opening [MeditationPrimer]'s explanation sheet instead of launching.
      *
-     * Left null for the ~34 entries whose title already explains itself (including "Bondad
-     * amorosa"), because every extra line on a shelf card is paid for by every card in that shelf. */
+     * Left null for entries whose title already explains itself (including "Bondad amorosa"). */
     val primer: MeditationPrimer? = null,
 )
 
@@ -62,8 +62,6 @@ data class MeditationCatalogEntry(
  * practice" framing.
  */
 data class MeditationPrimer(
-    /** One line, rendered under the title on the "Vale la pena conocerlas" shelf only. */
-    @StringRes val shortRes: Int,
     /** The full explanation, rendered as the body of the primer sheet. */
     @StringRes val longRes: Int,
     /** "Qué esperar" bullets -- concrete, practical expectations (posture, eyes, what counts as
@@ -72,4 +70,13 @@ data class MeditationPrimer(
     /** A plain-language rendering of an impenetrable title ("Mirada en un punto" for Trataka),
      *  shown under it in the sheet. Null when the title is already plain. */
     @StringRes val plainNameRes: Int? = null,
+    /** A 1-3 word plain-language label used as the shelf/grid card's headline in place of the real
+     *  title (design 6a: "Candle gazing" instead of "Trataka"), with the real title moving into the
+     *  card's meta line next to duration. A separate field from [plainNameRes] because a card
+     *  headline needs to be genuinely short to avoid wrapping badly at the shelf card's fixed
+     *  width -- when [plainNameRes] already fits that budget (e.g. Bhramari's two-word phrase),
+     *  the two may hold the same string; when it doesn't, this one carries a shorter substitute.
+     *  Null falls back to the real title, identical to how an entry with no [plainNameRes] behaves
+     *  in the detail sheet. */
+    @StringRes val cardHeadlineRes: Int? = null,
 )

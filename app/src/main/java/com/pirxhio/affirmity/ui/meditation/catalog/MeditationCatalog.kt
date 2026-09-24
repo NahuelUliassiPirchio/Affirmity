@@ -766,6 +766,16 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
     MeditationCatalogEntry(
         id = "bhramari",
         titleRes = R.string.meditation_catalog_bhramari_title,
+        primer = MeditationPrimer(
+            longRes = R.string.meditation_primer_bhramari_long,
+            expectationsRes = listOf(
+                R.string.meditation_primer_bhramari_expect_1,
+                R.string.meditation_primer_bhramari_expect_2,
+                R.string.meditation_primer_bhramari_expect_3,
+            ),
+            plainNameRes = R.string.meditation_primer_bhramari_plain,
+            cardHeadlineRes = R.string.meditation_primer_bhramari_card_headline,
+        ),
         descriptionRes = R.string.meditation_catalog_bhramari_description,
         categoryRes = R.string.meditation_catalog_category_respiracion,
         icon = Icons.Filled.Spa,
@@ -822,6 +832,16 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
     MeditationCatalogEntry(
         id = "kapalabhati",
         titleRes = R.string.meditation_catalog_kapalabhati_title,
+        primer = MeditationPrimer(
+            longRes = R.string.meditation_primer_kapalabhati_long,
+            expectationsRes = listOf(
+                R.string.meditation_primer_kapalabhati_expect_1,
+                R.string.meditation_primer_kapalabhati_expect_2,
+                R.string.meditation_primer_kapalabhati_expect_3,
+            ),
+            plainNameRes = R.string.meditation_primer_kapalabhati_plain,
+            cardHeadlineRes = R.string.meditation_primer_kapalabhati_card_headline,
+        ),
         descriptionRes = R.string.meditation_catalog_kapalabhati_description,
         categoryRes = R.string.meditation_catalog_category_energia,
         icon = Icons.Filled.Bolt,
@@ -1011,7 +1031,6 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
         id = "vipassana",
         titleRes = R.string.meditation_catalog_vipassana_title,
         primer = MeditationPrimer(
-            shortRes = R.string.meditation_primer_vipassana_short,
             longRes = R.string.meditation_primer_vipassana_long,
             expectationsRes = listOf(
                 R.string.meditation_primer_vipassana_expect_1,
@@ -1019,6 +1038,7 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                 R.string.meditation_primer_vipassana_expect_3,
             ),
             plainNameRes = R.string.meditation_primer_vipassana_plain,
+            cardHeadlineRes = R.string.meditation_primer_vipassana_card_headline,
         ),
         descriptionRes = R.string.meditation_catalog_vipassana_description,
         categoryRes = R.string.meditation_catalog_category_mindfulness,
@@ -1057,7 +1077,6 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
         // No plainNameRes: this entry's title is already "Bondad amorosa", which explains itself --
         // only the practice's shape needs describing, not its name.
         primer = MeditationPrimer(
-            shortRes = R.string.meditation_primer_metta_short,
             longRes = R.string.meditation_primer_metta_long,
             expectationsRes = listOf(
                 R.string.meditation_primer_metta_expect_1,
@@ -1132,6 +1151,16 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
     MeditationCatalogEntry(
         id = "zazen",
         titleRes = R.string.meditation_catalog_zazen_title,
+        primer = MeditationPrimer(
+            longRes = R.string.meditation_primer_zazen_long,
+            expectationsRes = listOf(
+                R.string.meditation_primer_zazen_expect_1,
+                R.string.meditation_primer_zazen_expect_2,
+                R.string.meditation_primer_zazen_expect_3,
+            ),
+            plainNameRes = R.string.meditation_primer_zazen_plain,
+            cardHeadlineRes = R.string.meditation_primer_zazen_card_headline,
+        ),
         descriptionRes = R.string.meditation_catalog_zazen_description,
         categoryRes = R.string.meditation_catalog_category_silencio,
         icon = Icons.Filled.Spa,
@@ -1369,6 +1398,16 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
     MeditationCatalogEntry(
         id = "so_hum",
         titleRes = R.string.meditation_catalog_so_hum_title,
+        primer = MeditationPrimer(
+            longRes = R.string.meditation_primer_so_hum_long,
+            expectationsRes = listOf(
+                R.string.meditation_primer_so_hum_expect_1,
+                R.string.meditation_primer_so_hum_expect_2,
+                R.string.meditation_primer_so_hum_expect_3,
+            ),
+            plainNameRes = R.string.meditation_primer_so_hum_plain,
+            cardHeadlineRes = R.string.meditation_primer_so_hum_card_headline,
+        ),
         descriptionRes = R.string.meditation_catalog_so_hum_description,
         categoryRes = R.string.meditation_catalog_category_mantra,
         icon = Icons.Filled.Spa,
@@ -1442,6 +1481,16 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
     MeditationCatalogEntry(
         id = "dhikr",
         titleRes = R.string.meditation_catalog_dhikr_title,
+        primer = MeditationPrimer(
+            longRes = R.string.meditation_primer_dhikr_long,
+            expectationsRes = listOf(
+                R.string.meditation_primer_dhikr_expect_1,
+                R.string.meditation_primer_dhikr_expect_2,
+                R.string.meditation_primer_dhikr_expect_3,
+            ),
+            plainNameRes = R.string.meditation_primer_dhikr_plain,
+            cardHeadlineRes = R.string.meditation_primer_dhikr_card_headline,
+        ),
         descriptionRes = R.string.meditation_catalog_dhikr_description,
         categoryRes = R.string.meditation_catalog_category_oracion,
         icon = Icons.Filled.Spa,
@@ -1514,6 +1563,16 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
     MeditationCatalogEntry(
         id = "muraqabah",
         titleRes = R.string.meditation_catalog_muraqabah_title,
+        primer = MeditationPrimer(
+            longRes = R.string.meditation_primer_muraqabah_long,
+            expectationsRes = listOf(
+                R.string.meditation_primer_muraqabah_expect_1,
+                R.string.meditation_primer_muraqabah_expect_2,
+                R.string.meditation_primer_muraqabah_expect_3,
+            ),
+            plainNameRes = R.string.meditation_primer_muraqabah_plain,
+            cardHeadlineRes = R.string.meditation_primer_muraqabah_card_headline,
+        ),
         descriptionRes = R.string.meditation_catalog_muraqabah_description,
         categoryRes = R.string.meditation_catalog_category_contemplacion,
         icon = Icons.Filled.Spa,
@@ -1544,6 +1603,16 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
     MeditationCatalogEntry(
         id = "hitbodedut",
         titleRes = R.string.meditation_catalog_hitbodedut_title,
+        primer = MeditationPrimer(
+            longRes = R.string.meditation_primer_hitbodedut_long,
+            expectationsRes = listOf(
+                R.string.meditation_primer_hitbodedut_expect_1,
+                R.string.meditation_primer_hitbodedut_expect_2,
+                R.string.meditation_primer_hitbodedut_expect_3,
+            ),
+            plainNameRes = R.string.meditation_primer_hitbodedut_plain,
+            cardHeadlineRes = R.string.meditation_primer_hitbodedut_card_headline,
+        ),
         descriptionRes = R.string.meditation_catalog_hitbodedut_description,
         categoryRes = R.string.meditation_catalog_category_oracion,
         icon = Icons.Filled.Spa,
@@ -1649,7 +1718,6 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
         id = "trataka",
         titleRes = R.string.meditation_catalog_trataka_title,
         primer = MeditationPrimer(
-            shortRes = R.string.meditation_primer_trataka_short,
             longRes = R.string.meditation_primer_trataka_long,
             expectationsRes = listOf(
                 R.string.meditation_primer_trataka_expect_1,
@@ -1657,6 +1725,7 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                 R.string.meditation_primer_trataka_expect_3,
             ),
             plainNameRes = R.string.meditation_primer_trataka_plain,
+            cardHeadlineRes = R.string.meditation_primer_trataka_card_headline,
         ),
         descriptionRes = R.string.meditation_catalog_trataka_description,
         categoryRes = R.string.meditation_catalog_category_enfoque,
@@ -1722,7 +1791,6 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
         id = "yoganidra",
         titleRes = R.string.meditation_catalog_yoganidra_title,
         primer = MeditationPrimer(
-            shortRes = R.string.meditation_primer_yoganidra_short,
             longRes = R.string.meditation_primer_yoganidra_long,
             expectationsRes = listOf(
                 R.string.meditation_primer_yoganidra_expect_1,
@@ -1730,6 +1798,7 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                 R.string.meditation_primer_yoganidra_expect_3,
             ),
             plainNameRes = R.string.meditation_primer_yoganidra_plain,
+            cardHeadlineRes = R.string.meditation_primer_yoganidra_card_headline,
         ),
         descriptionRes = R.string.meditation_catalog_yoganidra_description,
         categoryRes = R.string.meditation_catalog_category_sueno,
@@ -2179,6 +2248,16 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
     MeditationCatalogEntry(
         id = "lectio_divina",
         titleRes = R.string.meditation_catalog_lectio_divina_title,
+        primer = MeditationPrimer(
+            longRes = R.string.meditation_primer_lectio_divina_long,
+            expectationsRes = listOf(
+                R.string.meditation_primer_lectio_divina_expect_1,
+                R.string.meditation_primer_lectio_divina_expect_2,
+                R.string.meditation_primer_lectio_divina_expect_3,
+            ),
+            plainNameRes = R.string.meditation_primer_lectio_divina_plain,
+            cardHeadlineRes = R.string.meditation_primer_lectio_divina_card_headline,
+        ),
         descriptionRes = R.string.meditation_catalog_lectio_divina_description,
         categoryRes = R.string.meditation_catalog_category_contemplacion,
         icon = Icons.Filled.CenterFocusStrong,

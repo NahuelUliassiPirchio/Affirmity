@@ -254,31 +254,86 @@
     <string name="meditation_primer_info_content_description">Ver de qué se trata</string>
 
     <string name="meditation_primer_trataka_plain">Mirada en un punto</string>
-    <string name="meditation_primer_trataka_short">Descansá los ojos en un punto hasta que la mente siga.</string>
+    <string name="meditation_primer_trataka_card_headline">Mirada fija</string>
     <string name="meditation_primer_trataka_long">Te sentás frente a un solo punto de luz —una vela, o un punto en la pared— y mantenés los ojos ahí. Cuando la atención se va, la traés de vuelta. Esa es toda la práctica. Aquieta una mente acelerada más rápido que la mayoría de los ejercicios de respiración, y es la indicada para cuando los pensamientos no paran.</string>
     <string name="meditation_primer_trataka_expect_1">Los ojos van abiertos todo el tiempo</string>
     <string name="meditation_primer_trataka_expect_2">Funciona mejor con poca luz</string>
     <string name="meditation_primer_trataka_expect_3">Parpadeá cuando lo necesites</string>
 
     <string name="meditation_primer_yoganidra_plain">Descanso profundo guiado</string>
-    <string name="meditation_primer_yoganidra_short">Acostate y dejá que una voz te recorra el cuerpo.</string>
+    <string name="meditation_primer_yoganidra_card_headline">Descanso guiado</string>
     <string name="meditation_primer_yoganidra_long">Te acostás boca arriba y una voz lleva tu atención por el cuerpo, parte por parte. No estás tratando de dormirte, aunque mucha gente se duerme. Veinte minutos de esto dejan a la mayoría como si hubiera dormido una siesta de una hora.</string>
     <string name="meditation_primer_yoganidra_expect_1">Se hace acostado, no sentado</string>
     <string name="meditation_primer_yoganidra_expect_2">Quedarse dormido está bien</string>
     <string name="meditation_primer_yoganidra_expect_3">No hay nada que hacer, solo escuchar</string>
 
     <string name="meditation_primer_vipassana_plain">Observar lo que aparece</string>
-    <string name="meditation_primer_vipassana_short">Mirá lo que surge sin corregir nada.</string>
+    <string name="meditation_primer_vipassana_card_headline">Solo observar</string>
     <string name="meditation_primer_vipassana_long">Te sentás y notás lo que aparezca —la respiración, un sonido, una molestia, un pensamiento— sin perseguirlo ni empujarlo lejos. Más antigua y más simple de lo que suena, y la base sobre la que se construyen casi todas las demás prácticas.</string>
     <string name="meditation_primer_vipassana_expect_1">No hay visualización</string>
     <string name="meditation_primer_vipassana_expect_2">Sentado y con los ojos cerrados</string>
     <string name="meditation_primer_vipassana_expect_3">La inquietud es parte del asunto</string>
 
-    <string name="meditation_primer_metta_short">Mandá unos buenos deseos, empezando por vos.</string>
     <string name="meditation_primer_metta_long">Repetís un puñado de deseos simples: que yo esté bien, que yo esté en paz. Después mandás las mismas frases a alguien que querés, a alguien neutral, a alguien difícil. Es la práctica para los días en que estás siendo duro con vos mismo.</string>
     <string name="meditation_primer_metta_expect_1">Se repiten frases, no se vacía la mente</string>
     <string name="meditation_primer_metta_expect_2">Empezás por vos</string>
     <string name="meditation_primer_metta_expect_3">Que al principio no sientas nada es normal</string>
+
+    <string name="meditation_primer_bhramari_plain">Respirar zumbando</string>
+    <string name="meditation_primer_bhramari_card_headline">Respirar zumbando</string>
+    <string name="meditation_primer_bhramari_long">Inhalás normal, y en la exhalación soltás un zumbido continuo con la boca cerrada, como un motor suave. Se repite varias veces seguidas. El sonido ocupa la cabeza lo suficiente como para que los pensamientos bajen el volumen.</string>
+    <string name="meditation_primer_bhramari_expect_1">Inhalás en silencio, después zumbás al exhalar</string>
+    <string name="meditation_primer_bhramari_expect_2">Se repite varias veces seguidas</string>
+    <string name="meditation_primer_bhramari_expect_3">No hace falta que suene \"bien\", alcanza con el zumbido</string>
+
+    <string name="meditation_primer_kapalabhati_plain">Respiración fuerte y rápida</string>
+    <string name="meditation_primer_kapalabhati_card_headline">Respiración forzada</string>
+    <string name="meditation_primer_kapalabhati_long">Sentado con la espalda erguida, exhalás fuerte y corto por la nariz, una y otra vez, dejando que la inhalación pase sola entre cada exhalación. Se hace en tandas, con un descanso entre una y otra. Es una respiración activa, no relajada — se siente el abdomen trabajando.</string>
+    <string name="meditation_primer_kapalabhati_expect_1">Se hace sentado, no acostado</string>
+    <string name="meditation_primer_kapalabhati_expect_2">La inhalación es pasiva, el esfuerzo va en la exhalación</string>
+    <string name="meditation_primer_kapalabhati_expect_3">Hay una pausa de descanso entre cada tanda</string>
+
+    <string name="meditation_primer_zazen_plain">Sentarse en silencio</string>
+    <string name="meditation_primer_zazen_card_headline">Sentarse en silencio</string>
+    <string name="meditation_primer_zazen_long">Empieza con una campana, una instrucción breve de postura —espalda erguida, manos quietas— y después silencio, sin guía hablada ni música. Termina con otra campana. No hay técnica de respiración especial ni nada que visualizar: solo postura y tiempo sentado.</string>
+    <string name="meditation_primer_zazen_expect_1">Empieza y termina con una campana</string>
+    <string name="meditation_primer_zazen_expect_2">En el medio hay silencio total, sin voz guiando</string>
+    <string name="meditation_primer_zazen_expect_3">Las manos se quedan quietas</string>
+
+    <string name="meditation_primer_so_hum_plain">Mantra al ritmo de la respiración</string>
+    <string name="meditation_primer_so_hum_card_headline">Mantra al respirar</string>
+    <string name="meditation_primer_so_hum_long">En cada inhalación pensás (o susurrás) la sílaba \"So\", y en cada exhalación \"Hum\". Se repite así, respiración tras respiración, durante toda la sesión. No hay que entender ni traducir nada — es solo un ancla simple para la mente mientras respirás.</string>
+    <string name="meditation_primer_so_hum_expect_1">\"So\" va con la inhalación, \"Hum\" con la exhalación</string>
+    <string name="meditation_primer_so_hum_expect_2">Podés pensarlo, susurrarlo o decirlo en voz alta</string>
+    <string name="meditation_primer_so_hum_expect_3">Se repite todo el tiempo, no cambia</string>
+
+    <string name="meditation_primer_dhikr_plain">Repetir una frase, en voz alta o baja</string>
+    <string name="meditation_primer_dhikr_card_headline">Repetir una frase</string>
+    <string name="meditation_primer_dhikr_long">Fijás una intención, después repetís una frase corta —la tuya, o la que elijas— una cantidad fija de veces (11, 33 o 99). Termina con un silencio. La app cuenta las repeticiones, pero la frase la elegís vos.</string>
+    <string name="meditation_primer_dhikr_expect_1">Vos elegís (o escribís) la frase que repetís</string>
+    <string name="meditation_primer_dhikr_expect_2">Podés decirla en voz alta, en voz baja o solo pensarla</string>
+    <string name="meditation_primer_dhikr_expect_3">Termina en silencio, sin cierre hablado</string>
+
+    <string name="meditation_primer_muraqabah_plain">Atención interior en silencio</string>
+    <string name="meditation_primer_muraqabah_card_headline">Atención interior</string>
+    <string name="meditation_primer_muraqabah_long">Empieza con un momento para fijar una intención, seguido de un tramo para asentarte en tu respiración, y después un silencio extendido de contemplación —sin guía, sin frases para repetir. Es más parecido al silencio de zazen que a una meditación guiada.</string>
+    <string name="meditation_primer_muraqabah_expect_1">La mayor parte de la sesión es silencio sin guía</string>
+    <string name="meditation_primer_muraqabah_expect_2">Empieza con una breve intención y respiración, no directo al silencio</string>
+    <string name="meditation_primer_muraqabah_expect_3">No hay frases para repetir ni imágenes para visualizar</string>
+
+    <string name="meditation_primer_hitbodedut_plain">Hablarle a Dios con tus propias palabras</string>
+    <string name="meditation_primer_hitbodedut_card_headline">Hablarle a Dios</string>
+    <string name="meditation_primer_hitbodedut_long">Después de un momento para llegar, la sesión te va proponiendo temas —gratitud, preocupaciones, pedidos, vínculos, propósito, perdón, según lo que elijas— y en cada uno hablás con tus propias palabras, como en una conversación. Termina con un tramo de oración personal libre y silencio.</string>
+    <string name="meditation_primer_hitbodedut_expect_1">Se habla en voz alta, no en silencio ni por escrito</string>
+    <string name="meditation_primer_hitbodedut_expect_2">No hay una frase fija que repetir, se improvisa</string>
+    <string name="meditation_primer_hitbodedut_expect_3">Vos elegís qué temas tocar antes de empezar</string>
+
+    <string name="meditation_primer_lectio_divina_plain">Leer un texto sagrado en cuatro pasos</string>
+    <string name="meditation_primer_lectio_divina_card_headline">Lectura sagrada</string>
+    <string name="meditation_primer_lectio_divina_long">Se hace en cuatro pasos con un texto que vos elegís y traés (la app no lo provee): primero lo leés despacio sin analizarlo, después meditás sobre lo que te resonó, luego le respondés a Dios con tus propias palabras, y termina en silencio contemplativo. Cada paso tiene su propio tiempo.</string>
+    <string name="meditation_primer_lectio_divina_expect_1">Necesitás tener tu propio texto a mano antes de empezar</string>
+    <string name="meditation_primer_lectio_divina_expect_2">Los primeros tres pasos tienen guía hablada, el último es silencio</string>
+    <string name="meditation_primer_lectio_divina_expect_3">No hace falta analizar el texto, solo notar qué resuena</string>
 
     <string name="guided_meditation_cue_sound_mute_content_description">Silenciar sonido de transición</string>
     <string name="guided_meditation_cue_sound_unmute_content_description">Activar sonido de transición</string>

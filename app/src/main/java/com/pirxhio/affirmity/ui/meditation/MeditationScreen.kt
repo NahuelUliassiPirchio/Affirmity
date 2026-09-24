@@ -446,8 +446,10 @@ fun MeditationScreen(
                     )
                 }
             }
-            // The one shelf that carries a per-card one-liner. Same "Todo"-only condition as
-            // recents above, for the same reason: it deliberately mixes categories.
+            // Same "Todo"-only condition as recents above, for the same reason: it deliberately
+            // mixes categories. The card headline already swaps to the plain-language name (design
+            // 6a) for every primer entry, so this shelf no longer needs its own extra description
+            // line under the title -- the subtitle above the shelf is enough context.
             if (primerEntries.isNotEmpty() && selectedShelfKey == null) {
                 item {
                     MeditationShelf(
@@ -462,7 +464,6 @@ fun MeditationScreen(
                         anyAdInFlight = anyAdInFlight,
                         onEvent = onEvent,
                         subtitle = stringResource(R.string.meditation_primer_shelf_subtitle),
-                        showPrimerLine = true,
                     )
                 }
             }
@@ -641,7 +642,6 @@ private fun MeditationShelf(
     anyAdInFlight: Boolean,
     onEvent: (AnalyticsEvent) -> Unit,
     subtitle: String? = null,
-    showPrimerLine: Boolean = false,
 ) {
     Column(modifier = Modifier.padding(top = 26.dp)) {
         Text(
@@ -675,7 +675,6 @@ private fun MeditationShelf(
                     adInFlight = adInFlightFor(entry),
                     anyAdInFlight = anyAdInFlight,
                     onEvent = onEvent,
-                    showPrimerLine = showPrimerLine,
                 )
             }
         }
@@ -698,10 +697,6 @@ private fun MeditationSessionCard(
     adInFlight: Boolean,
     anyAdInFlight: Boolean,
     onEvent: (AnalyticsEvent) -> Unit,
-    /** True only on the "Vale la pena conocerlas" shelf. Elsewhere a primer entry's card stays the
-     *  same height as its neighbours -- one taller card in a category shelf makes the whole row
-     *  ragged, and that raggedness is what made the previous blanket-description attempt fail. */
-    showPrimerLine: Boolean = false,
 ) {
     val locked = isMeditationLocked(decision)
     val badge = deriveMeditationBadge(entry, decision)
@@ -789,28 +784,28 @@ private fun MeditationSessionCard(
                 }
             }
         }
+        // Design 6a: when a primer has a plain-language name (an impenetrable title like
+        // "Trataka" isn't self-explanatory on its own), that plain name IS the card's headline
+        // instead of the real title -- no extra line, card height untouched. The real title moves
+        // into the meta line next to the duration, so it's still there for anyone who already
+        // knows the practice or searches for it by name. Entries without a plain name (title
+        // already reads fine, e.g. Metta's "Bondad amorosa") keep the title as the headline.
+        val cardHeadlineRes = entry.primer?.cardHeadlineRes
         Text(
-            text = stringResource(entry.titleRes),
+            text = stringResource(cardHeadlineRes ?: entry.titleRes),
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 2,
             modifier = Modifier.padding(top = 7.dp),
         )
-        if (showPrimerLine && entry.primer != null) {
-            Text(
-                text = stringResource(entry.primer.shortRes),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 3.dp),
-            )
-        }
+        val durationLabel = stringResource(R.string.guided_meditation_idle_duration_minutes, remember(entry) { listDurationMinutes(entry) })
         Text(
-            text = stringResource(R.string.guided_meditation_idle_duration_minutes, remember(entry) { listDurationMinutes(entry) }),
+            text = if (cardHeadlineRes != null) "${stringResource(entry.titleRes)} • $durationLabel" else durationLabel,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 2.dp),
         )
     }
