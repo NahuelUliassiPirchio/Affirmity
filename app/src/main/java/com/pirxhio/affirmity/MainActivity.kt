@@ -1609,6 +1609,7 @@ fun AffirmityApp(
                                 catalogThemesById = catalogThemesById(),
                                 recommendedSurfaces = recommendedSurfaces,
                                 accessDecisionFor = accessDecisionFor,
+                                totalUniqueAffirmationCount = appState.filteredAffirmations.size,
                                 onRemoveTheme = { themeId -> appState.toggleTheme(themeId, toggleable = true) },
                                 onRemoveGroup = { universeId -> appState.removeThemesInUniverse(universeId) },
                                 onOpenSurface = { surfaceId ->

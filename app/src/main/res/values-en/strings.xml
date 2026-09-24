@@ -343,6 +343,7 @@
     <string name="your_feed_title">Your feed</string>
     <string name="your_feed_done">Done</string>
     <string name="your_feed_feeding_you_now">Feeding you now</string>
+    <string name="your_feed_total_affirmation_count">%1$d affirmations</string>
     <string name="your_feed_add_theme_a11y">Add themes</string>
     <string name="your_feed_remove_theme_a11y">Remove %1$s</string>
     <string name="your_feed_group_theme_count">%1$s · %2$d</string>
@@ -363,7 +364,6 @@
     <string name="your_feed_filter_selected">Selected</string>
     <string name="your_feed_filter_free">Free</string>
     <string name="your_feed_filter_premium">Premium</string>
-    <string name="your_feed_locked_theme_a11y">Locked</string>
     <string name="ad_unlock_earned_message">Done! You can now use this session.</string>
     <string name="ad_unlock_dismissed_message">You closed the ad before it finished, so nothing was unlocked.</string>
     <string name="ad_unlock_unavailable_message">No ads are available right now. Try again later.</string>

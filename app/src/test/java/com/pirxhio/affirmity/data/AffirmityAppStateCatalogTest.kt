@@ -57,19 +57,21 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when` as whenever
 
 /** Real ids from the committed taxonomy (`ui/groups/CatalogTaxonomy.kt`), so this suite exercises
- * the actual generated data rather than an invented fixture. [FREE_COLLECTION_ID] and
- * [PRO_COLLECTION_ID] deliberately share [THEME_ID] ("Your feed" refactor) -- theme-level
- * selection only gates which THEME's rows are candidates for the feed; per-row access is still
- * resolved per COLLECTION via `catalogAccessDecision`, so two collections under the same theme can
- * still resolve differently for the same user. [OTHER_THEME_ID] is a distinct known theme used to
- * simulate "this theme is not in the selection" without relying on an empty persisted set (which
- * `resolveSelectedThemeIds` treats as unresolved and falls back to defaults, not as "everything
- * deselected"). */
+ * the actual generated data rather than an invented fixture. Every theme in the generated catalog
+ * is now homogeneously Free or Pro across all of its collections (the "Go deeper" content pass),
+ * so [FREE_COLLECTION_ID] and [PRO_COLLECTION_ID] can no longer share one theme the way they used
+ * to -- [FREE_COLLECTION_ID] lives under [THEME_ID] (fully Free) and [PRO_COLLECTION_ID] lives
+ * under [OTHER_THEME_ID] (fully Pro), both known real themes in the same universe. Tests that need
+ * to prove a Pro-tier row is excluded by ACCESS rather than by theme selection select both themes
+ * ([THEME_ID] and [OTHER_THEME_ID]) so [OTHER_THEME_ID]'s row is a selection-eligible candidate;
+ * tests elsewhere that need "a known theme NOT in the selection" still select only [THEME_ID] and
+ * rely on [OTHER_THEME_ID] being merely known, unselected -- that usage is unaffected since it
+ * never referenced [PRO_COLLECTION_ID]. */
 private const val UNIVERSE_ID = "body_energy_wellbeing"
 private const val THEME_ID = "body_energy_wellbeing.body_acceptance"
 private const val OTHER_THEME_ID = "body_energy_wellbeing.body_confidence"
 private const val FREE_COLLECTION_ID = "body_energy_wellbeing.body_acceptance.respect_my_body_today"
-private const val PRO_COLLECTION_ID = "body_energy_wellbeing.body_acceptance.kind_body_relationship"
+private const val PRO_COLLECTION_ID = "body_energy_wellbeing.body_confidence.take_physical_space"
 
 /**
  * Write-routing (design D14), feed access filtering (D7), and cross-space favorites (D10) for the
@@ -176,7 +178,7 @@ class AffirmityAppStateCatalogTest {
             catalog = catalog,
             entitlements = FakeCatalogEntitlementRepository(AccessTier.FREE),
             knownThemeIds = setOf(THEME_ID, OTHER_THEME_ID),
-            themePreferences = FixedThemeSelectionPreferences(setOf(THEME_ID)),
+            themePreferences = FixedThemeSelectionPreferences(setOf(THEME_ID, OTHER_THEME_ID)),
         )
         runCurrent()
         advanceUntilIdle()
@@ -196,7 +198,7 @@ class AffirmityAppStateCatalogTest {
             catalog = catalog,
             entitlements = FakeCatalogEntitlementRepository(AccessTier.PRO),
             knownThemeIds = setOf(THEME_ID, OTHER_THEME_ID),
-            themePreferences = FixedThemeSelectionPreferences(setOf(THEME_ID)),
+            themePreferences = FixedThemeSelectionPreferences(setOf(THEME_ID, OTHER_THEME_ID)),
         )
         runCurrent()
         advanceUntilIdle()
@@ -329,7 +331,7 @@ class AffirmityAppStateCatalogTest {
             catalog = catalog,
             entitlements = FakeCatalogEntitlementRepository(AccessTier.FREE),
             knownThemeIds = setOf(THEME_ID, OTHER_THEME_ID),
-            themePreferences = FixedThemeSelectionPreferences(setOf(THEME_ID)),
+            themePreferences = FixedThemeSelectionPreferences(setOf(THEME_ID, OTHER_THEME_ID)),
         )
         runCurrent()
         advanceUntilIdle()

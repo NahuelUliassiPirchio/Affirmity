@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.ui.feed
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -11,13 +12,16 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.AccessDecision
 import com.pirxhio.affirmity.analytics.AnalyticsEvent
+import com.pirxhio.affirmity.ui.groups.AffirmationGroupAccessBadge
 import com.pirxhio.affirmity.ui.groups.CatalogTheme
+import com.pirxhio.affirmity.ui.groups.GroupBadge
 import com.pirxhio.affirmity.ui.groups.catalogThemesById
 import com.pirxhio.affirmity.ui.groups.isThemeToggleable
 
@@ -88,7 +92,9 @@ fun SurfaceDetailBottomSheet(
                 )
             }
             if (lockedIds.isNotEmpty()) {
-                SectionHeader(stringResource(R.string.your_feed_go_deeper))
+                SectionHeader(stringResource(R.string.your_feed_go_deeper)) {
+                    AffirmationGroupAccessBadge(GroupBadge.PREMIUM)
+                }
                 ThemeChipFlowRow(
                     themeIds = lockedIds,
                     themesById = themesById,
@@ -97,6 +103,7 @@ fun SurfaceDetailBottomSheet(
                     onToggleTheme = onToggleTheme,
                     onUpgradeClick = onUpgradeClick,
                     onEvent = onEvent,
+                    showChipBadge = false,
                 )
             }
             Column(modifier = Modifier.padding(bottom = 24.dp)) {}
@@ -105,13 +112,20 @@ fun SurfaceDetailBottomSheet(
 }
 
 @Composable
-private fun SectionHeader(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+private fun SectionHeader(text: String, trailing: (@Composable () -> Unit)? = null) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
-    )
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (trailing != null) {
+            Row(modifier = Modifier.padding(start = 8.dp)) { trailing() }
+        }
+    }
 }
 
 @Composable
@@ -123,6 +137,7 @@ private fun ThemeChipFlowRow(
     onToggleTheme: (themeId: String) -> Unit,
     onUpgradeClick: () -> Unit,
     onEvent: (AnalyticsEvent) -> Unit,
+    showChipBadge: Boolean = true,
 ) {
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -140,6 +155,7 @@ private fun ThemeChipFlowRow(
                 onToggleTheme = onToggleTheme,
                 onUpgradeClick = onUpgradeClick,
                 onEvent = onEvent,
+                showBadge = showChipBadge,
             )
         }
     }

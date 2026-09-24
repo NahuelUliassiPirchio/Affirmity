@@ -61,6 +61,7 @@ fun YourFeedScreen(
     catalogThemesById: Map<String, CatalogTheme>,
     recommendedSurfaces: List<SurfaceUiModel>,
     accessDecisionFor: (themeId: String) -> AccessDecision,
+    totalUniqueAffirmationCount: Int,
     onRemoveTheme: (themeId: String) -> Unit,
     onRemoveGroup: (universeId: String) -> Unit,
     onOpenSurface: (surfaceId: String) -> Unit,
@@ -103,6 +104,7 @@ fun YourFeedScreen(
         ) {
             CurrentFeedSection(
                 selectedThemes = selectedThemes,
+                totalUniqueAffirmationCount = totalUniqueAffirmationCount,
                 onRemoveTheme = onRemoveTheme,
                 onRemoveGroup = onRemoveGroup,
                 onSeeAllThemes = onSeeAllThemes,
@@ -323,6 +325,7 @@ fun YourFeedSheetContent(
     catalogThemesById: Map<String, CatalogTheme>,
     recommendedSurfaces: List<SurfaceUiModel>,
     accessDecisionFor: (themeId: String) -> AccessDecision,
+    totalUniqueAffirmationCount: Int,
     onRemoveTheme: (themeId: String) -> Unit,
     onRemoveGroup: (universeId: String) -> Unit,
     onOpenSurface: (surfaceId: String) -> Unit,
@@ -350,6 +353,7 @@ fun YourFeedSheetContent(
                 catalogThemesById = catalogThemesById,
                 recommendedSurfaces = recommendedSurfaces,
                 accessDecisionFor = accessDecisionFor,
+                totalUniqueAffirmationCount = totalUniqueAffirmationCount,
                 onRemoveTheme = onRemoveTheme,
                 onRemoveGroup = onRemoveGroup,
                 onOpenSurface = onOpenSurface,

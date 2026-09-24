@@ -838,6 +838,7 @@
     <string name="your_feed_source_own_description">Las que escribiste vos</string>
     <string name="your_feed_done">Listo</string>
     <string name="your_feed_feeding_you_now">Alimentando tu feed ahora</string>
+    <string name="your_feed_total_affirmation_count">%1$d afirmaciones</string>
     <string name="your_feed_add_theme_a11y">Agregar temas</string>
     <string name="your_feed_remove_theme_a11y">Quitar %1$s</string>
     <string name="your_feed_group_theme_count">%1$s · %2$d</string>
@@ -858,7 +859,6 @@
     <string name="your_feed_filter_selected">Seleccionados</string>
     <string name="your_feed_filter_free">Gratis</string>
     <string name="your_feed_filter_premium">Premium</string>
-    <string name="your_feed_locked_theme_a11y">Bloqueado</string>
     <string name="ad_unlock_earned_message">¡Listo! Ya podés usar esta sesión.</string>
     <string name="ad_unlock_dismissed_message">Cerraste el anuncio antes de terminar, así que no se desbloqueó nada.</string>
     <string name="ad_unlock_unavailable_message">No hay anuncios disponibles en este momento. Probá de nuevo más tarde.</string>

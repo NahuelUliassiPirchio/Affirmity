@@ -61,18 +61,29 @@ private const val COLLAPSED_GROUP_COUNT = 3
 @Composable
 fun CurrentFeedSection(
     selectedThemes: List<CatalogTheme>,
+    totalUniqueAffirmationCount: Int,
     onRemoveTheme: (themeId: String) -> Unit,
     onRemoveGroup: (universeId: String) -> Unit,
     onSeeAllThemes: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.your_feed_feeding_you_now),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-        )
+        ) {
+            Text(
+                text = stringResource(R.string.your_feed_feeding_you_now),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = stringResource(R.string.your_feed_total_affirmation_count, totalUniqueAffirmationCount),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 8.dp),
+            )
+        }
 
         val themesByUniverse = selectedThemes.groupBy { it.universeId }
         val groups = catalogUniverseGroups().mapNotNull { group ->
