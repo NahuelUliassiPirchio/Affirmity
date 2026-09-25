@@ -2443,6 +2443,11 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                     }
                 },
             ),
+            CustomizationField.Toggle(
+                key = "shuffleAffirmations",
+                labelRes = R.string.meditation_customization_breathing_affirmations_shuffle,
+                default = false,
+            ),
         ),
     ),
 )

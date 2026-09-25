@@ -1239,6 +1239,7 @@ fun AffirmityApp(
                             val affirmationTexts = affirmationTextsForBreathingAffirmations(
                                 universe = launchStep.customization["affirmationUniverse"] ?: "adaptive",
                                 count = launchStep.customization["affirmationCount"]?.toIntOrNull() ?: 5,
+                                shuffleAffirmations = launchStep.customization["shuffleAffirmations"]?.toBooleanStrictOrNull() ?: false,
                                 affirmationRepository = catalogAffirmationRepository,
                             )
                             resolvedSessionCustomization = launchStep.customization +

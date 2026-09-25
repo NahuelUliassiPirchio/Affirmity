@@ -955,6 +955,7 @@
     <string name="meditation_customization_breathing_affirmations_universe">Universo de afirmaciones</string>
     <string name="meditation_customization_breathing_affirmations_universe_adaptive">Adaptativo</string>
     <string name="meditation_customization_breathing_affirmations_affirmation_count">Cantidad de afirmaciones</string>
+    <string name="meditation_customization_breathing_affirmations_shuffle">Orden aleatorio</string>
     <string name="meditation_customization_affirmation_count_3">3 afirmaciones</string>
     <string name="meditation_customization_affirmation_count_5">5 afirmaciones</string>
     <string name="meditation_customization_affirmation_count_7">7 afirmaciones</string>
