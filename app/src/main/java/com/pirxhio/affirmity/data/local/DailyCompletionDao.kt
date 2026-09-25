@@ -39,4 +39,7 @@ interface DailyCompletionDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM daily_completion)")
     suspend fun hasAny(): Boolean
+
+    @Query("SELECT MIN(epochDay) FROM daily_completion")
+    suspend fun earliestEpochDay(): Long?
 }

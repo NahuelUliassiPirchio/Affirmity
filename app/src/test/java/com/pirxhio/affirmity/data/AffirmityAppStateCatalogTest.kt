@@ -561,6 +561,7 @@ private object EmptyCompletionsRepository2 : DailyCompletionRepository {
     override suspend fun getRange(from: Long, to: Long): List<DailyCompletionEntity> = emptyList()
     override suspend fun markMeditation(epochDay: Long) = Unit
     override suspend fun markAffirmation(epochDay: Long) = Unit
+    override suspend fun earliestEpochDay(): Long? = null
 }
 
 private object EmptyMoodsRepository2 : DailyMoodRepository {

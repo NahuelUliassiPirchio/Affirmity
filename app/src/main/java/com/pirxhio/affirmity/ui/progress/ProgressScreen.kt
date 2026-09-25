@@ -32,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,9 +42,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
+import com.pirxhio.affirmity.data.CompletionHistorySlice
 import com.pirxhio.affirmity.data.HealerActivation
 import com.pirxhio.affirmity.data.StreakHealerState
 import com.pirxhio.affirmity.data.WeeklyStreak
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 
 @Composable
 fun ProgressScreen(
@@ -51,7 +55,15 @@ fun ProgressScreen(
     meditationStreak: WeeklyStreak,
     streakHealer: StreakHealerState,
     onActivateHealer: () -> Unit,
+    observeEarliestCompletionEpochDay: () -> Flow<Long?> = { flowOf(null) },
+    observeCompletionHistory: (from: Long, to: Long) -> Flow<CompletionHistorySlice> =
+        { _, _ -> flowOf(CompletionHistorySlice(emptyList(), emptySet())) },
 ) {
+    // Which habit's full-history calendar is open, if any (design.md's "Whole card" trigger
+    // decision). `rememberSaveable` survives process recreation the same way other screen-local
+    // picker state does elsewhere in this app.
+    var historyHabit by rememberSaveable { mutableStateOf<HistoryHabit?>(null) }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxWidth()
@@ -85,14 +97,26 @@ fun ProgressScreen(
                     title = stringResource(R.string.progress_affirmations_label),
                     icon = Icons.Filled.AutoAwesome,
                     streak = affirmationsStreak,
+                    onClick = { historyHabit = HistoryHabit.AFFIRMATIONS },
                 )
                 WeeklyStreakTracker(
                     title = stringResource(R.string.progress_meditation_label),
                     icon = Icons.Filled.Timer,
                     streak = meditationStreak,
+                    onClick = { historyHabit = HistoryHabit.MEDITATION },
                 )
             }
         }
+    }
+
+    val openHabit = historyHabit
+    if (openHabit != null) {
+        HistoryCalendarDialog(
+            habit = openHabit,
+            earliestEpochDayFlow = remember(openHabit) { observeEarliestCompletionEpochDay() },
+            historyFlowFactory = observeCompletionHistory,
+            onDismissRequest = { historyHabit = null },
+        )
     }
 }
 
@@ -215,8 +239,10 @@ fun WeeklyStreakTracker(
     title: String,
     icon: ImageVector,
     streak: WeeklyStreak,
+    onClick: (() -> Unit)? = null,
 ) {
     Card(
+        onClick = onClick ?: {},
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
         shape = RoundedCornerShape(12.dp)

@@ -51,6 +51,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
@@ -110,11 +111,13 @@ private class FakeAffirmationRepository(
 
 private class FakeDailyCompletionRepository(
     private val flow: Flow<List<DailyCompletionEntity>> = EventedFlow("completions", mutableListOf(), listOf(emptyList())),
+    private val earliest: () -> Long? = { null },
 ) : DailyCompletionRepository {
     override fun observeRange(from: Long, to: Long): Flow<List<DailyCompletionEntity>> = flow
     override suspend fun getRange(from: Long, to: Long): List<DailyCompletionEntity> = emptyList()
     override suspend fun markMeditation(epochDay: Long) = Unit
     override suspend fun markAffirmation(epochDay: Long) = Unit
+    override suspend fun earliestEpochDay(): Long? = earliest()
 }
 
 private class FakeDailyMoodRepository(
@@ -268,13 +271,15 @@ private fun fakeLocal(
     seededAffirmations: List<AffirmationEntity> = listOf(affirmation(id)),
     entitlements: EntitlementRepository = LocalFreeEntitlementRepository(),
     notificationSettings: Map<NotificationChannelSpec, ChannelSettings> = emptyMap(),
+    completions: DailyCompletionRepository = FakeDailyCompletionRepository(EventedFlow("local-completions", events, listOf(emptyList()))),
+    healerUses: StreakHealerRepository = FakeStreakHealerRepository(EventedFlow("local-healerUses", events, listOf(emptyList()))),
 ): DataSession.Local = DataSession.Local(
     affirmations = FakeAffirmationRepository(
         EventedFlow("local-affirmations", events, listOf(seededAffirmations)),
     ),
-    completions = FakeDailyCompletionRepository(EventedFlow("local-completions", events, listOf(emptyList()))),
+    completions = completions,
     moods = FakeDailyMoodRepository(EventedFlow("local-moods", events, listOf(emptyList()))),
-    healerUses = FakeStreakHealerRepository(EventedFlow("local-healerUses", events, listOf(emptyList()))),
+    healerUses = healerUses,
     entitlements = entitlements,
     meditation = FakeMeditationPreferencesRepository(EventedFlow("local-meditation", events, listOf(600))),
     notifications = FakeNotificationSettingsRepository(
@@ -290,14 +295,16 @@ private fun fakeRemote(
     id: String = "remote-1",
     adUnlocks: AdUnlockRepository = FakeAdUnlockRepository(),
     entitlements: EntitlementRepository = FakeEntitlementRepository(),
+    completions: DailyCompletionRepository = FakeDailyCompletionRepository(EventedFlow("remote-completions", events, listOf(emptyList()))),
+    healerUses: StreakHealerRepository = FakeStreakHealerRepository(EventedFlow("remote-healerUses", events, listOf(emptyList()))),
 ): DataSession.Remote = DataSession.Remote(
     uid = uid,
     affirmations = FakeAffirmationRepository(
         EventedFlow("remote-affirmations", events, listOf(listOf(affirmation(id)))),
     ),
-    completions = FakeDailyCompletionRepository(EventedFlow("remote-completions", events, listOf(emptyList()))),
+    completions = completions,
     moods = FakeDailyMoodRepository(EventedFlow("remote-moods", events, listOf(emptyList()))),
-    healerUses = FakeStreakHealerRepository(EventedFlow("remote-healerUses", events, listOf(emptyList()))),
+    healerUses = healerUses,
     meditation = FakeMeditationPreferencesRepository(EventedFlow("remote-meditation", events, listOf(600))),
     notifications = FakeNotificationSettingsRepository(
         EventedFlow("remote-notifications", events, listOf(ChannelSettings(enabled = false, segments = setOf(DaySegment.MANANA, DaySegment.TARDE)))),
@@ -1063,5 +1070,120 @@ class AffirmityAppStateSwapTest {
 
             scope.cancel()
         }
+    }
+
+    // --- History calendar (progress-history-calendar): earliest-day + range flows -------------
+
+    @Test
+    fun `observeEarliestCompletionEpochDay resolves the local session's earliest day and re-queries after sign-in`() = runBlocking {
+        val events = mutableListOf<String>()
+        val local = fakeLocal(
+            events, id = "local-earliest",
+            completions = FakeDailyCompletionRepository(earliest = { 100L }),
+        )
+        val authRepository = FakeAuthRepository()
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val state = buildState(
+            local = local,
+            remote = {
+                fakeRemote(
+                    "uid-earliest", events, id = "remote-earliest",
+                    completions = FakeDailyCompletionRepository(earliest = { 500L }),
+                )
+            },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = authRepository,
+            scope = scope,
+        )
+        val collected = mutableListOf<Long?>()
+        val job = scope.launch { state.observeEarliestCompletionEpochDay().collect { collected += it } }
+        delay(50)
+        assertEquals(100L, collected.last())
+
+        authRepository.emit(AuthState.SignedIn(uid = "uid-earliest", displayName = null, email = null))
+        delay(200)
+
+        assertEquals(500L, collected.last())
+
+        job.cancel()
+        scope.cancel()
+    }
+
+    @Test
+    fun `observeEarliestCompletionEpochDay falls back to null when the active repository throws`() = runBlocking {
+        val events = mutableListOf<String>()
+        val local = fakeLocal(
+            events, id = "local-earliest-fail",
+            completions = FakeDailyCompletionRepository(earliest = { error("boom") }),
+        )
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val state = buildState(
+            local = local,
+            remote = { fakeRemote("uid-earliest-fail", events) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = FakeAuthRepository(),
+            scope = scope,
+        )
+        val collected = mutableListOf<Long?>()
+        val job = scope.launch { state.observeEarliestCompletionEpochDay().collect { collected += it } }
+        delay(50)
+
+        assertEquals(listOf<Long?>(null), collected)
+
+        job.cancel()
+        scope.cancel()
+    }
+
+    @Test
+    fun `observeCompletionHistory combines completion rows and healed days for the requested range`() = runBlocking {
+        val events = mutableListOf<String>()
+        val rangeRows = listOf(DailyCompletionEntity(epochDay = 10L, affirmationDone = true))
+        val healerRows = listOf(StreakHealerUseEntity(healedEpochDay = 11L, activatedAtMillis = 0L))
+        val local = fakeLocal(
+            events, id = "local-history",
+            completions = FakeDailyCompletionRepository(flowOf(rangeRows)),
+            healerUses = FakeStreakHealerRepository(flowOf(healerRows)),
+        )
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val state = buildState(
+            local = local,
+            remote = { fakeRemote("uid-history", events) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = FakeAuthRepository(),
+            scope = scope,
+        )
+        val collected = mutableListOf<CompletionHistorySlice>()
+        val job = scope.launch { state.observeCompletionHistory(10L, 11L).collect { collected += it } }
+        delay(50)
+
+        assertEquals(rangeRows, collected.last().rows)
+        assertEquals(setOf(11L), collected.last().healedDays)
+
+        job.cancel()
+        scope.cancel()
+    }
+
+    @Test
+    fun `observeCompletionHistory falls back to a single empty slice when the active repository throws`() = runBlocking {
+        val events = mutableListOf<String>()
+        val throwingFlow: Flow<List<DailyCompletionEntity>> =
+            kotlinx.coroutines.flow.flow { throw IllegalStateException("boom") }
+        val local = fakeLocal(events, id = "local-history-fail", completions = FakeDailyCompletionRepository(throwingFlow))
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val state = buildState(
+            local = local,
+            remote = { fakeRemote("uid-history-fail", events) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = FakeAuthRepository(),
+            scope = scope,
+        )
+        val collected = mutableListOf<CompletionHistorySlice>()
+        val job = scope.launch { state.observeCompletionHistory(5L, 5L).collect { collected += it } }
+        delay(50)
+
+        assertEquals(listOf(CompletionHistorySlice(emptyList(), emptySet())), collected)
+
+        job.cancel()
+        scope.cancel()
     }
 }

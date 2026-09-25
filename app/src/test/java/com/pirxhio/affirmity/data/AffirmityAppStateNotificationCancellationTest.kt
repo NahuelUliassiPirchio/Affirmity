@@ -87,6 +87,8 @@ private class CancellationFakeDailyCompletionRepository : DailyCompletionReposit
         val existing = rows[epochDay] ?: DailyCompletionEntity(epochDay)
         rows[epochDay] = existing.copy(affirmationDone = true)
     }
+
+    override suspend fun earliestEpochDay(): Long? = null
 }
 
 private class FakeDailyMoodRepository3 : DailyMoodRepository {

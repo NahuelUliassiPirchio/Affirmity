@@ -163,6 +163,14 @@
     <string name="healer_granted_confirm_button">Entendido</string>
     <string name="healer_granted_icon_content_description">Ícono de sanador de racha</string>
     <string name="progress_weekly_streak_format">Racha: %1$d días</string>
+    <string name="history_calendar_title_affirmations">Historial de afirmaciones</string>
+    <string name="history_calendar_title_meditation">Historial de meditación</string>
+    <string name="history_calendar_close_content_description">Cerrar</string>
+    <string name="history_calendar_prev_month_content_description">Mes anterior</string>
+    <string name="history_calendar_next_month_content_description">Mes siguiente</string>
+    <string name="history_calendar_status_done_format">%1$s: Hecho</string>
+    <string name="history_calendar_status_not_done_format">%1$s: No hecho</string>
+    <string name="history_calendar_status_healed_format">%1$s: Sanado</string>
 
     <!-- Onboarding product guide (spec R3, design D6) -->
     <string name="onboarding_guide_slide1_title">Armá tu feed de afirmaciones</string>

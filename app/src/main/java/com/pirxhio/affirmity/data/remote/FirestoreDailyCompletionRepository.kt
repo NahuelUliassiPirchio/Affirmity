@@ -46,6 +46,15 @@ class FirestoreDailyCompletionRepository(
 
     override suspend fun markAffirmation(epochDay: Long) = markDone(epochDay, FIELD_AFFIRMATION_DONE)
 
+    override suspend fun earliestEpochDay(): Long? = collection()
+        .orderBy(FIELD_EPOCH_DAY)
+        .limit(1)
+        .get()
+        .await()
+        .documents
+        .firstOrNull()
+        ?.getLong(FIELD_EPOCH_DAY)
+
     private suspend fun markDone(epochDay: Long, doneField: String) {
         collection().document(epochDay.toString())
             .set(mapOf(FIELD_EPOCH_DAY to epochDay, doneField to true), SetOptions.merge())

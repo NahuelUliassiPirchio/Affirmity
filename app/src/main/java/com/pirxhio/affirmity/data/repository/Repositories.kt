@@ -58,6 +58,10 @@ interface DailyCompletionRepository {
     suspend fun getRange(from: Long, to: Long): List<DailyCompletionEntity>
     suspend fun markMeditation(epochDay: Long)
     suspend fun markAffirmation(epochDay: Long)
+
+    /** Earliest recorded `epochDay` across all rows, or `null` when no row exists. Bounds the
+     *  history calendar's backward navigation (design.md "Earliest-day API"). */
+    suspend fun earliestEpochDay(): Long?
 }
 
 /** Store-agnostic contract for the daily mood check-in (1-5 scale + optional note). */

@@ -14,4 +14,5 @@ class RoomDailyCompletionRepository(private val dao: DailyCompletionDao) : Daily
 
     override suspend fun markMeditation(epochDay: Long) = dao.markMeditation(epochDay)
     override suspend fun markAffirmation(epochDay: Long) = dao.markAffirmation(epochDay)
+    override suspend fun earliestEpochDay(): Long? = dao.earliestEpochDay()
 }

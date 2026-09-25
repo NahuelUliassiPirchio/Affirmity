@@ -138,6 +138,7 @@ import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
@@ -146,6 +147,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
@@ -1912,6 +1914,42 @@ class AffirmityAppState(
      * "Migration / Rollout" decision), while still respecting the usual lookback window. */
     private fun healerStartEpochDay(todayEpochDay: Long): Long =
         StreakHealerStats.healerStartEpochDay(todayEpochDay)
+
+    /**
+     * One-shot earliest-completion day, re-queried on every session swap (design.md's
+     * "Earliest-day API" decision: a one-shot `suspend fun`, not a permanent `MIN()` listener) --
+     * bounds the history calendar's backward navigation. `null` means no `daily_completion` row
+     * exists yet, so the calendar treats the current month as the lower bound. Cold flow bound to
+     * [HistoryCalendarDialog]'s own composition lifecycle (design's "State ownership" decision) --
+     * nothing runs while no collector is attached.
+     */
+    fun observeEarliestCompletionEpochDay(): Flow<Long?> = session.flatMapLatest { activeSession ->
+        flow { emit(activeSession.completions.earliestEpochDay()) }
+    }.catch { error ->
+        Log.e(TAG, "earliest completion day flow failed", error)
+        emit(null)
+    }
+
+    /**
+     * Per-visible-month completion + healer-use slice for the history calendar (design.md's
+     * "Loading" decision: per visible month, not the whole history at once, bounding Firestore
+     * cost to about 31 docs). Session-scoped like every other per-user collector -- a
+     * sign-in/sign-out swap cancels the in-flight Room/Firestore subscription for the previous
+     * identity via [flatMapLatest]. Habit-agnostic on purpose: [CompletionHistorySlice.healedDays]
+     * is the general streak's healed set (the same event log [WeeklyStreakTracker]'s healed dots
+     * already read from) -- the UI layer picks the habit-specific `isDone` flag when deriving day
+     * state via [HistoryCalendarStats.dayStates].
+     */
+    fun observeCompletionHistory(from: Long, to: Long): Flow<CompletionHistorySlice> =
+        session.flatMapLatest { activeSession ->
+            combine(
+                activeSession.completions.observeRange(from, to),
+                activeSession.healerUses.observeRange(from, to),
+            ) { rows, healerRows -> CompletionHistorySlice(rows, healerRows.map { it.healedEpochDay }.toSet()) }
+        }.catch { error ->
+            Log.e(TAG, "completion history flow failed", error)
+            emit(CompletionHistorySlice(emptyList(), emptySet()))
+        }
 
     private companion object {
         const val TAG = "AffirmityAppState"

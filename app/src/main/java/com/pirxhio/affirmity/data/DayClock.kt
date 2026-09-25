@@ -24,6 +24,24 @@ object DayClock {
         epochDay(calendar) - 6
 
     /**
+     * Inverse of [epochDay]: a [Calendar] set to local midnight for the device-local day identified
+     * by [epochDay]. Walks day-by-day from the current local midnight with [Calendar.add] rather
+     * than multiplying [epochDay] by a fixed millis-per-day, so the result stays correct even
+     * across DST transitions and is never off by a UTC-offset day on negative-offset timezones.
+     */
+    fun calendarForEpochDay(epochDay: Long, calendar: Calendar = Calendar.getInstance()): Calendar {
+        val midnight = (calendar.clone() as Calendar).apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val dayDelta = (epochDay - epochDay(midnight)).toInt()
+        midnight.add(Calendar.DAY_OF_YEAR, dayDelta)
+        return midnight
+    }
+
+    /**
      * [epochDay] of whichever calendar day held more of the wall-clock span
      * `[startMillis, endMillis)` — used to attribute a session that crosses local midnight (e.g.
      * started 23:57, ran 10 minutes) to the day it was mostly spent on, not just the day it ended.

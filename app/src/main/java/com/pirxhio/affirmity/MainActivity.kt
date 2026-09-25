@@ -1798,6 +1798,8 @@ fun AffirmityApp(
                     meditationStreak = appState.meditationStreak.value,
                     streakHealer = appState.streakHealer.value,
                     onActivateHealer = { appState.activateStreakHealer() },
+                    observeEarliestCompletionEpochDay = { appState.observeEarliestCompletionEpochDay() },
+                    observeCompletionHistory = { from, to -> appState.observeCompletionHistory(from, to) },
                 )
 
                 AppDestinations.ANIMO -> MoodScreen(

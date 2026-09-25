@@ -92,6 +92,21 @@ class DayClockTest {
         )
     }
 
+    @Test
+    fun `calendarForEpochDay round-trips through epochDay on a negative UTC-offset timezone`() {
+        val buenosAiresZone = TimeZone.getTimeZone("America/Argentina/Buenos_Aires") // UTC-3
+        val original = calendarAt(2026, Calendar.JANUARY, 14, hour = 23, minute = 30, zone = buenosAiresZone)
+        val epochDay = DayClock.epochDay(original)
+
+        val reconstructed = DayClock.calendarForEpochDay(epochDay, original)
+
+        assertEquals(epochDay, DayClock.epochDay(reconstructed))
+        assertEquals(2026, reconstructed.get(Calendar.YEAR))
+        assertEquals(Calendar.JANUARY, reconstructed.get(Calendar.MONTH))
+        assertEquals(14, reconstructed.get(Calendar.DAY_OF_MONTH))
+        assertEquals(0, reconstructed.get(Calendar.HOUR_OF_DAY))
+    }
+
     private val spanishLetters = listOf("D", "L", "M", "M", "J", "V", "S") // Sun..Sat
     private val englishLetters = listOf("S", "M", "T", "W", "T", "F", "S") // Sun..Sat
 

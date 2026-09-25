@@ -163,6 +163,14 @@
     <string name="healer_granted_confirm_button">Got it</string>
     <string name="healer_granted_icon_content_description">Streak healer icon</string>
     <string name="progress_weekly_streak_format">Streak: %1$d days</string>
+    <string name="history_calendar_title_affirmations">Affirmations history</string>
+    <string name="history_calendar_title_meditation">Meditation history</string>
+    <string name="history_calendar_close_content_description">Close</string>
+    <string name="history_calendar_prev_month_content_description">Previous month</string>
+    <string name="history_calendar_next_month_content_description">Next month</string>
+    <string name="history_calendar_status_done_format">%1$s: Done</string>
+    <string name="history_calendar_status_not_done_format">%1$s: Not done</string>
+    <string name="history_calendar_status_healed_format">%1$s: Healed</string>
 
     <!-- Onboarding product guide (spec R3, design D6) -->
     <string name="onboarding_guide_slide1_title">Build your affirmation feed</string>

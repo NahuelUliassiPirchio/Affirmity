@@ -89,6 +89,7 @@ private class NoopDailyCompletionRepository : DailyCompletionRepository {
     override suspend fun getRange(from: Long, to: Long): List<DailyCompletionEntity> = emptyList()
     override suspend fun markMeditation(epochDay: Long) = Unit
     override suspend fun markAffirmation(epochDay: Long) = Unit
+    override suspend fun earliestEpochDay(): Long? = null
 }
 
 private class NoopDailyMoodRepository : DailyMoodRepository {
