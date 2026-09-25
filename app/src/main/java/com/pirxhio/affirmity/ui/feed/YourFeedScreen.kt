@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -171,6 +172,23 @@ private fun FeedSourcesSection(
                 onClick = { onChange(sources.copy(includeOwn = !sources.includeOwn)) },
                 modifier = Modifier.weight(1f),
             )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            // A lone third tile plus a matching Spacer keeps this row's square the same size as the
+            // pair above -- three squares side by side would leave too little width for the
+            // description text (design "File Changes" note).
+            FeedSourceCard(
+                icon = Icons.Filled.Shuffle,
+                label = stringResource(R.string.your_feed_source_random),
+                description = stringResource(R.string.your_feed_source_random_description),
+                checked = sources.randomizeOrder,
+                onClick = { onChange(sources.copy(randomizeOrder = !sources.randomizeOrder)) },
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(modifier = Modifier.weight(1f))
         }
     }
 }

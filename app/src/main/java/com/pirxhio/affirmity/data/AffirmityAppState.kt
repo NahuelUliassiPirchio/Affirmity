@@ -134,6 +134,7 @@ import com.pirxhio.affirmity.ui.myaffirmations.customAffirmationAccessDecision
 import com.pirxhio.affirmity.widget.WeeklyTrackerWidget
 import androidx.glance.appwidget.updateAll
 import java.util.TimeZone
+import kotlin.random.Random
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -493,6 +494,11 @@ class AffirmityAppState(
      *  NEVER wrapped by [analytics]'s consent gate. Defaulted to [NoOpPersonalizationSignalRecorder],
      *  the same injection convention as [analytics]/[adUnlockSource]. */
     private val personalizationSignalRecorder: PersonalizationSignalRecorder = NoOpPersonalizationSignalRecorder,
+    /** Generates a fresh [FeedSources.orderSeed] at commit time when the committed
+     *  [FeedSources.randomizeOrder] is on (design "Seed generation" decision). Defaulted to
+     *  [kotlin.random.Random.nextLong] -- inline `Random.nextLong()` can't be tested
+     *  deterministically -- so every existing JVM test construction of this class is unaffected. */
+    private val feedSeedSource: () -> Long = { Random.nextLong() },
 ) {
     val affirmations = mutableStateListOf<Affirmation>()
 
@@ -515,10 +521,20 @@ class AffirmityAppState(
     var hiddenAffirmationIds = mutableStateOf<Set<String>>(emptySet())
         private set
 
-    /** Which optional sources feed the rotation, toggled from Your feed. Device-local, same posture
+    /** Which optional sources feed the rotation -- the COMMITTED value, only ever written by the
+     *  DataStore collector below or by [applyThemeSelection]'s commit. Device-local, same posture
      *  as [hiddenAffirmationIds]. */
     var feedSources = mutableStateOf(FeedSources())
         private set
+
+    /** Pending (uncommitted) feed sources "Your feed" mutates while open -- mirrors [draftThemeIds]
+     *  ("Your feed" refactor + this feature's spec "Pending State for All Feed-Source Toggles").
+     *  Seeded from [feedSources] when it first resolves; never itself read by [filteredAffirmations]
+     *  or persisted directly -- only [applyThemeSelection] commits it. */
+    var draftFeedSources = mutableStateOf(FeedSources())
+        private set
+
+    private var feedSourcesDraftInitialized = false
 
     private var favoriteOrderedIds = mutableStateOf<List<String>>(emptyList())
     private val favoriteToggleMutex = Mutex()
@@ -536,11 +552,22 @@ class AffirmityAppState(
 
     private var themeDraftInitialized = false
 
-    /** True when [draftThemeIds] is non-empty, or when [feedSources] can carry the feed on its own
-     * (Favorites and/or Mine). Unlike the old group-level rule, `personalizadas` never factors in
-     * (scope decision #2) -- there is nothing to carve out for it. */
+    /** True when [draftThemeIds] is non-empty, or when [draftFeedSources] can carry the feed on its
+     * own (Favorites and/or Mine). Reads the DRAFT, not the committed [feedSources] -- otherwise
+     * turning a source off in the draft would still validate against the stale committed value
+     * (resolved implementation-risk item, `sdd/feed-randomize-order` T4). Unlike the old
+     * group-level rule, `personalizadas` never factors in (scope decision #2) -- there is nothing
+     * to carve out for it. */
     val isDraftThemeSelectionValid: Boolean
-        get() = isDraftThemeSelectionValid(draftThemeIds.value, feedSources.value)
+        get() = isDraftThemeSelectionValid(draftThemeIds.value, draftFeedSources.value)
+
+    /** Extended "Actualizar mi feed" dirty check (spec "Extended isDirty Detection"): true when
+     *  [draftThemeIds] differs from the committed [selectedThemeIds], or any of
+     *  [FeedSources.includeFavorites]/[FeedSources.includeOwn]/[FeedSources.randomizeOrder] differs
+     *  between [draftFeedSources] and [feedSources]. [FeedSources.orderSeed] is excluded -- see
+     *  [isFeedDraftDirty]'s kdoc. */
+    val isFeedDraftDirty: Boolean
+        get() = isFeedDraftDirty(draftThemeIds.value, selectedThemeIds.value, draftFeedSources.value, feedSources.value)
 
     /** The feed's list: every OWNED (`personalizadas`) affirmation unconditionally (scope decision
      * #2), plus every CATALOG affirmation whose theme is in the committed selection AND still
@@ -561,11 +588,15 @@ class AffirmityAppState(
             // Pre-resolution the feed is owned-rows-only (see kdoc), so a favourite can only
             // contribute an owned row here -- never a catalog one, whose access cannot be judged
             // before the theme selection resolves.
-            val ids = selectedThemeIds.value ?: return (
-                own + favoriteAffirmations.filter {
-                    sources.includeFavorites && it.id in ownIds && it.id !in hiddenIds
-                }
-                ).distinctBy { it.id }
+            val ids = selectedThemeIds.value ?: return orderFeed(
+                (
+                    own + favoriteAffirmations.filter {
+                        sources.includeFavorites && it.id in ownIds && it.id !in hiddenIds
+                    }
+                    ).distinctBy { it.id },
+                sources,
+                idOf = { it.id },
+            )
             val collectionsById = catalogCollectionsById()
             val groupsById = catalogUniverseGroups().associateBy { it.id }
             val now = System.currentTimeMillis()
@@ -597,11 +628,17 @@ class AffirmityAppState(
             } else {
                 emptyList()
             }
-            return (own + favorites + catalogAffirmations.filter { affirmation ->
-                    affirmation.id !in hiddenIds &&
-                        collectionsById[affirmation.collectionId]?.themeId in ids &&
-                        catalogRowUnlocked(affirmation)
-                }).distinctBy { it.id }
+            return orderFeed(
+                (
+                    own + favorites + catalogAffirmations.filter { affirmation ->
+                        affirmation.id !in hiddenIds &&
+                            collectionsById[affirmation.collectionId]?.themeId in ids &&
+                            catalogRowUnlocked(affirmation)
+                    }
+                    ).distinctBy { it.id },
+                sources,
+                idOf = { it.id },
+            )
         }
 
     /** Resolved [Affirmation]s for every hidden id (pre-launch audit item #1's "Manage hidden
@@ -1010,6 +1047,10 @@ class AffirmityAppState(
         scope.launch {
             trackerPreferences.observeFeedSources().collect { sources ->
                 feedSources.value = sources
+                if (!feedSourcesDraftInitialized) {
+                    draftFeedSources.value = sources
+                    feedSourcesDraftInitialized = true
+                }
             }
         }
         scope.launch {
@@ -1573,10 +1614,12 @@ class AffirmityAppState(
         )
     }
 
-    /** Persists a Your-feed source toggle. Fire-and-forget: [feedSources] catches up through the
-     *  DataStore flow collected in init, so there is no second source of truth to keep in step. */
-    fun setFeedSources(sources: FeedSources) {
-        scope.launch { trackerPreferences.saveFeedSources(sources) }
+    /** Records a pending Your-feed source toggle in [draftFeedSources] only -- memory-only, no
+     *  DataStore write and no effect on [feedSources]/[filteredAffirmations] until
+     *  [applyThemeSelection] commits it (spec "Pending State for All Feed-Source Toggles"). Replaces
+     *  the old live `setFeedSources`, which persisted immediately. */
+    fun setDraftFeedSources(sources: FeedSources) {
+        draftFeedSources.value = sources
     }
 
     /** Reverses [hideAffirmation] from the "Manage hidden affirmations" screen. */
@@ -1868,12 +1911,28 @@ class AffirmityAppState(
         draftThemeIds.value = draftThemeIds.value.filterNot { themesById[it]?.universeId == universeId }.toSet()
     }
 
-    /** Commits [draftThemeIds] as [selectedThemeIds] and persists it, unless the draft violates
-     * the minimum-selection invariant — in which case nothing is committed or persisted. Returns
-     * whether the commit happened, so the caller can decide whether to close "Your feed". */
+    /** Commits [draftThemeIds] as [selectedThemeIds] AND [draftFeedSources] as [feedSources],
+     * persisting both, unless the draft violates the minimum-selection invariant — in which case
+     * nothing is committed or persisted (spec "Commit Applies All Pending Feed-Source Changes":
+     * both changes take effect together). Returns whether the commit happened, so the caller can
+     * decide whether to close "Your feed".
+     *
+     * When the committed [FeedSources.randomizeOrder] is true, a fresh [FeedSources.orderSeed] is
+     * generated via [feedSeedSource] for THIS commit, regardless of whether the toggle was already
+     * on before it (spec "Seed Generation and Regeneration Timing"). When it is false, the previous
+     * committed seed is carried over unchanged and [feedSeedSource] is not invoked. */
     fun applyThemeSelection(): Boolean {
         if (!isDraftThemeSelectionValid) return false
         val committed = draftThemeIds.value
+        val committedFeedSources = draftFeedSources.value.copy(
+            orderSeed = if (draftFeedSources.value.randomizeOrder) {
+                feedSeedSource()
+            } else {
+                feedSources.value.orderSeed
+            },
+        )
+        feedSources.value = committedFeedSources
+        scope.launch { trackerPreferences.saveFeedSources(committedFeedSources) }
         // spec "personalization-signals -- emission", THEME_ADDED: only newly-committed theme ids
         // count as "added" -- a theme already selected before this commit emits nothing again, and
         // a theme dropped from the draft is a removal, not a signal-worthy event.
@@ -1904,9 +1963,11 @@ class AffirmityAppState(
     }
 
     /** Discards any uncommitted draft edits, restoring [draftThemeIds] to the last committed
-     * [selectedThemeIds] — used when "Your feed" re-opens. */
+     * [selectedThemeIds] and [draftFeedSources] to the last committed [feedSources] — used when
+     * "Your feed" re-opens (name kept to avoid churn; it now resets both drafts). */
     fun resetThemeDraftToCommitted() {
         selectedThemeIds.value?.let { draftThemeIds.value = it }
+        draftFeedSources.value = feedSources.value
     }
 
     /** Floors [StreakHealerStats] evaluation at [StreakHealerStats.EPOCH_START_DAY] so completion

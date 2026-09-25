@@ -532,6 +532,8 @@
     <string name="your_feed_source_favorites_description">Even when their theme isn\'t selected</string>
     <string name="your_feed_source_own">Mine</string>
     <string name="your_feed_source_own_description">The ones you wrote</string>
+    <string name="your_feed_source_random">Random order</string>
+    <string name="your_feed_source_random_description">Shuffle your feed on each update</string>
     <string name="affirmation_share_image_content_description">Share as image</string>
     <string name="affirmation_share_image_error">Could not create the image</string>
     <string name="meditation_customization_breathing_affirmations_shuffle">Random order</string>

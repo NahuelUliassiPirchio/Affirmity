@@ -1605,7 +1605,7 @@ fun AffirmityApp(
                             YourFeedSheetContent(
                                 isExpanded = yourFeedSheetState.currentValue == SheetValue.Expanded,
                                 draftThemeIds = appState.draftThemeIds.value,
-                                isDirty = appState.draftThemeIds.value != appState.selectedThemeIds.value,
+                                isDirty = appState.isFeedDraftDirty,
                                 isValid = appState.isDraftThemeSelectionValid,
                                 catalogThemesById = catalogThemesById(),
                                 recommendedSurfaces = recommendedSurfaces,
@@ -1634,8 +1634,8 @@ fun AffirmityApp(
                                     }
                                 },
                                 onFavoritesClick = { showFavorites = true },
-                                feedSources = appState.feedSources.value,
-                                onFeedSourcesChange = appState::setFeedSources,
+                                feedSources = appState.draftFeedSources.value,
+                                onFeedSourcesChange = appState::setDraftFeedSources,
                             )
                         },
                     ) {

@@ -844,6 +844,8 @@
     <string name="your_feed_source_favorites_description">Aunque su tema no esté elegido</string>
     <string name="your_feed_source_own">Mías</string>
     <string name="your_feed_source_own_description">Las que escribiste vos</string>
+    <string name="your_feed_source_random">Orden aleatorio</string>
+    <string name="your_feed_source_random_description">Mezcla tu feed en cada actualización</string>
     <string name="your_feed_done">Listo</string>
     <string name="your_feed_feeding_you_now">Alimentando tu feed ahora</string>
     <string name="your_feed_total_affirmation_count">%1$d afirmaciones</string>

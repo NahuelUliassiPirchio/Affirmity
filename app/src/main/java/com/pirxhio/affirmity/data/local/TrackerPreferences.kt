@@ -18,17 +18,25 @@ private val Context.trackerDataStore by preferencesDataStore(name = "tracker_pre
 data class DailyViewCount(val epochDay: Long, val count: Int)
 
 /**
- * The two optional sources the main affirmation feed can draw from, on top of the theme selection.
+ * The optional sources the main affirmation feed can draw from, on top of the theme selection.
  *
  * [includeFavorites] on means a favourited affirmation stays in the rotation even when its theme is
  * not currently selected -- favouriting it is a stronger signal than the theme filter. It defaults
  * OFF: that is the behaviour that shipped before the toggle existed, so no existing feed changes
  * shape until the user asks for it. [includeOwn] defaults on for the same reason -- own rows were
  * always in the feed.
+ *
+ * [randomizeOrder] on means the committed feed order is a deterministic hash-sort keyed by
+ * [orderSeed] instead of the fixed own -> favorites -> catalog order. Defaults OFF, preserving
+ * today's fixed order. [orderSeed] is only meaningful when [randomizeOrder] is true; a fresh seed
+ * is generated at commit time (see `AffirmityAppState.applyThemeSelection`), never on read, so the
+ * order stays stable across recompositions and app restarts until the next commit.
  */
 data class FeedSources(
     val includeFavorites: Boolean = false,
     val includeOwn: Boolean = true,
+    val randomizeOrder: Boolean = false,
+    val orderSeed: Long = 0L,
 )
 
 /**
@@ -127,6 +135,8 @@ class TrackerPreferences(private val context: Context) {
             FeedSources(
                 includeFavorites = prefs[FEED_INCLUDE_FAVORITES] ?: false,
                 includeOwn = prefs[FEED_INCLUDE_OWN] ?: true,
+                randomizeOrder = prefs[FEED_RANDOMIZE_ORDER] ?: false,
+                orderSeed = prefs[FEED_ORDER_SEED] ?: 0L,
             )
         }
 
@@ -134,6 +144,8 @@ class TrackerPreferences(private val context: Context) {
         context.trackerDataStore.edit { prefs ->
             prefs[FEED_INCLUDE_FAVORITES] = sources.includeFavorites
             prefs[FEED_INCLUDE_OWN] = sources.includeOwn
+            prefs[FEED_RANDOMIZE_ORDER] = sources.randomizeOrder
+            prefs[FEED_ORDER_SEED] = sources.orderSeed
         }
     }
 
@@ -143,6 +155,8 @@ class TrackerPreferences(private val context: Context) {
         val MEDITATION_DURATION_SECONDS = intPreferencesKey("meditation_duration_seconds")
         val FEED_INCLUDE_FAVORITES = booleanPreferencesKey("feed_include_favorites")
         val FEED_INCLUDE_OWN = booleanPreferencesKey("feed_include_own")
+        val FEED_RANDOMIZE_ORDER = booleanPreferencesKey("feed_randomize_order")
+        val FEED_ORDER_SEED = longPreferencesKey("feed_order_seed")
         val MEDITATION_CUE_SOUND_ENABLED = booleanPreferencesKey("meditation_cue_sound_enabled")
         val HIDDEN_AFFIRMATION_IDS = stringSetPreferencesKey("hidden_affirmation_ids")
         val RECENT_MEDITATION_IDS = stringPreferencesKey("recent_meditation_ids")
