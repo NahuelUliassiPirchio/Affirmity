@@ -1,7 +1,7 @@
 /**
  * Port of `DailyCompletionStats.streakOf` (app/src/main/java/com/pirxhio/affirmity/data/DailyCompletionStats.kt)
- * plus `shouldFireStreakAlert`, the new server-side streak channel decision (spec's
- * "Streak-About-to-End Channel" requirement).
+ * plus the server-side streak channel decisions (spec's "Streak-About-to-End Channel"
+ * requirement): general streak, at-risk trigger, and general-vs-activity alert selection.
  */
 
 export interface Completion {
@@ -29,31 +29,58 @@ export function streakOf(
 }
 
 /**
- * "Current streak" as shown to the user: the longer of the two independently tracked
- * (meditation, affirmation) contiguous streaks ending at `todayEpochDay` -- the app tracks and
- * displays them separately (see `AffirmityAppState.affirmationsStreak` / `.meditationStreak`),
- * and the spec scenarios describe a single undifferentiated "streak of N" without picking one
- * track, so this takes the max of both as the more conservative (fires more readily)
- * interpretation.
+ * "Current streak" as shown to the user: the GENERAL streak, i.e. consecutive days ending at
+ * `todayEpochDay` with at least one activity (meditation OR affirmations). Days may be held by
+ * different activities.
  */
 export function currentStreak(rows: Completion[], todayEpochDay: number): number {
-  const meditationStreak = streakOf(rows, todayEpochDay, (row) => row.meditationDone);
-  const affirmationStreak = streakOf(rows, todayEpochDay, (row) => row.affirmationDone);
-  return Math.max(meditationStreak, affirmationStreak);
+  return streakOf(rows, todayEpochDay, (row) => row.meditationDone || row.affirmationDone);
+}
+
+export type StreakActivity = 'meditation' | 'affirmations';
+
+/** Minimum own-streak length for an activity-specific streak notification. */
+export const ACTIVITY_STREAK_MIN_DAYS = 3;
+
+export interface StreakAlertSelection {
+  streakCount: number;
+  /** Present only for an activity-specific alert. */
+  activity?: StreakActivity;
 }
 
 /**
- * Streak-about-to-end trigger condition (proposal decision 3, spec's "Streak-About-to-End
- * Channel"): the user had a live streak through yesterday AND at least one of
- * affirmation/meditation is still unmarked for `todayEpochDay`. Basing the at-risk count on
- * yesterday is essential: early-morning planning normally runs before today's first completion.
+ * Streak-about-to-end trigger condition: the GENERAL streak is live through yesterday AND there
+ * is no activity yet on `todayEpochDay`. Basing the at-risk count on yesterday is essential:
+ * early-morning planning normally runs before today's first completion.
  */
 export function shouldFireStreakAlert(rows: Completion[], todayEpochDay: number): boolean {
   const today = rows.find((row) => row.epochDay === todayEpochDay);
-  const affirmationDone = today?.affirmationDone ?? false;
-  const meditationDone = today?.meditationDone ?? false;
+  const activeToday = (today?.affirmationDone ?? false) || (today?.meditationDone ?? false);
 
-  return currentStreak(rows, todayEpochDay - 1) >= 1 && (!affirmationDone || !meditationDone);
+  // Derived from `selectStreakAlert` (non-null iff the general streak through yesterday is live),
+  // so the trigger and the selection cannot drift apart.
+  return selectStreakAlert(rows, todayEpochDay) !== null && !activeToday;
+}
+
+/**
+ * Picks what the streak alert talks about. Defaults to the general streak; switches to an
+ * activity-specific alert only when exactly ONE activity has its own live streak of
+ * `ACTIVITY_STREAK_MIN_DAYS`+ days through yesterday (when both do, the general streak already
+ * describes the user). Returns null when there is no live general streak through yesterday.
+ */
+export function selectStreakAlert(rows: Completion[], todayEpochDay: number): StreakAlertSelection | null {
+  const yesterday = todayEpochDay - 1;
+  const general = currentStreak(rows, yesterday);
+  if (general < 1) return null;
+
+  const meditation = streakOf(rows, yesterday, (row) => row.meditationDone);
+  const affirmations = streakOf(rows, yesterday, (row) => row.affirmationDone);
+  const meditationLive = meditation >= ACTIVITY_STREAK_MIN_DAYS;
+  const affirmationsLive = affirmations >= ACTIVITY_STREAK_MIN_DAYS;
+
+  if (meditationLive && !affirmationsLive) return { streakCount: meditation, activity: 'meditation' };
+  if (affirmationsLive && !meditationLive) return { streakCount: affirmations, activity: 'affirmations' };
+  return { streakCount: general };
 }
 
 export type StreakBand = 'streak_1_3' | 'streak_4_13' | 'streak_14plus';

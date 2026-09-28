@@ -37,7 +37,7 @@ import {
 import { taskName } from './tasks';
 import { hasTransientFcmFailures, sendAndPrune, type FcmClient, type TokenStore } from './fcm';
 import { evaluateSendEligibility, notificationTtl, type SendTimeSettings } from './sendPolicy';
-import { currentStreak, streakBand, type Completion } from './streak';
+import { currentStreak, selectStreakAlert, streakBand, type Completion } from './streak';
 import { isHealerExpiringToday, type HealerUse } from './healer';
 import { shouldFireMeditationReturn, type MeditationReturnState } from './meditationReturn';
 import {
@@ -462,25 +462,47 @@ export const sendNotification = onRequest(async (req, res) => {
   // catalog at send time -- any `title`/`body` in the request body is only a legacy pass-through
   // fallback (design §7's backward-compat guarantee: pre-deploy Cloud Tasks need no migration).
   // ---------------------------------------------------------------------------------------------
-  const streakCountValue =
-    channel === 'streak'
-      ? String(currentStreak(completions, localDay - 1))
-      : channel === 'healer'
-        ? // The streak count being protected/recovered by the healer -- the streak held through the
-          // break day (localDay - 1), i.e. as of localDay - 2.
-          String(currentStreak(completions, localDay - 2))
-        : undefined;
+  // General streak by default; an activity-specific alert only when a single activity has its own
+  // live streak of 3+ days (see `selectStreakAlert`). If the activity copy is not in the catalog
+  // the send falls back to the general look (count, context, payload all switch together).
+  const streakAlert = channel === 'streak' ? selectStreakAlert(completions, localDay) : null;
+  const generalStreakValue = channel === 'streak' ? String(currentStreak(completions, localDay - 1)) : undefined;
+  const healerStreakValue =
+    channel === 'healer'
+      ? // The streak count being protected/recovered by the healer -- the streak held through the
+        // break day (localDay - 1), i.e. as of localDay - 2.
+        String(currentStreak(completions, localDay - 2))
+      : undefined;
 
-  const context: string[] =
-    channel === 'mood'
-      ? [localMinuteOfDay(sendCheckedAtMillis, zone) < MOOD_EVENING_START_MINUTE ? 'afternoon' : 'evening']
-      : channel === 'streak' && streakCountValue !== undefined
-        ? [streakBand(Number(streakCountValue))]
-        : channel === 'meditation_return' && meditationReturnDecision?.band
-          ? [meditationReturnDecision.band]
-          : [];
-
-  const placeholderValues: Record<string, string> = streakCountValue !== undefined ? { streakCount: streakCountValue } : {};
+  interface CopyAttempt {
+    context: string[];
+    streakCount: string | undefined;
+    activity?: string;
+  }
+  const attempts: CopyAttempt[] = [];
+  if (channel === 'streak' && streakAlert?.activity) {
+    attempts.push({
+      context: ['streak_activity', `activity_${streakAlert.activity}`],
+      streakCount: String(streakAlert.streakCount),
+      activity: streakAlert.activity,
+    });
+  }
+  if (channel === 'streak') {
+    attempts.push({
+      context: generalStreakValue !== undefined ? [streakBand(Number(generalStreakValue))] : [],
+      streakCount: generalStreakValue,
+    });
+  } else {
+    attempts.push({
+      context:
+        channel === 'mood'
+          ? [localMinuteOfDay(sendCheckedAtMillis, zone) < MOOD_EVENING_START_MINUTE ? 'afternoon' : 'evening']
+          : channel === 'meditation_return' && meditationReturnDecision?.band
+            ? [meditationReturnDecision.band]
+            : [],
+      streakCount: healerStreakValue,
+    });
+  }
 
   // A malformed/partially-seeded `notificationCopy` doc (e.g. missing `locales`/`placeholders`)
   // must never crash this handler before it can fall back to the legacy title/body pass-through
@@ -489,29 +511,57 @@ export const sendNotification = onRequest(async (req, res) => {
   // left `null`, which the legacy pass-through below already handles.
   let variant: CopyVariant | null = null;
   let rendered: CopyText | null = null;
+  let usedAttempt: CopyAttempt = attempts[attempts.length - 1];
   try {
     const catalog = await loadCopyCatalog(firestoreCatalogSource());
     const recentKeys = notificationState.variantHistory[family] ?? [];
-    variant = selectVariant(catalog, family, context, recentKeys);
-    rendered = variant ? renderCopy(variant, locale, placeholderValues) : null;
+    for (const attempt of attempts) {
+      const placeholderValues: Record<string, string> =
+        attempt.streakCount !== undefined ? { streakCount: attempt.streakCount } : {};
+      const candidate = selectVariant(catalog, family, attempt.context, recentKeys);
+      const candidateRendered = candidate ? renderCopy(candidate, locale, placeholderValues) : null;
+      usedAttempt = attempt;
+      if (candidate && candidateRendered) {
+        variant = candidate;
+        rendered = candidateRendered;
+        break;
+      }
+    }
   } catch (err) {
     console.error(
       JSON.stringify({ event: 'notification_send_failed', uid, channel, error: String(err) }),
     );
   }
+  if (!variant) {
+    console.warn(
+      JSON.stringify({
+        event: 'notification_copy_variant_missing',
+        uid,
+        family,
+        locale,
+        contexts: attempts.map((attempt) => attempt.context),
+      }),
+    );
+  }
+  // Payload, copy and tags must agree: `activity`/`streakCount` reflect the attempt actually used.
+  const streakCountValue = usedAttempt.streakCount;
+  const sentActivity = variant ? usedAttempt.activity : undefined;
 
   const title = rendered?.title ?? legacyTitle;
   const body = rendered?.body ?? legacyBody;
   const variantKey = rendered ? variant?.key : undefined;
 
+  // A planned `activity` hint is never trusted (it can be stale); it is re-derived above.
+  const { activity: _stalePlannedActivity, ...legacyDataWithoutActivity } = legacyData ?? {};
   const v2Data: Record<string, string> = {
-    ...(legacyData ?? {}),
+    ...legacyDataWithoutActivity,
     family,
     destination: DESTINATION_BY_CHANNEL[channel],
     ctaKey: CTA_KEY_BY_CHANNEL[channel],
     locale,
     ...(variantKey ? { variantKey } : {}),
     ...(streakCountValue !== undefined ? { streakCount: streakCountValue } : {}),
+    ...(sentActivity ? { activity: sentActivity } : {}),
     ...(channel === 'meditation_return' && meditationReturnDecision?.inactiveDays !== undefined
       ? { inactiveDays: String(meditationReturnDecision.inactiveDays) }
       : {}),

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { localInstantMillis } from '../src/localDay';
 import {
   applyPriority,
   planAllUsers,
@@ -157,6 +158,116 @@ describe('planAllUsers', () => {
       | undefined;
     expect(streakTask?.data?.streakCount).toBe('2');
     expect(streakTask?.body).toBeUndefined();
+  });
+
+  it('includes the activity when a single activity has its own live streak of 3+ days', async () => {
+    const store = makeStore();
+    const enqueuer = makeEnqueuer();
+    const localDay = baseInput.localDay;
+
+    const input: UserPlanInput = {
+      ...baseInput,
+      completions: [3, 2, 1].map((back) => ({
+        epochDay: localDay - back,
+        meditationDone: true,
+        affirmationDone: false,
+      })),
+    };
+
+    await planUser(input, store, enqueuer);
+
+    const streakTask = enqueuer.calls.find((task) => (task as { channel: string }).channel === 'streak') as
+      | { data?: { streakCount?: string; activity?: string } }
+      | undefined;
+    expect(streakTask?.data).toEqual({ streakCount: '3', activity: 'meditation' });
+  });
+
+  it('omits the activity for a general streak', async () => {
+    const store = makeStore();
+    const enqueuer = makeEnqueuer();
+    const localDay = baseInput.localDay;
+
+    await planUser(
+      {
+        ...baseInput,
+        completions: [
+          { epochDay: localDay - 2, meditationDone: true, affirmationDone: true },
+          { epochDay: localDay - 1, meditationDone: true, affirmationDone: true },
+        ],
+      },
+      store,
+      enqueuer,
+    );
+
+    const streakTask = enqueuer.calls.find((task) => (task as { channel: string }).channel === 'streak') as
+      | { data?: Record<string, string> }
+      | undefined;
+    expect(streakTask?.data).toEqual({ streakCount: '2' });
+  });
+
+  describe('streak task selection edge cases', () => {
+    const streakTaskOf = (enqueuer: ReturnType<typeof makeEnqueuer>) =>
+      enqueuer.calls.find((task) => (task as { channel: string }).channel === 'streak') as
+        | { atMillis: number; data?: Record<string, string> }
+        | undefined;
+    const row = (epochDay: number, meditationDone: boolean, affirmationDone: boolean) => ({
+      epochDay,
+      meditationDone,
+      affirmationDone,
+    });
+
+    it('enqueues no streak task when the streak ended two days ago', async () => {
+      const enqueuer = makeEnqueuer();
+      const day = baseInput.localDay;
+
+      await planUser({ ...baseInput, completions: [row(day - 3, true, true), row(day - 2, true, true)] }, makeStore(), enqueuer);
+
+      expect(streakTaskOf(enqueuer)).toBeUndefined();
+    });
+
+    it('enqueues a general task without activity when both activities have live streaks of 3+', async () => {
+      const enqueuer = makeEnqueuer();
+      const day = baseInput.localDay;
+
+      await planUser(
+        { ...baseInput, completions: [row(day - 3, true, true), row(day - 2, true, true), row(day - 1, true, true)] },
+        makeStore(),
+        enqueuer,
+      );
+
+      expect(streakTaskOf(enqueuer)?.data).toEqual({ streakCount: '3' });
+    });
+
+    it('enqueues no streak task when an activity is already done today', async () => {
+      const enqueuer = makeEnqueuer();
+      const day = baseInput.localDay;
+
+      await planUser(
+        { ...baseInput, completions: [row(day - 2, true, false), row(day - 1, true, false), row(day, false, true)] },
+        makeStore(),
+        enqueuer,
+      );
+
+      expect(streakTaskOf(enqueuer)).toBeUndefined();
+    });
+
+    it('anchors the task at 20:00 of the user-local day in a non-UTC zone', async () => {
+      const enqueuer = makeEnqueuer();
+      const day = baseInput.localDay;
+      const zone = 'Asia/Tokyo';
+
+      await planUser(
+        {
+          ...baseInput,
+          settings: { ...baseInput.settings, timeZone: zone, remindersEnabled: false },
+          completions: [row(day - 1, true, true)],
+        },
+        makeStore(),
+        enqueuer,
+      );
+
+      expect(streakTaskOf(enqueuer)?.atMillis).toBe(localInstantMillis(day, zone, 20 * 60));
+    });
   });
 
   it('does not enqueue a fixed-time alert once its safe scheduling window has passed', async () => {

@@ -145,6 +145,19 @@ describe('notification-copy.v1.json data quality', () => {
     }
   });
 
+  it('ships activity-specific streak variants for both meditation and affirmations', () => {
+    for (const activity of ['meditation', 'affirmations']) {
+      const variants = catalog.variants.filter(
+        (v) =>
+          v.family === 'streak' &&
+          v.context.includes('streak_activity') &&
+          v.context.includes(`activity_${activity}`),
+      );
+      expect(variants.length).toBeGreaterThan(0);
+      for (const variant of variants) expect(variant.placeholders).toContain('streakCount');
+    }
+  });
+
   it('never leaves an undeclared `{...}` occurrence in either locale', () => {
     for (const variant of catalog.variants) {
       for (const locale of ['es', 'en'] as const) {

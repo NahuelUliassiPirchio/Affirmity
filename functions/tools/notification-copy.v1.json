@@ -314,6 +314,54 @@
       }
     },
     {
+      "key": "streak_activity_meditation_a",
+      "family": "streak",
+      "context": ["streak_activity", "activity_meditation"],
+      "placeholders": ["streakCount"],
+      "enabled": true,
+      "order": 1,
+      "locales": {
+        "es": { "title": "Llevás {streakCount} días meditando, no paremos ahora 🧘", "body": "Un momento de calma hoy mantiene viva tu racha." },
+        "en": { "title": "You've been meditating for {streakCount} days, let's not stop now 🧘", "body": "A moment of calm today keeps your streak alive." }
+      }
+    },
+    {
+      "key": "streak_activity_meditation_b",
+      "family": "streak",
+      "context": ["streak_activity", "activity_meditation"],
+      "placeholders": ["streakCount"],
+      "enabled": true,
+      "order": 2,
+      "locales": {
+        "es": { "title": "{streakCount} días seguidos de meditación 🔥", "body": "Sentate unos minutos y seguí con tu racha." },
+        "en": { "title": "{streakCount} days of meditation in a row 🔥", "body": "Sit down for a few minutes and keep your streak going." }
+      }
+    },
+    {
+      "key": "streak_activity_affirmations_a",
+      "family": "streak",
+      "context": ["streak_activity", "activity_affirmations"],
+      "placeholders": ["streakCount"],
+      "enabled": true,
+      "order": 1,
+      "locales": {
+        "es": { "title": "Llevás {streakCount} días con tus afirmaciones, no paremos ahora ✨", "body": "Leé una hoy y mantené viva tu racha." },
+        "en": { "title": "You've been doing your affirmations for {streakCount} days, let's not stop now ✨", "body": "Read one today and keep your streak alive." }
+      }
+    },
+    {
+      "key": "streak_activity_affirmations_b",
+      "family": "streak",
+      "context": ["streak_activity", "activity_affirmations"],
+      "placeholders": ["streakCount"],
+      "enabled": true,
+      "order": 2,
+      "locales": {
+        "es": { "title": "{streakCount} días seguidos de afirmaciones 🔥", "body": "Todavía llegás a sumar el de hoy." },
+        "en": { "title": "{streakCount} days of affirmations in a row 🔥", "body": "You still have time to add today's." }
+      }
+    },
+    {
       "key": "streak_risk_1_3_a",
       "family": "streak",
       "context": ["streak_1_3"],

@@ -13,7 +13,7 @@ import {
   type MeditationReturnState,
 } from './meditationReturn';
 import { DAY_SEGMENTS, isSafelyFuture, isWithinQuietHours, segmentSlots, slotInstant } from './schedule';
-import { currentStreak, shouldFireStreakAlert, type Completion } from './streak';
+import { selectStreakAlert, shouldFireStreakAlert, type Completion } from './streak';
 import { shouldFireHealerAlert, type HealerUse } from './healer';
 
 export const REMINDER_SLOT_COUNT = 3;
@@ -69,6 +69,8 @@ export interface PlannedTask {
 
 export interface NotificationData {
   streakCount?: string;
+  /** Set only for an activity-specific streak alert ('meditation' | 'affirmations'). */
+  activity?: string;
 }
 
 export type PlanStatus = 'planned' | 'skipped' | 'failed';
@@ -145,15 +147,21 @@ export function planUserTasks(
     );
   }
 
-  if (settings.streakEnabled && shouldFireStreakAlert(completions, localDay)) {
-    const streak = currentStreak(completions, localDay - 1);
+  const streakAlert =
+    settings.streakEnabled && shouldFireStreakAlert(completions, localDay)
+      ? selectStreakAlert(completions, localDay)
+      : null;
+  if (streakAlert) {
     const task: PlannedTask = {
       uid: '',
       localDay,
       channel: 'streak',
       slot: 0,
       atMillis: slotInstant(localDay, zone, STREAK_ALERT_MINUTE, STREAK_ALERT_MINUTE, rng).getTime(),
-      data: { streakCount: String(streak) },
+      data: {
+        streakCount: String(streakAlert.streakCount),
+        ...(streakAlert.activity ? { activity: streakAlert.activity } : {}),
+      },
     };
     if (isSafelyFuture(task.atMillis, planGeneratedAtMillis)) tasks.push(task);
   }
