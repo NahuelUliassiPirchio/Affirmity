@@ -2,4 +2,16 @@
 <resources>
     <!-- Matches TealPrimaryDark in ui/theme/Color.kt (dark color scheme's primary). -->
     <color name="splash_background">#FF5BBCC3</color>
+
+    <color name="notif_streak_bg">#FF3A2412</color>
+    <color name="notif_streak_accent">#FFFF9A4D</color>
+    <color name="notif_streak_chip_bg">#FFFF9A4D</color>
+    <color name="notif_streak_chip_text">#FF3A2412</color>
+    <color name="notif_streak_text">#FFFFE8D2</color>
+    <color name="notif_reflection_bg">#FF232B33</color>
+    <color name="notif_reflection_accent">#FF9DB7CF</color>
+    <color name="notif_reflection_text">#FFE6EDF3</color>
+    <color name="notif_mood_bg">#FF12312F</color>
+    <color name="notif_mood_accent">#FF5BBCC3</color>
+    <color name="notif_mood_text">#FFD7F0EE</color>
 </resources>

@@ -77,6 +77,7 @@ import com.pirxhio.affirmity.compass.CompassAnswerRepository
 import com.pirxhio.affirmity.access.AccessDecision
 import com.pirxhio.affirmity.analytics.AnalyticsEvent
 import com.pirxhio.affirmity.analytics.AnalyticsId
+import com.pirxhio.affirmity.analytics.NotificationActivityValue
 import com.pirxhio.affirmity.analytics.NotificationDestinationValue
 import com.pirxhio.affirmity.analytics.NotificationFamilyValue
 import com.pirxhio.affirmity.analytics.NotificationLocaleValue
@@ -197,6 +198,10 @@ const val EXTRA_NOTIFICATION_DESTINATION = "notification_destination"
  * server rendered this delivery's copy in (design §9). */
 const val EXTRA_NOTIFICATION_LOCALE = "notification_locale"
 
+/** Companion extra to [EXTRA_NOTIFICATION_FAMILY]: the wire `activity` of an activity-specific streak
+ * alert (`meditation`/`affirmations`); absent for every other notification. */
+const val EXTRA_NOTIFICATION_ACTIVITY = "notification_activity"
+
 /** Reserved for a future `NotificationCompat.Action` CTA button's own `PendingIntent` (design §9's
  * `notification_action_clicked` call site). No producer sets this extra yet -- CTA button wiring
  * itself remains the same open follow-up flagged since Phase 5b (`NotificationCanceller`'s kdoc) --
@@ -227,6 +232,7 @@ data class NotificationLaunchAttribution(
     val variantKey: String? = null,
     val destination: String? = null,
     val locale: String? = null,
+    val activity: String? = null,
     val action: String? = null,
     val eventKey: Int = 0,
 )
@@ -308,6 +314,9 @@ private fun resolveNotificationDestination(intent: Intent?): String? =
 private fun resolveNotificationLocale(intent: Intent?): String? =
     intent?.getStringExtra(EXTRA_NOTIFICATION_LOCALE)
 
+private fun resolveNotificationActivity(intent: Intent?): String? =
+    intent?.getStringExtra(EXTRA_NOTIFICATION_ACTIVITY)
+
 /** See [EXTRA_NOTIFICATION_ACTION]'s kdoc -- no current producer, resolved for forward-compat. */
 private fun resolveNotificationAction(intent: Intent?): String? =
     intent?.getStringExtra(EXTRA_NOTIFICATION_ACTION)
@@ -330,6 +339,7 @@ internal fun resolveNotificationOpenedEvent(
     variantKey: String?,
     destination: String?,
     locale: String?,
+    activity: String? = null,
 ): AnalyticsEvent.NotificationOpened? {
     if (family == null) return null
     return AnalyticsEvent.NotificationOpened(
@@ -337,6 +347,7 @@ internal fun resolveNotificationOpenedEvent(
         variantKey = variantKey?.let { AnalyticsId.ofNotificationVariant(it) },
         destination = NotificationDestinationValue.fromWire(destination),
         locale = NotificationLocaleValue.fromWire(locale),
+        activity = NotificationActivityValue.fromWire(activity),
     )
 }
 
@@ -547,6 +558,7 @@ private fun resolveStartExtras(
             variantKey = resolveNotificationVariantKey(intent),
             destination = resolveNotificationDestination(intent),
             locale = resolveNotificationLocale(intent),
+            activity = resolveNotificationActivity(intent),
             action = resolveNotificationAction(intent),
             eventKey = nextNotificationLaunchEventKey(currentNotificationEventKey, notificationFamily),
         ),
@@ -567,6 +579,7 @@ private fun removeConsumedStartExtras(intent: Intent?) {
     intent?.removeExtra(EXTRA_NOTIFICATION_VARIANT_KEY)
     intent?.removeExtra(EXTRA_NOTIFICATION_DESTINATION)
     intent?.removeExtra(EXTRA_NOTIFICATION_LOCALE)
+    intent?.removeExtra(EXTRA_NOTIFICATION_ACTIVITY)
     intent?.removeExtra(EXTRA_NOTIFICATION_ACTION)
 }
 
@@ -711,6 +724,7 @@ fun AffirmityApp(
             variantKey = startNotification.variantKey,
             destination = startNotification.destination,
             locale = startNotification.locale,
+            activity = startNotification.activity,
         )?.let { event ->
             appState.logAnalyticsEvent(event)
             appState.setActiveNotificationAttribution(

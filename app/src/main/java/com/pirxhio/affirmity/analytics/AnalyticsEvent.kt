@@ -51,6 +51,8 @@ enum class AnalyticsParam(val wireName: String) {
     VARIANT_KEY("variant_key"),
     DESTINATION("destination"),
     LOCALE("locale"),
+    // Activity a streak notification was about (`meditation`/`affirmations`); only on activity-specific alerts.
+    ACTIVITY("activity"),
     // Declared per design §9's exact AnalyticsParam list. Not yet populated on any event this phase
     // -- no client-side streak/inactivity banding function exists (that logic lives server-side,
     // functions/src/streak.ts's streakBand / the planned meditationReturnBand), and the spec's
@@ -107,6 +109,17 @@ enum class NotificationLocaleValue {
     companion object {
         fun fromWire(raw: String?): NotificationLocaleValue =
             entries.firstOrNull { it.name.equals(raw, ignoreCase = true) } ?: UNKNOWN
+    }
+}
+
+/** Bounded mapping of the wire `activity` token of an activity-specific streak alert. Unknown values
+ *  map to null (the param is then omitted) instead of leaking a raw string into analytics. */
+enum class NotificationActivityValue {
+    MEDITATION, AFFIRMATIONS;
+
+    companion object {
+        fun fromWire(raw: String?): NotificationActivityValue? =
+            entries.firstOrNull { it.name.equals(raw, ignoreCase = true) }
     }
 }
 
@@ -277,6 +290,8 @@ sealed interface AnalyticsEvent {
         val variantKey: AnalyticsId?,
         val destination: NotificationDestinationValue,
         val locale: NotificationLocaleValue,
+        /** Set only for an activity-specific streak alert; null for every other notification. */
+        val activity: NotificationActivityValue? = null,
     ) : AnalyticsEvent {
         override val name = AnalyticsEventName.NOTIFICATION_OPENED
     }

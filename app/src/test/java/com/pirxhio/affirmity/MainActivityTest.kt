@@ -6,6 +6,7 @@ import com.pirxhio.affirmity.access.AdUnlockState
 import com.pirxhio.affirmity.analytics.AccessDecisionValue
 import com.pirxhio.affirmity.analytics.AnalyticsEvent
 import com.pirxhio.affirmity.analytics.AnalyticsId
+import com.pirxhio.affirmity.analytics.NotificationActivityValue
 import com.pirxhio.affirmity.analytics.NotificationDestinationValue
 import com.pirxhio.affirmity.analytics.NotificationFamilyValue
 import com.pirxhio.affirmity.analytics.NotificationLocaleValue
@@ -504,5 +505,18 @@ class MainActivityTest {
         const val TWO_MINUTES_MILLIS = 120_000L
         const val TWENTY_MINUTES_MILLIS = 1_200_000L
         const val TEN_MINUTES_MILLIS = 600_000L
+    }
+
+    @Test
+    fun `resolveNotificationOpenedEvent maps the activity wire value and drops unknown ones`() {
+        val meditation = resolveNotificationOpenedEvent(
+            family = "streak", variantKey = null, destination = null, locale = "en", activity = "meditation",
+        )
+        val yoga = resolveNotificationOpenedEvent(
+            family = "streak", variantKey = null, destination = null, locale = "en", activity = "yoga",
+        )
+
+        assertEquals(NotificationActivityValue.MEDITATION, meditation?.activity)
+        assertNull(yoga?.activity)
     }
 }

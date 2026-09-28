@@ -18,6 +18,10 @@ data class NotificationAttribution(
     val family: String? = null,
     val variantKey: String? = null,
     val locale: String? = null,
+    /** Streak count the server rendered into the copy (streak channel only). */
+    val streakCount: String? = null,
+    /** Set only for an activity-specific streak alert: `meditation` or `affirmations`. */
+    val activity: String? = null,
 )
 
 /** Something that can post a notification for a given channel. Implemented by [Notifier]. */
@@ -52,6 +56,8 @@ sealed interface FcmAction {
         val inactiveDays: String? = null,
         val questionId: String? = null,
         val expiringToday: Boolean = false,
+        /** Optional (backwards compatible): activity an activity-specific streak alert is about. */
+        val activity: String? = null,
     ) : FcmAction
     data object RefreshWidget : FcmAction
     data object Ignore : FcmAction
@@ -87,6 +93,7 @@ class FcmMessageHandler(private val strings: (NotificationChannelSpec) -> Pair<S
             inactiveDays = data["inactiveDays"],
             questionId = data["questionId"],
             expiringToday = data["expiringToday"] == "true",
+            activity = data["activity"],
         )
     }
 }
@@ -105,6 +112,8 @@ suspend fun FcmAction.applyTo(poster: NotificationPoster, refreshWidget: suspend
                 family = family,
                 variantKey = variantKey,
                 locale = locale,
+                streakCount = streakCount,
+                activity = activity,
             ),
         )
         FcmAction.RefreshWidget -> refreshWidget()

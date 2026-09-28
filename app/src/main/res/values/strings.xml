@@ -19,7 +19,7 @@
     <string name="notification_reflection_title">Un momento de honestidad</string>
     <string name="notification_reflection_fallback_body">Una pregunta honesta para mirar hacia adentro hoy.</string>
     <string name="notification_mood_title">¿Cómo te sentiste hoy?</string>
-    <string name="notification_mood_fallback_body">Tocá un emoji para loguear tu ánimo de hoy.</string>
+    <string name="notification_mood_fallback_body">Tocá para loguear tu ánimo de hoy.</string>
     <string name="notification_streak_title">Tu racha está por terminar</string>
     <string name="notification_streak_fallback_body">Todavía puedes completar hoy y mantener tu racha.</string>
     <string name="notification_healer_title">Tu racha se rompió, pero tenés un sanador</string>
@@ -28,6 +28,8 @@
     <string name="notification_meditation_return_fallback_body">Unos minutos hoy pueden ayudarte a retomar el hábito.</string>
 
     <!-- Notifications V2 task 5.3: one CTA label per family, resolved from the server's `ctaKey`. -->
+    <string name="notification_streak_activity_meditation">Meditación</string>
+    <string name="notification_streak_activity_affirmations">Afirmaciones</string>
     <string name="notification_cta_affirmations">Ver afirmaciones</string>
     <string name="notification_cta_mood">Loguear ánimo</string>
     <string name="notification_cta_reflection">Responder</string>

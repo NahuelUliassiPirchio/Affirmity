@@ -89,31 +89,118 @@ computation.
 
 The system SHALL evaluate, once per active user during the nightly planner
 pass, whether to enqueue a "streak about to end" notification for 20:00
-user-local time. The trigger condition MUST be: the user's current streak
-(via the ported `DailyCompletionStats.streakOf` logic) is >= 1, AND at least
-one of affirmation-completed or meditation-completed is still unmarked for
-the user's current local day (per their persisted timezone).
+user-local time. The notification is about the GENERAL streak: consecutive
+days with at least one activity (affirmations OR meditation). The trigger
+condition MUST be: the general streak through yesterday is >= 1, AND no
+activity (neither affirmation nor meditation) is marked for the user's
+current local day (per their persisted timezone). The condition MUST be
+re-evaluated at send time.
 
-#### Scenario: Fires when streak is live and day incomplete
+#### Scenario: Fires when the general streak is live and today has no activity
 
-- GIVEN a user with a streak of 3 and, at 20:00 their local time, meditation
-  is marked complete for today but affirmation is not
+- GIVEN a user whose general streak through yesterday is 3 and who has
+  marked neither meditation nor affirmations today at 20:00 local time
 - WHEN the planner evaluates the streak channel for that user
 - THEN it MUST enqueue a "streak about to end" notification for 20:00
   user-local time
 
-#### Scenario: Does not fire once the day is fully completed
+#### Scenario: General streak is held by mixed activities
 
-- GIVEN a user with a streak of 3 who has completed both affirmation and
-  meditation for their current local day before 20:00
+- GIVEN a user who meditated two days ago and did affirmations yesterday
+- WHEN the general streak is computed
+- THEN it MUST count both days as one streak of 2
+
+#### Scenario: Does not fire once any activity is done today
+
+- GIVEN a user with a general streak of 3 who has completed at least one of
+  affirmation or meditation for their current local day before 20:00
 - WHEN the planner evaluates the streak channel for that user
 - THEN it MUST NOT enqueue a "streak about to end" notification for that day
 
 #### Scenario: Does not fire with no active streak
 
-- GIVEN a user whose current streak is 0
+- GIVEN a user whose general streak through yesterday is 0
 - WHEN the planner evaluates the streak channel for that user
 - THEN it MUST NOT enqueue a "streak about to end" notification
+
+### Requirement: Activity-Specific Streak Notification
+
+When the streak channel fires, the system SHALL send the general-streak copy
+by default. It SHALL instead send an activity-specific notification only when
+exactly one activity (meditation or affirmations) has its own live streak of
+at least 3 consecutive days through yesterday. The activity-specific copy MUST
+name the activity and use that activity's streak count (for example "You've
+been meditating for 5 days, let's not stop now"). The FCM data payload MUST
+carry an `activity` field (`meditation` | `affirmations`) only for
+activity-specific alerts, and copy MUST come from catalog variants tagged
+`streak_activity` plus `activity_meditation` or `activity_affirmations` (es and
+en). The client MUST treat `activity` as optional so older payloads still work.
+
+#### Scenario: Single activity with a live streak of 3+ days
+
+- GIVEN a user with a meditation streak of 5 days through yesterday and no
+  affirmations streak of 3+ days
+- WHEN the streak notification is sent
+- THEN the payload MUST include `activity=meditation` and `streakCount=5`
+- AND the copy MUST be a meditation-tagged variant
+
+#### Scenario: Both activities have live streaks of 3+ days
+
+- GIVEN a user whose meditation and affirmations streaks are both >= 3
+- WHEN the streak notification is sent
+- THEN it MUST use the general copy and MUST NOT include `activity`
+
+#### Scenario: Activity streak below the threshold
+
+- GIVEN a user whose only activity streak is 2 days
+- WHEN the streak notification is sent
+- THEN it MUST use the general copy and MUST NOT include `activity`
+
+#### Rollout and rollback
+
+- Seed the copy catalog (`functions/tools/seedCopyCatalog.ts`) BEFORE deploying the
+  function. If the `streak_activity_*` variants are missing or disabled at send time, the
+  function falls back to the general band copy, omits `activity` from the payload and logs a
+  `notification_copy_variant_missing` warning when no variant matches at all.
+- Rollback: set `enabled=false` on the four `streak_activity_meditation_a/b` and
+  `streak_activity_affirmations_a/b` catalog documents; sends then use the general copy with no
+  redeploy.
+- Streak counts in streak notifications are now the GENERAL streak (any activity per day) and may
+  differ from the per-activity streaks shown in the app. Activity-specific alerts use that
+  activity's own count. A stale planned `activity` value is never trusted: payload, context tags
+  and copy are all re-derived at send time.
+- `notification_opened` carries an optional `activity` analytics param (`meditation` |
+  `affirmations`) for activity-specific alerts only.
+
+### Requirement: Per-Type Notification Presentation
+
+The Android client SHALL render STREAK, REFLECTION and MOOD notifications with
+distinct custom presentations (custom `RemoteViews` layouts inside
+`DecoratedCustomViewStyle`, with collapsed and expanded views and light/dark
+colors); every other channel MUST keep the plain BigText presentation. The
+presentation choice MUST be produced by a framework-free spec mapper so it is
+JVM-unit-testable. Tapping any of these notifications MUST keep the existing
+start-destination and mood-picker deep-link behavior.
+
+#### Scenario: Streak notification
+
+- GIVEN a streak notification with `streakCount=7`
+- WHEN it is posted
+- THEN it MUST show a flame and the count prominently
+- AND, when `activity` is present, the expanded view MUST show the activity name
+
+#### Scenario: Reflection notification
+
+- GIVEN a reflection notification whose body is a question
+- WHEN it is posted
+- THEN the question MUST be rendered large in a calm, quote-like layout
+
+#### Scenario: Mood notification
+
+- GIVEN a mood notification
+- WHEN it is posted expanded
+- THEN it MUST show a friendly text-only prompt (title and body) on a tinted card with a heart icon
+- AND tapping it MUST open the mood picker on the mood destination
 
 ### Requirement: Signed-Out Users Receive Zero Notifications
 

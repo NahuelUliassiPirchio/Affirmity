@@ -325,4 +325,31 @@ class FirebaseAnalyticsLoggerTest {
             logged.params,
         )
     }
+
+    @Test
+    fun `notification_opened appends activity when the streak alert is activity-specific`() {
+        val logged = log(
+            AnalyticsEvent.NotificationOpened(
+                NotificationFamilyValue.STREAK,
+                AnalyticsId.ofNotificationVariant("streak_activity_meditation_a"),
+                NotificationDestinationValue.STREAK_ACTION,
+                NotificationLocaleValue.EN,
+                NotificationActivityValue.MEDITATION,
+            ),
+        )
+        assertEquals(AnalyticsParamValue.Text("activity", "meditation"), logged.params.last())
+    }
+
+    @Test
+    fun `notification_opened omits activity when null`() {
+        val logged = log(
+            AnalyticsEvent.NotificationOpened(
+                NotificationFamilyValue.STREAK,
+                null,
+                NotificationDestinationValue.STREAK_ACTION,
+                NotificationLocaleValue.EN,
+            ),
+        )
+        assertEquals(false, logged.params.any { it.key == "activity" })
+    }
 }

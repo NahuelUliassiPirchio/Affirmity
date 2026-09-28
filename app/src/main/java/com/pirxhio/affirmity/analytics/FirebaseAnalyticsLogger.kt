@@ -86,7 +86,7 @@ class FirebaseAnalyticsLogger(private val sink: FirebaseAnalyticsSink) : Analyti
         )
         is AnalyticsEvent.NotificationOpened -> notificationParams(
             event.family, event.variantKey, event.destination, event.locale,
-        )
+        ) + listOfNotNull(event.activity?.let { text(AnalyticsParam.ACTIVITY, it.name) })
         is AnalyticsEvent.NotificationActionClicked -> notificationParams(
             event.family, event.variantKey, event.destination, event.locale,
         )

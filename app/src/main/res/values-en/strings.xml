@@ -19,7 +19,7 @@
     <string name="notification_reflection_title">A moment of honesty</string>
     <string name="notification_reflection_fallback_body">An honest question to look inward today.</string>
     <string name="notification_mood_title">How did you feel today?</string>
-    <string name="notification_mood_fallback_body">Tap an emoji to log today\'s mood.</string>
+    <string name="notification_mood_fallback_body">Tap to log today\'s mood.</string>
     <string name="notification_streak_title">Your streak is about to end</string>
     <string name="notification_streak_fallback_body">You can still complete today and keep your streak.</string>
     <string name="notification_healer_title">Your streak broke, but you have a healer</string>
@@ -28,6 +28,8 @@
     <string name="notification_meditation_return_fallback_body">A few minutes today can help you pick the habit back up.</string>
 
     <!-- Notifications V2 task 5.3: one CTA label per family, resolved from the server's `ctaKey`. -->
+    <string name="notification_streak_activity_meditation">Meditation</string>
+    <string name="notification_streak_activity_affirmations">Affirmations</string>
     <string name="notification_cta_affirmations">View affirmations</string>
     <string name="notification_cta_mood">Log mood</string>
     <string name="notification_cta_reflection">Answer</string>

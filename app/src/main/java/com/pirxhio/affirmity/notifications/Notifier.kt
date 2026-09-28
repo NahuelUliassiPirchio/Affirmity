@@ -6,8 +6,12 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import android.view.View
+import android.widget.RemoteViews
+import androidx.annotation.LayoutRes
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import com.pirxhio.affirmity.EXTRA_NOTIFICATION_ACTIVITY
 import com.pirxhio.affirmity.EXTRA_NOTIFICATION_DESTINATION
 import com.pirxhio.affirmity.EXTRA_NOTIFICATION_FAMILY
 import com.pirxhio.affirmity.EXTRA_NOTIFICATION_LOCALE
@@ -38,6 +42,7 @@ class Notifier(
         attribution: NotificationAttribution,
     ) {
         val (destination, expiringToday, questionId, family, variantKey, locale) = attribution
+        val activity = attribution.activity
         val notificationManager = NotificationManagerCompat.from(context)
         val channelImportance = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             notificationManager.getNotificationChannel(channel.channelId)?.importance
@@ -97,15 +102,17 @@ class Notifier(
                 variantKey?.let { putExtra(EXTRA_NOTIFICATION_VARIANT_KEY, it) }
                 destination?.let { putExtra(EXTRA_NOTIFICATION_DESTINATION, it) }
                 locale?.let { putExtra(EXTRA_NOTIFICATION_LOCALE, it) }
+                activity?.let { putExtra(EXTRA_NOTIFICATION_ACTIVITY, it) }
             },
             PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val builder = NotificationCompat.Builder(context, channel.channelId)
+        val spec = notificationStyleSpec(channel, title, body, attribution)
+        // A fresh builder per attempt so a half-applied custom style never leaks into the fallback.
+        fun newBuilder() = NotificationCompat.Builder(context, channel.channelId)
             .setSmallIcon(R.drawable.notification_icon_24dp)
             .setContentTitle(title)
             .setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setContentIntent(contentIntent)
             .setAutoCancel(true)
             .apply {
@@ -119,8 +126,103 @@ class Notifier(
                 }
             }
 
-        notificationManager.notify(deliveryNotificationId, builder.build())
+        postWithPlainFallback(
+            usesCustomViews = spec.usesCustomViews(),
+            postStyled = {
+                notificationManager.notify(
+                    deliveryNotificationId,
+                    newBuilder().applyStyle(spec, contentIntent).build(),
+                )
+            },
+            postPlain = {
+                notificationManager.notify(
+                    deliveryNotificationId,
+                    newBuilder().setStyle(NotificationCompat.BigTextStyle().bigText(body)).build(),
+                )
+            },
+            onFallback = { error ->
+                Log.w(TAG, "Custom notification layout failed for ${channel.channelId}; posting plain", error)
+            },
+        )
+        // Reached only after a successful post (styled or plain fallback).
         debugLog.record(channel, NotificationLogEvent.NOTIFY_POSTED)
+    }
+
+    /**
+     * Applies the per-type look. Streak/reflection/mood use custom RemoteViews inside
+     * [NotificationCompat.DecoratedCustomViewStyle] so the system keeps the header (icon, app name,
+     * time) and expand affordance; RemoteViews are the only way to get a bespoke layout (count
+     * typography) since the built-in styles cannot render one. Everything else keeps
+     * the system BigText look. Each card ships its own tinted surface with light/dark colors so
+     * contrast never depends on the system shade.
+     */
+    private fun NotificationCompat.Builder.applyStyle(
+        spec: NotificationStyleSpec,
+        contentIntent: PendingIntent,
+    ): NotificationCompat.Builder = when (spec) {
+        is NotificationStyleSpec.Streak -> customViews(
+            collapsed = streakViews(R.layout.notification_streak_collapsed, spec, contentIntent),
+            expanded = streakViews(R.layout.notification_streak_expanded, spec, contentIntent),
+        )
+        is NotificationStyleSpec.Reflection -> customViews(
+            collapsed = reflectionViews(R.layout.notification_reflection_collapsed, spec, contentIntent),
+            expanded = reflectionViews(R.layout.notification_reflection_expanded, spec, contentIntent),
+        )
+        is NotificationStyleSpec.Mood -> customViews(
+            collapsed = moodViews(R.layout.notification_mood_collapsed, spec, contentIntent),
+            expanded = moodViews(R.layout.notification_mood_expanded, spec, contentIntent),
+        )
+        is NotificationStyleSpec.Plain -> setStyle(NotificationCompat.BigTextStyle().bigText(spec.body))
+    }
+
+    private fun NotificationCompat.Builder.customViews(
+        collapsed: RemoteViews,
+        expanded: RemoteViews,
+    ): NotificationCompat.Builder = setStyle(NotificationCompat.DecoratedCustomViewStyle())
+        .setCustomContentView(collapsed)
+        .setCustomBigContentView(expanded)
+
+    private fun streakViews(@LayoutRes layout: Int, spec: NotificationStyleSpec.Streak, tap: PendingIntent) =
+        RemoteViews(context.packageName, layout).apply {
+            setTextViewText(R.id.streak_title, spec.title)
+            setTextViewText(R.id.streak_body, spec.body)
+            if (spec.count != null) {
+                setTextViewText(R.id.streak_count, spec.count.toString())
+            } else {
+                setViewVisibility(R.id.streak_count, View.GONE)
+            }
+            // The chip only exists in the expanded layout; activity-specific alerts name the activity.
+            if (layout == R.layout.notification_streak_expanded) {
+                if (spec.activity != null) {
+                    setTextViewText(R.id.streak_activity, context.getString(spec.activity.labelRes()))
+                    setViewVisibility(R.id.streak_activity, View.VISIBLE)
+                } else {
+                    setViewVisibility(R.id.streak_activity, View.GONE)
+                }
+            }
+            setOnClickPendingIntent(R.id.streak_root, tap)
+        }
+
+    private fun reflectionViews(
+        @LayoutRes layout: Int,
+        spec: NotificationStyleSpec.Reflection,
+        tap: PendingIntent,
+    ) = RemoteViews(context.packageName, layout).apply {
+        setTextViewText(R.id.reflection_title, spec.title)
+        setTextViewText(R.id.reflection_question, spec.body)
+        setOnClickPendingIntent(R.id.reflection_root, tap)
+    }
+
+    private fun moodViews(@LayoutRes layout: Int, spec: NotificationStyleSpec.Mood, tap: PendingIntent) =
+        RemoteViews(context.packageName, layout).apply {
+            setTextViewText(R.id.mood_title, spec.title)
+            setTextViewText(R.id.mood_body, spec.body)
+            setOnClickPendingIntent(R.id.mood_root, tap)
+        }
+
+    private fun StreakActivity.labelRes(): Int = when (this) {
+        StreakActivity.MEDITATION -> R.string.notification_streak_activity_meditation
+        StreakActivity.AFFIRMATIONS -> R.string.notification_streak_activity_affirmations
     }
 
     private companion object {

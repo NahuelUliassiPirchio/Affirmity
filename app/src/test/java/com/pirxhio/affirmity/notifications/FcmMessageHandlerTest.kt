@@ -224,4 +224,70 @@ class FcmMessageHandlerTest {
             )
         }
     }
+
+    @Test
+    fun `parses the optional activity field of an activity-specific streak payload`() {
+        val action = handler.resolve(
+            mapOf("channel" to "streak", "streakCount" to "5", "activity" to "meditation"),
+        ) as FcmAction.Post
+
+        assertEquals("meditation", action.activity)
+        assertEquals("5", action.streakCount)
+    }
+
+    @Test
+    fun `activity is null when the payload omits it (backwards compatible)`() {
+        val action = handler.resolve(mapOf("channel" to "streak", "streakCount" to "5")) as FcmAction.Post
+
+        assertEquals(null, action.activity)
+    }
+
+    @Test
+    fun `applyTo forwards streakCount and activity into the attribution`() = runBlocking {
+        var seen: NotificationAttribution? = null
+        val poster = object : NotificationPoster {
+            override suspend fun notify(
+                channel: NotificationChannelSpec,
+                title: String,
+                body: String,
+                attribution: NotificationAttribution,
+            ) {
+                seen = attribution
+            }
+        }
+
+        FcmAction.Post(
+            channel = NotificationChannelSpec.STREAK,
+            title = "t",
+            body = "b",
+            streakCount = "5",
+            activity = "meditation",
+        ).applyTo(poster) {}
+
+        assertEquals("5", seen?.streakCount)
+        assertEquals("meditation", seen?.activity)
+    }
+
+    @Test
+    fun `an unknown activity value like yoga resolves to the general streak look`() {
+        val action = handler.resolve(
+            mapOf("channel" to "streak", "streakCount" to "4", "activity" to "yoga"),
+        ) as FcmAction.Post
+        var seen: NotificationAttribution? = null
+        val poster = object : NotificationPoster {
+            override suspend fun notify(
+                channel: NotificationChannelSpec,
+                title: String,
+                body: String,
+                attribution: NotificationAttribution,
+            ) {
+                seen = attribution
+            }
+        }
+        runBlocking { action.applyTo(poster) {} }
+
+        val spec = notificationStyleSpec(NotificationChannelSpec.STREAK, "t", "b", seen!!) as NotificationStyleSpec.Streak
+        assertEquals(null, spec.activity)
+        assertEquals(4, spec.count)
+    }
 }

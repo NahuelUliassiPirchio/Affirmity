@@ -12,4 +12,18 @@
          splash background (themes.xml's Theme.Affirmity.Starting) matches AffirmityTheme's primary
          color as soon as Compose takes over. -->
     <color name="splash_background">#FF00696F</color>
+
+    <!-- Notification custom layouts (streak = warm, reflection = calm, mood = friendly). Each card
+         carries its own surface so text contrast never depends on the system shade color. -->
+    <color name="notif_streak_bg">#FFFFEFD9</color>
+    <color name="notif_streak_accent">#FFE8590C</color>
+    <color name="notif_streak_chip_bg">#FFB93F00</color>
+    <color name="notif_streak_chip_text">#FFFFFFFF</color>
+    <color name="notif_streak_text">#FF3B1F0A</color>
+    <color name="notif_reflection_bg">#FFE9EEF3</color>
+    <color name="notif_reflection_accent">#FF456582</color>
+    <color name="notif_reflection_text">#FF1F2933</color>
+    <color name="notif_mood_bg">#FFE3F4F1</color>
+    <color name="notif_mood_accent">#FF00696F</color>
+    <color name="notif_mood_text">#FF0F2F30</color>
 </resources>
