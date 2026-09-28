@@ -140,6 +140,28 @@
 
     <string name="notification_debug_send_test_button">Enviar notificación de prueba ahora</string>
     <string name="notification_debug_send_test_mood_button">Enviar notificación de ánimo de prueba</string>
+    <string name="notification_debug_preview_section_title">Previsualizar estilos de notificación</string>
+    <string name="notification_debug_preview_section_hint">Publica una notificación local real por el mismo camino que un mensaje FCM.</string>
+    <string name="notification_debug_preview_streak_general">Racha general (5 días)</string>
+    <string name="notification_debug_preview_streak_meditation">Racha: meditación (5 días)</string>
+    <string name="notification_debug_preview_streak_affirmations">Racha: afirmaciones (5 días)</string>
+    <string name="notification_debug_preview_reflection">Pregunta Brújula</string>
+    <string name="notification_debug_preview_mood">Chequeo de ánimo</string>
+    <string name="notification_debug_preview_plain">Estilo simple (BigText)</string>
+    <string name="notification_debug_preview_streak_general_title">Tu racha de 5 días está en riesgo 🔥</string>
+    <string name="notification_debug_preview_streak_general_body">Todavía podés mantenerla antes de que termine el día.</string>
+    <string name="notification_debug_preview_streak_meditation_title">Llevás 5 días meditando, no paremos ahora 🧘</string>
+    <string name="notification_debug_preview_streak_meditation_body">Un momento de calma hoy mantiene viva tu racha.</string>
+    <string name="notification_debug_preview_streak_affirmations_title">Llevás 5 días con tus afirmaciones, no paremos ahora ✨</string>
+    <string name="notification_debug_preview_streak_affirmations_body">Leé una hoy y mantené viva tu racha.</string>
+    <string name="notification_debug_preview_reflection_title">Un momento de honestidad</string>
+    <string name="notification_debug_preview_reflection_body">¿Qué decisión estás evitando tomar?</string>
+    <string name="notification_debug_preview_mood_title">¿Cómo te sentiste hoy?</string>
+    <string name="notification_debug_preview_mood_body">Tocá para registrar tu ánimo de hoy.</string>
+    <string name="notification_debug_preview_plain_title">Notificación de prueba</string>
+    <string name="notification_debug_preview_plain_body">Este es el estilo simple del sistema.</string>
+    <string name="notification_debug_preview_blocked_permission">Las notificaciones están bloqueadas. Activá el permiso para ver la vista previa.</string>
+    <string name="notification_debug_preview_blocked_channel">El canal de esta notificación está desactivado en los ajustes del sistema.</string>
     <string name="notification_debug_clear_history_button">Borrar historial</string>
     <string name="notification_debug_empty_message">Todavía no hay actividad registrada. Esperá al próximo horario programado, o cambiá la ventana en Ajustes para que dispare pronto.</string>
 

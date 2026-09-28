@@ -107,6 +107,8 @@ import com.pirxhio.affirmity.data.repository.RoomMeditationPreferencesRepository
 import com.pirxhio.affirmity.data.repository.RoomNotificationSettingsRepository
 import com.pirxhio.affirmity.data.repository.RoomStreakHealerRepository
 import com.pirxhio.affirmity.meditation.SessionEndReason
+import com.pirxhio.affirmity.notifications.FcmMessageHandler
+import com.pirxhio.affirmity.notifications.applyTo
 import com.pirxhio.affirmity.notifications.NotificationAttribution
 import com.pirxhio.affirmity.notifications.NotificationCanceller
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
@@ -1355,9 +1357,17 @@ class AffirmityAppState(
             notifier.notify(
                 channel = NotificationChannelSpec.MOOD,
                 title = "¿Cómo te sentiste hoy?",
-                body = "Notificación de prueba: tocá un emoji para abrir tu ánimo de hoy con esa opción elegida.",
+                body = "Notificación de prueba: tocá para abrir tu ánimo de hoy.",
                 attribution = NotificationAttribution(),
             )
+        }
+    }
+
+    /** Debug preview: pushes an FCM-like [data] map through the same resolve/apply path as a real
+     * message (`AffirmityMessagingService.onMessageReceived`), so the real [Notifier] builds it. */
+    fun sendNotificationPreview(data: Map<String, String>) {
+        scope.launch {
+            FcmMessageHandler { "" to "" }.resolve(data).applyTo(notifier) {}
         }
     }
 

@@ -13,6 +13,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -23,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.local.NotificationLogEntry
 import com.pirxhio.affirmity.data.local.NotificationLogEvent
+import com.pirxhio.affirmity.notifications.NotificationPreviewCase
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -38,6 +40,7 @@ fun NotificationDebugScreen(
     onClear: () -> Unit,
     onSendTestNotification: () -> Unit,
     onSendTestMoodNotification: () -> Unit,
+    onSendPreview: (NotificationPreviewCase) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -56,6 +59,24 @@ fun NotificationDebugScreen(
         item {
             Button(onClick = onSendTestMoodNotification, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.notification_debug_send_test_mood_button))
+            }
+        }
+
+        item {
+            Text(
+                text = stringResource(R.string.notification_debug_preview_section_title),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 16.dp),
+            )
+            Text(
+                text = stringResource(R.string.notification_debug_preview_section_hint),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+
+        items(NotificationPreviewCase.entries, key = { it.name }) { case ->
+            OutlinedButton(onClick = { onSendPreview(case) }, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(case.labelRes))
             }
         }
 
@@ -111,4 +132,6 @@ private fun NotificationLogRow(entry: NotificationLogEntry) {
 private val TIMESTAMP_FORMAT = SimpleDateFormat("dd/MM HH:mm:ss", Locale.getDefault())
 
 private val NotificationLogEvent.isProblem: Boolean
-    get() = this == NotificationLogEvent.NOTIFY_SKIPPED_PERMISSION || this == NotificationLogEvent.WORKER_FAILED
+    get() = this == NotificationLogEvent.NOTIFY_SKIPPED_PERMISSION ||
+        this == NotificationLogEvent.NOTIFY_SKIPPED_CHANNEL_BLOCKED ||
+        this == NotificationLogEvent.WORKER_FAILED

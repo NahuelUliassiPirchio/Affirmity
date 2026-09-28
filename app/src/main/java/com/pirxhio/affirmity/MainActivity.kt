@@ -95,6 +95,10 @@ import com.pirxhio.affirmity.data.resolvePreSurveyGuideGate
 import com.pirxhio.affirmity.meditation.SessionEndReason
 import com.pirxhio.affirmity.notifications.NotificationCanceller
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
+import com.pirxhio.affirmity.notifications.PreviewBlock
+import com.pirxhio.affirmity.notifications.notificationPreviewData
+import com.pirxhio.affirmity.notifications.notificationSkipEvent
+import com.pirxhio.affirmity.notifications.previewBlock
 import com.pirxhio.affirmity.ui.compass.CompassAnswerScreen
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
 import com.pirxhio.affirmity.ui.components.FloatingStatusOverlay
@@ -146,6 +150,7 @@ import com.pirxhio.affirmity.meditation.customization.resolvedValues
 import com.pirxhio.affirmity.ui.meditation.customization.MeditationCustomizationScreen
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
+import java.util.Locale
 import kotlinx.coroutines.launch
 
 /** Extra key a launcher (e.g. the home-screen widget) sets to pick the initial [AppDestinations]. */
@@ -1030,6 +1035,7 @@ fun AffirmityApp(
         BackHandler { showNotificationDebug = false }
         Scaffold(
             modifier = Modifier.fillMaxSize(),
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 TopAppBar(
                     title = { Text(stringResource(R.string.nav_notification_debug_title)) },
@@ -1050,6 +1056,42 @@ fun AffirmityApp(
                 onClear = { appState.clearNotificationDebugLog() },
                 onSendTestNotification = { appState.sendTestNotification() },
                 onSendTestMoodNotification = { appState.sendTestMoodNotification() },
+                onSendPreview = { case ->
+                    // Same gating Notifier applies, checked up front so a blocked permission or
+                    // channel gives visible feedback (and the permission flow) instead of nothing.
+                    val manager = NotificationManagerCompat.from(context)
+                    val importance = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        manager.getNotificationChannel(case.channel.channelId)?.importance
+                    } else {
+                        null
+                    }
+                    val block = previewBlock(
+                        notificationSkipEvent(manager.areNotificationsEnabled(), Build.VERSION.SDK_INT, importance),
+                    )
+                    when (block) {
+                        PreviewBlock.PERMISSION -> {
+                            snackbarScope.launch {
+                                snackbarHostState.showSnackbar(
+                                    context.getString(R.string.notification_debug_preview_blocked_permission),
+                                )
+                            }
+                            onNotificationEnableRequested()
+                        }
+                        PreviewBlock.CHANNEL_BLOCKED -> snackbarScope.launch {
+                            snackbarHostState.showSnackbar(
+                                context.getString(R.string.notification_debug_preview_blocked_channel),
+                            )
+                        }
+                        null -> appState.sendNotificationPreview(
+                            notificationPreviewData(
+                                case = case,
+                                title = context.getString(case.titleRes),
+                                body = context.getString(case.bodyRes),
+                                locale = Locale.getDefault().language.takeIf { it == "es" || it == "en" } ?: "en",
+                            ),
+                        )
+                    }
+                },
             )
         }
         return

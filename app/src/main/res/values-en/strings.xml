@@ -140,6 +140,28 @@
 
     <string name="notification_debug_send_test_button">Send a test notification now</string>
     <string name="notification_debug_send_test_mood_button">Send a test mood notification</string>
+    <string name="notification_debug_preview_section_title">Preview notification styles</string>
+    <string name="notification_debug_preview_section_hint">Posts a real local notification through the same path as an FCM message.</string>
+    <string name="notification_debug_preview_streak_general">Streak: general (5 days)</string>
+    <string name="notification_debug_preview_streak_meditation">Streak: meditation (5 days)</string>
+    <string name="notification_debug_preview_streak_affirmations">Streak: affirmations (5 days)</string>
+    <string name="notification_debug_preview_reflection">Compass question</string>
+    <string name="notification_debug_preview_mood">Mood check-in</string>
+    <string name="notification_debug_preview_plain">Plain style (BigText)</string>
+    <string name="notification_debug_preview_streak_general_title">Your 5-day streak is at risk 🔥</string>
+    <string name="notification_debug_preview_streak_general_body">You can still keep it going before the day ends.</string>
+    <string name="notification_debug_preview_streak_meditation_title">You\'ve been meditating for 5 days, let\'s not stop now 🧘</string>
+    <string name="notification_debug_preview_streak_meditation_body">A moment of calm today keeps your streak alive.</string>
+    <string name="notification_debug_preview_streak_affirmations_title">You\'ve been doing your affirmations for 5 days, let\'s not stop now ✨</string>
+    <string name="notification_debug_preview_streak_affirmations_body">Read one today and keep your streak alive.</string>
+    <string name="notification_debug_preview_reflection_title">A moment of honesty</string>
+    <string name="notification_debug_preview_reflection_body">What decision have you been avoiding?</string>
+    <string name="notification_debug_preview_mood_title">How did you feel today?</string>
+    <string name="notification_debug_preview_mood_body">Tap to log today\'s mood.</string>
+    <string name="notification_debug_preview_plain_title">Test notification</string>
+    <string name="notification_debug_preview_plain_body">This is the plain system style.</string>
+    <string name="notification_debug_preview_blocked_permission">Notifications are blocked. Enable the permission to see the preview.</string>
+    <string name="notification_debug_preview_blocked_channel">This notification\'s channel is disabled in system settings.</string>
     <string name="notification_debug_clear_history_button">Clear history</string>
     <string name="notification_debug_empty_message">No activity logged yet. Wait for the next scheduled time, or change the window in Settings to trigger it sooner.</string>
 
