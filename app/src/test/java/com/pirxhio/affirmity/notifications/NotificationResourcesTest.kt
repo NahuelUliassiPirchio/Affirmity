@@ -120,4 +120,22 @@ class NotificationResourcesTest {
             }
         }
     }
+
+    @Test
+    fun `mood collapsed lets the body wrap and never ellipsizes title and body on one line each`() {
+        val root = layout("notification_mood_collapsed")
+        val views = textViews(root).associateBy { it.getAttributeNS(android, "id").substringAfter('/') }
+        val title = views.getValue("mood_title")
+        val body = views.getValue("mood_body")
+
+        val bodyLines = body.getAttributeNS(android, "maxLines").toIntOrNull() ?: Int.MAX_VALUE
+        assertTrue("body maxLines=$bodyLines must allow 2+ lines", bodyLines >= 2)
+        val singleLine = { v: Element -> v.getAttributeNS(android, "maxLines") == "1" }
+        assertTrue("title and body must not both be single-line", !(singleLine(title) && singleLine(body)))
+
+        val fixedHeights = (listOf(root) + textViews(root)).filter {
+            it.getAttributeNS(android, "layout_height").endsWith("dp")
+        }
+        assertTrue("no fixed heights on root/text views", fixedHeights.isEmpty())
+    }
 }
