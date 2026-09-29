@@ -1357,7 +1357,7 @@ class AffirmityAppState(
             notifier.notify(
                 channel = NotificationChannelSpec.MOOD,
                 title = "¿Cómo te sentiste hoy?",
-                body = "Notificación de prueba: tocá para abrir tu ánimo de hoy.",
+                body = "Notificación de prueba: toca para abrir tu ánimo de hoy.",
                 attribution = NotificationAttribution(),
             )
         }

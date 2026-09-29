@@ -8,22 +8,22 @@
     <string name="notification_channel_streak_name">Racha en riesgo</string>
     <string name="notification_channel_streak_description">Avisos cuando tu racha está por terminar</string>
     <string name="notification_channel_healer_name">Sanador de racha</string>
-    <string name="notification_channel_healer_description">Avisos cuando tenés un sanador disponible para curar tu racha</string>
+    <string name="notification_channel_healer_description">Avisos cuando tienes un sanador disponible para curar tu racha</string>
     <string name="notification_channel_mood_name">Recordatorio de ánimo</string>
-    <string name="notification_channel_mood_description">Un aviso para loguear cómo te sentiste hoy</string>
+    <string name="notification_channel_mood_description">Un aviso para registrar cómo te sentiste hoy</string>
     <string name="notification_channel_meditation_return_name">Volver a meditar</string>
-    <string name="notification_channel_meditation_return_description">Un aviso suave si hace unos días que no meditás</string>
+    <string name="notification_channel_meditation_return_description">Un aviso suave si hace unos días que no meditas</string>
 
     <string name="notification_reminder_title">Un momento para ti</string>
     <string name="notification_reminder_fallback_body">Tómate un momento para meditar o ver tus afirmaciones.</string>
     <string name="notification_reflection_title">Un momento de honestidad</string>
     <string name="notification_reflection_fallback_body">Una pregunta honesta para mirar hacia adentro hoy.</string>
     <string name="notification_mood_title">¿Cómo te sentiste hoy?</string>
-    <string name="notification_mood_fallback_body">Tocá para loguear tu ánimo de hoy.</string>
+    <string name="notification_mood_fallback_body">Toca para registrar tu ánimo de hoy.</string>
     <string name="notification_streak_title">Tu racha está por terminar</string>
     <string name="notification_streak_fallback_body">Todavía puedes completar hoy y mantener tu racha.</string>
-    <string name="notification_healer_title">Tu racha se rompió, pero tenés un sanador</string>
-    <string name="notification_healer_fallback_body">Activá tu sanador hoy para recuperar la racha que perdiste ayer.</string>
+    <string name="notification_healer_title">Tu racha se rompió, pero tienes un sanador</string>
+    <string name="notification_healer_fallback_body">Activa tu sanador hoy para recuperar la racha que perdiste ayer.</string>
     <string name="notification_meditation_return_title">¿Volvemos a meditar?</string>
     <string name="notification_meditation_return_fallback_body">Unos minutos hoy pueden ayudarte a retomar el hábito.</string>
 
@@ -31,7 +31,7 @@
     <string name="notification_streak_activity_meditation">Meditación</string>
     <string name="notification_streak_activity_affirmations">Afirmaciones</string>
     <string name="notification_cta_affirmations">Ver afirmaciones</string>
-    <string name="notification_cta_mood">Loguear ánimo</string>
+    <string name="notification_cta_mood">Registrar ánimo</string>
     <string name="notification_cta_reflection">Responder</string>
     <string name="notification_cta_streak">Mantener racha</string>
     <string name="notification_cta_healer">Activar sanador</string>
@@ -45,7 +45,7 @@
     <!-- Notifications V2 scope-expansion: minimal Compass answer screen (task 4.7's fifth
          completion site). Question text itself comes from the notification payload, not a string
          resource; these are the screen's static chrome only. -->
-    <string name="compass_answer_note_placeholder">Escribí tu respuesta (opcional)</string>
+    <string name="compass_answer_note_placeholder">Escribe tu respuesta (opcional)</string>
     <string name="compass_answer_save_button">Guardar</string>
 
     <string name="settings_title">Ajustes</string>
@@ -67,8 +67,8 @@
     <string name="settings_time_picker_ok">OK</string>
     <string name="settings_permission_banner_text">Las notificaciones están desactivadas en el sistema</string>
     <string name="settings_permission_banner_action">Abrir ajustes</string>
-    <string name="settings_notifications_sign_in_required">Iniciá sesión para activar las notificaciones</string>
-    <string name="settings_notification_permission_open_settings">El permiso de notificaciones está bloqueado. Activá las notificaciones desde los ajustes del sistema.</string>
+    <string name="settings_notifications_sign_in_required">Inicia sesión para activar las notificaciones</string>
+    <string name="settings_notification_permission_open_settings">El permiso de notificaciones está bloqueado. Activa las notificaciones desde los ajustes del sistema.</string>
 
     <string name="settings_account_sign_in_button">Iniciar sesión con Google</string>
     <string name="settings_account_signed_in_prefix">Sesión iniciada como</string>
@@ -82,12 +82,12 @@
     <string name="onboarding_back_button">Atrás</string>
     <string name="onboarding_next_button">Siguiente</string>
     <string name="onboarding_continue_without_account_button">Continuar sin cuenta</string>
-    <string name="onboarding_completion_error">No pudimos guardar tus respuestas. Probá de nuevo.</string>
+    <string name="onboarding_completion_error">No pudimos guardar tus respuestas. Prueba de nuevo.</string>
     <string name="onboarding_auth_title">Ya casi terminamos</string>
-    <string name="onboarding_auth_subtitle">Iniciá sesión para guardar tu progreso en la nube, o continuá sin cuenta.</string>
+    <string name="onboarding_auth_subtitle">Inicia sesión para guardar tu progreso en la nube, o continúa sin cuenta.</string>
     <string name="onboarding_auth_signed_in">¡Listo! Sesión iniciada.</string>
     <string name="onboarding_intro_title">Bienvenido a Affirmity</string>
-    <string name="onboarding_intro_subtitle">¿Ya usaste la app antes? Iniciá sesión para omitir las preguntas.</string>
+    <string name="onboarding_intro_subtitle">¿Ya usaste la app antes? Inicia sesión para omitir las preguntas.</string>
     <string name="onboarding_intro_sign_in_button">Ya tengo una cuenta</string>
     <string name="onboarding_intro_start_button">Empezar</string>
     <string name="onboarding_intro_checking">Verificando tu cuenta…</string>
@@ -149,21 +149,21 @@
     <string name="notification_debug_preview_mood">Chequeo de ánimo</string>
     <string name="notification_debug_preview_plain">Estilo simple (BigText)</string>
     <string name="notification_debug_preview_streak_general_title">Tu racha de 5 días está en riesgo 🔥</string>
-    <string name="notification_debug_preview_streak_general_body">Todavía podés mantenerla antes de que termine el día.</string>
-    <string name="notification_debug_preview_streak_meditation_title">Llevás 5 días meditando, no paremos ahora 🧘</string>
+    <string name="notification_debug_preview_streak_general_body">Todavía puedes mantenerla antes de que termine el día.</string>
+    <string name="notification_debug_preview_streak_meditation_title">Llevas 5 días meditando, no paremos ahora 🧘</string>
     <string name="notification_debug_preview_streak_meditation_body">Un momento de calma hoy mantiene viva tu racha.</string>
-    <string name="notification_debug_preview_streak_affirmations_title">Llevás 5 días con tus afirmaciones, no paremos ahora ✨</string>
-    <string name="notification_debug_preview_streak_affirmations_body">Leé una hoy y mantené viva tu racha.</string>
+    <string name="notification_debug_preview_streak_affirmations_title">Llevas 5 días con tus afirmaciones, no paremos ahora ✨</string>
+    <string name="notification_debug_preview_streak_affirmations_body">Lee una hoy y mantén viva tu racha.</string>
     <string name="notification_debug_preview_reflection_title">Un momento de honestidad</string>
     <string name="notification_debug_preview_reflection_body">¿Qué decisión estás evitando tomar?</string>
     <string name="notification_debug_preview_mood_title">¿Cómo te sentiste hoy?</string>
-    <string name="notification_debug_preview_mood_body">Tocá para registrar tu ánimo de hoy.</string>
+    <string name="notification_debug_preview_mood_body">Toca para registrar tu ánimo de hoy.</string>
     <string name="notification_debug_preview_plain_title">Notificación de prueba</string>
     <string name="notification_debug_preview_plain_body">Este es el estilo simple del sistema.</string>
-    <string name="notification_debug_preview_blocked_permission">Las notificaciones están bloqueadas. Activá el permiso para ver la vista previa.</string>
+    <string name="notification_debug_preview_blocked_permission">Las notificaciones están bloqueadas. Activa el permiso para ver la vista previa.</string>
     <string name="notification_debug_preview_blocked_channel">El canal de esta notificación está desactivado en los ajustes del sistema.</string>
     <string name="notification_debug_clear_history_button">Borrar historial</string>
-    <string name="notification_debug_empty_message">Todavía no hay actividad registrada. Esperá al próximo horario programado, o cambiá la ventana en Ajustes para que dispare pronto.</string>
+    <string name="notification_debug_empty_message">Todavía no hay actividad registrada. Espera al próximo horario programado, o cambia la ventana en Ajustes para que dispare pronto.</string>
 
     <string name="progress_title">Mi Progreso</string>
     <string name="progress_affirmations_label">Afirmaciones</string>
@@ -176,14 +176,14 @@
     <string name="progress_general_streak_dialog_title">Racha general</string>
     <string name="progress_general_streak_dialog_text">Se mantiene mientras completes al menos una de las dos actividades (afirmación o meditación) cada día. Se rompe solo si pasa un día entero sin completar ninguna.</string>
     <string name="progress_streak_healer_title">Sanador de racha</string>
-    <string name="progress_streak_healer_available_body">Ayer no completaste ningún hábito. Activá el sanador para conservar tu racha general — esto no reemplaza lo que hagas hoy.</string>
+    <string name="progress_streak_healer_available_body">Ayer no completaste ningún hábito. Activa el sanador para conservar tu racha general — esto no reemplaza lo que hagas hoy.</string>
     <string name="progress_streak_healer_activate_button">Activar sanador</string>
     <string name="progress_streak_healer_used_today_body">Sanador activado: tu racha general sigue intacta.</string>
-    <string name="progress_streak_healer_held_body">Tenés 1 sanador guardado para el próximo día que falles.</string>
+    <string name="progress_streak_healer_held_body">Tienes 1 sanador guardado para el próximo día que falles.</string>
     <string name="progress_healed_day_content_description">Día sanado con el sanador de racha</string>
     <string name="healer_granted_title">¡Conseguiste un sanador de racha!</string>
     <string name="healer_granted_subtitle">Dos días seguidos completando tus hábitos. Nada mal.</string>
-    <string name="healer_granted_explanation">Un sanador protege tu racha general si algún día te olvidás de completar tus hábitos: lo activás al día siguiente y ese día pasa a contar como si lo hubieras cumplido. Guardás hasta 1 sanador a la vez, y no reemplaza lo que hagas hoy — solo te da un margen para un tropiezo.</string>
+    <string name="healer_granted_explanation">Un sanador protege tu racha general si algún día te olvidas de completar tus hábitos: lo activas al día siguiente y ese día pasa a contar como si lo hubieras cumplido. Guardas hasta 1 sanador a la vez, y no reemplaza lo que hagas hoy — solo te da un margen para un tropiezo.</string>
     <string name="healer_granted_confirm_button">Entendido</string>
     <string name="healer_granted_icon_content_description">Ícono de sanador de racha</string>
     <string name="progress_weekly_streak_format">Racha: %1$d días</string>
@@ -197,17 +197,17 @@
     <string name="history_calendar_status_healed_format">%1$s: Sanado</string>
 
     <!-- Onboarding product guide (spec R3, design D6) -->
-    <string name="onboarding_guide_slide1_title">Armá tu feed de afirmaciones</string>
-    <string name="onboarding_guide_slide1_body">En Tu feed, explorá áreas y elegí los temas que querés ver. Deslizá las tarjetas, guardá favoritas con el corazón o con dos toques, y decidí si incluís tus favoritas y las que escribís vos. Algunos temas requieren Pro.</string>
+    <string name="onboarding_guide_slide1_title">Arma tu feed de afirmaciones</string>
+    <string name="onboarding_guide_slide1_body">En Tu feed, explora áreas y elige los temas que quieres ver. Desliza las tarjetas, guarda favoritas con el corazón o con dos toques, y decide si incluyes tus favoritas y las que escribes tú. Algunos temas requieren Pro.</string>
     <string name="onboarding_guide_slide1_icon_content_description">Ícono de afirmaciones</string>
     <string name="onboarding_guide_slide2_title">Meditaciones para cada momento</string>
-    <string name="onboarding_guide_slide2_body">Las sesiones guiadas están organizadas por categoría —sueño, calma, enfoque— y muestran su duración aproximada. También tenés un temporizador libre para meditar a tu ritmo. Algunas sesiones son Pro o se desbloquean viendo un anuncio.</string>
+    <string name="onboarding_guide_slide2_body">Las sesiones guiadas están organizadas por categoría —sueño, calma, enfoque— y muestran su duración aproximada. También tienes un temporizador libre para meditar a tu ritmo. Algunas sesiones son Pro o se desbloquean viendo un anuncio.</string>
     <string name="onboarding_guide_slide2_icon_content_description">Ícono de meditación</string>
-    <string name="onboarding_guide_slide3_title">Registrá tu ánimo</string>
-    <string name="onboarding_guide_slide3_body">Anotá tu ánimo una vez por día y agregá una nota si querés. Si te olvidaste algún día, podés completarlo después: tu historial queda siempre disponible.</string>
+    <string name="onboarding_guide_slide3_title">Registra tu ánimo</string>
+    <string name="onboarding_guide_slide3_body">Anota tu ánimo una vez por día y agrega una nota si quieres. Si te olvidaste algún día, puedes completarlo después: tu historial queda siempre disponible.</string>
     <string name="onboarding_guide_slide3_icon_content_description">Ícono de registro de ánimo</string>
     <string name="onboarding_guide_slide4_title">Tu racha y el sanador</string>
-    <string name="onboarding_guide_slide4_body">Tenés UNA sola racha general, que avanza cuando completás una afirmación y una meditación el mismo día. Dos días seguidos completos te dan un sanador guardado: si al día siguiente te olvidás, podés activarlo para reparar ese día dentro de la misma racha —no es una racha aparte. Guardás como máximo 1 sanador a la vez.</string>
+    <string name="onboarding_guide_slide4_body">Tienes UNA sola racha general, que avanza cuando completas una afirmación y una meditación el mismo día. Dos días seguidos completos te dan un sanador guardado: si al día siguiente te olvidas, puedes activarlo para reparar ese día dentro de la misma racha —no es una racha aparte. Guardas como máximo 1 sanador a la vez.</string>
     <string name="onboarding_guide_slide4_icon_content_description">Ícono de racha y sanador</string>
     <string name="onboarding_guide_skip_button">Omitir</string>
     <string name="onboarding_guide_next_button">Siguiente</string>
@@ -227,7 +227,7 @@
     <string name="progress_image_url_error">Falta la URL de la imagen</string>
     <string name="progress_gallery_pick_button">Elegir de la galería</string>
     <string name="progress_gallery_change_button">Cambiar imagen elegida</string>
-    <string name="progress_gallery_error">Elegí una imagen de la galería</string>
+    <string name="progress_gallery_error">Elige una imagen de la galería</string>
     <string name="progress_copy_json_example_button"> Copiar ejemplo de JSON</string>
     <string name="progress_json_paste_label">Pegar JSON de afirmaciones</string>
     <string name="progress_replace_existing_label">Reemplazar afirmaciones actuales</string>
@@ -235,7 +235,7 @@
     <string name="progress_import_button">Importar</string>
     <string name="progress_delete_content_description">Eliminar</string>
     <string name="my_affirmations_locked_headline">Crear afirmaciones propias requiere Pro</string>
-    <string name="my_affirmations_locked_body">Tus afirmaciones existentes siguen disponibles y podés eliminarlas cuando quieras. Para crear nuevas, necesitás una suscripción Pro.</string>
+    <string name="my_affirmations_locked_body">Tus afirmaciones existentes siguen disponibles y puedes eliminarlas cuando quieras. Para crear nuevas, necesitas una suscripción Pro.</string>
     <string name="my_affirmations_locked_cta">Mejorar a Pro</string>
 
     <string name="settings_notification_debug_title">Debug de notificaciones</string>
@@ -257,17 +257,17 @@
     <string name="meditation_category_all">Todo</string>
     <string name="meditation_badge_ad_unlock">Anuncio gratis</string>
     <string name="meditation_ad_unlock_sheet_title">Desbloquear %1$s</string>
-    <string name="meditation_ad_unlock_body_per_use">Mirá un anuncio corto y esta sesión queda disponible ahora mismo.</string>
-    <string name="meditation_ad_unlock_body_one_time_trial">Mirá un anuncio corto para probar esta sesión una vez, sin costo.</string>
-    <string name="meditation_ad_unlock_body_timed">Mirá un anuncio corto y esta sesión queda disponible por %1$d horas.</string>
+    <string name="meditation_ad_unlock_body_per_use">Mira un anuncio corto y esta sesión queda disponible ahora mismo.</string>
+    <string name="meditation_ad_unlock_body_one_time_trial">Mira un anuncio corto para probar esta sesión una vez, sin costo.</string>
+    <string name="meditation_ad_unlock_body_timed">Mira un anuncio corto y esta sesión queda disponible por %1$d horas.</string>
     <string name="meditation_ad_unlock_dismiss">Ahora no</string>
 
     <string name="guided_meditation_round_label">Ronda %1$d de %2$d</string>
     <string name="guided_meditation_breath_label">Respiración %1$d de %2$d</string>
-    <string name="guided_meditation_inhale">Inhalá</string>
-    <string name="guided_meditation_exhale">Exhalá</string>
-    <string name="guided_meditation_retention">Sostené la respiración</string>
-    <string name="guided_meditation_retention_hint">Tocá cuando quieras soltar</string>
+    <string name="guided_meditation_inhale">Inhala</string>
+    <string name="guided_meditation_exhale">Exhala</string>
+    <string name="guided_meditation_retention">Sostén la respiración</string>
+    <string name="guided_meditation_retention_hint">Toca cuando quieras soltar</string>
     <string name="guided_meditation_recovery">Recuperación</string>
     <string name="guided_meditation_completed">Sesión completa</string>
     <string name="guided_meditation_done">Listo</string>
@@ -287,40 +287,40 @@
 
     <string name="meditation_primer_trataka_plain">Mirada en un punto</string>
     <string name="meditation_primer_trataka_card_headline">Mirada fija</string>
-    <string name="meditation_primer_trataka_long">Te sentás frente a un solo punto de luz —una vela, o un punto en la pared— y mantenés los ojos ahí. Cuando la atención se va, la traés de vuelta. Esa es toda la práctica. Aquieta una mente acelerada más rápido que la mayoría de los ejercicios de respiración, y es la indicada para cuando los pensamientos no paran.</string>
+    <string name="meditation_primer_trataka_long">Te sientas frente a un solo punto de luz —una vela, o un punto en la pared— y mantienes los ojos ahí. Cuando la atención se va, la traes de vuelta. Esa es toda la práctica. Aquieta una mente acelerada más rápido que la mayoría de los ejercicios de respiración, y es la indicada para cuando los pensamientos no paran.</string>
     <string name="meditation_primer_trataka_expect_1">Los ojos van abiertos todo el tiempo</string>
     <string name="meditation_primer_trataka_expect_2">Funciona mejor con poca luz</string>
-    <string name="meditation_primer_trataka_expect_3">Parpadeá cuando lo necesites</string>
+    <string name="meditation_primer_trataka_expect_3">Parpadea cuando lo necesites</string>
 
     <string name="meditation_primer_yoganidra_plain">Descanso profundo guiado</string>
     <string name="meditation_primer_yoganidra_card_headline">Descanso guiado</string>
-    <string name="meditation_primer_yoganidra_long">Te acostás boca arriba y una voz lleva tu atención por el cuerpo, parte por parte. No estás tratando de dormirte, aunque mucha gente se duerme. Veinte minutos de esto dejan a la mayoría como si hubiera dormido una siesta de una hora.</string>
+    <string name="meditation_primer_yoganidra_long">Te acuestas boca arriba y una voz lleva tu atención por el cuerpo, parte por parte. No estás tratando de dormirte, aunque mucha gente se duerme. Veinte minutos de esto dejan a la mayoría como si hubiera dormido una siesta de una hora.</string>
     <string name="meditation_primer_yoganidra_expect_1">Se hace acostado, no sentado</string>
     <string name="meditation_primer_yoganidra_expect_2">Quedarse dormido está bien</string>
     <string name="meditation_primer_yoganidra_expect_3">No hay nada que hacer, solo escuchar</string>
 
     <string name="meditation_primer_vipassana_plain">Observar lo que aparece</string>
     <string name="meditation_primer_vipassana_card_headline">Solo observar</string>
-    <string name="meditation_primer_vipassana_long">Te sentás y notás lo que aparezca —la respiración, un sonido, una molestia, un pensamiento— sin perseguirlo ni empujarlo lejos. Más antigua y más simple de lo que suena, y la base sobre la que se construyen casi todas las demás prácticas.</string>
+    <string name="meditation_primer_vipassana_long">Te sientas y notas lo que aparezca —la respiración, un sonido, una molestia, un pensamiento— sin perseguirlo ni empujarlo lejos. Más antigua y más simple de lo que suena, y la base sobre la que se construyen casi todas las demás prácticas.</string>
     <string name="meditation_primer_vipassana_expect_1">No hay visualización</string>
     <string name="meditation_primer_vipassana_expect_2">Sentado y con los ojos cerrados</string>
     <string name="meditation_primer_vipassana_expect_3">La inquietud es parte del asunto</string>
 
-    <string name="meditation_primer_metta_long">Repetís un puñado de deseos simples: que yo esté bien, que yo esté en paz. Después mandás las mismas frases a alguien que querés, a alguien neutral, a alguien difícil. Es la práctica para los días en que estás siendo duro con vos mismo.</string>
+    <string name="meditation_primer_metta_long">Repites un puñado de deseos simples: que yo esté bien, que yo esté en paz. Después envías las mismas frases a alguien que quieres, a alguien neutral, a alguien difícil. Es la práctica para los días en que estás siendo duro contigo mismo.</string>
     <string name="meditation_primer_metta_expect_1">Se repiten frases, no se vacía la mente</string>
-    <string name="meditation_primer_metta_expect_2">Empezás por vos</string>
+    <string name="meditation_primer_metta_expect_2">Empiezas por ti</string>
     <string name="meditation_primer_metta_expect_3">Que al principio no sientas nada es normal</string>
 
     <string name="meditation_primer_bhramari_plain">Respirar zumbando</string>
     <string name="meditation_primer_bhramari_card_headline">Respirar zumbando</string>
-    <string name="meditation_primer_bhramari_long">Inhalás normal, y en la exhalación soltás un zumbido continuo con la boca cerrada, como un motor suave. Se repite varias veces seguidas. El sonido ocupa la cabeza lo suficiente como para que los pensamientos bajen el volumen.</string>
-    <string name="meditation_primer_bhramari_expect_1">Inhalás en silencio, después zumbás al exhalar</string>
+    <string name="meditation_primer_bhramari_long">Inhalas normal, y en la exhalación sueltas un zumbido continuo con la boca cerrada, como un motor suave. Se repite varias veces seguidas. El sonido ocupa la cabeza lo suficiente como para que los pensamientos bajen el volumen.</string>
+    <string name="meditation_primer_bhramari_expect_1">Inhalas en silencio, después zumbas al exhalar</string>
     <string name="meditation_primer_bhramari_expect_2">Se repite varias veces seguidas</string>
     <string name="meditation_primer_bhramari_expect_3">No hace falta que suene \"bien\", alcanza con el zumbido</string>
 
     <string name="meditation_primer_kapalabhati_plain">Respiración fuerte y rápida</string>
     <string name="meditation_primer_kapalabhati_card_headline">Respiración forzada</string>
-    <string name="meditation_primer_kapalabhati_long">Sentado con la espalda erguida, exhalás fuerte y corto por la nariz, una y otra vez, dejando que la inhalación pase sola entre cada exhalación. Se hace en tandas, con un descanso entre una y otra. Es una respiración activa, no relajada — se siente el abdomen trabajando.</string>
+    <string name="meditation_primer_kapalabhati_long">Sentado con la espalda erguida, exhalas fuerte y corto por la nariz, una y otra vez, dejando que la inhalación pase sola entre cada exhalación. Se hace en tandas, con un descanso entre una y otra. Es una respiración activa, no relajada — se siente el abdomen trabajando.</string>
     <string name="meditation_primer_kapalabhati_expect_1">Se hace sentado, no acostado</string>
     <string name="meditation_primer_kapalabhati_expect_2">La inhalación es pasiva, el esfuerzo va en la exhalación</string>
     <string name="meditation_primer_kapalabhati_expect_3">Hay una pausa de descanso entre cada tanda</string>
@@ -334,16 +334,16 @@
 
     <string name="meditation_primer_so_hum_plain">Mantra al ritmo de la respiración</string>
     <string name="meditation_primer_so_hum_card_headline">Mantra al respirar</string>
-    <string name="meditation_primer_so_hum_long">En cada inhalación pensás (o susurrás) la sílaba \"So\", y en cada exhalación \"Hum\". Se repite así, respiración tras respiración, durante toda la sesión. No hay que entender ni traducir nada — es solo un ancla simple para la mente mientras respirás.</string>
+    <string name="meditation_primer_so_hum_long">En cada inhalación piensas (o susurras) la sílaba \"So\", y en cada exhalación \"Hum\". Se repite así, respiración tras respiración, durante toda la sesión. No hay que entender ni traducir nada — es solo un ancla simple para la mente mientras respiras.</string>
     <string name="meditation_primer_so_hum_expect_1">\"So\" va con la inhalación, \"Hum\" con la exhalación</string>
-    <string name="meditation_primer_so_hum_expect_2">Podés pensarlo, susurrarlo o decirlo en voz alta</string>
+    <string name="meditation_primer_so_hum_expect_2">Puedes pensarlo, susurrarlo o decirlo en voz alta</string>
     <string name="meditation_primer_so_hum_expect_3">Se repite todo el tiempo, no cambia</string>
 
     <string name="meditation_primer_dhikr_plain">Repetir una frase, en voz alta o baja</string>
     <string name="meditation_primer_dhikr_card_headline">Repetir una frase</string>
-    <string name="meditation_primer_dhikr_long">Fijás una intención, después repetís una frase corta —la tuya, o la que elijas— una cantidad fija de veces (11, 33 o 99). Termina con un silencio. La app cuenta las repeticiones, pero la frase la elegís vos.</string>
-    <string name="meditation_primer_dhikr_expect_1">Vos elegís (o escribís) la frase que repetís</string>
-    <string name="meditation_primer_dhikr_expect_2">Podés decirla en voz alta, en voz baja o solo pensarla</string>
+    <string name="meditation_primer_dhikr_long">Fijas una intención, después repites una frase corta —la tuya, o la que elijas— una cantidad fija de veces (11, 33 o 99). Termina con un silencio. La app cuenta las repeticiones, pero la frase la eliges tú.</string>
+    <string name="meditation_primer_dhikr_expect_1">Tú eliges (o escribes) la frase que repites</string>
+    <string name="meditation_primer_dhikr_expect_2">Puedes decirla en voz alta, en voz baja o solo pensarla</string>
     <string name="meditation_primer_dhikr_expect_3">Termina en silencio, sin cierre hablado</string>
 
     <string name="meditation_primer_muraqabah_plain">Atención interior en silencio</string>
@@ -355,15 +355,15 @@
 
     <string name="meditation_primer_hitbodedut_plain">Hablarle a Dios con tus propias palabras</string>
     <string name="meditation_primer_hitbodedut_card_headline">Hablarle a Dios</string>
-    <string name="meditation_primer_hitbodedut_long">Después de un momento para llegar, la sesión te va proponiendo temas —gratitud, preocupaciones, pedidos, vínculos, propósito, perdón, según lo que elijas— y en cada uno hablás con tus propias palabras, como en una conversación. Termina con un tramo de oración personal libre y silencio.</string>
+    <string name="meditation_primer_hitbodedut_long">Después de un momento para llegar, la sesión te va proponiendo temas —gratitud, preocupaciones, pedidos, vínculos, propósito, perdón, según lo que elijas— y en cada uno hablas con tus propias palabras, como en una conversación. Termina con un tramo de oración personal libre y silencio.</string>
     <string name="meditation_primer_hitbodedut_expect_1">Se habla en voz alta, no en silencio ni por escrito</string>
     <string name="meditation_primer_hitbodedut_expect_2">No hay una frase fija que repetir, se improvisa</string>
-    <string name="meditation_primer_hitbodedut_expect_3">Vos elegís qué temas tocar antes de empezar</string>
+    <string name="meditation_primer_hitbodedut_expect_3">Tú eliges qué temas tocar antes de empezar</string>
 
     <string name="meditation_primer_lectio_divina_plain">Leer un texto sagrado en cuatro pasos</string>
     <string name="meditation_primer_lectio_divina_card_headline">Lectura sagrada</string>
-    <string name="meditation_primer_lectio_divina_long">Se hace en cuatro pasos con un texto que vos elegís y traés (la app no lo provee): primero lo leés despacio sin analizarlo, después meditás sobre lo que te resonó, luego le respondés a Dios con tus propias palabras, y termina en silencio contemplativo. Cada paso tiene su propio tiempo.</string>
-    <string name="meditation_primer_lectio_divina_expect_1">Necesitás tener tu propio texto a mano antes de empezar</string>
+    <string name="meditation_primer_lectio_divina_long">Se hace en cuatro pasos con un texto que tú eliges y traes (la app no lo provee): primero lo lees despacio sin analizarlo, después meditas sobre lo que te resonó, luego le respondes a Dios con tus propias palabras, y termina en silencio contemplativo. Cada paso tiene su propio tiempo.</string>
+    <string name="meditation_primer_lectio_divina_expect_1">Necesitas tener tu propio texto a mano antes de empezar</string>
     <string name="meditation_primer_lectio_divina_expect_2">Los primeros tres pasos tienen guía hablada, el último es silencio</string>
     <string name="meditation_primer_lectio_divina_expect_3">No hace falta analizar el texto, solo notar qué resuena</string>
 
@@ -382,9 +382,9 @@
     <string name="meditation_catalog_dormir_title">Dormir</string>
     <string name="meditation_catalog_dormir_description">Guía de 10 minutos para prepararte a dormir.</string>
     <string name="meditation_catalog_body_scan_title">Body Scan</string>
-    <string name="meditation_catalog_body_scan_description">Recorré tu cuerpo con atención plena durante 10 minutos.</string>
+    <string name="meditation_catalog_body_scan_description">Recorre tu cuerpo con atención plena durante 10 minutos.</string>
     <string name="meditation_catalog_autocompasion_5_title">Autocompasión 5</string>
-    <string name="meditation_catalog_autocompasion_5_description">Practicá autocompasión en 5 minutos.</string>
+    <string name="meditation_catalog_autocompasion_5_description">Practica autocompasión en 5 minutos.</string>
     <string name="meditation_catalog_autocompasion_10_title">Autocompasión 10</string>
     <string name="meditation_catalog_autocompasion_10_description">Una práctica extendida de autocompasión de 10 minutos.</string>
 
@@ -395,49 +395,49 @@
     <string name="meditation_catalog_category_cuerpo">Cuerpo</string>
     <string name="meditation_catalog_category_autocompasion">Autocompasión</string>
 
-    <string name="meditation_quickreset_intro">Encontrá una postura cómoda y soltá los hombros.</string>
-    <string name="meditation_quickreset_closing">Volvé a tu día con esta calma.</string>
-    <string name="meditation_calm_intro">Dejá que tu respiración se haga más lenta.</string>
-    <string name="meditation_calm_hold">Sostené suavemente.</string>
-    <string name="meditation_calm_rest">Notá cómo se siente tu respiración ahora.</string>
-    <string name="meditation_calm_closing">Llevá esta calma con vos.</string>
-    <string name="meditation_focus_intro">Preparate para enfocar tu atención.</string>
-    <string name="meditation_focus_hold">Sostené con firmeza.</string>
-    <string name="meditation_focus_anchor">Mantené la atención en el presente.</string>
+    <string name="meditation_quickreset_intro">Encuentra una postura cómoda y suelta los hombros.</string>
+    <string name="meditation_quickreset_closing">Vuelve a tu día con esta calma.</string>
+    <string name="meditation_calm_intro">Deja que tu respiración se haga más lenta.</string>
+    <string name="meditation_calm_hold">Sostén suavemente.</string>
+    <string name="meditation_calm_rest">Nota cómo se siente tu respiración ahora.</string>
+    <string name="meditation_calm_closing">Lleva esta calma contigo.</string>
+    <string name="meditation_focus_intro">Prepárate para enfocar tu atención.</string>
+    <string name="meditation_focus_hold">Sostén con firmeza.</string>
+    <string name="meditation_focus_anchor">Mantén la atención en el presente.</string>
     <string name="meditation_focus_closing">Tu enfoque está listo.</string>
-    <string name="meditation_sleep_settle">Acomodate y dejá que tu cuerpo se hunda.</string>
-    <string name="meditation_sleep_guidance">Soltá el día que dejás atrás.</string>
-    <string name="meditation_sleep_rest_1">Dejate llevar por el sonido.</string>
-    <string name="meditation_sleep_release">Soltá cualquier tensión que quede.</string>
+    <string name="meditation_sleep_settle">Acomódate y deja que tu cuerpo se hunda.</string>
+    <string name="meditation_sleep_guidance">Suelta el día que dejas atrás.</string>
+    <string name="meditation_sleep_rest_1">Déjate llevar por el sonido.</string>
+    <string name="meditation_sleep_release">Suelta cualquier tensión que quede.</string>
     <string name="meditation_sleep_rest_2">Cada respiración te acerca más al sueño.</string>
-    <string name="meditation_sleep_closing">Descansá bien.</string>
-    <string name="meditation_bodyscan_intro">Recorré tu cuerpo con atención, sin juzgar.</string>
-    <string name="meditation_bodyscan_feet">Llevá tu atención a los pies.</string>
-    <string name="meditation_bodyscan_legs">Llevá tu atención a las piernas.</string>
-    <string name="meditation_bodyscan_torso">Llevá tu atención al torso.</string>
-    <string name="meditation_bodyscan_arms">Llevá tu atención a los brazos.</string>
-    <string name="meditation_bodyscan_head">Llevá tu atención a la cabeza.</string>
-    <string name="meditation_bodyscan_whole">Sentí tu cuerpo entero como un todo.</string>
-    <string name="meditation_bodyscan_closing">Volvé al espacio a tu alrededor.</string>
-    <string name="meditation_selfcompassion_intro">Ponete una mano en el pecho, con suavidad.</string>
+    <string name="meditation_sleep_closing">Descansa bien.</string>
+    <string name="meditation_bodyscan_intro">Recorre tu cuerpo con atención, sin juzgar.</string>
+    <string name="meditation_bodyscan_feet">Lleva tu atención a los pies.</string>
+    <string name="meditation_bodyscan_legs">Lleva tu atención a las piernas.</string>
+    <string name="meditation_bodyscan_torso">Lleva tu atención al torso.</string>
+    <string name="meditation_bodyscan_arms">Lleva tu atención a los brazos.</string>
+    <string name="meditation_bodyscan_head">Lleva tu atención a la cabeza.</string>
+    <string name="meditation_bodyscan_whole">Siente tu cuerpo entero como un todo.</string>
+    <string name="meditation_bodyscan_closing">Vuelve al espacio a tu alrededor.</string>
+    <string name="meditation_selfcompassion_intro">Ponte una mano en el pecho, con suavidad.</string>
     <string name="meditation_selfcompassion_phrase_1">Que pueda ser amable conmigo mismo/a.</string>
     <string name="meditation_selfcompassion_phrase_2">Que pueda aceptar este momento tal como es.</string>
     <string name="meditation_selfcompassion_phrase_3">Que pueda darme la compasión que necesito.</string>
-    <string name="meditation_selfcompassion_closing">Llevá esta amabilidad con vos.</string>
+    <string name="meditation_selfcompassion_closing">Lleva esta amabilidad contigo.</string>
 
     <!-- New meditation family (breathing-technique batch): catalog entries + cue text for the 8
          pranayama-style meditations. Copy is an engineering placeholder pending editorial review,
          same status as the entries above. -->
     <string name="meditation_catalog_box_breathing_title">Respiración en caja</string>
-    <string name="meditation_catalog_box_breathing_description">Inhalá, sostené, exhalá y sostené: cuatro tiempos iguales para recuperar el control.</string>
+    <string name="meditation_catalog_box_breathing_description">Inhala, sostén, exhala y sostén: cuatro tiempos iguales para recuperar el control.</string>
     <string name="meditation_catalog_breathing478_title">Respiración 4-7-8</string>
     <string name="meditation_catalog_breathing478_description">Inhalación, retención y exhalación prolongada para relajarte.</string>
     <string name="meditation_catalog_extended_exhale_title">Exhalación extendida</string>
-    <string name="meditation_catalog_extended_exhale_description">Una respiración simple donde exhalás más tiempo del que inhalás, para bajar un cambio.</string>
+    <string name="meditation_catalog_extended_exhale_description">Una respiración simple donde exhalas más tiempo del que inhalas, para bajar el ritmo.</string>
     <string name="meditation_catalog_coherent_breathing_title">Respiración coherente</string>
     <string name="meditation_catalog_coherent_breathing_description">Respiración lenta y pareja a un ritmo constante, para equilibrar cuerpo y mente.</string>
     <string name="meditation_catalog_nadi_shodhana_title">Respiración alterna</string>
-    <string name="meditation_catalog_nadi_shodhana_description">Alterná la respiración entre ambas fosas nasales para cultivar equilibrio y foco.</string>
+    <string name="meditation_catalog_nadi_shodhana_description">Alterna la respiración entre ambas fosas nasales para cultivar equilibrio y foco.</string>
     <string name="meditation_catalog_bhramari_title">Bhramari</string>
     <string name="meditation_catalog_bhramari_description">Pranayama de la abeja: un zumbido suave en la exhalación calma la mente.</string>
     <string name="meditation_catalog_kapalabhati_title">Kapalabhati</string>
@@ -448,17 +448,17 @@
     <string name="meditation_catalog_category_respiracion">Respiración</string>
     <string name="meditation_catalog_category_energia">Energía</string>
 
-    <string name="meditation_boxbreathing_hold">Sostené, contá hasta cuatro.</string>
-    <string name="meditation_breathing478_hold">Sostené la respiración.</string>
-    <string name="meditation_bhramari_humming_exhale">Zumbá suavemente al exhalar.</string>
-    <string name="meditation_nadishodhana_inhale_left">Inhalá por la fosa izquierda.</string>
-    <string name="meditation_nadishodhana_exhale_right">Exhalá por la fosa derecha.</string>
-    <string name="meditation_nadishodhana_inhale_right">Inhalá por la fosa derecha.</string>
-    <string name="meditation_nadishodhana_exhale_left">Exhalá por la fosa izquierda.</string>
-    <string name="meditation_kapalabhati_preparation">Sentate cómodo/a con la espalda erguida y respirá con naturalidad.</string>
-    <string name="meditation_kapalabhati_active">Exhalá fuerte y corto por la nariz, dejá que la inhalación sea pasiva.</string>
-    <string name="meditation_breathoffire_preparation">Sentate erguido/a y establecé una respiración natural y cómoda.</string>
-    <string name="meditation_breathoffire_active">Respirá rápido y parejo, con el mismo ritmo en inhalación y exhalación.</string>
+    <string name="meditation_boxbreathing_hold">Sostén, cuenta hasta cuatro.</string>
+    <string name="meditation_breathing478_hold">Sostén la respiración.</string>
+    <string name="meditation_bhramari_humming_exhale">Zumba suavemente al exhalar.</string>
+    <string name="meditation_nadishodhana_inhale_left">Inhala por la fosa izquierda.</string>
+    <string name="meditation_nadishodhana_exhale_right">Exhala por la fosa derecha.</string>
+    <string name="meditation_nadishodhana_inhale_right">Inhala por la fosa derecha.</string>
+    <string name="meditation_nadishodhana_exhale_left">Exhala por la fosa izquierda.</string>
+    <string name="meditation_kapalabhati_preparation">Siéntate cómodo/a con la espalda erguida y respira con naturalidad.</string>
+    <string name="meditation_kapalabhati_active">Exhala fuerte y corto por la nariz, deja que la inhalación sea pasiva.</string>
+    <string name="meditation_breathoffire_preparation">Siéntate erguido/a y establece una respiración natural y cómoda.</string>
+    <string name="meditation_breathoffire_active">Respira rápido y uniforme, con el mismo ritmo en inhalación y exhalación.</string>
 
     <!-- Stage 3, Batch F: pre-session customization field labels/options for the 8 breathing-family
          meditations. -->
@@ -519,7 +519,7 @@
     <string name="meditation_customization_breathoffire_pace_moderate">Moderado</string>
     <string name="meditation_customization_breathoffire_pace_traditional">Tradicional</string>
 
-    <string name="meditation_nadishodhana_hold">Sostené la respiración.</string>
+    <string name="meditation_nadishodhana_hold">Sostén la respiración.</string>
 
     <!-- Stage 3, Batch G: pre-session customization field labels/options for the 8
          mindfulness/silence/movement/mantra meditations. Extends Batch F's `_Nmin` duration-value
@@ -560,7 +560,7 @@
     <string name="meditation_customization_mantra_om">Om</string>
     <string name="meditation_customization_mantra_custom">Personalizado</string>
     <string name="meditation_customization_mantra_custom_text">Tu mantra</string>
-    <string name="meditation_customization_mantra_custom_placeholder">Escribí tu palabra o frase</string>
+    <string name="meditation_customization_mantra_custom_placeholder">Escribe tu palabra o frase</string>
 
     <string name="meditation_customization_repetition_mode">Modo de repetición</string>
     <string name="meditation_customization_repetition_mental">Mental</string>
@@ -585,21 +585,21 @@
          meditation and so hum. Copy is an engineering placeholder pending editorial review, same
          status as the entries above. -->
     <string name="meditation_catalog_anapanasati_title">Respiración consciente</string>
-    <string name="meditation_catalog_anapanasati_description">Observá tu respiración durante 10 minutos y volvé a ella cada vez que la mente se distraiga.</string>
+    <string name="meditation_catalog_anapanasati_description">Observa tu respiración durante 10 minutos y vuelve a ella cada vez que la mente se distraiga.</string>
     <string name="meditation_catalog_vipassana_title">Vipassana</string>
-    <string name="meditation_catalog_vipassana_description">Observá sensaciones, pensamientos y experiencias sin retenerlos ni rechazarlos.</string>
+    <string name="meditation_catalog_vipassana_description">Observa sensaciones, pensamientos y experiencias sin retenerlos ni rechazarlos.</string>
     <string name="meditation_catalog_metta_title">Bondad amorosa</string>
-    <string name="meditation_catalog_metta_description">Extendé deseos de bienestar hacia vos y hacia otras personas, paso a paso.</string>
+    <string name="meditation_catalog_metta_description">Extiende deseos de bienestar hacia ti y hacia otras personas, paso a paso.</string>
     <string name="meditation_catalog_zazen_title">Zazen</string>
     <string name="meditation_catalog_zazen_description">Meditación sentada de tradición zen: postura estable y presencia mínima guiada.</string>
     <string name="meditation_catalog_walking_meditation_title">Meditación caminando</string>
-    <string name="meditation_catalog_walking_meditation_description">Caminá lentamente y observá las sensaciones de cada movimiento.</string>
+    <string name="meditation_catalog_walking_meditation_description">Camina lentamente y observa las sensaciones de cada movimiento.</string>
     <string name="meditation_catalog_mantra_meditation_title">Meditación con mantra</string>
-    <string name="meditation_catalog_mantra_meditation_description">Repetí una palabra o sonido como objeto estable de atención.</string>
+    <string name="meditation_catalog_mantra_meditation_description">Repite una palabra o sonido como objeto estable de atención.</string>
     <string name="meditation_catalog_om_meditation_title">Meditación Om</string>
-    <string name="meditation_catalog_om_meditation_description">Repetí el mantra Om en voz alta o mentalmente, sincronizado con la respiración.</string>
+    <string name="meditation_catalog_om_meditation_description">Repite el mantra Om en voz alta o mentalmente, sincronizado con la respiración.</string>
     <string name="meditation_catalog_so_hum_title">So Hum</string>
-    <string name="meditation_catalog_so_hum_description">Sincronizá mentalmente el mantra So Hum con tu inhalación y exhalación.</string>
+    <string name="meditation_catalog_so_hum_description">Sincroniza mentalmente el mantra So Hum con tu inhalación y exhalación.</string>
 
     <string name="meditation_catalog_category_mindfulness">Mindfulness</string>
     <string name="meditation_catalog_category_compasion">Compasión</string>
@@ -607,25 +607,25 @@
     <string name="meditation_catalog_category_movimiento">Movimiento</string>
     <string name="meditation_catalog_category_mantra">Mantra</string>
 
-    <string name="meditation_anapanasati_arrival">Acomodate en tu postura y notá tu cuerpo.</string>
-    <string name="meditation_anapanasati_awareness">Observá tu respiración tal como es.</string>
-    <string name="meditation_anapanasati_closing">Expandí tu atención y cerrá suavemente la práctica.</string>
-    <string name="meditation_vipassana_breath_anchor">Usá tu respiración como ancla.</string>
-    <string name="meditation_vipassana_body_awareness">Notá las sensaciones en tu cuerpo.</string>
-    <string name="meditation_vipassana_open_observation">Dejá que cualquier experiencia aparezca y pase.</string>
-    <string name="meditation_vipassana_closing">Volvé lentamente al espacio que te rodea.</string>
+    <string name="meditation_anapanasati_arrival">Acomódate en tu postura y nota tu cuerpo.</string>
+    <string name="meditation_anapanasati_awareness">Observa tu respiración tal como es.</string>
+    <string name="meditation_anapanasati_closing">Expande tu atención y cierra suavemente la práctica.</string>
+    <string name="meditation_vipassana_breath_anchor">Usa tu respiración como ancla.</string>
+    <string name="meditation_vipassana_body_awareness">Nota las sensaciones en tu cuerpo.</string>
+    <string name="meditation_vipassana_open_observation">Deja que cualquier experiencia aparezca y pase.</string>
+    <string name="meditation_vipassana_closing">Vuelve lentamente al espacio que te rodea.</string>
     <string name="meditation_metta_self">Que yo esté bien. Que yo esté en paz.</string>
-    <string name="meditation_metta_loved_one">Que la persona que querés esté bien y en paz.</string>
+    <string name="meditation_metta_loved_one">Que la persona que quieres esté bien y en paz.</string>
     <string name="meditation_metta_neutral_person">Que esa persona neutral esté bien y en paz.</string>
     <string name="meditation_metta_difficult_person">Que esa persona difícil esté bien y en paz.</string>
     <string name="meditation_metta_all_beings">Que todos los seres estén bien y en paz.</string>
-    <string name="meditation_zazen_posture">Sentate con la espalda erguida y las manos en calma.</string>
-    <string name="meditation_walkingmeditation_arrival">Ponete de pie y notá el contacto con el suelo.</string>
-    <string name="meditation_walkingmeditation_standing">Sentí el peso de tu cuerpo antes de moverte.</string>
-    <string name="meditation_walkingmeditation_walking">Caminá lento y notá cada sensación del movimiento.</string>
-    <string name="meditation_walkingmeditation_closing">Detenete y notá cómo te sentís ahora.</string>
-    <string name="meditation_mantrameditation_preparation">Encontrá una postura cómoda y relajá los hombros.</string>
-    <string name="meditation_mantrameditation_mantra">Repetí tu mantra en silencio, a tu propio ritmo.</string>
+    <string name="meditation_zazen_posture">Siéntate con la espalda erguida y las manos en calma.</string>
+    <string name="meditation_walkingmeditation_arrival">Ponte de pie y nota el contacto con el suelo.</string>
+    <string name="meditation_walkingmeditation_standing">Siente el peso de tu cuerpo antes de moverte.</string>
+    <string name="meditation_walkingmeditation_walking">Camina lento y nota cada sensación del movimiento.</string>
+    <string name="meditation_walkingmeditation_closing">Detente y nota cómo te sientes ahora.</string>
+    <string name="meditation_mantrameditation_preparation">Encuentra una postura cómoda y relaja los hombros.</string>
+    <string name="meditation_mantrameditation_mantra">Repite tu mantra en silencio, a tu propio ritmo.</string>
     <string name="meditation_ommeditation_chant">Om.</string>
     <string name="meditation_sohum_so">So</string>
     <string name="meditation_sohum_hum">Hum</string>
@@ -635,27 +635,27 @@
          Copy is an engineering placeholder pending editorial review, same status as the entries
          above; religious cue text is kept neutral to the specific phrase/tradition variant. -->
     <string name="meditation_catalog_dhikr_title">Dhikr</string>
-    <string name="meditation_catalog_dhikr_description">Recordá a Dios mediante la repetición consciente de una frase, tradicionalmente 33 veces.</string>
+    <string name="meditation_catalog_dhikr_description">Recuerda a Dios mediante la repetición consciente de una frase, tradicionalmente 33 veces.</string>
     <string name="meditation_catalog_muraqabah_title">Muraqabah</string>
-    <string name="meditation_catalog_muraqabah_description">Cultivá conciencia interior y atención a la presencia de Dios.</string>
+    <string name="meditation_catalog_muraqabah_description">Cultiva conciencia interior y atención a la presencia de Dios.</string>
     <string name="meditation_catalog_hitbodedut_title">Hitbodedut</string>
-    <string name="meditation_catalog_hitbodedut_description">Hablá con Dios con tus propias palabras, en reflexión espontánea.</string>
+    <string name="meditation_catalog_hitbodedut_description">Habla con Dios con tus propias palabras, en reflexión espontánea.</string>
     <string name="meditation_catalog_self_compassion_break_title">Pausa de autocompasión</string>
-    <string name="meditation_catalog_self_compassion_break_description">Reconocé una dificultad, recordá que no estás solo/a, y ofrecete amabilidad.</string>
+    <string name="meditation_catalog_self_compassion_break_description">Reconoce una dificultad, recuerda que no estás solo/a, y ofrécete amabilidad.</string>
 
     <string name="meditation_catalog_category_oracion">Oración</string>
     <string name="meditation_catalog_category_contemplacion">Contemplación</string>
 
-    <string name="meditation_dhikr_intention">Tomate un momento para fijar tu intención.</string>
-    <string name="meditation_dhikr_repetition">Repetí tu frase de dhikr.</string>
-    <string name="meditation_muraqabah_intention">Tomate un momento para fijar tu intención.</string>
-    <string name="meditation_muraqabah_breath_settling">Asentate en tu respiración.</string>
-    <string name="meditation_hitbodedut_arrival">Acomodate y date un momento para llegar.</string>
-    <string name="meditation_hitbodedut_gratitude">Reconocé algo por lo que sentís gratitud.</string>
+    <string name="meditation_dhikr_intention">Tómate un momento para fijar tu intención.</string>
+    <string name="meditation_dhikr_repetition">Repite tu frase de dhikr.</string>
+    <string name="meditation_muraqabah_intention">Tómate un momento para fijar tu intención.</string>
+    <string name="meditation_muraqabah_breath_settling">Asiéntate en tu respiración.</string>
+    <string name="meditation_hitbodedut_arrival">Acomódate y date un momento para llegar.</string>
+    <string name="meditation_hitbodedut_gratitude">Reconoce algo por lo que sientes gratitud.</string>
     <string name="meditation_hitbodedut_personal_prayer">Hablále a Dios con tus propias palabras.</string>
-    <string name="meditation_selfcompassionbreak_recognize">Reconocé que este es un momento difícil.</string>
+    <string name="meditation_selfcompassionbreak_recognize">Reconoce que este es un momento difícil.</string>
     <string name="meditation_selfcompassionbreak_shared_humanity">Las dificultades son parte de la experiencia humana. No estás solo/a.</string>
-    <string name="meditation_selfcompassionbreak_kindness">¿Qué necesitás escuchar ahora? Ofrecete esas palabras con amabilidad.</string>
+    <string name="meditation_selfcompassionbreak_kindness">¿Qué necesitas escuchar ahora? Ofrécete esas palabras con amabilidad.</string>
 
     <!-- Stage 3, Batch H: pre-session customization for dhikr, muraqabah, hitbodedut, and the
          Self-Compassion Break. Extends Batch F/G's shared duration/guidance-level fields. -->
@@ -667,7 +667,7 @@
     <string name="meditation_customization_dhikr_repetitions_33">33</string>
     <string name="meditation_customization_dhikr_repetitions_99">99</string>
     <string name="meditation_customization_dhikr_phrase">Tu frase de dhikr</string>
-    <string name="meditation_customization_dhikr_phrase_placeholder">Escribí la frase que querés repetir</string>
+    <string name="meditation_customization_dhikr_phrase_placeholder">Escribe la frase que quieres repetir</string>
     <string name="meditation_customization_repetition_quiet">En voz baja</string>
 
     <string name="meditation_customization_hitbodedut_guided_prompts">Guía con temas sugeridos</string>
@@ -679,69 +679,69 @@
     <string name="meditation_customization_hitbodedut_topic_purpose">Propósito</string>
     <string name="meditation_customization_hitbodedut_topic_forgiveness">Perdón</string>
 
-    <string name="meditation_hitbodedut_concerns">Nombrá algo que te preocupa.</string>
-    <string name="meditation_hitbodedut_requests">Pedí lo que necesitás pedir.</string>
-    <string name="meditation_hitbodedut_relationships">Pensá en tus vínculos con otras personas.</string>
-    <string name="meditation_hitbodedut_purpose">Reflexioná sobre tu propósito.</string>
-    <string name="meditation_hitbodedut_forgiveness">Considerá algo que necesitás perdonar o perdonarte.</string>
+    <string name="meditation_hitbodedut_concerns">Nombra algo que te preocupa.</string>
+    <string name="meditation_hitbodedut_requests">Pide lo que necesitas pedir.</string>
+    <string name="meditation_hitbodedut_relationships">Piensa en tus vínculos con otras personas.</string>
+    <string name="meditation_hitbodedut_purpose">Reflexiona sobre tu propósito.</string>
+    <string name="meditation_hitbodedut_forgiveness">Considera algo que necesitas perdonar o perdonarte.</string>
 
     <string name="meditation_customization_self_compassion_break_phrase">Tu frase de amabilidad</string>
-    <string name="meditation_customization_self_compassion_break_phrase_placeholder">Escribí las palabras que querés ofrecerte</string>
+    <string name="meditation_customization_self_compassion_break_phrase_placeholder">Escribe las palabras que quieres ofrecerte</string>
 
     <!-- Second new-meditation batch: trataka, yoga nidra, open awareness, noting, and progressive
          muscle relaxation. (body-scan from this batch was skipped — already covered by the
          existing body_scan entry.) Copy is an engineering placeholder pending editorial review. -->
     <string name="meditation_catalog_trataka_title">Trataka</string>
-    <string name="meditation_catalog_trataka_description">Sostené la mirada en un punto fijo, tradicionalmente la llama de una vela, para cultivar concentración.</string>
+    <string name="meditation_catalog_trataka_description">Sostén la mirada en un punto fijo, tradicionalmente la llama de una vela, para cultivar concentración.</string>
     <string name="meditation_catalog_yoganidra_title">Yoga Nidra</string>
-    <string name="meditation_catalog_yoganidra_description">Recorré el cuerpo, la respiración y distintos niveles de atención, acostado y guiado.</string>
+    <string name="meditation_catalog_yoganidra_description">Recorre el cuerpo, la respiración y distintos niveles de atención, acostado y guiado.</string>
     <string name="meditation_catalog_openawareness_title">Conciencia abierta</string>
-    <string name="meditation_catalog_openawareness_description">Dejá que sonidos, sensaciones y pensamientos aparezcan dentro de un campo amplio de conciencia.</string>
+    <string name="meditation_catalog_openawareness_description">Deja que sonidos, sensaciones y pensamientos aparezcan dentro de un campo amplio de conciencia.</string>
     <string name="meditation_catalog_noting_title">Noting</string>
-    <string name="meditation_catalog_noting_description">Reconocé brevemente lo que aparece, pensamiento, sonido o sensación, y dejalo pasar.</string>
+    <string name="meditation_catalog_noting_description">Reconoce brevemente lo que aparece, pensamiento, sonido o sensación, y déjalo pasar.</string>
     <string name="meditation_catalog_progressivemusclerelaxation_title">Relajación muscular progresiva</string>
-    <string name="meditation_catalog_progressivemusclerelaxation_description">Tensá y soltá cada grupo muscular para notar mejor la diferencia entre tensión y descanso.</string>
+    <string name="meditation_catalog_progressivemusclerelaxation_description">Tensa y suelta cada grupo muscular para notar mejor la diferencia entre tensión y descanso.</string>
 
-    <string name="meditation_trataka_preparation">Sentate cómodo/a frente al punto que vas a mirar.</string>
-    <string name="meditation_trataka_external_focus">Mirá el punto fijo, sin forzar la vista.</string>
-    <string name="meditation_trataka_eyes_closed">Cerrá los ojos y observá la imagen residual.</string>
-    <string name="meditation_yoganidra_settling">Acomodate acostado/a y soltá el cuerpo.</string>
-    <string name="meditation_yoganidra_intention">Elegí una intención breve para esta práctica.</string>
-    <string name="meditation_yoganidra_feet">Llevá la atención a tus pies.</string>
-    <string name="meditation_yoganidra_legs">Llevá la atención a tus piernas.</string>
-    <string name="meditation_yoganidra_abdomen">Llevá la atención a tu abdomen.</string>
-    <string name="meditation_yoganidra_chest">Llevá la atención a tu pecho.</string>
-    <string name="meditation_yoganidra_arms">Llevá la atención a tus brazos.</string>
-    <string name="meditation_yoganidra_head">Llevá la atención a tu cabeza.</string>
-    <string name="meditation_yoganidra_breath_awareness">Notá el ritmo natural de tu respiración.</string>
-    <string name="meditation_yoganidra_visualization">Imaginá un lugar tranquilo y seguro.</string>
-    <string name="meditation_yoganidra_return">De a poco, volvé la atención al espacio a tu alrededor.</string>
-    <string name="meditation_openawareness_anchor">Anclate en la respiración.</string>
-    <string name="meditation_openawareness_expand">Ampliá el campo de tu atención.</string>
-    <string name="meditation_openawareness_open">Dejá que lo que aparezca esté presente, sin elegir un objeto fijo.</string>
-    <string name="meditation_noting_breath_anchor">Anclate en la respiración.</string>
-    <string name="meditation_noting_noting">Nombrá brevemente lo que aparece: pensando, escuchando, sintiendo.</string>
-    <string name="meditation_noting_open">Volvé a un campo abierto de atención.</string>
-    <string name="meditation_progressivemusclerelaxation_settling">Acomodate y preparate para recorrer el cuerpo.</string>
-    <string name="meditation_progressivemusclerelaxation_tense">Tensá suavemente este grupo muscular.</string>
-    <string name="meditation_progressivemusclerelaxation_relax">Soltá y notá la diferencia al relajarte.</string>
+    <string name="meditation_trataka_preparation">Siéntate cómodo/a frente al punto que vas a mirar.</string>
+    <string name="meditation_trataka_external_focus">Mira el punto fijo, sin forzar la vista.</string>
+    <string name="meditation_trataka_eyes_closed">Cierra los ojos y observa la imagen residual.</string>
+    <string name="meditation_yoganidra_settling">Acomódate acostado/a y suelta el cuerpo.</string>
+    <string name="meditation_yoganidra_intention">Elige una intención breve para esta práctica.</string>
+    <string name="meditation_yoganidra_feet">Lleva la atención a tus pies.</string>
+    <string name="meditation_yoganidra_legs">Lleva la atención a tus piernas.</string>
+    <string name="meditation_yoganidra_abdomen">Lleva la atención a tu abdomen.</string>
+    <string name="meditation_yoganidra_chest">Lleva la atención a tu pecho.</string>
+    <string name="meditation_yoganidra_arms">Lleva la atención a tus brazos.</string>
+    <string name="meditation_yoganidra_head">Lleva la atención a tu cabeza.</string>
+    <string name="meditation_yoganidra_breath_awareness">Nota el ritmo natural de tu respiración.</string>
+    <string name="meditation_yoganidra_visualization">Imagina un lugar tranquilo y seguro.</string>
+    <string name="meditation_yoganidra_return">Poco a poco, vuelve la atención al espacio a tu alrededor.</string>
+    <string name="meditation_openawareness_anchor">Ánclate en la respiración.</string>
+    <string name="meditation_openawareness_expand">Amplía el campo de tu atención.</string>
+    <string name="meditation_openawareness_open">Deja que lo que aparezca esté presente, sin elegir un objeto fijo.</string>
+    <string name="meditation_noting_breath_anchor">Ánclate en la respiración.</string>
+    <string name="meditation_noting_noting">Nombra brevemente lo que aparece: pensando, escuchando, sintiendo.</string>
+    <string name="meditation_noting_open">Vuelve a un campo abierto de atención.</string>
+    <string name="meditation_progressivemusclerelaxation_settling">Acomódate y prepárate para recorrer el cuerpo.</string>
+    <string name="meditation_progressivemusclerelaxation_tense">Tensa suavemente este grupo muscular.</string>
+    <string name="meditation_progressivemusclerelaxation_relax">Suelta y nota la diferencia al relajarte.</string>
 
     <!-- Third new-meditation batch (final batch): guided visualization, gratitude meditation,
          and three Christian contemplative practices (centering prayer, Jesus prayer, lectio
          divina). Copy is an engineering placeholder pending editorial review, same status as the
          entries above; religious cue text stays neutral and non-doctrinal beyond the spec. -->
     <string name="meditation_catalog_visualization_title">Visualización guiada</string>
-    <string name="meditation_catalog_visualization_description">Usá imágenes mentales para dirigir tu atención hacia un escenario o experiencia.</string>
+    <string name="meditation_catalog_visualization_description">Usa imágenes mentales para dirigir tu atención hacia un escenario o experiencia.</string>
     <string name="meditation_catalog_gratitude_meditation_title">Meditación de gratitud</string>
-    <string name="meditation_catalog_gratitude_meditation_description">Reconocé personas, experiencias y aspectos de tu vida que te generan agradecimiento.</string>
+    <string name="meditation_catalog_gratitude_meditation_description">Reconoce personas, experiencias y aspectos de tu vida que te generan agradecimiento.</string>
     <string name="meditation_catalog_centering_prayer_title">Oración centrante</string>
-    <string name="meditation_catalog_centering_prayer_description">Permanecé en silencio, receptivo/a, sostenido/a por una palabra sagrada.</string>
+    <string name="meditation_catalog_centering_prayer_description">Permanece en silencio, receptivo/a, sostenido/a por una palabra sagrada.</string>
     <string name="meditation_catalog_jesus_prayer_title">Oración de Jesús</string>
-    <string name="meditation_catalog_jesus_prayer_description">Repetí la Oración de Jesús en sincronía con tu respiración.</string>
+    <string name="meditation_catalog_jesus_prayer_description">Repite la Oración de Jesús en sincronía con tu respiración.</string>
     <string name="meditation_catalog_lectio_divina_title">Lectio Divina</string>
-    <string name="meditation_catalog_lectio_divina_description">Leé, meditá, orá y contemplá un texto sagrado en cuatro etapas.</string>
+    <string name="meditation_catalog_lectio_divina_description">Lee, medita, ora y contempla un texto sagrado en cuatro etapas.</string>
     <string name="meditation_catalog_breathing_affirmations_title">Respirar y Afirmar</string>
-    <string name="meditation_catalog_breathing_affirmations_description">Regulá tu respiración, meditá un momento y cerrá con afirmaciones elegidas para vos.</string>
+    <string name="meditation_catalog_breathing_affirmations_description">Regula tu respiración, medita un momento y cierra con afirmaciones elegidas para ti.</string>
 
     <string name="meditation_catalog_category_visualizacion">Visualización</string>
     <string name="meditation_catalog_category_gratitud">Gratitud</string>
@@ -762,29 +762,29 @@
          pill (see MeditationScreen.kt's recentEntries visibility condition). -->
     <string name="meditation_shelf_recent">Recientes</string>
 
-    <string name="meditation_visualization_relaxation">Relajá el cuerpo y preparate para imaginar.</string>
-    <string name="meditation_visualization_visualization_nature">Imaginá un paisaje natural que te dé calma: el sonido del agua, el aire, la luz.</string>
-    <string name="meditation_visualization_visualization_safe_place">Imaginá tu lugar seguro, con todo el detalle posible: qué ves, qué escuchás, cómo te sentís ahí.</string>
-    <string name="meditation_visualization_visualization_goal">Imaginate habiendo logrado ese objetivo: cómo te sentís, qué cambió, quién está con vos.</string>
-    <string name="meditation_visualization_visualization_performance">Visualizá ese momento de desempeño saliendo exactamente como querés, paso a paso.</string>
-    <string name="meditation_visualization_visualization_custom">Imaginá con detalle el escenario que elegiste.</string>
-    <string name="meditation_visualization_integration">Notá cómo te sentís después de esa imagen.</string>
-    <string name="meditation_visualization_return">De a poco, volvé la atención al espacio a tu alrededor.</string>
-    <string name="meditation_gratitudemeditation_arrival">Acomodate y date un momento para llegar.</string>
-    <string name="meditation_gratitudemeditation_person">Recordá a una persona que aprecies.</string>
-    <string name="meditation_gratitudemeditation_experience">Recordá una experiencia que aprecies.</string>
-    <string name="meditation_gratitudemeditation_present">Notá algo, ahora mismo, que puedas apreciar.</string>
-    <string name="meditation_centeringprayer_sacred_word">Elegí una palabra sagrada como ancla suave para esta práctica.</string>
-    <string name="meditation_centeringprayer_closing">Cerrá con una breve oración de cierre.</string>
+    <string name="meditation_visualization_relaxation">Relaja el cuerpo y prepárate para imaginar.</string>
+    <string name="meditation_visualization_visualization_nature">Imagina un paisaje natural que te dé calma: el sonido del agua, el aire, la luz.</string>
+    <string name="meditation_visualization_visualization_safe_place">Imagina tu lugar seguro, con todo el detalle posible: qué ves, qué escuchas, cómo te sientes ahí.</string>
+    <string name="meditation_visualization_visualization_goal">Imagínate habiendo logrado ese objetivo: cómo te sientes, qué cambió, quién está contigo.</string>
+    <string name="meditation_visualization_visualization_performance">Visualiza ese momento de desempeño saliendo exactamente como quieres, paso a paso.</string>
+    <string name="meditation_visualization_visualization_custom">Imagina con detalle el escenario que elegiste.</string>
+    <string name="meditation_visualization_integration">Nota cómo te sientes después de esa imagen.</string>
+    <string name="meditation_visualization_return">Poco a poco, vuelve la atención al espacio a tu alrededor.</string>
+    <string name="meditation_gratitudemeditation_arrival">Acomódate y date un momento para llegar.</string>
+    <string name="meditation_gratitudemeditation_person">Recuerda a una persona que aprecies.</string>
+    <string name="meditation_gratitudemeditation_experience">Recuerda una experiencia que aprecies.</string>
+    <string name="meditation_gratitudemeditation_present">Nota algo, ahora mismo, que puedas apreciar.</string>
+    <string name="meditation_centeringprayer_sacred_word">Elige una palabra sagrada como ancla suave para esta práctica.</string>
+    <string name="meditation_centeringprayer_closing">Cierra con una breve oración de cierre.</string>
     <string name="meditation_jesusprayer_inhale">Señor Jesucristo, Hijo de Dios</string>
     <string name="meditation_jesusprayer_exhale">ten piedad de mí</string>
-    <string name="meditation_lectiodivina_lectio">Leé el texto despacio, sin buscar analizarlo.</string>
-    <string name="meditation_lectiodivina_meditatio">Meditá sobre lo que resonó en la lectura.</string>
-    <string name="meditation_lectiodivina_oratio">Respondé a Dios con tus propias palabras.</string>
-    <string name="meditation_breathingaffirmations_meditation">Quedate con la atención en tu respiración.</string>
-    <string name="meditation_breathingaffirmations_affirmation_unavailable">Tomate un momento para repetir una afirmación propia.</string>
+    <string name="meditation_lectiodivina_lectio">Lee el texto despacio, sin buscar analizarlo.</string>
+    <string name="meditation_lectiodivina_meditatio">Medita sobre lo que resonó en la lectura.</string>
+    <string name="meditation_lectiodivina_oratio">Responde a Dios con tus propias palabras.</string>
+    <string name="meditation_breathingaffirmations_meditation">Quédate con la atención en tu respiración.</string>
+    <string name="meditation_breathingaffirmations_affirmation_unavailable">Tómate un momento para repetir una afirmación propia.</string>
 
-    <string name="widget_empty_state_label">Empezá hoy</string>
+    <string name="widget_empty_state_label">Empieza hoy</string>
     <string name="widget_action_affirm_label">Afirmar</string>
     <string name="widget_action_meditate_label">Meditar</string>
 
@@ -825,7 +825,7 @@
     <string name="affirmation_group_open_favorites">Ver favoritos</string>
     <string name="favorites_title">Favoritos</string>
     <string name="favorites_empty_state">Aún no guardaste ninguna afirmación.</string>
-    <string name="favorites_empty_hint">Tocá dos veces una afirmación para guardarla acá.</string>
+    <string name="favorites_empty_hint">Toca dos veces una afirmación para guardarla aquí.</string>
     <string name="favorites_unlike_content_description">Quitar de favoritos</string>
     <string name="affirmation_hide_content_description">Ocultar afirmación</string>
     <string name="affirmation_clean_screen_content_description">Pantalla limpia</string>
@@ -840,11 +840,11 @@
     <string name="settings_my_goals_title">Mis objetivos</string>
     <string name="settings_my_goals_edit_button">Editar</string>
     <string name="my_goals_screen_title">Mis objetivos</string>
-    <string name="my_goals_headline">¿Qué querés priorizar ahora?</string>
-    <string name="my_goals_subtitle">Tus objetivos pueden cambiar. Esto solo define qué prioriza Affirmity para vos.</string>
+    <string name="my_goals_headline">¿Qué quieres priorizar ahora?</string>
+    <string name="my_goals_subtitle">Tus objetivos pueden cambiar. Esto solo define qué prioriza Affirmity para ti.</string>
     <string name="my_goals_save_button">Actualizar mis objetivos</string>
-    <string name="my_goals_save_error">No pudimos guardar tus objetivos. Probá de nuevo.</string>
-    <string name="divergence_prompt_title">¿Cambió lo que necesitás últimamente?</string>
+    <string name="my_goals_save_error">No pudimos guardar tus objetivos. Prueba de nuevo.</string>
+    <string name="divergence_prompt_title">¿Cambió lo que necesitas últimamente?</string>
     <string name="divergence_prompt_suggested_goal">Objetivo sugerido: %1$s</string>
     <string name="divergence_prompt_add">Agregar</string>
     <string name="divergence_prompt_dismiss">Ahora no</string>
@@ -857,7 +857,7 @@
     <string name="divergence_goal_direction">Encontrar dirección</string>
     <string name="affirmation_group_locked_a11y">%1$s (bloqueado)</string>
     <string name="affirmation_group_upgrade_cta">Mejorar a Pro</string>
-    <string name="ad_unlock_cta_a11y">Mirá un anuncio para desbloquear %1$s</string>
+    <string name="ad_unlock_cta_a11y">Mira un anuncio para desbloquear %1$s</string>
     <string name="ad_unlock_loading_a11y">Cargando anuncio…</string>
     <string name="meditation_watch_ad_cta">Ver anuncio para desbloquear</string>
     <string name="your_feed_expand">Expandir tu feed</string>
@@ -867,7 +867,7 @@
     <string name="your_feed_source_favorites">Favoritas</string>
     <string name="your_feed_source_favorites_description">Aunque su tema no esté elegido</string>
     <string name="your_feed_source_own">Mías</string>
-    <string name="your_feed_source_own_description">Las que escribiste vos</string>
+    <string name="your_feed_source_own_description">Las que escribiste tú</string>
     <string name="your_feed_source_random">Orden aleatorio</string>
     <string name="your_feed_source_random_description">Mezcla tu feed en cada actualización</string>
     <string name="your_feed_done">Listo</string>
@@ -885,7 +885,7 @@
     <string name="your_feed_see_all_themes">Ver todos los temas</string>
     <string name="your_feed_update_button">Actualizar mi feed</string>
     <string name="your_feed_selected_count">%1$d de %2$d seleccionados</string>
-    <string name="your_feed_suggested_for_you">Sugeridos para vos</string>
+    <string name="your_feed_suggested_for_you">Sugeridos para ti</string>
     <string name="your_feed_more_in">Más en %1$s</string>
     <string name="your_feed_go_deeper">Ir más profundo</string>
     <string name="your_feed_recommended_tag">Recomendado</string>
@@ -893,22 +893,22 @@
     <string name="your_feed_filter_selected">Seleccionados</string>
     <string name="your_feed_filter_free">Gratis</string>
     <string name="your_feed_filter_premium">Premium</string>
-    <string name="ad_unlock_earned_message">¡Listo! Ya podés usar esta sesión.</string>
+    <string name="ad_unlock_earned_message">¡Listo! Ya puedes usar esta sesión.</string>
     <string name="ad_unlock_dismissed_message">Cerraste el anuncio antes de terminar, así que no se desbloqueó nada.</string>
-    <string name="ad_unlock_unavailable_message">No hay anuncios disponibles en este momento. Probá de nuevo más tarde.</string>
+    <string name="ad_unlock_unavailable_message">No hay anuncios disponibles en este momento. Prueba de nuevo más tarde.</string>
     <string name="paywall_title">Afirmity Pro</string>
-    <string name="paywall_description">Desbloqueá todos los grupos temáticos con una suscripción Pro.</string>
+    <string name="paywall_description">Desbloquea todos los grupos temáticos con una suscripción Pro.</string>
     <string name="paywall_monthly_cta">Mensual — %1$s</string>
     <string name="paywall_annual_cta">Anual — %1$s</string>
-    <string name="paywall_unavailable">No se pudieron cargar los planes. Intentá de nuevo más tarde.</string>
+    <string name="paywall_unavailable">No se pudieron cargar los planes. Intenta de nuevo más tarde.</string>
     <string name="paywall_snackbar_lapse_message">Tu acceso Pro terminó.</string>
     <string name="paywall_snackbar_lapse_action">Ver planes</string>
-    <string name="meditation_access_blocked_message">Ya no tenés acceso a esta sesión.</string>
+    <string name="meditation_access_blocked_message">Ya no tienes acceso a esta sesión.</string>
     <string name="settings_subscription_title">Suscripción</string>
     <string name="settings_subscription_manage_button">Gestionar suscripción</string>
     <string name="meditation_customization_start">Comenzar</string>
     <string name="meditation_customization_cancel">Cancelar</string>
-    <string name="meditation_customization_free_text_placeholder">Escribí tu propia frase (opcional)</string>
+    <string name="meditation_customization_free_text_placeholder">Escribe tu propia frase (opcional)</string>
 
     <!-- Stage 3, Batch I customization labels -->
     <string name="meditation_customization_seconds_30">30 s</string>
@@ -919,7 +919,7 @@
     <string name="meditation_customization_trataka_focus_object_dot">Punto</string>
     <string name="meditation_customization_trataka_focus_object_symbol">Símbolo</string>
     <string name="meditation_customization_yoganidra_intention">Intención (sankalpa)</string>
-    <string name="meditation_customization_yoganidra_intention_placeholder">Escribí tu intención (opcional)</string>
+    <string name="meditation_customization_yoganidra_intention_placeholder">Escribe tu intención (opcional)</string>
     <string name="meditation_customization_yoganidra_sleep_ending">Terminar dejándote dormir</string>
     <string name="meditation_customization_yoganidra_voice_guidance">Guía de voz</string>
     <string name="meditation_customization_yoganidra_voice_guidance_continuous">Continua</string>
@@ -960,7 +960,7 @@
     <string name="meditation_customization_gratitude_prompt_count">Cantidad de reflexiones</string>
     <string name="meditation_customization_gratitude_journal_at_end">Anotar al finalizar</string>
     <string name="meditation_customization_centering_prayer_sacred_word">Palabra sagrada</string>
-    <string name="meditation_customization_centering_prayer_sacred_word_placeholder">Elegí una palabra que te ancle en la presencia de Dios</string>
+    <string name="meditation_customization_centering_prayer_sacred_word_placeholder">Elige una palabra que te ancle en la presencia de Dios</string>
     <string name="meditation_customization_centering_prayer_opening_guidance">Guía de apertura</string>
     <string name="meditation_customization_jesus_prayer_sync_with_breath">Sincronizar con la respiración</string>
     <string name="meditation_customization_lectio_divina_minutes_per_stage">Minutos por etapa</string>
@@ -969,7 +969,7 @@
     <string name="meditation_customization_lectio_divina_stage_oratio">Oratio (oración)</string>
     <string name="meditation_customization_lectio_divina_stage_contemplatio">Contemplatio (contemplación)</string>
     <string name="meditation_customization_lectio_divina_passage">Pasaje elegido</string>
-    <string name="meditation_customization_lectio_divina_passage_placeholder">Escribí el pasaje que vas a leer</string>
+    <string name="meditation_customization_lectio_divina_passage_placeholder">Escribe el pasaje que vas a leer</string>
     <string name="meditation_customization_lectio_divina_guided_prompts">Guía con indicaciones</string>
     <string name="meditation_customization_breathing_affirmations_technique">Técnica de respiración</string>
     <string name="meditation_customization_breathing_affirmations_technique_coherent">Respiración coherente</string>

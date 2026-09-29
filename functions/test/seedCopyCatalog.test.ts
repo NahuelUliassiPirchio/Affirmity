@@ -12,6 +12,18 @@ import {
   type CopyFirestoreWrite,
 } from '../tools/seedCopyCatalog';
 
+// Keep this detector aligned with NeutralSpanishResourcesTest on Android.
+const VOSEO_WORDS = /(?<![\p{L}])(anclate|asentate|dejate|abrí|acomodate|activá|agregá|alterná|ampliá|anotá|armá|boludo|cambiá|caminá|cerrá|che|completá|considerá|contemplá|continuá|contá|cultivá|dale|decidí|dejalo|dejá|desbloqueá|descansá|deslizá|detenete|elegí|empezá|encontrá|entrá|escribí|esperá|establecé|exhalá|expandí|explorá|extendé|guardalo|guardá|hablá|hacelo|hacé|imaginate|imaginá|inhalá|iniciá|intentá|laburo|leé|llevá|llevátela|mantené|meditá|miralo|mirá|nombrá|notá|observá|ofrecete|orá|parpadeá|pedí|pensá|permanecé|ponete|practicá|preparate|probá|quedate|reconocé|recordá|recorré|recuperá|reflexioná|registrá|regulá|relajá|repetí|respirá|respondete|respondé|seguí|sentate|sentí|sincronizá|soltá|sos|sostené|tensá|tocá|tomate|usalo|usá|visualizá|volvé|vos|zumbá)(?![\p{L}])/iu;
+const VOSEO_ENDING = /(?<![\p{L}])\p{L}+(ás|és|ís)(?![\p{L}])/giu;
+const NEUTRAL_ENDINGS = new Set(['demás', 'estás', 'más', 'además', 'después', 'país', 'atrás', 'detrás', 'quizás', 'jamás', 'través', 'interés', 'inglés', 'francés', 'hablarás', 'tendrás', 'podrás', 'serás', 'estarás', 'harás', 'dirás', 'vendrás', 'saldrás', 'querrás', 'sabrás', 'pondrás', 'valdrás', 'habrás', 'irás']);
+// Reviewed neutral words include future forms; do not exempt every -rás (mirás is voseo).
+const usesVoseo = (text: string): boolean =>
+  VOSEO_WORDS.test(text) ||
+  (text.match(VOSEO_ENDING) ?? []).some((word) => {
+    const lower = word.toLowerCase();
+    return !NEUTRAL_ENDINGS.has(lower);
+  });
+
 /**
  * Mirrors `seedCatalog.test.ts`'s style: a fake `CopyCommitter`, no Admin SDK app, no emulator.
  * Also asserts the committed catalog's data-quality invariants (design §1's seed test):
@@ -145,17 +157,75 @@ describe('notification-copy.v1.json data quality', () => {
     }
   });
 
-  it('ships activity-specific streak variants for both meditation and affirmations', () => {
-    for (const activity of ['meditation', 'affirmations']) {
-      const variants = catalog.variants.filter(
-        (v) =>
-          v.family === 'streak' &&
-          v.context.includes('streak_activity') &&
-          v.context.includes(`activity_${activity}`),
-      );
-      expect(variants.length).toBeGreaterThan(0);
-      for (const variant of variants) expect(variant.placeholders).toContain('streakCount');
+  it('every Spanish notification variant uses neutral Spanish', () => {
+    for (const variant of catalog.variants) {
+      const { title, body } = variant.locales.es;
+      expect(usesVoseo(`${title} ${body}`), `${variant.key} es uses voseo/regional forms`).toBe(false);
     }
+  });
+
+  it('the voseo detector flags common Argentine forms and accepts neutral Spanish', () => {
+    for (const sample of ['Llevás 5 días', 'Vos sabes', 'Todavía llegás', 'Ya venís', 'Seguís sumando', 'Tenés tiempo', 'Sos genial', 'Hacelo hoy', 'Usalo hoy', 'Mantené la racha', 'Leé una hoy', 'Sentate un rato', 'Dale que va', 'Creés que puedes', 'Acomodate', 'Respondete', 'Mirá aquí', 'Inhalá', 'Quedate', 'PreparATE', 'Imaginate', 'GUARDALO', 'Mirás', 'Estirás', 'Anclate', 'Asentate', 'Dejate']) {
+      expect(usesVoseo(sample), sample).toBe(true);
+    }
+    for (const sample of ['Llevas 5 días meditando', 'Lee una hoy', 'Siéntate un momento', 'Sigues sumando', 'Aún estás a tiempo', 'Tienes tiempo', 'Después de las prácticas', 'Hablarás después', 'Tendrás tiempo', 'Darle espacio', 'Date un momento', 'Más interés en el país', 'Creo que puedes', 'Las demás prácticas']) {
+      expect(usesVoseo(sample), sample).toBe(false);
+    }
+  });
+
+  describe('activity-specific streak variants', () => {
+    const MIN_VARIANTS_PER_ACTIVITY = 4;
+    /** Rendered with a 2-digit count; a collapsed notification shows one title line and two body lines. */
+    const MAX_TITLE_CHARS = 80;
+    const MAX_BODY_CHARS = 100;
+    const ORIGINAL_KEYS = new Set([
+      'streak_activity_meditation_a',
+      'streak_activity_meditation_b',
+      'streak_activity_affirmations_a',
+      'streak_activity_affirmations_b',
+    ]);
+    const NAMES_ACTIVITY: Record<string, Record<'es' | 'en', RegExp>> = {
+      meditation: { es: /medita/i, en: /meditat|meditation/i },
+      affirmations: { es: /afirma/i, en: /affirmation/i },
+    };
+    const render = (text: string) => text.replaceAll('{streakCount}', '14');
+    const EMOJI = /\p{Extended_Pictographic}/u;
+    for (const activity of ['meditation', 'affirmations']) {
+      const variantsOf = () =>
+        catalog.variants.filter(
+          (v) =>
+            v.family === 'streak' &&
+            v.context.includes('streak_activity') &&
+            v.context.includes(`activity_${activity}`),
+        );
+
+      it(`has at least ${MIN_VARIANTS_PER_ACTIVITY} ${activity} variants so anti-repeat has room`, () => {
+        expect(variantsOf().length).toBeGreaterThanOrEqual(MIN_VARIANTS_PER_ACTIVITY);
+      });
+
+      it(`every ${activity} variant has es+en, {streakCount}, exact tags, names the activity and fits`, () => {
+        for (const variant of variantsOf()) {
+          expect(variant.context.sort()).toEqual(['activity_' + activity, 'streak_activity'].sort());
+          expect(variant.placeholders).toEqual(['streakCount']);
+          for (const locale of ['es', 'en'] as const) {
+            const { title, body } = variant.locales[locale];
+            expect(`${title} ${body}`, `${variant.key} ${locale} has {streakCount}`).toContain('{streakCount}');
+            expect(render(title).length, `${variant.key} ${locale} title length`).toBeLessThanOrEqual(MAX_TITLE_CHARS);
+            expect(render(body).length, `${variant.key} ${locale} body length`).toBeLessThanOrEqual(MAX_BODY_CHARS);
+            expect(`${title} ${body}`, `${variant.key} ${locale} names the activity`).toMatch(
+              NAMES_ACTIVITY[activity][locale],
+            );
+            expect(EMOJI.test(`${title} ${body}`), `${variant.key} ${locale} has no emoji`).toBe(false);
+            expect(title, `${variant.key} ${locale} not all caps`).not.toBe(title.toUpperCase());
+          }
+        }
+      });
+    }
+
+    it('keeps the four original variant keys', () => {
+      const keys = catalog.variants.map((v) => v.key);
+      for (const key of ORIGINAL_KEYS) expect(keys).toContain(key);
+    });
   });
 
   it('never leaves an undeclared `{...}` occurrence in either locale', () => {

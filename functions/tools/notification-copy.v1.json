@@ -9,7 +9,7 @@
       "enabled": true,
       "order": 1,
       "locales": {
-        "es": { "title": "¿Qué necesitás escuchar hoy?", "body": "Hay una afirmación que puede acompañarte ahora." },
+        "es": { "title": "¿Qué necesitas escuchar hoy?", "body": "Hay una afirmación que puede acompañarte ahora." },
         "en": { "title": "What do you need to hear today?", "body": "There may be an affirmation that fits this moment." }
       }
     },
@@ -21,7 +21,7 @@
       "enabled": true,
       "order": 2,
       "locales": {
-        "es": { "title": "Tu cabeza ya habló bastante por hoy", "body": "Elegí vos qué querés repetirte." },
+        "es": { "title": "Tu cabeza ya habló bastante por hoy", "body": "Elige tú qué quieres repetirte." },
         "en": { "title": "Your mind has said enough for today", "body": "Now choose what you want to repeat to yourself." }
       }
     },
@@ -33,7 +33,7 @@
       "enabled": true,
       "order": 3,
       "locales": {
-        "es": { "title": "No todo lo que pensás merece quedarse", "body": "Abrí tus afirmaciones y elegí una idea distinta." },
+        "es": { "title": "No todo lo que piensas merece quedarse", "body": "Abre tus afirmaciones y elige una idea distinta." },
         "en": { "title": "Not every thought deserves to stay", "body": "Open your affirmations and choose a different idea." }
       }
     },
@@ -45,7 +45,7 @@
       "enabled": true,
       "order": 4,
       "locales": {
-        "es": { "title": "Elegí con qué idea querés quedarte hoy", "body": "Un minuto puede alcanzar para cambiar el tono del día." },
+        "es": { "title": "Elige con qué idea quieres quedarte hoy", "body": "Un minuto puede alcanzar para cambiar el tono del día." },
         "en": { "title": "Choose the idea you want to carry today", "body": "One minute can change the tone of the rest of your day." }
       }
     },
@@ -57,7 +57,7 @@
       "enabled": true,
       "order": 5,
       "locales": {
-        "es": { "title": "Antes de seguir, volvé a vos", "body": "Encontrá una afirmación para este momento." },
+        "es": { "title": "Antes de seguir, vuelve a ti", "body": "Encuentra una afirmación para este momento." },
         "en": { "title": "Before you keep going, come back to yourself", "body": "Find an affirmation for this moment." }
       }
     },
@@ -69,7 +69,7 @@
       "enabled": true,
       "order": 6,
       "locales": {
-        "es": { "title": "Capaz necesitás leer esto hoy", "body": "Abrí tu feed y elegí la frase que más te pegue." },
+        "es": { "title": "Quizás necesitas leer esto hoy", "body": "Abre tu feed y elige la frase que más conecte contigo." },
         "en": { "title": "You might need to read this today", "body": "Open your feed and choose the line that hits home." }
       }
     },
@@ -93,7 +93,7 @@
       "enabled": true,
       "order": 8,
       "locales": {
-        "es": { "title": "¿Cómo querés hablarte hoy?", "body": "Elegí una afirmación y llevátela con vos." },
+        "es": { "title": "¿Cómo quieres hablarte hoy?", "body": "Elige una afirmación y llévatela contigo." },
         "en": { "title": "How do you want to speak to yourself today?", "body": "Choose an affirmation and take it with you." }
       }
     },
@@ -105,7 +105,7 @@
       "enabled": true,
       "order": 1,
       "locales": {
-        "es": { "title": "¿Cómo venís hasta ahora?", "body": "Hacé un check-in rápido y registrá cómo estás." },
+        "es": { "title": "¿Cómo vas hasta ahora?", "body": "Haz un check-in rápido y registra cómo estás." },
         "en": { "title": "How are you doing so far?", "body": "Take a quick check-in and log how you're feeling." }
       }
     },
@@ -117,7 +117,7 @@
       "enabled": true,
       "order": 2,
       "locales": {
-        "es": { "title": "¿Cómo te está tratando el día?", "body": "Guardá cómo venís y seguí con lo tuyo." },
+        "es": { "title": "¿Cómo te está tratando el día?", "body": "Guarda cómo estás y sigue con lo tuyo." },
         "en": { "title": "How is the day treating you?", "body": "Log how you're doing, then get back to your day." }
       }
     },
@@ -129,7 +129,7 @@
       "enabled": true,
       "order": 3,
       "locales": {
-        "es": { "title": "Un segundo: ¿cómo estás?", "body": "Registrá tu mood de hoy cuando tengas un minuto." },
+        "es": { "title": "Un segundo: ¿cómo estás?", "body": "Registra tu mood de hoy cuando tengas un minuto." },
         "en": { "title": "One second — how are you?", "body": "Log today's mood when you have a minute." }
       }
     },
@@ -141,7 +141,7 @@
       "enabled": true,
       "order": 4,
       "locales": {
-        "es": { "title": "¿Cómo venís de verdad?", "body": "Hacé una pausa corta y registrá cómo estás." },
+        "es": { "title": "¿Cómo estás de verdad?", "body": "Haz una pausa corta y registra cómo estás." },
         "en": { "title": "How are you, really?", "body": "Take a short pause and check in with yourself." }
       }
     },
@@ -153,7 +153,7 @@
       "enabled": true,
       "order": 1,
       "locales": {
-        "es": { "title": "Antes de cerrar el día, ¿cómo estuviste?", "body": "Registrá tu mood y, si querés, dejá unas palabras." },
+        "es": { "title": "Antes de cerrar el día, ¿cómo estuviste?", "body": "Registra tu mood y, si quieres, deja unas palabras." },
         "en": { "title": "Before you close the day, how did you feel?", "body": "Log your mood and, if you want, leave a few words." }
       }
     },
@@ -165,7 +165,7 @@
       "enabled": true,
       "order": 2,
       "locales": {
-        "es": { "title": "¿Con qué ánimo terminás hoy?", "body": "Mirá hacia atrás un segundo y guardalo." },
+        "es": { "title": "¿Con qué ánimo terminas hoy?", "body": "Mira hacia atrás un segundo y guárdalo." },
         "en": { "title": "What mood are you ending the day in?", "body": "Look back for a second and save it." }
       }
     },
@@ -177,7 +177,7 @@
       "enabled": true,
       "order": 3,
       "locales": {
-        "es": { "title": "Ya terminó casi todo. ¿Cómo quedaste vos?", "body": "Hacé tu check-in del día." },
+        "es": { "title": "Ya terminó casi todo. ¿Cómo quedaste tú?", "body": "Haz tu check-in del día." },
         "en": { "title": "The day is almost over. How did it leave you?", "body": "Take your daily check-in." }
       }
     },
@@ -189,7 +189,7 @@
       "enabled": true,
       "order": 4,
       "locales": {
-        "es": { "title": "¿Cómo te vas a dormir hoy?", "body": "Registrá cómo te sentís antes de cerrar el día." },
+        "es": { "title": "¿Cómo te vas a dormir hoy?", "body": "Registra cómo te sientes antes de cerrar el día." },
         "en": { "title": "How are you heading into tonight?", "body": "Log how you're feeling before you close the day." }
       }
     },
@@ -201,7 +201,7 @@
       "enabled": true,
       "order": 1,
       "locales": {
-        "es": { "title": "¿Qué estás postergando por miedo, no por falta de tiempo?", "body": "Respondete sin buscar una buena excusa." },
+        "es": { "title": "¿Qué estás postergando por miedo, no por falta de tiempo?", "body": "Respóndete sin buscar una buena excusa." },
         "en": { "title": "What are you putting off because of fear, not lack of time?", "body": "Answer without reaching for a good excuse." }
       }
     },
@@ -213,7 +213,7 @@
       "enabled": true,
       "order": 2,
       "locales": {
-        "es": { "title": "¿A quién le debés una conversación honesta?", "body": "Capaz ya sabés la respuesta." },
+        "es": { "title": "¿A quién le debes una conversación honesta?", "body": "Quizás ya sabes la respuesta." },
         "en": { "title": "Who do you owe an honest conversation to?", "body": "You may already know the answer." }
       }
     },
@@ -225,7 +225,7 @@
       "enabled": true,
       "order": 3,
       "locales": {
-        "es": { "title": "¿Qué parte de vos venís ignorando?", "body": "Tu Brújula de hoy." },
+        "es": { "title": "¿Qué parte de ti sigues ignorando?", "body": "Tu Brújula de hoy." },
         "en": { "title": "What part of yourself have you been ignoring?", "body": "Your Compass question for today." }
       }
     },
@@ -237,7 +237,7 @@
       "enabled": true,
       "order": 4,
       "locales": {
-        "es": { "title": "¿Qué verdad sobre vos te cuesta aceptar?", "body": "No hace falta que sea cómoda." },
+        "es": { "title": "¿Qué verdad sobre ti te cuesta aceptar?", "body": "No hace falta que sea cómoda." },
         "en": { "title": "What truth about yourself is hard to accept?", "body": "The answer doesn't have to be comfortable." }
       }
     },
@@ -249,7 +249,7 @@
       "enabled": true,
       "order": 5,
       "locales": {
-        "es": { "title": "Si fueras totalmente honesto, ¿qué cambiarías hoy?", "body": "Tomate un minuto antes de responder." },
+        "es": { "title": "Si fueras totalmente honesto, ¿qué cambiarías hoy?", "body": "Tómate un minuto antes de responder." },
         "en": { "title": "If you were completely honest, what would you change today?", "body": "Take a minute before you answer." }
       }
     },
@@ -261,7 +261,7 @@
       "enabled": true,
       "order": 6,
       "locales": {
-        "es": { "title": "¿Qué estás sosteniendo solo porque te cuesta soltarlo?", "body": "Miralo de frente por un momento." },
+        "es": { "title": "¿Qué estás sosteniendo solo porque te cuesta soltarlo?", "body": "Míralo de frente por un momento." },
         "en": { "title": "What are you holding onto only because letting go is hard?", "body": "Look at it directly for a moment." }
       }
     },
@@ -273,7 +273,7 @@
       "enabled": true,
       "order": 7,
       "locales": {
-        "es": { "title": "¿Qué excusa te venís repitiendo?", "body": "¿Sigue siendo cierta?" },
+        "es": { "title": "¿Qué excusa te sigues repitiendo?", "body": "¿Sigue siendo cierta?" },
         "en": { "title": "What excuse have you been repeating to yourself?", "body": "Is it still true?" }
       }
     },
@@ -285,7 +285,7 @@
       "enabled": true,
       "order": 8,
       "locales": {
-        "es": { "title": "¿Dónde estás diciendo \"estoy bien\" cuando no lo estás?", "body": "No necesitás responderle a nadie más que a vos." },
+        "es": { "title": "¿Dónde estás diciendo \"estoy bien\" cuando no lo estás?", "body": "No necesitas responderle a nadie más que a ti." },
         "en": { "title": "Where are you saying \"I'm fine\" when you're not?", "body": "You don't need to answer anyone but yourself." }
       }
     },
@@ -297,7 +297,7 @@
       "enabled": true,
       "order": 9,
       "locales": {
-        "es": { "title": "¿Qué necesitás reconocer antes de seguir?", "body": "Una respuesta honesta alcanza." },
+        "es": { "title": "¿Qué necesitas reconocer antes de seguir?", "body": "Una respuesta honesta alcanza." },
         "en": { "title": "What do you need to acknowledge before you move on?", "body": "One honest answer is enough." }
       }
     },
@@ -309,7 +309,7 @@
       "enabled": true,
       "order": 10,
       "locales": {
-        "es": { "title": "¿Qué decisión estás evitando tomar?", "body": "Pensá qué te está frenando de verdad." },
+        "es": { "title": "¿Qué decisión estás evitando tomar?", "body": "Piensa qué te está frenando de verdad." },
         "en": { "title": "What decision have you been avoiding?", "body": "Ask yourself what's really holding you back." }
       }
     },
@@ -321,8 +321,8 @@
       "enabled": true,
       "order": 1,
       "locales": {
-        "es": { "title": "Llevás {streakCount} días meditando, no paremos ahora 🧘", "body": "Un momento de calma hoy mantiene viva tu racha." },
-        "en": { "title": "You've been meditating for {streakCount} days, let's not stop now 🧘", "body": "A moment of calm today keeps your streak alive." }
+        "es": { "title": "Llevas {streakCount} días meditando, no paremos ahora", "body": "Un momento de calma hoy mantiene viva tu racha." },
+        "en": { "title": "You've been meditating for {streakCount} days, let's not stop now", "body": "A moment of calm today keeps your streak alive." }
       }
     },
     {
@@ -333,8 +333,56 @@
       "enabled": true,
       "order": 2,
       "locales": {
-        "es": { "title": "{streakCount} días seguidos de meditación 🔥", "body": "Sentate unos minutos y seguí con tu racha." },
-        "en": { "title": "{streakCount} days of meditation in a row 🔥", "body": "Sit down for a few minutes and keep your streak going." }
+        "es": { "title": "{streakCount} días seguidos de meditación", "body": "Siéntate unos minutos y sigue con tu racha." },
+        "en": { "title": "{streakCount} days of meditation in a row", "body": "Sit down for a few minutes and keep your streak going." }
+      }
+    },
+    {
+      "key": "streak_activity_meditation_c",
+      "family": "streak",
+      "context": ["streak_activity", "activity_meditation"],
+      "placeholders": ["streakCount"],
+      "enabled": true,
+      "order": 3,
+      "locales": {
+        "es": { "title": "{streakCount} días meditando, qué buen ritmo", "body": "Un rato de calma hoy y sigues sumando." },
+        "en": { "title": "{streakCount} days of meditation, nice rhythm", "body": "A few quiet minutes today and you keep it going." }
+      }
+    },
+    {
+      "key": "streak_activity_meditation_d",
+      "family": "streak",
+      "context": ["streak_activity", "activity_meditation"],
+      "placeholders": ["streakCount"],
+      "enabled": true,
+      "order": 4,
+      "locales": {
+        "es": { "title": "Llevas {streakCount} días meditando", "body": "Hoy también hay un momento para respirar." },
+        "en": { "title": "You've meditated {streakCount} days running", "body": "Take a little time to breathe today and keep going." }
+      }
+    },
+    {
+      "key": "streak_activity_meditation_e",
+      "family": "streak",
+      "context": ["streak_activity", "activity_meditation"],
+      "placeholders": ["streakCount"],
+      "enabled": true,
+      "order": 5,
+      "locales": {
+        "es": { "title": "Tu meditación de {streakCount} días sigue en pie", "body": "Unos minutos de silencio hoy bastan para mantenerla." },
+        "en": { "title": "Your {streakCount}-day meditation habit is going strong", "body": "A few quiet minutes today is all it takes." }
+      }
+    },
+    {
+      "key": "streak_activity_meditation_f",
+      "family": "streak",
+      "context": ["streak_activity", "activity_meditation"],
+      "placeholders": ["streakCount"],
+      "enabled": true,
+      "order": 6,
+      "locales": {
+        "es": { "title": "{streakCount} días de meditación seguidos", "body": "Siéntate un momento y continúa con tu práctica." },
+        "en": { "title": "{streakCount} meditation days in a row", "body": "Sit for a moment and keep your practice flowing." }
       }
     },
     {
@@ -345,8 +393,8 @@
       "enabled": true,
       "order": 1,
       "locales": {
-        "es": { "title": "Llevás {streakCount} días con tus afirmaciones, no paremos ahora ✨", "body": "Leé una hoy y mantené viva tu racha." },
-        "en": { "title": "You've been doing your affirmations for {streakCount} days, let's not stop now ✨", "body": "Read one today and keep your streak alive." }
+        "es": { "title": "Llevas {streakCount} días con tus afirmaciones, no paremos ahora", "body": "Lee una hoy y mantén viva tu racha." },
+        "en": { "title": "You've been doing your affirmations for {streakCount} days, let's not stop now", "body": "Read one today and keep your streak alive." }
       }
     },
     {
@@ -357,8 +405,56 @@
       "enabled": true,
       "order": 2,
       "locales": {
-        "es": { "title": "{streakCount} días seguidos de afirmaciones 🔥", "body": "Todavía llegás a sumar el de hoy." },
-        "en": { "title": "{streakCount} days of affirmations in a row 🔥", "body": "You still have time to add today's." }
+        "es": { "title": "{streakCount} días seguidos de afirmaciones", "body": "Aún estás a tiempo de sumar la de hoy." },
+        "en": { "title": "{streakCount} days of affirmations in a row", "body": "You still have time to add today's." }
+      }
+    },
+    {
+      "key": "streak_activity_affirmations_c",
+      "family": "streak",
+      "context": ["streak_activity", "activity_affirmations"],
+      "placeholders": ["streakCount"],
+      "enabled": true,
+      "order": 3,
+      "locales": {
+        "es": { "title": "{streakCount} días con tus afirmaciones, sigue así", "body": "Lee una hoy y llévate esa frase contigo." },
+        "en": { "title": "{streakCount} days of affirmations, keep it up", "body": "Read one today and carry it with you." }
+      }
+    },
+    {
+      "key": "streak_activity_affirmations_d",
+      "family": "streak",
+      "context": ["streak_activity", "activity_affirmations"],
+      "placeholders": ["streakCount"],
+      "enabled": true,
+      "order": 4,
+      "locales": {
+        "es": { "title": "Llevas {streakCount} días practicando afirmaciones", "body": "Hoy también vale la pena decirte algo bonito." },
+        "en": { "title": "{streakCount} days of practicing affirmations", "body": "Today is another good day to say something kind to yourself." }
+      }
+    },
+    {
+      "key": "streak_activity_affirmations_e",
+      "family": "streak",
+      "context": ["streak_activity", "activity_affirmations"],
+      "placeholders": ["streakCount"],
+      "enabled": true,
+      "order": 5,
+      "locales": {
+        "es": { "title": "Tu racha de afirmaciones llega a {streakCount} días", "body": "Un minuto para leer una y mantener el ritmo." },
+        "en": { "title": "Your affirmations streak is at {streakCount} days", "body": "Take a minute to read one and keep your rhythm." }
+      }
+    },
+    {
+      "key": "streak_activity_affirmations_f",
+      "family": "streak",
+      "context": ["streak_activity", "activity_affirmations"],
+      "placeholders": ["streakCount"],
+      "enabled": true,
+      "order": 6,
+      "locales": {
+        "es": { "title": "{streakCount} días de afirmaciones, sigamos juntos", "body": "Aún estás a tiempo de leer la de hoy." },
+        "en": { "title": "{streakCount} days of affirmations and counting", "body": "You still have time for today's." }
       }
     },
     {
@@ -369,7 +465,7 @@
       "enabled": true,
       "order": 1,
       "locales": {
-        "es": { "title": "Seguí construyendo tu racha: llevás {streakCount} días 🔥", "body": "Todavía llegás a completar tu práctica de hoy." },
+        "es": { "title": "Sigue construyendo tu racha: llevas {streakCount} días 🔥", "body": "Todavía llegas a completar tu práctica de hoy." },
         "en": { "title": "Keep building it — you're at {streakCount} days 🔥", "body": "You still have time to complete today's practice." }
       }
     },
@@ -381,7 +477,7 @@
       "enabled": true,
       "order": 1,
       "locales": {
-        "es": { "title": "Tu racha de {streakCount} días está en riesgo 🔥", "body": "Todavía podés mantenerla antes de que termine el día." },
+        "es": { "title": "Tu racha de {streakCount} días está en riesgo 🔥", "body": "Todavía puedes mantenerla antes de que termine el día." },
         "en": { "title": "Your {streakCount}-day streak is at risk 🔥", "body": "You can still keep it going before the day ends." }
       }
     },
@@ -393,7 +489,7 @@
       "enabled": true,
       "order": 2,
       "locales": {
-        "es": { "title": "{streakCount} días seguidos. Que hoy no sea el corte 🔥", "body": "Completá tu práctica y mantené la racha." },
+        "es": { "title": "{streakCount} días seguidos. Que hoy no sea el corte 🔥", "body": "Completa tu práctica y mantén la racha." },
         "en": { "title": "{streakCount} days in a row. Don't let today break it 🔥", "body": "Complete today's practice and keep your streak alive." }
       }
     },
@@ -417,7 +513,7 @@
       "enabled": true,
       "order": 2,
       "locales": {
-        "es": { "title": "Tu racha de {streakCount} días está en riesgo 🔥", "body": "Hacé tu práctica de hoy antes de cerrar el día." },
+        "es": { "title": "Tu racha de {streakCount} días está en riesgo 🔥", "body": "Haz tu práctica de hoy antes de cerrar el día." },
         "en": { "title": "Your {streakCount}-day streak is at risk 🔥", "body": "Complete today's practice before the day ends." }
       }
     },
@@ -429,7 +525,7 @@
       "enabled": true,
       "order": 3,
       "locales": {
-        "es": { "title": "{streakCount} días construyendo esto. Hoy todavía cuenta.", "body": "Entrá y mantené viva tu racha." },
+        "es": { "title": "{streakCount} días construyendo esto. Hoy todavía cuenta.", "body": "Entra y mantén viva tu racha." },
         "en": { "title": "{streakCount} days building this. Today still counts.", "body": "Open the app and keep your streak alive." }
       }
     },
@@ -441,7 +537,7 @@
       "enabled": true,
       "order": 1,
       "locales": {
-        "es": { "title": "Todavía podés recuperar tus {streakCount} días 🔥", "body": "Tenés un sanador disponible. Usalo antes de que termine la oportunidad." },
+        "es": { "title": "Todavía puedes recuperar tus {streakCount} días 🔥", "body": "Tienes un sanador disponible. Úsalo antes de que termine la oportunidad." },
         "en": { "title": "You can still recover your {streakCount} days 🔥", "body": "You have a streak healer available. Use it before the window closes." }
       }
     },
@@ -453,7 +549,7 @@
       "enabled": true,
       "order": 2,
       "locales": {
-        "es": { "title": "Tu racha se cortó, pero no está perdida", "body": "Activá tu sanador y recuperá tus {streakCount} días." },
+        "es": { "title": "Tu racha se cortó, pero no está perdida", "body": "Activa tu sanador y recupera tus {streakCount} días." },
         "en": { "title": "Your streak broke, but it isn't gone yet", "body": "Activate your healer and restore your {streakCount} days." }
       }
     },
@@ -465,7 +561,7 @@
       "enabled": true,
       "order": 3,
       "locales": {
-        "es": { "title": "Tus {streakCount} días todavía se pueden salvar", "body": "Tenés un sanador listo para usar." },
+        "es": { "title": "Tus {streakCount} días todavía se pueden salvar", "body": "Tienes un sanador listo para usar." },
         "en": { "title": "Your {streakCount} days can still be saved", "body": "You have a streak healer ready to use." }
       }
     },
@@ -477,7 +573,7 @@
       "enabled": true,
       "order": 1,
       "locales": {
-        "es": { "title": "Hace unos días que no meditás", "body": "¿Querés volver con algo corto hoy?" },
+        "es": { "title": "Hace unos días que no meditas", "body": "¿Quieres volver con algo corto hoy?" },
         "en": { "title": "It's been a few days since you meditated", "body": "Want to come back with something short today?" }
       }
     },
@@ -489,7 +585,7 @@
       "enabled": true,
       "order": 2,
       "locales": {
-        "es": { "title": "¿Hace cuánto no te regalás unos minutos de calma?", "body": "Hay una meditación corta esperándote." },
+        "es": { "title": "¿Hace cuánto no te regalas unos minutos de calma?", "body": "Hay una meditación corta esperándote." },
         "en": { "title": "When was the last time you gave yourself a few quiet minutes?", "body": "There's a short meditation waiting for you." }
       }
     },
@@ -501,7 +597,7 @@
       "enabled": true,
       "order": 3,
       "locales": {
-        "es": { "title": "Capaz hoy viene bien volver", "body": "Hace unos días que no hacés una meditación." },
+        "es": { "title": "Quizás hoy viene bien volver", "body": "Hace unos días que no haces una meditación." },
         "en": { "title": "Today might be a good day to come back", "body": "It's been a few days since your last meditation." }
       }
     },
@@ -513,7 +609,7 @@
       "enabled": true,
       "order": 4,
       "locales": {
-        "es": { "title": "Hace rato que no nos encontramos acá 🧘", "body": "¿Te pinta volver con unos minutos hoy?" },
+        "es": { "title": "Hace rato que no nos encontramos aquí 🧘", "body": "¿Te gustaría volver con unos minutos hoy?" },
         "en": { "title": "It's been a little while since we met here 🧘", "body": "Want to come back for a few minutes today?" }
       }
     },
@@ -525,7 +621,7 @@
       "enabled": true,
       "order": 5,
       "locales": {
-        "es": { "title": "¿Todo bien por ahí?", "body": "Hace {inactiveDays} días que no meditás. Si querés, volvemos con algo corto." },
+        "es": { "title": "¿Todo bien por ahí?", "body": "Hace {inactiveDays} días que no meditas. Si quieres, volvemos con algo corto." },
         "en": { "title": "Everything okay over there?", "body": "It's been {inactiveDays} days since you meditated. If you want, let's come back with something short." }
       }
     },
@@ -537,7 +633,7 @@
       "enabled": true,
       "order": 1,
       "locales": {
-        "es": { "title": "Volver no significa empezar de cero", "body": "Hace {inactiveDays} días que no meditás. Podés retomar con 3 minutos." },
+        "es": { "title": "Volver no significa empezar de cero", "body": "Hace {inactiveDays} días que no meditas. Puedes retomar con 3 minutos." },
         "en": { "title": "Coming back doesn't mean starting from zero", "body": "It's been {inactiveDays} days since you meditated. You can return with just 3 minutes." }
       }
     },
@@ -561,7 +657,7 @@
       "enabled": true,
       "order": 3,
       "locales": {
-        "es": { "title": "Tu práctica sigue acá", "body": "Cuando quieras volver, empezamos con algo simple." },
+        "es": { "title": "Tu práctica sigue aquí", "body": "Cuando quieras volver, empezamos con algo simple." },
         "en": { "title": "Your practice is still here", "body": "Whenever you want to come back, we'll start with something simple." }
       }
     }
