@@ -2,6 +2,7 @@ package com.pirxhio.affirmity.data.repository
 
 import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.access.AdUnlockRecord
+import com.pirxhio.affirmity.data.DEFAULT_COLLECTION_HIGHLIGHT_ID
 import com.pirxhio.affirmity.data.UserCollection
 import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.CatalogAffirmationEntity
@@ -59,7 +60,13 @@ interface UserCollectionRepository {
     fun observeCollections(): Flow<List<UserCollection>>
 
     suspend fun getCollections(): List<UserCollection>
-    suspend fun create(id: String, name: String, nowMillis: Long, initialAffirmationId: String?)
+    suspend fun create(
+        id: String,
+        name: String,
+        nowMillis: Long,
+        initialAffirmationId: String?,
+        highlightId: String = DEFAULT_COLLECTION_HIGHLIGHT_ID,
+    )
     suspend fun rename(id: String, name: String)
     suspend fun delete(id: String)
     suspend fun addItem(userCollectionId: String, affirmationId: String, nowMillis: Long)
@@ -74,7 +81,13 @@ interface UserCollectionRepository {
 object NoOpUserCollectionRepository : UserCollectionRepository {
     override fun observeCollections(): Flow<List<UserCollection>> = flowOf(emptyList())
     override suspend fun getCollections(): List<UserCollection> = emptyList()
-    override suspend fun create(id: String, name: String, nowMillis: Long, initialAffirmationId: String?) = Unit
+    override suspend fun create(
+        id: String,
+        name: String,
+        nowMillis: Long,
+        initialAffirmationId: String?,
+        highlightId: String,
+    ) = Unit
     override suspend fun rename(id: String, name: String) = Unit
     override suspend fun delete(id: String) = Unit
     override suspend fun addItem(userCollectionId: String, affirmationId: String, nowMillis: Long) = Unit

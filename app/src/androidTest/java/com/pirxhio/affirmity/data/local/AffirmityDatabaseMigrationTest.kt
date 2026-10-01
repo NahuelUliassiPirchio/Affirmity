@@ -382,6 +382,40 @@ class AffirmityDatabaseMigrationTest {
         }
     }
 
+    /** MIGRATION_14_15: existing collections and their items survive and backfill to the default highlight. */
+    @Test
+    fun migrate14To15_backfillsHighlightIdWithTheDefault() {
+        helper.createDatabase(TEST_DB, 14).apply {
+            execSQL(
+                "INSERT INTO user_collections (id, name, createdAtMillis, enabled, lastUsedAtMillis) " +
+                    "VALUES ('c1', 'Morning', 1, 1, 1)",
+            )
+            execSQL(
+                "INSERT INTO user_collections (id, name, createdAtMillis, enabled, lastUsedAtMillis) " +
+                    "VALUES ('c2', 'Evening', 2, 0, 2)",
+            )
+            execSQL(
+                "INSERT INTO user_collection_items (userCollectionId, affirmationId, addedAtMillis) " +
+                    "VALUES ('c1', 'cat_id-1', 1)",
+            )
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(TEST_DB, 15, true, MIGRATION_14_15)
+
+        migrated.query("SELECT id, highlightId FROM user_collections ORDER BY id").use { cursor ->
+            assertEquals(2, cursor.count)
+            assertTrue(cursor.moveToFirst())
+            assertEquals("teal", cursor.getString(1))
+            assertTrue(cursor.moveToNext())
+            assertEquals("teal", cursor.getString(1))
+        }
+        migrated.query("SELECT COUNT(*) FROM user_collection_items WHERE userCollectionId = 'c1'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(1, cursor.getInt(0))
+        }
+    }
+
     private companion object {
         const val TEST_DB = "migration-test"
     }

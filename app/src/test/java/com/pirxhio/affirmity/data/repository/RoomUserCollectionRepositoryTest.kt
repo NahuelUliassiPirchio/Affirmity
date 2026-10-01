@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.data.repository
 
+import com.pirxhio.affirmity.data.DEFAULT_COLLECTION_HIGHLIGHT_ID
 import com.pirxhio.affirmity.data.local.UserCollectionDao
 import com.pirxhio.affirmity.data.local.UserCollectionEntity
 import com.pirxhio.affirmity.data.local.UserCollectionItemEntity
@@ -48,6 +49,17 @@ class RoomUserCollectionRepositoryTest {
         assertEquals(1234L, entity.createdAtMillis)
         assertEquals(1234L, entity.lastUsedAtMillis)
         assertEquals(UserCollectionItemEntity("c1", "aff-1", 1234L), dao.createdItems.single())
+    }
+
+    @Test
+    fun create_storesTheHighlightAndDefaultsWhenOmitted() = runBlocking {
+        val dao = FakeDao()
+        val repository = RoomUserCollectionRepository(dao)
+
+        repository.create("c1", "Morning", nowMillis = 1L, initialAffirmationId = null, highlightId = "gold")
+        repository.create("c2", "Evening", nowMillis = 2L, initialAffirmationId = null)
+
+        assertEquals(listOf("gold", DEFAULT_COLLECTION_HIGHLIGHT_ID), dao.createdCollections.map { it.highlightId })
     }
 
     @Test

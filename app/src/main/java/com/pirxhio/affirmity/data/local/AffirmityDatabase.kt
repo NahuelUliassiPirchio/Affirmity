@@ -251,6 +251,16 @@ val MIGRATION_13_14 = object : androidx.room.migration.Migration(13, 14) {
     }
 }
 
+/**
+ * Additive: gives each user collection a highlight colour id. Existing rows backfill to the default
+ * through the column's NOT NULL DEFAULT, matching the entity's `@ColumnInfo(defaultValue)`.
+ */
+val MIGRATION_14_15 = object : androidx.room.migration.Migration(14, 15) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `user_collections` ADD COLUMN `highlightId` TEXT NOT NULL DEFAULT 'teal'")
+    }
+}
+
 @Database(
     entities = [
         AffirmationEntity::class,
@@ -267,7 +277,7 @@ val MIGRATION_13_14 = object : androidx.room.migration.Migration(13, 14) {
         UserCollectionEntity::class,
         UserCollectionItemEntity::class,
     ],
-    version = 14,
+    version = 15,
     exportSchema = true,
 )
 @androidx.room.TypeConverters(OverridesConverters::class)
@@ -309,6 +319,7 @@ abstract class AffirmityDatabase : RoomDatabase() {
                     MIGRATION_11_12,
                     MIGRATION_12_13,
                     MIGRATION_13_14,
+                    MIGRATION_14_15,
                 ).build().also { instance = it }
             }
     }

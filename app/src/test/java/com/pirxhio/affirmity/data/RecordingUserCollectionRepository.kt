@@ -24,7 +24,13 @@ internal class RecordingUserCollectionRepository(
 
     override suspend fun getCollections(): List<UserCollection> = state.value
 
-    override suspend fun create(id: String, name: String, nowMillis: Long, initialAffirmationId: String?) {
+    override suspend fun create(
+        id: String,
+        name: String,
+        nowMillis: Long,
+        initialAffirmationId: String?,
+        highlightId: String,
+    ) {
         events += "create:start:$id"
         createGate?.await()
         events += "create:$id:$name:$nowMillis:${initialAffirmationId ?: "-"}"
@@ -36,6 +42,7 @@ internal class RecordingUserCollectionRepository(
                 enabled = true,
                 lastUsedAtMillis = nowMillis,
                 affirmationIds = listOfNotNull(initialAffirmationId),
+                highlightId = highlightId,
             )
         }
     }

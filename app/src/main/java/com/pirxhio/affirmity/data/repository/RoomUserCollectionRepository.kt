@@ -17,7 +17,13 @@ class RoomUserCollectionRepository(
     override suspend fun getCollections(): List<UserCollection> =
         dao.getAll().map { it.toDomain() }
 
-    override suspend fun create(id: String, name: String, nowMillis: Long, initialAffirmationId: String?) {
+    override suspend fun create(
+        id: String,
+        name: String,
+        nowMillis: Long,
+        initialAffirmationId: String?,
+        highlightId: String,
+    ) {
         dao.createWithItem(
             collection = UserCollectionEntity(
                 id = id,
@@ -25,6 +31,7 @@ class RoomUserCollectionRepository(
                 createdAtMillis = nowMillis,
                 enabled = true,
                 lastUsedAtMillis = nowMillis,
+                highlightId = highlightId,
             ),
             item = initialAffirmationId?.let { UserCollectionItemEntity(id, it, nowMillis) },
         )
@@ -60,4 +67,5 @@ private fun UserCollectionWithItems.toDomain() = UserCollection(
     enabled = collection.enabled,
     lastUsedAtMillis = collection.lastUsedAtMillis,
     affirmationIds = affirmationIds,
+    highlightId = collection.highlightId,
 )
