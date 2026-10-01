@@ -29,10 +29,10 @@ private const val FloatingChromeAlpha = 0.9f
 
 /** Container colour shared by the floating chrome over the feed (this pill, the Save-to button). */
 @Composable
-fun floatingChromeColor(): Color = MaterialTheme.colorScheme.surface.copy(alpha = FloatingChromeAlpha)
+internal fun floatingChromeColor(): Color = MaterialTheme.colorScheme.surface.copy(alpha = FloatingChromeAlpha)
 
 /** Tonal and shadow elevation shared by the floating chrome over the feed. */
-val FloatingChromeElevation = 4.dp
+internal val FloatingChromeElevation = 4.dp
 
 /**
  * Mini floating status widget for the corner of a screen: general streak + user avatar.

@@ -75,8 +75,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -454,8 +452,8 @@ private fun AffirmationCard(
                 },
             ) {
                 if (onAddToCollection != null) {
-                    // Save to...: an outlined + until the affirmation is in Favorites or any group, then a
-                    // filled accent check (SaveToIndicator). Double-tap / token tap still toggle Favorites and feed this state.
+                    // Save to...: a stroked + until the affirmation is in Favorites or any group, then a
+                    // stroked check, both in the primary colour (SaveToIndicator). Double-tap / token tap still toggle Favorites and feed this state.
                     SaveToIndicator(saved = isSaved(isFavorite, isInAnyGroup))
                 } else {
                     Icon(

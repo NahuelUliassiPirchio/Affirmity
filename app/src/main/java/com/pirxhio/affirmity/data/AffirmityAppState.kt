@@ -567,7 +567,7 @@ class AffirmityAppState(
     /** Serialises every collection write (and the re-validation each one does) -- design D7. */
     private val userCollectionMutex = Mutex()
 
-    /** Chips for the UI, in chip order. `resolvedItemCount` only counts affirmations that still
+    /** The user's groups for the "Your groups" shelf and the Save-to sheet, in recency order. `resolvedItemCount` only counts affirmations that still
      *  exist (orphan ids excluded), including Pro-locked or hidden rows -- those stay members. */
     val userCollections: List<UserCollectionUi>
         get() = collectionsState.value.toUserCollectionUi(allAffirmations.mapTo(HashSet()) { it.id })
