@@ -102,7 +102,7 @@ AppState API:
 - `canCreateCollection`
 - `userCollectionIdsFor(affirmationId): Set<String>`
 - `suspend createCollection(name, withAffirmationId: String? = null): CollectionNameResult`
-- `renameCollection(id, name): CollectionNameResult`
+- `suspend renameCollection(id, name): CollectionNameResult`
 - `deleteCollection(id)`
 - `addToCollection(cid, aid)` and `removeFromCollection(cid, aid)`
 - `setCollectionEnabled(id, enabled)` and `toggleCollection(id)`
@@ -126,9 +126,9 @@ sequenceDiagram
   S->>M: onAddToCollection(aid)
   M->>A: userCollectionIdsFor(aid), canCreateCollection
   U->>M: "Create new" + name
-  M->>A: createCollection(name, aid)
-  A-->>M: Ok | Blank | TooLong | Duplicate | LimitReached (sync)
-  A->>R: [Mutex] re-validate via getCollections(); create(uuid, name, now, aid)
+  M->>A: createCollection(name, aid) [suspend]
+  A->>R: [Mutex] validate via getCollections(); create(uuid, name, now, aid) if Ok
+  A-->>M: Ok | Blank | TooLong | Duplicate | LimitReached (authoritative, computed under the Mutex)
   R-->>A: observeCollections() emits; chips + feed recompose
   U->>M: tap chip (off -> on)
   M->>A: setCollectionEnabled(id, true)
@@ -184,12 +184,13 @@ The migration is additive. Rollback for released builds is a forward migration f
 - **Last carrier off**: ALLOWED. Turning off the last enabled chip is never blocked; the feed may become empty. A dedicated empty state points the user to collections (the current empty-feed copy points to Progress and is misleading); its string lives in `strings.xml`.
 - **Import replace scope**: replace-import clears memberships only for the owned affirmations it deletes. Collections and catalog memberships are kept.
 - **Rename/delete entry point**: long-press on a chip (delete requires confirmation).
-- **Chip placement**: overlap with `FloatingStatusOverlay` is deferred to the UI slice (visual check).
+- **Chip placement**: overlap with `FloatingStatusOverlay` is deferred to the UI slice (visual check). The check (task 3.8) was NOT executed; placement was chosen by layout arithmetic only.
+- **UI hooks as built**: the chip long-press actions are a `ModalBottomSheet` (`CollectionManageHost`). Both the picker's collection id and the manage state survive recreation (`rememberSaveable`, the manage state via `CollectionManageStateSaver`).
 
-## Open Questions / Proposal Deltas (superseded where listed above)
+## Open Questions / Proposal Deltas (all resolved)
 
-- [ ] **Import replace scope**: the design clears only memberships of owned ids. The proposal's "clear memberships" could be read as clearing all of them. Favorites' precedent clears all favorites.
-- [ ] **Last carrier off**: a live chip OFF can leave the committed feed empty (no themes, sources off). Recommended: allow it and show an empty-feed message instead of the current "Agrega tu primera afirmación" copy. Needs a product call.
-- [ ] **Empty enabled collection**: it counts as a valid carrier, as the proposal says, so the feed can be empty.
-- [ ] **Rename/delete entry point**: chip long-press is assumed, since the proposal has no detail screen.
-- [ ] **Chip placement**: possible overlap with `FloatingStatusOverlay` (TopEnd). Needs a visual check.
+- **Import replace scope**: resolved, see "Resolved open questions" (owned ids only).
+- **Last carrier off**: resolved, see "Resolved open questions" (allowed, with a dedicated empty state).
+- **Empty enabled collection**: resolved. It counts as a valid carrier, as the proposal says, so the feed can be empty.
+- **Rename/delete entry point**: resolved, see "Resolved open questions" (chip long-press).
+- **Chip placement**: resolved except the visual check, which remains unexecuted (see above).

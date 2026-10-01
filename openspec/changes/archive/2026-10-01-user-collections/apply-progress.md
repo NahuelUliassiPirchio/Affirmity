@@ -90,7 +90,7 @@ Not executed: androidTests (no device).
 ## Batch 3 - Slice C (UI): 8/9 tasks complete (3.8 manual visual check NOT executed)
 Mode: Strict TDD. Delivery: single-pr with size:exception. Nothing committed.
 
-- [x] 3.1 strings in values/ (neutral Spanish, default) and values-en/ (23 keys: collection_* and feed_empty_*)
+- [x] 3.1 strings in values/ (neutral Spanish, default) and values-en/ (24 keys: collection_* and feed_empty_*)
 - [x] 3.2 `AffirmationsScreen`: nullable `onAddToCollection` (row hidden when null) + `PlaylistAdd` row; new `emptyState` param
 - [x] 3.3 `ui/collections/CollectionNameDialog.kt` (suspend onSubmit, inline error from returned `CollectionNameResult`)
 - [x] 3.4 `CollectionPickerSheet.kt` (membership toggles, create new with `withAffirmationId`, limit message + `onUpgrade`)

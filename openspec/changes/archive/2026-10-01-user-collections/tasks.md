@@ -9,11 +9,11 @@
 | Chained PRs recommended | Yes |
 | Suggested split | PR 1 (a) -> PR 2 (b) -> PR 3 (c) |
 | Delivery strategy | single-pr |
-| Chain strategy | size-exception |
+| Chain strategy | none (single PR with size:exception) |
 
-Decision needed before apply: Yes
-Chained PRs recommended: Yes
-Chain strategy: size-exception
+Decision needed before apply: No (resolved)
+Chained PRs recommended: Yes (forecast), NOT adopted
+Final decision: the user chose ONE PR with size:exception, delivered as work-unit commits per slice (A, B, C).
 400-line budget risk: High
 
 ### Suggested Work Units
@@ -62,4 +62,4 @@ Paths relative to `app/src/main/java/com/pirxhio/affirmity/`. Tests: `./gradlew 
 - [x] 3.6 `MainActivity.kt`: picker state, chips row in L1698 Box (hidden in clean screen/when none), delete confirmation
 - [x] 3.7 Replace misleading empty-feed copy with collections empty state
 - [ ] 3.8 Visual check of chip row vs `FloatingStatusOverlay`; adjust placement (MANUAL, NOT EXECUTED: placement chosen by layout arithmetic only)
-- [x] 3.9 Run `assembleDebug`, `lintDebug`, unit suite (assembleDebug + unit suite 1061/0 after the fix pass; lintDebug NOT run)
+- [x] 3.9 Run `assembleDebug`, `lintDebug`, unit suite (assembleDebug + unit suite 1061/0 after the fix pass; lintDebug NOT run: 372 pre-existing errors; one new unused-resource warning was removed)
