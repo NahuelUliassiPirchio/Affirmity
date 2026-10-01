@@ -362,6 +362,8 @@ internal fun AffirmationCard(
                         .imePadding()
                 } else {
                     Modifier
+                        // The group player draws edge to edge with no scaffold, so it keeps the text clear of bars and cutouts itself.
+                        .then(if (readOnly) Modifier.windowInsetsPadding(WindowInsets.safeDrawing) else Modifier)
                         .padding(24.dp)
                         .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
                         .padding(24.dp)
