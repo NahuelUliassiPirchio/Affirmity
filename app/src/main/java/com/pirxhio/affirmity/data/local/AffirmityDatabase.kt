@@ -225,6 +225,32 @@ val MIGRATION_12_13 = object : androidx.room.migration.Migration(12, 13) {
     }
 }
 
+/**
+ * Additive: creates `user_collections` and `user_collection_items` empty. The item table cascades
+ * on collection delete; `affirmationId` is deliberately not a FK (ids span owned and catalog
+ * stores). SQL mirrors the exported 14.json schema.
+ */
+val MIGRATION_13_14 = object : androidx.room.migration.Migration(13, 14) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `user_collections` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, " +
+                "`createdAtMillis` INTEGER NOT NULL, `enabled` INTEGER NOT NULL, " +
+                "`lastUsedAtMillis` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `user_collection_items` (`userCollectionId` TEXT NOT NULL, " +
+                "`affirmationId` TEXT NOT NULL, `addedAtMillis` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`userCollectionId`, `affirmationId`), " +
+                "FOREIGN KEY(`userCollectionId`) REFERENCES `user_collections`(`id`) " +
+                "ON UPDATE NO ACTION ON DELETE CASCADE )",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_user_collection_items_affirmationId` " +
+                "ON `user_collection_items` (`affirmationId`)",
+        )
+    }
+}
+
 @Database(
     entities = [
         AffirmationEntity::class,
@@ -238,8 +264,10 @@ val MIGRATION_12_13 = object : androidx.room.migration.Migration(12, 13) {
         CatalogOverrideEntity::class,
         MeditationCustomizationEntity::class,
         PersonalizationSignalEntity::class,
+        UserCollectionEntity::class,
+        UserCollectionItemEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
 )
 @androidx.room.TypeConverters(OverridesConverters::class)
@@ -255,6 +283,7 @@ abstract class AffirmityDatabase : RoomDatabase() {
     abstract fun catalogOverrideDao(): CatalogOverrideDao
     abstract fun meditationCustomizationDao(): MeditationCustomizationDao
     abstract fun personalizationSignalDao(): PersonalizationSignalDao
+    abstract fun userCollectionDao(): UserCollectionDao
 
     companion object {
         @Volatile
@@ -279,6 +308,7 @@ abstract class AffirmityDatabase : RoomDatabase() {
                     MIGRATION_10_11,
                     MIGRATION_11_12,
                     MIGRATION_12_13,
+                    MIGRATION_13_14,
                 ).build().also { instance = it }
             }
     }

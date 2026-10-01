@@ -2,6 +2,7 @@ package com.pirxhio.affirmity.data.repository
 
 import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.access.AdUnlockRecord
+import com.pirxhio.affirmity.data.UserCollection
 import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.CatalogAffirmationEntity
 import com.pirxhio.affirmity.data.local.ChannelSettings
@@ -50,6 +51,37 @@ object NoOpFavoriteAffirmationRepository : FavoriteAffirmationRepository {
     override suspend fun add(id: String, favoritedAtMillis: Long) = Unit
     override suspend fun remove(id: String) = Unit
     override suspend fun clear() = Unit
+}
+
+/** Device-local user collections contract. Outside [DataSession]: collections never sync. */
+interface UserCollectionRepository {
+    /** Collections in chip order: most recently enabled first, then newest created first. */
+    fun observeCollections(): Flow<List<UserCollection>>
+
+    suspend fun getCollections(): List<UserCollection>
+    suspend fun create(id: String, name: String, nowMillis: Long, initialAffirmationId: String?)
+    suspend fun rename(id: String, name: String)
+    suspend fun delete(id: String)
+    suspend fun addItem(userCollectionId: String, affirmationId: String, nowMillis: Long)
+    suspend fun removeItem(userCollectionId: String, affirmationId: String)
+
+    /** Enables [id] and bumps its `lastUsedAtMillis`; [disable] never touches it. */
+    suspend fun enable(id: String, nowMillis: Long)
+    suspend fun disable(id: String)
+    suspend fun removeAffirmations(affirmationIds: Collection<String>)
+}
+
+object NoOpUserCollectionRepository : UserCollectionRepository {
+    override fun observeCollections(): Flow<List<UserCollection>> = flowOf(emptyList())
+    override suspend fun getCollections(): List<UserCollection> = emptyList()
+    override suspend fun create(id: String, name: String, nowMillis: Long, initialAffirmationId: String?) = Unit
+    override suspend fun rename(id: String, name: String) = Unit
+    override suspend fun delete(id: String) = Unit
+    override suspend fun addItem(userCollectionId: String, affirmationId: String, nowMillis: Long) = Unit
+    override suspend fun removeItem(userCollectionId: String, affirmationId: String) = Unit
+    override suspend fun enable(id: String, nowMillis: Long) = Unit
+    override suspend fun disable(id: String) = Unit
+    override suspend fun removeAffirmations(affirmationIds: Collection<String>) = Unit
 }
 
 /** Store-agnostic contract for the daily habit-completion tracker (streak source of truth). */

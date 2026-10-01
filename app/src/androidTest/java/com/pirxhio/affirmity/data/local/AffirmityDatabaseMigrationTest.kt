@@ -335,6 +335,53 @@ class AffirmityDatabaseMigrationTest {
         }
     }
 
+    /**
+     * Covers user-collections spec "Migration applies cleanly" (MIGRATION_13_14): both tables are
+     * created empty, existing data is untouched, and the FK cascade is live after migration.
+     */
+    @Test
+    fun migrate13To14_createsUserCollectionTablesEmptyAndKeepsExistingData() {
+        helper.createDatabase(TEST_DB, 13).apply {
+            execSQL(
+                "INSERT INTO catalog_affirmations " +
+                    "(id, text, subtitle, groupId, themeId, collectionId, sortOrder) " +
+                    "VALUES ('cat_id-1', 'Title', 'Subtitle', 'self_worth', 'self_worth.t1', 'self_worth.t1.c1', 0)",
+            )
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(TEST_DB, 14, true, MIGRATION_13_14)
+
+        migrated.query("SELECT COUNT(*) FROM user_collections").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0))
+        }
+        migrated.query("SELECT COUNT(*) FROM user_collection_items").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0))
+        }
+        migrated.query("SELECT COUNT(*) FROM catalog_affirmations WHERE id = 'cat_id-1'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(1, cursor.getInt(0))
+        }
+
+        // Enforcement is a per-connection setting; make it explicit instead of relying on defaults.
+        migrated.execSQL("PRAGMA foreign_keys=ON")
+        migrated.execSQL(
+            "INSERT INTO user_collections (id, name, createdAtMillis, enabled, lastUsedAtMillis) " +
+                "VALUES ('c1', 'Morning', 1, 0, 0)",
+        )
+        migrated.execSQL(
+            "INSERT INTO user_collection_items (userCollectionId, affirmationId, addedAtMillis) " +
+                "VALUES ('c1', 'cat_id-1', 1)",
+        )
+        migrated.execSQL("DELETE FROM user_collections WHERE id = 'c1'")
+        migrated.query("SELECT COUNT(*) FROM user_collection_items").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0))
+        }
+    }
+
     private companion object {
         const val TEST_DB = "migration-test"
     }
