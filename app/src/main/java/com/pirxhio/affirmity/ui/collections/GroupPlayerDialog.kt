@@ -38,11 +38,12 @@ internal fun GroupPlayerDialog(
     affirmations: List<Affirmation>,
     onDismiss: () -> Unit,
 ) {
+    // Hoisted above the Dialog so the position is saved with the host's state and survives rotation.
+    val pagerState = rememberPagerState(pageCount = { affirmations.size })
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        val pagerState = rememberPagerState(pageCount = { affirmations.size })
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
             VerticalPager(
                 state = pagerState,
