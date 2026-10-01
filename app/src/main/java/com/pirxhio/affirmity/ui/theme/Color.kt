@@ -87,3 +87,8 @@ val PremiumContainerLight = Color(0xFFFFE0C7)
 val OnPremiumContainerLight = Color(0xFF7A3B00)
 val PremiumContainerDark = Color(0xFF5C3200)
 val OnPremiumContainerDark = Color(0xFFFFD9AD)
+
+// "Your groups" covers (design 7a/7b): the cover is a dark card in both themes so the translucent
+// highlight reads the same everywhere; the group name on it is therefore always near-white.
+val GroupCoverGround = Color(0xFF0F1216)
+val GroupCoverOnGround = Color(0xFFF2F3F5)
