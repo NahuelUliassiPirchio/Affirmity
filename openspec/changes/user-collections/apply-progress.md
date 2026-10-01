@@ -86,3 +86,50 @@ Evidence: `./gradlew -Dorg.gradle.workers.max=2 :app:testDebugUnitTest :app:comp
 Deviation: `createCollection` no longer does a synchronous in-memory pre-check; it always takes the Mutex (authoritative only). Dialog inline errors now come from the returned value.
 Deferred (not done): derivedStateOf id-set cache, flow retry after .catch, shared test fixture, lock-and-launch helper, typed event log.
 Not executed: androidTests (no device).
+
+## Batch 3 - Slice C (UI): 8/9 tasks complete (3.8 manual visual check NOT executed)
+Mode: Strict TDD. Delivery: single-pr with size:exception. Nothing committed.
+
+- [x] 3.1 strings in values/ (neutral Spanish, default) and values-en/ (23 keys: collection_* and feed_empty_*)
+- [x] 3.2 `AffirmationsScreen`: nullable `onAddToCollection` (row hidden when null) + `PlaylistAdd` row; new `emptyState` param
+- [x] 3.3 `ui/collections/CollectionNameDialog.kt` (suspend onSubmit, inline error from returned `CollectionNameResult`)
+- [x] 3.4 `CollectionPickerSheet.kt` (membership toggles, create new with `withAffirmationId`, limit message + `onUpgrade`)
+- [x] 3.5 `CollectionChipsRow.kt` (tap toggle, long press) + `CollectionManageHost` (actions, rename, delete confirmation)
+- [x] 3.6 `MainActivity`: picker state, chips row in the feed Box (TopStart, top 80dp; hidden in clean screen/when none), manage host
+- [x] 3.7 empty feed uses `feedEmptyState` (Collections vs Generic copy, both from strings.xml)
+- [ ] 3.8 MANUAL visual check: NOT executed
+- [x] 3.9 `assembleDebug` OK, unit suite 1063 tests / 0 failures; `lintDebug` NOT run
+
+### TDD Cycle Evidence (batch 3)
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|------|-----------|-------|------------|-----|-------|-------------|----------|
+| 3.1-3.7 pure logic | `ui/collections/CollectionUiLogicTest.kt` | Unit (pure) | NeutralSpanishResourcesTest guards new es strings (2/2) | Compile failed: unresolved `errorStringRes`, `collection_name_error_*` (run) | 18/18 pass | error mapping x3, picker rows x4, chip label, empty state x5, manage flow x5 | None |
+| 3.5 chips | `androidTest/.../CollectionChipsRowTest.kt` | Instrumented | N/A | n/a | Compiles; NOT executed (no device) | tap + long press | None |
+
+## Deviations (batch 3)
+- Chips are a custom `Surface` + `combinedClickable` chip, not `FilterChip`: Material chips own their click and expose no long press.
+- Empty state: Collections whenever the user owns any collection (all off or enabled-but-empty), Generic only with none. Existing hardcoded copy moved to `feed_empty_generic`.
+- `onAddToCollection` is nullable (row hidden if null) instead of a no-op default.
+- Paywall hook reuses `onUpgradeClick(PaywallSource.OTHER)` (no new PaywallSource value).
+- Placement documented in MainActivity: TopStart, 80dp down, below favourite heart and the TopEnd status overlay.
+
+## Not executed (batch 3)
+No visual verification (3.8), no instrumented tests run, `lintDebug` not run.
+
+## Batch 3 fix pass (review fixes, slice C) - still uncommitted
+Mode: Strict TDD. Task list unchanged (8/9 checked; 3.8 stays unchecked and NOT executed).
+
+Behaviour (RED -> GREEN):
+- `feedEmptyState` dropped the redundant `anyCollectionEnabled` param; tests updated first. RED: compile errors (missing arg), GREEN after change.
+- `deleteIdFor` removed (ConfirmingDelete branch calls `onDelete(id)` directly); replaced by a reducer test: ChooseDelete only reaches ConfirmingDelete from Actions.
+- New `CollectionManageStateSaver` (primitives list) with a round-trip test over all four states. RED: unresolved `CollectionManageStateSaver`. GREEN: `--tests *CollectionUiLogicTest *NeutralSpanishResourcesTest` BUILD SUCCESSFUL.
+- Removed two restating tests (distinct resources, empty state strings differ) and the duplicate enabled-but-empty empty-state test (identical input after param drop); `calm` fixture moved to top.
+- Compose-only changes (compile-verified, NOT executed): chip touch target via `minimumInteractiveComponentSize` on an outer Box, `Role.Switch` + `toggleableState` + `selected`, click/long-click labels (new strings in both locales); `CollectionNameDialog` try/finally (rethrows, does not swallow); picker list in a `LazyColumn` with the create/limit footer pinned; picker rows `toggleable(role = Checkbox)`; actions dialog replaced by a bottom sheet with Rename and Delete rows.
+- Structure: `CollectionsFeedOverlay` (BoxScope extension) owns chips, manage host and picker; `CollectionManageHost` moved to its own file; MainActivity keeps only `collectionPickerAffirmationId`. Recreation: both picker id and manage state are `rememberSaveable`. Named constants for chip offsets. Removed unused `collection_picker_done`, unused imports, FQN `R`. `messageRes()` for None now `error(...)`.
+- androidTests added/extended: `CollectionNameDialogTest` (Duplicate then Ok) and `assertIsSelected`/`assertIsNotSelected` in `CollectionChipsRowTest`: compile only.
+
+Evidence: `./gradlew -Dorg.gradle.workers.max=2 :app:testDebugUnitTest :app:assembleDebug :app:compileDebugAndroidTestKotlin` BUILD SUCCESSFUL; unit suite 1061 tests, 0 failures/errors.
+Deviations: `error()` chosen for FeedEmptyState.None (empty branch and emptyState share the same list, so it is unreachable); Saver stores the chip snapshot (name/count) so a restored dialog shows the pre-recreation name.
+Deferred (not done): shared AffirmationActionRow, string key merge/rename, unwrapping the onAddToCollection lambda, stale-name snapshot in delete dialog.
+Not executed: visual check (3.8), all instrumented tests, lintDebug.
+

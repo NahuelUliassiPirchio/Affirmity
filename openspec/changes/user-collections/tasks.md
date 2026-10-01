@@ -54,12 +54,12 @@ Paths relative to `app/src/main/java/com/pirxhio/affirmity/`. Tests: `./gradlew 
 
 ## Slice C: UI
 
-- [ ] 3.1 Add strings (picker, dialog errors, chips, delete confirm, empty state pointing to collections) to `res/values/strings.xml` and `values-en/strings.xml`
-- [ ] 3.2 `AffirmationsScreen.kt`: `onAddToCollection` param + `PlaylistAdd` row in `AffirmationActionsSheet`
-- [ ] 3.3 Create `ui/collections/CollectionNameDialog.kt` (inline error from `CollectionNameResult`)
-- [ ] 3.4 Create `ui/collections/CollectionPickerSheet.kt` (membership toggles, create new, limit state)
-- [ ] 3.5 Create `ui/collections/CollectionChipsRow.kt` (tap toggle, long-press rename/delete)
-- [ ] 3.6 `MainActivity.kt`: picker state, chips row in L1698 Box (hidden in clean screen/when none), delete confirmation
-- [ ] 3.7 Replace misleading empty-feed copy with collections empty state
-- [ ] 3.8 Visual check of chip row vs `FloatingStatusOverlay`; adjust placement
-- [ ] 3.9 Run `assembleDebug`, `lintDebug`, unit suite
+- [x] 3.1 Add strings (picker, dialog errors, chips, delete confirm, empty state pointing to collections) to `res/values/strings.xml` and `values-en/strings.xml`
+- [x] 3.2 `AffirmationsScreen.kt`: `onAddToCollection` param + `PlaylistAdd` row in `AffirmationActionsSheet`
+- [x] 3.3 Create `ui/collections/CollectionNameDialog.kt` (inline error from `CollectionNameResult`)
+- [x] 3.4 Create `ui/collections/CollectionPickerSheet.kt` (membership toggles, create new, limit state)
+- [x] 3.5 Create `ui/collections/CollectionChipsRow.kt` (tap toggle, long-press rename/delete); fix pass: `CollectionManageHost.kt` split out, `CollectionsFeedOverlay.kt` host added
+- [x] 3.6 `MainActivity.kt`: picker state, chips row in L1698 Box (hidden in clean screen/when none), delete confirmation
+- [x] 3.7 Replace misleading empty-feed copy with collections empty state
+- [ ] 3.8 Visual check of chip row vs `FloatingStatusOverlay`; adjust placement (MANUAL, NOT EXECUTED: placement chosen by layout arithmetic only)
+- [x] 3.9 Run `assembleDebug`, `lintDebug`, unit suite (assembleDebug + unit suite 1061/0 after the fix pass; lintDebug NOT run)
