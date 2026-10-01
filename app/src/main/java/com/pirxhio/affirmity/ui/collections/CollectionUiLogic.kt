@@ -190,3 +190,36 @@ internal fun GroupHighlight.labelRes(): Int = when (this) {
     GroupHighlight.Green -> R.string.groups_highlight_green
     GroupHighlight.Gold -> R.string.groups_highlight_gold
 }
+
+// --- "Save to" sheet (the card's + button) ---
+
+/** One line of the "Save to" sheet: Favorites is pinned first, then the user's groups. */
+internal sealed interface SaveToRow {
+    val checked: Boolean
+
+    data class Favorites(override val checked: Boolean) : SaveToRow
+    data class Group(val id: String, val name: String, val highlightId: String, override val checked: Boolean) : SaveToRow
+}
+
+/** What tapping a [SaveToRow] asks the caller to do. */
+internal sealed interface SaveToAction {
+    data object ToggleFavorite : SaveToAction
+    /** Add or remove is decided by the caller from persisted state, not from what was rendered. */
+    data class ToggleGroup(val groupId: String) : SaveToAction
+}
+
+internal fun saveToRows(
+    collections: List<UserCollectionUi>,
+    memberIds: Set<String>,
+    isFavorite: Boolean,
+): List<SaveToRow> =
+    listOf<SaveToRow>(SaveToRow.Favorites(isFavorite)) +
+        collections.map { SaveToRow.Group(it.id, it.name, it.highlightId, it.id in memberIds) }
+
+internal fun SaveToRow.toggle(): SaveToAction = when (this) {
+    is SaveToRow.Favorites -> SaveToAction.ToggleFavorite
+    is SaveToRow.Group -> SaveToAction.ToggleGroup(id)
+}
+
+/** The card's + shows a check once the affirmation lives in Favorites or in any group. */
+internal fun isSaved(isFavorite: Boolean, isInAnyGroup: Boolean): Boolean = isFavorite || isInAnyGroup

@@ -162,4 +162,36 @@ class CollectionUiLogicTest {
             CollectionManageState.Closed.reduce(CollectionManageEvent.ConfirmDelete),
         )
     }
+
+    // --- "Save to" sheet ---
+
+    @Test
+    fun `save to rows pin Favorites first then groups in chip order`() {
+        val rows = saveToRows(listOf(ui("a"), ui("b")), memberIds = setOf("b"), isFavorite = true)
+
+        assertEquals(
+            listOf(SaveToRow.Favorites(checked = true), SaveToRow.Group("a", "a", "teal", false), SaveToRow.Group("b", "b", "teal", true)),
+            rows,
+        )
+    }
+
+    @Test
+    fun `save to rows with no groups still offer Favorites`() {
+        assertEquals(listOf(SaveToRow.Favorites(checked = false)), saveToRows(emptyList(), emptySet(), isFavorite = false))
+    }
+
+    @Test
+    fun `tapping a row toggles its own destination`() {
+        assertEquals(SaveToAction.ToggleFavorite, SaveToRow.Favorites(checked = false).toggle())
+        // Direction is decided later from persisted state, so a stale `checked` cannot matter.
+        assertEquals(SaveToAction.ToggleGroup("g"), SaveToRow.Group("g", "G", "teal", false).toggle())
+        assertEquals(SaveToAction.ToggleGroup("g"), SaveToRow.Group("g", "G", "teal", true).toggle())
+    }
+
+    @Test
+    fun `an affirmation is saved when it is a favourite or in any group`() {
+        assertEquals(false, isSaved(isFavorite = false, isInAnyGroup = false))
+        assertEquals(true, isSaved(isFavorite = true, isInAnyGroup = false))
+        assertEquals(true, isSaved(isFavorite = false, isInAnyGroup = true))
+    }
 }

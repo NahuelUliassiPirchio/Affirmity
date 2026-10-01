@@ -1717,36 +1717,40 @@ fun AffirmityApp(
                         },
                     ) {
                         Box(modifier = Modifier.fillMaxSize()) {
+                            val toggleFavoriteWithUndo: (String) -> Unit = { id ->
+                                // Undo is offered only in the destructive direction: losing a
+                                // favourite by a stray double-tap is the costly mistake, gaining one
+                                // is not. The direction comes from the PERSISTED result (serialised
+                                // by the favourite mutex), so rapid taps cannot mis-report it. Strings
+                                // are resolved above in composable scope, never via context.getString
+                                // inside the coroutine (LocalContextGetResourceValueCall).
+                                snackbarScope.launch {
+                                    val nowFavorite = appState.toggleFavoriteAndGet(id)
+                                    if (!nowFavorite) {
+                                        snackbarHostState.currentSnackbarData?.dismiss()
+                                        val result = snackbarHostState.showSnackbar(
+                                            message = unfavoritedMessage,
+                                            actionLabel = unfavoritedUndoAction,
+                                            duration = androidx.compose.material3.SnackbarDuration.Short,
+                                        )
+                                        if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                                            appState.restoreFavorite(id)
+                                        }
+                                    }
+                                }
+                            }
                             AffirmationsScreen(
                                 affirmations = appState.filteredAffirmations,
                                 onAffirmationViewed = { appState.recordAffirmationViewed() },
                                 onOverrideCommitted = appState::setTokenOverride,
                                 favoriteIds = appState.favoriteAffirmationIds.value,
-                                onToggleFavorite = { id ->
-                                    // Undo is offered only in the destructive direction: losing a
-                                    // favourite by a stray double-tap is the costly mistake, gaining one
-                                    // is not. Strings are resolved above in composable scope, never via
-                                    // context.getString inside the coroutine (LocalContextGetResourceValueCall).
-                                    val wasFavorite = id in appState.favoriteAffirmationIds.value
-                                    appState.toggleFavorite(id)
-                                    if (wasFavorite) {
-                                        snackbarScope.launch {
-                                            val result = snackbarHostState.showSnackbar(
-                                                message = unfavoritedMessage,
-                                                actionLabel = unfavoritedUndoAction,
-                                                duration = androidx.compose.material3.SnackbarDuration.Short,
-                                            )
-                                            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
-                                                appState.restoreFavorite(id)
-                                            }
-                                        }
-                                    }
-                                },
+                                onToggleFavorite = toggleFavoriteWithUndo,
                                 onHideAffirmation = appState::hideAffirmation,
                                 onAffirmationShared = appState::recordAffirmationShared,
                                 isCleanScreen = isCleanScreen,
                                 onCleanScreenChange = { isCleanScreen = it },
                                 onAddToCollection = { id -> collectionPickerAffirmationId = id },
+                                groupedIds = appState.affirmationIdsInUserCollections,
                                 emptyState = feedEmptyState(
                                     feedIsEmpty = appState.filteredAffirmations.isEmpty(),
                                     hasCollections = appState.userCollections.isNotEmpty(),
@@ -1757,12 +1761,15 @@ fun AffirmityApp(
                                 canCreate = appState.canCreateCollection,
                                 isCleanScreen = isCleanScreen,
                                 pickerAffirmationId = collectionPickerAffirmationId,
+                                isFavoriteFor = { id -> id in appState.favoriteAffirmationIds.value },
+                                // No undo snackbar here: the host sits behind the modal sheet, and the
+                                // Favorites row itself is the one-tap reversal while the sheet is open.
+                                onToggleFavorite = appState::toggleFavorite,
                                 memberIdsFor = appState::userCollectionIdsFor,
                                 onToggle = appState::toggleCollection,
                                 onRename = appState::renameCollection,
                                 onDelete = appState::deleteCollection,
-                                onAdd = appState::addToCollection,
-                                onRemove = appState::removeFromCollection,
+                                onToggleInGroup = appState::toggleAffirmationInCollection,
                                 onCreate = { name, highlightId, affirmationId ->
                                     appState.createCollection(name, withAffirmationId = affirmationId, highlightId = highlightId)
                                 },

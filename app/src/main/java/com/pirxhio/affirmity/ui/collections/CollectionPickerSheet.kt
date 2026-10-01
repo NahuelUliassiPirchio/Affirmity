@@ -1,7 +1,11 @@
 package com.pirxhio.affirmity.ui.collections
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -10,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -31,12 +36,15 @@ import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.CollectionNameResult
 import com.pirxhio.affirmity.data.UserCollectionUi
+import com.pirxhio.affirmity.ui.theme.GroupHighlight
 
 /**
- * "Add to collection" picker for one affirmation. Stateless about data: the caller passes the
- * collections, the ids this affirmation already belongs to, and callbacks. Tapping a row toggles
- * membership; "Create new collection" opens [NewGroupSheet] and, on success, the caller's
- * [onCreate] (name and highlight) is expected to add this affirmation to the new collection.
+ * "Save to" sheet for one affirmation (opened by the card's + button). Favorites is pinned first,
+ * then the user's groups ([saveToRows]); each row toggles immediately and the sheet stays open until
+ * "Done", so one affirmation can go to several places. Stateless about data: the caller passes the
+ * collections, the ids this affirmation already belongs to, its favourite state and callbacks.
+ * "New group" opens [NewGroupSheet] (no "Start with": the affirmation is the seed) and the caller's
+ * [onCreate] (name and highlight) is expected to add this affirmation to the new group.
  *
  * When [canCreate] is false (Free user at the limit) the create action is replaced by the limit
  * message and an optional upgrade button ([onUpgrade]).
@@ -46,9 +54,10 @@ import com.pirxhio.affirmity.data.UserCollectionUi
 internal fun CollectionPickerSheet(
     collections: List<UserCollectionUi>,
     memberIds: Set<String>,
+    isFavorite: Boolean,
     canCreate: Boolean,
-    onAdd: (userCollectionId: String) -> Unit,
-    onRemove: (userCollectionId: String) -> Unit,
+    onToggleFavorite: () -> Unit,
+    onToggleGroup: (userCollectionId: String) -> Unit,
     onCreate: suspend (name: String, highlightId: String) -> CollectionNameResult,
     onUpgrade: () -> Unit,
     onDismiss: () -> Unit,
@@ -58,30 +67,32 @@ internal fun CollectionPickerSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
-            Text(
-                text = stringResource(R.string.collection_picker_title),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-            )
-            val rows = pickerRows(collections, memberIds)
-            if (rows.isEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
-                    text = stringResource(R.string.collection_picker_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                    text = stringResource(R.string.collection_picker_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f).padding(vertical = 8.dp),
                 )
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.collection_picker_done)) }
             }
             // The list scrolls inside a bounded region; the create / limit footer below stays
             // pinned and reachable with many collections or a large font scale.
             LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
-                items(rows, key = { it.id }) { row ->
-                    PickerRowItem(
+                items(saveToRows(collections, memberIds, isFavorite), key = { row ->
+                    when (row) {
+                        is SaveToRow.Favorites -> "favorites"
+                        is SaveToRow.Group -> row.id
+                    }
+                }) { row ->
+                    SaveToRowItem(
                         row = row,
                         onToggle = {
-                            when (row.toggle()) {
-                                PickerToggle.Add -> onAdd(row.id)
-                                PickerToggle.Remove -> onRemove(row.id)
+                            when (val action = row.toggle()) {
+                                SaveToAction.ToggleFavorite -> onToggleFavorite()
+                                is SaveToAction.ToggleGroup -> onToggleGroup(action.groupId)
                             }
                         },
                     )
@@ -121,7 +132,7 @@ internal fun CollectionPickerSheet(
 }
 
 @Composable
-private fun PickerRowItem(row: PickerRow, onToggle: () -> Unit) {
+private fun SaveToRowItem(row: SaveToRow, onToggle: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -131,10 +142,33 @@ private fun PickerRowItem(row: PickerRow, onToggle: () -> Unit) {
     ) {
         // The row owns the toggle semantics (checked state + Checkbox role); the box is display-only.
         Checkbox(checked = row.checked, onCheckedChange = null)
-        Text(
-            text = row.name,
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.padding(start = 18.dp),
-        )
+        when (row) {
+            is SaveToRow.Favorites -> {
+                Icon(
+                    Icons.Filled.Favorite,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 18.dp).size(14.dp),
+                )
+                Text(
+                    text = stringResource(R.string.collection_picker_favorites),
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(start = 10.dp),
+                )
+            }
+            is SaveToRow.Group -> {
+                Box(
+                    modifier = Modifier
+                        .padding(start = 18.dp)
+                        .size(width = 14.dp, height = 8.dp)
+                        .background(GroupHighlight.fromId(row.highlightId).color, RoundedCornerShape(2.dp)),
+                )
+                Text(
+                    text = row.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(start = 10.dp),
+                )
+            }
+        }
     }
 }

@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -587,6 +588,11 @@ class AffirmityAppState(
             ?: return emptyList()
         val byId = allAffirmations.associateBy { it.id }
         return resolveCollectionMembers(memberIds, byId::get)
+    }
+
+    /** Every affirmation id held by at least one collection, for the card's saved state. */
+    val affirmationIdsInUserCollections: Set<String> by derivedStateOf {
+        collectionsState.value.flatMapTo(HashSet()) { it.affirmationIds }
     }
 
     /** Ids of every collection currently holding [affirmationId], for the picker's toggles. */
@@ -1612,20 +1618,26 @@ class AffirmityAppState(
     }
 
     fun toggleFavorite(id: String) {
-        scope.launch {
-            favoriteToggleMutex.withLock {
-                if (favorites.isFavorite(id)) {
-                    favorites.remove(id)
-                } else {
-                    favorites.add(id, System.currentTimeMillis())
-                    // spec "Signal emission at existing feature call sites" -- only the ADD
-                    // direction counts as "saved" (design D3); removing a favorite is not a
-                    // negative signal, it just emits nothing.
-                    recordPersonalizationSignal(SignalType.AFFIRMATION_SAVED, id)
-                }
+        scope.launch { toggleFavoriteAndGet(id) }
+    }
+
+    /** Toggles [id] under [favoriteToggleMutex] and returns its PERSISTED state afterwards (true =
+     *  now a favourite), so callers such as the unfavourite-undo snackbar act on what really
+     *  happened rather than on a stale rendered state. */
+    suspend fun toggleFavoriteAndGet(id: String): Boolean =
+        favoriteToggleMutex.withLock {
+            if (favorites.isFavorite(id)) {
+                favorites.remove(id)
+                false
+            } else {
+                favorites.add(id, System.currentTimeMillis())
+                // spec "Signal emission at existing feature call sites" -- only the ADD
+                // direction counts as "saved" (design D3); removing a favorite is not a
+                // negative signal, it just emits nothing.
+                recordPersonalizationSignal(SignalType.AFFIRMATION_SAVED, id)
+                true
             }
         }
-    }
 
     /** Remove-only action for the Favorites screen. Repeated or stale callbacks stay idempotent. */
     fun removeFavorite(id: String) {
@@ -1684,6 +1696,23 @@ class AffirmityAppState(
 
     fun deleteCollection(userCollectionId: String) {
         scope.launch { userCollectionMutex.withLock { collectionRepository.delete(userCollectionId) } }
+    }
+
+    /** Adds or removes [affirmationId] depending on the PERSISTED membership, read under
+     *  [userCollectionMutex] like [toggleCollection]: two fast taps end as add-then-remove no matter
+     *  what the UI had rendered. A deleted collection is a no-op. */
+    fun toggleAffirmationInCollection(userCollectionId: String, affirmationId: String) {
+        scope.launch {
+            userCollectionMutex.withLock {
+                val current = collectionRepository.getCollections().firstOrNull { it.id == userCollectionId }
+                    ?: return@withLock
+                if (affirmationId in current.affirmationIds) {
+                    collectionRepository.removeItem(userCollectionId, affirmationId)
+                } else {
+                    collectionRepository.addItem(userCollectionId, affirmationId, collectionClock())
+                }
+            }
+        }
     }
 
     /** Idempotent: re-adding an existing member is a no-op in the repository. A collection deleted

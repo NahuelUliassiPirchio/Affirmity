@@ -32,7 +32,6 @@ import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.SelfImprovement
@@ -73,6 +72,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -84,6 +88,7 @@ import com.pirxhio.affirmity.data.AffirmationTemplateParser
 import com.pirxhio.affirmity.data.TemplateField
 import com.pirxhio.affirmity.data.backgroundColor
 import com.pirxhio.affirmity.ui.collections.FeedEmptyState
+import com.pirxhio.affirmity.ui.collections.isSaved
 import com.pirxhio.affirmity.ui.collections.messageRes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -122,6 +127,8 @@ fun AffirmationsScreen(
     onCleanScreenChange: (Boolean) -> Unit = {},
     /** Null hides the "Add to collection" action. Called with the long-pressed affirmation's id. */
     onAddToCollection: ((affirmationId: String) -> Unit)? = null,
+    /** Ids held by at least one user group; with [favoriteIds] it drives the + / check state of the save button. */
+    groupedIds: Set<String> = emptySet(),
     /** Which message to show while [affirmations] is empty; decided by [feedEmptyState]. */
     emptyState: FeedEmptyState = FeedEmptyState.Generic,
 ) {
@@ -204,6 +211,7 @@ fun AffirmationsScreen(
                 isCleanScreen = isCleanScreen,
                 onEnterCleanScreen = { onCleanScreenChange(true) },
                 onAddToCollection = onAddToCollection?.let { callback -> { callback(affirmation.id) } },
+                isInAnyGroup = affirmation.id in groupedIds,
             )
         }
         if (isCleanScreen) {
@@ -240,6 +248,7 @@ private fun AffirmationCard(
     isCleanScreen: Boolean,
     onEnterCleanScreen: () -> Unit,
     onAddToCollection: (() -> Unit)?,
+    isInAnyGroup: Boolean,
 ) {
     var cardPositionInRoot by remember(affirmation.id) { mutableStateOf(Offset.Zero) }
     var cardSize by remember(affirmation.id) { mutableStateOf(IntSize.Zero) }
@@ -406,6 +415,13 @@ private fun AffirmationCard(
             modifier = Modifier.fillMaxSize(),
         )
         if (!isCleanScreen) {
+            val saved = isSaved(isFavorite, isInAnyGroup)
+            val saveButtonDescription = stringResource(
+                if (saved) R.string.affirmation_save_to_saved else R.string.affirmation_save_to,
+            )
+            val saveStateDescription = stringResource(
+                if (saved) R.string.affirmation_save_state_saved else R.string.affirmation_save_state_not_saved,
+            )
             IconButton(
                 modifier = Modifier
                     .align(Alignment.TopStart)
@@ -417,8 +433,18 @@ private fun AffirmationCard(
                     .graphicsLayer {
                         scaleX = favoriteScale.value
                         scaleY = favoriteScale.value
-                    },
-                onClick = {
+                    }
+                    .then(
+                        if (onAddToCollection != null) {
+                            Modifier.semantics {
+                                contentDescription = saveButtonDescription
+                                stateDescription = saveStateDescription
+                            }
+                        } else {
+                            Modifier
+                        },
+                    ),
+                onClick = onAddToCollection ?: {
                     requestFavoriteToggle(
                         favoritePositionInRoot - cardPositionInRoot + Offset(
                             favoriteSize.width / 2f,
@@ -427,11 +453,22 @@ private fun AffirmationCard(
                     )
                 },
             ) {
-                Icon(
-                    imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                    contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
-                    tint = Color.White,
-                )
+                if (onAddToCollection != null) {
+                    // Save to...: + until the affirmation is in Favorites or any group, then a check in
+                    // the accent colour. Double-tap / token tap still toggle Favorites and feed this state.
+                    val saved = isSaved(isFavorite, isInAnyGroup)
+                    Icon(
+                        imageVector = if (saved) Icons.Filled.Check else Icons.Filled.Add,
+                        contentDescription = null,
+                        tint = if (saved) MaterialTheme.colorScheme.primary else Color.White,
+                    )
+                } else {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                        contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                        tint = Color.White,
+                    )
+                }
             }
         }
     }
@@ -474,12 +511,6 @@ private fun AffirmationCard(
                 showActions = false
                 onEnterCleanScreen()
             },
-            onAddToCollection = onAddToCollection?.let { callback ->
-                {
-                    showActions = false
-                    callback()
-                }
-            },
             onDismiss = { showActions = false },
         )
     }
@@ -493,7 +524,6 @@ private fun AffirmationActionsSheet(
     onShareImage: () -> Unit,
     onHide: () -> Unit,
     onCleanScreen: () -> Unit,
-    onAddToCollection: (() -> Unit)?,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -514,13 +544,6 @@ private fun AffirmationActionsSheet(
                 label = stringResource(R.string.affirmation_clean_screen_content_description),
                 onClick = onCleanScreen,
             )
-            if (onAddToCollection != null) {
-                AffirmationActionRow(
-                    icon = Icons.AutoMirrored.Filled.PlaylistAdd,
-                    label = stringResource(R.string.collection_add_to_collection),
-                    onClick = onAddToCollection,
-                )
-            }
         }
     }
 }

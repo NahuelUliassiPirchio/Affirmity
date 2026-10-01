@@ -132,6 +132,63 @@ class AffirmityAppStateUserCollectionsTest {
     }
 
     @Test
+    fun `affirmation ids in user collections is the union of every group's members`() = runTest {
+        val repo = RecordingUserCollectionRepository(
+            listOf(uc("c1", items = listOf("a", "b")), uc("c2", items = listOf("b", "c")), uc("c3")),
+        )
+        val state = buildUcState(backgroundScope, repo)
+        runCurrent()
+
+        assertEquals(setOf("a", "b", "c"), state.affirmationIdsInUserCollections)
+    }
+
+    @Test
+    fun `two rapid toggles of the same membership end as add then remove from persisted state`() = runTest {
+        val repo = RecordingUserCollectionRepository(listOf(uc("c1")))
+        val state = buildUcState(backgroundScope, repo)
+        runCurrent()
+
+        state.toggleAffirmationInCollection("c1", "a")
+        state.toggleAffirmationInCollection("c1", "a")
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(listOf("addItem:c1:a", "removeItem:c1:a"), repo.events)
+        assertEquals(emptyList<String>(), repo.current.single().affirmationIds)
+    }
+
+    @Test
+    fun `toggling membership of a deleted collection writes nothing`() = runTest {
+        val repo = RecordingUserCollectionRepository()
+        val state = buildUcState(backgroundScope, repo)
+        runCurrent()
+
+        state.toggleAffirmationInCollection("gone", "a")
+        runCurrent()
+        advanceUntilIdle()
+
+        assertTrue(repo.events.isEmpty())
+    }
+
+    @Test
+    fun `an affirmation stops counting as grouped after removal or after its group is deleted`() = runTest {
+        val repo = RecordingUserCollectionRepository(listOf(uc("c1", items = listOf("a")), uc("c2", items = listOf("b"))))
+        val state = buildUcState(backgroundScope, repo)
+        runCurrent()
+        assertEquals(setOf("a", "b"), state.affirmationIdsInUserCollections)
+
+        state.removeFromCollection("c1", "a")
+        runCurrent()
+        advanceUntilIdle()
+        assertEquals(setOf("b"), state.affirmationIdsInUserCollections)
+
+        state.deleteCollection("c2")
+        runCurrent()
+        advanceUntilIdle()
+        assertEquals(emptySet<String>(), state.affirmationIdsInUserCollections)
+    }
+
+    @Test
     fun `create normalises an unknown highlight to the default`() = runTest {
         val repo = RecordingUserCollectionRepository()
         val state = buildUcState(backgroundScope, repo, ids = sequenceOf("u").iterator())

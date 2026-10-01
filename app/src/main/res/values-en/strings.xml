@@ -562,7 +562,7 @@
     <string name="affirmation_share_image_error">Could not create the image</string>
     <string name="meditation_customization_breathing_affirmations_shuffle">Random order</string>
     <string name="collection_add_to_collection">Add to collection</string>
-    <string name="collection_picker_title">Add to collection</string>
+    <string name="collection_picker_title">Save to</string>
     <string name="collection_picker_create">Create new collection</string>
     <string name="collection_picker_empty">You have no collections yet.</string>
     <string name="collection_limit_reached">You have reached the free plan limit of collections. Upgrade to Pro to create more.</string>
@@ -620,4 +620,10 @@
     <string name="groups_toggle_state_in_feed">In your feed</string>
     <string name="groups_toggle_state_not_in_feed">Not in feed</string>
     <string name="groups_toggle_a11y_label">Toggle %1$s in your feed</string>
+    <string name="collection_picker_done">Done</string>
+    <string name="collection_picker_favorites">Favorites</string>
+    <string name="affirmation_save_to">Save to\u2026</string>
+    <string name="affirmation_save_state_saved">Saved</string>
+    <string name="affirmation_save_state_not_saved">Not saved</string>
+    <string name="affirmation_save_to_saved">Saved. Change where it is saved</string>
 </resources>

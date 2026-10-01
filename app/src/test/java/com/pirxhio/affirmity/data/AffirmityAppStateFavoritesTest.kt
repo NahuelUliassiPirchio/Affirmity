@@ -49,6 +49,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.mockito.Mockito.mock
@@ -77,6 +78,17 @@ class AffirmityAppStateFavoritesTest {
         assertEquals("affirmation-1", added.first)
         assertTrue(added.second >= before)
         assertTrue(added.second <= System.currentTimeMillis())
+    }
+
+    @Test
+    fun `toggleFavoriteAndGet reports the persisted direction so undo is only offered on removal`() = runTest {
+        val favorites = RecordingFavoritesRepository()
+        val state = buildState(backgroundScope, favorites)
+        runCurrent()
+
+        assertTrue(state.toggleFavoriteAndGet("affirmation-1"))
+        assertFalse(state.toggleFavoriteAndGet("affirmation-1"))
+        assertEquals(listOf("affirmation-1"), favorites.removed)
     }
 
     @Test
