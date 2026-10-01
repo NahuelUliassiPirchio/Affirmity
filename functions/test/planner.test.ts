@@ -309,6 +309,21 @@ describe('planAllUsers', () => {
     expect(healerTask).toBeDefined();
   });
 
+  it('plans another missed-day alert from remaining inventory after one activation', async () => {
+    const store = makeStore();
+    const enqueuer = makeEnqueuer();
+    const localDay = 20677;
+    await planUser({
+      ...baseInput,
+      localDay,
+      completions: [6, 5, 4, 3].map((offset) => ({
+        epochDay: localDay - offset, meditationDone: true, affirmationDone: true,
+      })),
+      healerUses: [{ healedEpochDay: localDay - 2 }],
+    }, store, enqueuer);
+    expect(enqueuer.calls.filter((task) => task.channel === 'healer')).toHaveLength(1);
+  });
+
   it('does not fire the healer channel when the break day was already healed', async () => {
     const store = makeStore();
     const enqueuer = makeEnqueuer();
@@ -375,14 +390,8 @@ describe('planAllUsers', () => {
     expect(healerTask).toBeUndefined();
   });
 
-  // Wiring check: planUserTasks must run applyPriority (design §3) after quiet-hours filtering,
-  // so a healer candidate the same day suppresses a would-be meditation_return slot end-to-end.
-  // (Exercised here indirectly via the mood-reflection interaction; meditation_return's own
-  // end-to-end suppression is covered in the `meditation_return candidate` describe block below.)
-  it('applies plan-time priority so no reflection slot ever lands inside 2h after mood', async () => {
-    const store = makeStore();
+  it('enqueues surviving reflection slots exactly two hours after mood', async () => {
     const enqueuer = makeEnqueuer();
-
     const input: UserPlanInput = {
       ...baseInput,
       settings: {
@@ -395,19 +404,40 @@ describe('planAllUsers', () => {
       },
     };
 
-    // Real (non-seeded) rng: applyPriority's invariant must hold no matter how slots land.
-    await planUser(input, store, enqueuer);
+    const randomValues = [1 / 24, 1 / 24, 1 / 24, 0];
+    await planAndEnqueueUser(input, makeStore(), enqueuer, () => randomValues.shift() ?? 0, planGeneratedAt(input));
 
-    const moodTask = enqueuer.calls.find((t) => (t as { channel: string }).channel === 'mood') as
-      | { atMillis: number }
-      | undefined;
-    const reflectionTasks = enqueuer.calls.filter((t) => (t as { channel: string }).channel === 'reflection') as
-      { atMillis: number }[];
-    expect(moodTask).toBeDefined();
-    for (const reflectionTask of reflectionTasks) {
-      const gap = reflectionTask.atMillis - moodTask!.atMillis;
-      expect(gap <= 0 || gap >= 2 * 60 * 60_000).toBe(true);
-    }
+    const dayStart = input.localDay * 86_400_000;
+    expect(enqueuer.calls).toEqual([
+      ...[0, 1, 2].map((slot) => ({
+        uid: input.uid, localDay: input.localDay, channel: 'reflection', slot,
+        atMillis: dayStart + 8 * 60 * 60_000,
+      })),
+      { uid: input.uid, localDay: input.localDay, channel: 'mood', slot: 0, atMillis: dayStart + 6 * 60 * 60_000 },
+    ]);
+  });
+
+  it('suppresses reflection slots when mood leaves no two-hour gap in their segment', async () => {
+    const enqueuer = makeEnqueuer();
+    const input: UserPlanInput = {
+      ...baseInput,
+      settings: {
+        ...baseInput.settings,
+        remindersEnabled: false,
+        moodEnabled: true,
+        moodSegments: ['manana'],
+        reflectionEnabled: true,
+        reflectionSegments: ['manana'],
+      },
+    };
+
+    const randomValues = [7 / 8, 7 / 8, 7 / 8, 5 / 6];
+    await planAndEnqueueUser(input, makeStore(), enqueuer, () => randomValues.shift() ?? 0, planGeneratedAt(input));
+
+    expect(enqueuer.calls).toEqual([
+      { uid: input.uid, localDay: input.localDay, channel: 'mood', slot: 0,
+        atMillis: input.localDay * 86_400_000 + 11 * 60 * 60_000 },
+    ]);
   });
 
   it('plans nothing for a user missing a timezone', async () => {

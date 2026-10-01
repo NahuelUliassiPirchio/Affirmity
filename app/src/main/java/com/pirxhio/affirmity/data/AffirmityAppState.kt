@@ -501,6 +501,8 @@ class AffirmityAppState(
      *  [kotlin.random.Random.nextLong] -- inline `Random.nextLong()` can't be tested
      *  deterministically -- so every existing JVM test construction of this class is unaffected. */
     private val feedSeedSource: () -> Long = { Random.nextLong() },
+    /** Fresh day reads around activation suspensions; default retains device-local boundaries. */
+    private val healerTodayEpochDay: () -> Long = { DayClock.epochDay() },
 ) {
     val affirmations = mutableStateListOf<Affirmation>()
 
@@ -689,14 +691,15 @@ class AffirmityAppState(
         StreakHealerState(
             generalStreakDays = 0,
             isTodayDone = false,
-            healerHeld = false,
+            healerCount = 0,
+            pairProgress = 0,
             healedDays = emptySet(),
             activation = HealerActivation.Unavailable,
         )
     )
         private set
 
-    /** True right after [streakHealer]'s `healerHeld` flips from false to true — drives the
+    /** True right after [streakHealer]'s inventory increases — drives the
      * one-time [com.pirxhio.affirmity.ui.healer.StreakHealerGrantedScreen]. Never set on the first
      * emission of a (re)started healer flow, so a cold start or sign-in/out session swap that
      * happens to load an already-held healer doesn't replay the celebration. */
@@ -992,6 +995,7 @@ class AffirmityAppState(
             // stale Room/Firestore collector for either flow can survive a sign-in/sign-out swap.
             session.flatMapLatest { s ->
                 healerFlowInitialized = false
+                healerJustGranted.value = false
                 combine(
                     s.completions.observeRange(windowStart - STREAK_LOOKBACK_DAYS, windowStart + 6),
                     s.healerUses.observeRange(healerStart, today),
@@ -1020,7 +1024,7 @@ class AffirmityAppState(
                     todayEpochDay = today,
                     isDone = { it.meditationDone },
                 ).copy(dayLabels = dayLabels, healedDays = healedIndices)
-                if (healerFlowInitialized && newHealerState.healerHeld && !streakHealer.value.healerHeld) {
+                if (healerFlowInitialized && newHealerState.healerCount > streakHealer.value.healerCount) {
                     healerJustGranted.value = true
                 }
                 healerFlowInitialized = true
@@ -1804,11 +1808,12 @@ class AffirmityAppState(
      */
     fun activateStreakHealer() {
         scope.launch {
-            val today = DayClock.epochDay()
+            val today = healerTodayEpochDay()
             val start = healerStartEpochDay(today)
             val activeSession = ready()
             val rows = activeSession.completions.getRange(start, today)
             val uses = activeSession.healerUses.getRange(start, today)
+            if (session.value !== activeSession || healerTodayEpochDay() != today) return@launch
             val activation = StreakHealerStats.evaluate(rows, uses, todayEpochDay = today, startEpochDay = start).activation
             if (activation is HealerActivation.Available) {
                 activeSession.healerUses.recordUse(activation.breakEpochDay)

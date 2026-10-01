@@ -23,10 +23,13 @@ data class StreakTimeline(
 data class StreakHealerState(
     val generalStreakDays: Int,
     val isTodayDone: Boolean,
-    val healerHeld: Boolean,
+    val healerCount: Int,
+    val pairProgress: Int,
     val healedDays: Set<Long>,
     val activation: HealerActivation,
-)
+) {
+    val healerHeld: Boolean get() = healerCount > 0
+}
 
 /** Whether/how the explicit activation CTA should render for "today". */
 sealed interface HealerActivation {
@@ -115,7 +118,7 @@ object StreakHealerStats {
     /**
      * Applies [uses] (the persisted activation-event log, keyed by `healedEpochDay`) on top of
      * [timeline]. A day counts toward the streak if it had activity OR was explicitly healed.
-     * `held` is derived by simulating grant (two consecutive full days, capped at one) and
+     * `healerCount` is derived by simulating grants (non-overlapping full-day pairs, capped at two) and
      * consumption (any day present in [uses]) from [startEpochDay] through [todayEpochDay] —
      * [startEpochDay] is the *healer* rollout floor and only bounds grant/heal/activation
      * eligibility. [generalStreakDays] is a separate, unfloored day-count: it walks back from
@@ -134,13 +137,25 @@ object StreakHealerStats {
         val healedDays = uses.map { it.healedEpochDay }.toSet()
         fun effectiveDone(day: Long) = timeline.hasActivity(day) || day in healedDays
 
-        var held = false
-        var fullDayStreak = 0
+        var healerCount = 0
+        var pairProgress = 0
         var day = startEpochDay
         while (day <= todayEpochDay) {
-            fullDayStreak = if (timeline.isFullDay(day)) fullDayStreak + 1 else 0
-            if (fullDayStreak >= 2 && !held) held = true
-            if (day in healedDays) held = false
+            when {
+                day in healedDays -> {
+                    healerCount = (healerCount - 1).coerceAtLeast(0)
+                    pairProgress = 0
+                }
+                healerCount == 2 -> pairProgress = 0
+                timeline.isFullDay(day) -> {
+                    pairProgress++
+                    if (pairProgress == 2) {
+                        healerCount++
+                        pairProgress = 0
+                    }
+                }
+                else -> pairProgress = 0
+            }
             day++
         }
 
@@ -161,14 +176,15 @@ object StreakHealerStats {
 
         val activation: HealerActivation = when {
             isBreakDay && breakCandidate in healedDays -> HealerActivation.UsedToday(breakCandidate)
-            isBreakDay && held -> HealerActivation.Available(breakCandidate)
+            isBreakDay && healerCount > 0 -> HealerActivation.Available(breakCandidate)
             else -> HealerActivation.Unavailable
         }
 
         return StreakHealerState(
             generalStreakDays = generalStreakDays,
             isTodayDone = isTodayDone,
-            healerHeld = held,
+            healerCount = healerCount,
+            pairProgress = pairProgress,
             healedDays = healedDays,
             activation = activation,
         )

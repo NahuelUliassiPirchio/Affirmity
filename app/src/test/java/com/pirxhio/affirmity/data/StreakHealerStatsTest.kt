@@ -21,6 +21,96 @@ class StreakHealerStatsTest {
         StreakHealerUseEntity(healedEpochDay = healedEpochDay, activatedAtMillis = 0L)
 
     @Test
+    fun `partial missing and healed days break earning pairs but preserve OR continuity`() {
+        val interruptions = listOf(
+            listOf(partialDay(start + 1, meditationDone = true)) to emptyList(),
+            listOf(partialDay(start + 1, affirmationDone = true)) to emptyList(),
+            emptyList<DailyCompletionEntity>() to emptyList(),
+            emptyList<DailyCompletionEntity>() to listOf(use(start + 1)),
+        )
+        interruptions.forEachIndexed { index, (middleRows, uses) ->
+            val state = StreakHealerStats.evaluate(
+                listOf(fullDay(start), fullDay(start + 2)) + middleRows, uses, start + 2, start,
+            )
+            assertEquals(0, state.healerCount)
+            assertEquals(1, state.pairProgress)
+            assertEquals(if (index == 2) 1 else 3, state.generalStreakDays)
+        }
+    }
+
+    @Test
+    fun `capacity banks no credit and activation day starts a fresh pair in either order`() {
+        val fullRun = (0..8).map { fullDay(start + it) }
+        val atCap = StreakHealerStats.evaluate(fullRun, emptyList(), start + 8, start)
+        assertEquals(2, atCap.healerCount)
+        assertEquals(0, atCap.pairProgress)
+        val uses = listOf(use(start + 9))
+        val freshDay = fullRun + fullDay(start + 10)
+        // Completing before activation and activating before completion converge on the same log.
+        val completionFirst = StreakHealerStats.evaluate(freshDay, emptyList(), start + 10, start)
+        assertEquals(2, completionFirst.healerCount)
+        val afterActivation = StreakHealerStats.evaluate(freshDay, uses, start + 10, start)
+        val activationFirst = StreakHealerStats.evaluate(fullRun, uses, start + 10, start)
+        assertEquals(1, activationFirst.healerCount)
+        assertEquals(0, activationFirst.pairProgress)
+        assertEquals(1, afterActivation.healerCount)
+        assertEquals(1, afterActivation.pairProgress)
+        assertEquals(afterActivation, StreakHealerStats.evaluate(freshDay, uses, start + 10, start))
+        val refilled = StreakHealerStats.evaluate(freshDay + fullDay(start + 11), uses, start + 11, start)
+        assertEquals(2, refilled.healerCount)
+        assertEquals(0, refilled.pairProgress)
+    }
+
+    @Test
+    fun `two successive uses spend one each and duplicate keys never spend twice`() {
+        val rows = (0..3).map { fullDay(start + it) }
+        val firstUse = listOf(use(start + 4), use(start + 4))
+        val first = StreakHealerStats.evaluate(rows, firstUse, start + 5, start)
+        assertEquals(1, first.healerCount)
+        assertEquals(HealerActivation.UsedToday(start + 4), first.activation)
+        val nextWindow = StreakHealerStats.evaluate(rows, firstUse, start + 6, start)
+        assertEquals(HealerActivation.Available(start + 5), nextWindow.activation)
+        val second = StreakHealerStats.evaluate(rows, firstUse + use(start + 5), start + 6, start)
+        assertEquals(0, second.healerCount)
+        assertEquals(6, second.generalStreakDays)
+        assertEquals(HealerActivation.UsedToday(start + 5), second.activation)
+        assertEquals(setOf(start + 4, start + 5), second.healedDays)
+    }
+
+    @Test
+    fun `orphan and conflicting historical uses retain continuity without debt or earning`() {
+        val state = StreakHealerStats.evaluate(
+            listOf(fullDay(start), fullDay(start + 1), fullDay(start + 2)),
+            listOf(use(start), use(start + 1), use(start + 1)), start + 2, start,
+        )
+        assertEquals(0, state.healerCount)
+        assertEquals(1, state.pairProgress)
+        assertEquals(3, state.generalStreakDays)
+        assertEquals(setOf(start, start + 1), state.healedDays)
+    }
+
+    @Test
+    fun `earning bounds are inclusive and ignore earlier completions`() {
+        val today = StreakHealerStats.EPOCH_START_DAY + 400
+        val floor = StreakHealerStats.healerStartEpochDay(today)
+        assertEquals(today - 370, floor)
+        assertEquals(StreakHealerStats.EPOCH_START_DAY, StreakHealerStats.healerStartEpochDay(StreakHealerStats.EPOCH_START_DAY + 3))
+        val rows = (-2..3).map { fullDay(floor + it) }
+        assertEquals(0, StreakHealerStats.evaluate(rows, emptyList(), floor, floor).healerCount)
+        assertEquals(2, StreakHealerStats.evaluate(rows, emptyList(), today, floor).healerCount)
+    }
+
+    @Test
+    fun `four complete days yield balances zero one one two`() {
+        val rows = (0..3).map { fullDay(start + it) }
+        val states = (0..3).map {
+            StreakHealerStats.evaluate(rows, emptyList(), start + it, start)
+        }
+        assertEquals(listOf(0, 1, 1, 2), states.map { it.healerCount })
+        assertEquals(listOf(1, 0, 1, 0), states.map { it.pairProgress })
+    }
+
+    @Test
     fun `earning at 2 consecutive full days grants exactly 1 healer`() {
         val rows = listOf(fullDay(start), fullDay(start + 1))
 
@@ -30,12 +120,14 @@ class StreakHealerStatsTest {
     }
 
     @Test
-    fun `re-qualifying while already holding a healer does not grant a second one`() {
+    fun `complete days award non-overlapping pairs up to two healers`() {
         val rows = (0..5).map { fullDay(start + it) }
 
         val state = StreakHealerStats.evaluate(rows, emptyList(), todayEpochDay = start + 5, startEpochDay = start)
 
         assertTrue(state.healerHeld)
+        assertEquals(2, state.healerCount)
+        assertEquals(0, state.pairProgress)
         assertEquals(6, state.generalStreakDays)
     }
 

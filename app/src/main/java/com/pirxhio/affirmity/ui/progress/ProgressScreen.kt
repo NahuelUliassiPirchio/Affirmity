@@ -173,13 +173,12 @@ private fun GeneralStreakCounter(generalStreakDays: Int, isTodayDone: Boolean) {
 /**
  * The streak-healer CTA (design.md's "StreakHealerCard above the two WeeklyStreakTrackers"):
  * a held badge when no window is open, an explicit activation button when [HealerActivation.Available],
- * and a used-today confirmation when [HealerActivation.UsedToday]. Renders nothing when neither a
- * healer is held nor a window is open, to avoid cluttering the screen for the common case.
+ * and a used-today confirmation when [HealerActivation.UsedToday]. Inventory stays visible
+ * at zero so the earning rule remains discoverable.
  */
 @Composable
 private fun StreakHealerCard(streakHealer: StreakHealerState, onActivateHealer: () -> Unit) {
     val activation = streakHealer.activation
-    if (!streakHealer.healerHeld && activation == HealerActivation.Unavailable) return
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -195,7 +194,7 @@ private fun StreakHealerCard(streakHealer: StreakHealerState, onActivateHealer: 
                     modifier = Modifier.size(20.dp),
                 )
                 Text(
-                    text = stringResource(R.string.progress_streak_healer_title),
+                    text = stringResource(R.string.progress_streak_healer_title, streakHealer.healerCount),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(start = 8.dp),
@@ -222,7 +221,7 @@ private fun StreakHealerCard(streakHealer: StreakHealerState, onActivateHealer: 
                 }
 
                 HealerActivation.Unavailable -> {
-                    // streakHealer.healerHeld is true here (guarded above): show the held badge.
+                    // Keep the earning explanation visible even with empty inventory.
                     Text(
                         text = stringResource(R.string.progress_streak_healer_held_body),
                         style = MaterialTheme.typography.bodyMedium,

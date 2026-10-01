@@ -24,8 +24,8 @@ import com.pirxhio.affirmity.R
 
 /**
  * Full-screen celebration shown once, right when [com.pirxhio.affirmity.data.StreakHealerState]
- * transitions from not-held to held — a mini explanation of what the healer does, since it's the
- * user's first exposure to the mechanic. Everyday held/available/used-today states keep living in
+ * inventory increases, including the second healer — a reminder of earning and activation.
+ * Everyday held/available/used-today states keep living in
  * [com.pirxhio.affirmity.ui.progress.ProgressScreen]'s StreakHealerCard.
  */
 @Composable

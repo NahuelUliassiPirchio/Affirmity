@@ -103,6 +103,21 @@ describe('evaluateSendEligibility', () => {
     expect(result).toEqual({ eligible: false, reason: 'streak-no-longer-at-risk' });
   });
 
+  it('permits the next missed-day alert with one healer remaining', () => {
+    const localDay = LOCAL_DAY + 2;
+    const result = evaluateSendEligibility({
+      ...baseInput,
+      channel: 'healer',
+      localDay,
+      nowMillis: NOON_UTC + 2 * 86_400_000,
+      completions: [6, 5, 4, 3].map((offset) => ({
+        epochDay: localDay - offset, meditationDone: true, affirmationDone: true,
+      })),
+      healerUses: [{ healedEpochDay: localDay - 2 }],
+    });
+    expect(result).toEqual({ eligible: true });
+  });
+
   it('skips a healer task when the healer was activated after planning', () => {
     const result = evaluateSendEligibility({
       ...baseInput,

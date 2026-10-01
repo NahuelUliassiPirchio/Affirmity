@@ -24,6 +24,37 @@ export function healerStartEpochDay(todayEpochDay: number): number {
   return Math.max(todayEpochDay - HEALER_LOOKBACK_DAYS, HEALER_EPOCH_START_DAY);
 }
 
+export interface HealerInventory {
+  healerCount: number;
+  pairProgress: number;
+}
+
+/** Replay non-overlapping complete-day pairs and unique healed-day consumption. */
+export function deriveHealerInventory(rows: Completion[], uses: HealerUse[], todayEpochDay: number): HealerInventory {
+  const byDay = new Map(rows.map((row) => [row.epochDay, row]));
+  const healedDays = new Set(uses.map((use) => use.healedEpochDay));
+  let healerCount = 0;
+  let pairProgress = 0;
+  for (let day = healerStartEpochDay(todayEpochDay); day <= todayEpochDay; day++) {
+    const row = byDay.get(day);
+    if (healedDays.has(day)) {
+      healerCount = Math.max(0, healerCount - 1);
+      pairProgress = 0;
+    } else if (healerCount === 2) {
+      pairProgress = 0;
+    } else if (row?.meditationDone && row.affirmationDone) {
+      pairProgress++;
+      if (pairProgress === 2) {
+        healerCount++;
+        pairProgress = 0;
+      }
+    } else {
+      pairProgress = 0;
+    }
+  }
+  return { healerCount, pairProgress };
+}
+
 /**
  * Streak-healer-available trigger condition: `todayEpochDay - 1` broke the streak (zero activity,
  * with an alive day or the window floor right before it), a healer was held going into that break,
@@ -36,20 +67,8 @@ export function shouldFireHealerAlert(rows: Completion[], uses: HealerUse[], tod
     const row = byDay.get(day);
     return row ? row.meditationDone || row.affirmationDone : false;
   };
-  const isFullDay = (day: number) => {
-    const row = byDay.get(day);
-    return row ? row.meditationDone && row.affirmationDone : false;
-  };
   const healedDays = new Set(uses.map((use) => use.healedEpochDay));
   const effectiveDone = (day: number) => hasActivity(day) || healedDays.has(day);
-
-  let held = false;
-  let fullDayStreak = 0;
-  for (let day = startEpochDay; day <= todayEpochDay; day++) {
-    fullDayStreak = isFullDay(day) ? fullDayStreak + 1 : 0;
-    if (fullDayStreak >= 2 && !held) held = true;
-    if (healedDays.has(day)) held = false;
-  }
 
   const breakCandidate = todayEpochDay - 1;
   const isBreakDay =
@@ -57,7 +76,7 @@ export function shouldFireHealerAlert(rows: Completion[], uses: HealerUse[], tod
     !hasActivity(breakCandidate) &&
     (breakCandidate === startEpochDay || effectiveDone(breakCandidate - 1));
 
-  return isBreakDay && held && !healedDays.has(breakCandidate);
+  return isBreakDay && deriveHealerInventory(rows, uses, todayEpochDay).healerCount > 0 && !healedDays.has(breakCandidate);
 }
 
 /**

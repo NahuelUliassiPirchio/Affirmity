@@ -112,9 +112,10 @@ private class FakeAffirmationRepository(
 private class FakeDailyCompletionRepository(
     private val flow: Flow<List<DailyCompletionEntity>> = EventedFlow("completions", mutableListOf(), listOf(emptyList())),
     private val earliest: () -> Long? = { null },
+    private val read: suspend () -> List<DailyCompletionEntity> = { emptyList() },
 ) : DailyCompletionRepository {
     override fun observeRange(from: Long, to: Long): Flow<List<DailyCompletionEntity>> = flow
-    override suspend fun getRange(from: Long, to: Long): List<DailyCompletionEntity> = emptyList()
+    override suspend fun getRange(from: Long, to: Long): List<DailyCompletionEntity> = read()
     override suspend fun markMeditation(epochDay: Long) = Unit
     override suspend fun markAffirmation(epochDay: Long) = Unit
     override suspend fun earliestEpochDay(): Long? = earliest()
@@ -130,10 +131,11 @@ private class FakeDailyMoodRepository(
 
 private class FakeStreakHealerRepository(
     private val flow: Flow<List<StreakHealerUseEntity>> = EventedFlow("healerUses", mutableListOf(), listOf(emptyList())),
+    private val read: suspend () -> List<StreakHealerUseEntity> = { emptyList() },
 ) : StreakHealerRepository {
     val recorded = CopyOnWriteArrayList<Long>()
     override fun observeRange(from: Long, to: Long): Flow<List<StreakHealerUseEntity>> = flow
-    override suspend fun getRange(from: Long, to: Long): List<StreakHealerUseEntity> = emptyList()
+    override suspend fun getRange(from: Long, to: Long): List<StreakHealerUseEntity> = read()
     override suspend fun recordUse(healedEpochDay: Long) {
         recorded += healedEpochDay
     }
@@ -338,6 +340,7 @@ private fun buildState(
     fcmTokenRepositoryOverride: FcmTokenRepository? = null,
     fcmTokenProvider: suspend () -> String = { "test-token" },
     fcmTokenOwnershipCoordinator: FcmTokenOwnershipCoordinator = FcmTokenOwnershipCoordinator(),
+    healerTodayEpochDay: () -> Long = { DayClock.epochDay() },
 ): AffirmityAppState {
     val trackerPreferences = mock(TrackerPreferences::class.java)
     whenever(trackerPreferences.observeAffirmationsViewedToday())
@@ -365,6 +368,7 @@ private fun buildState(
 
     return AffirmityAppState(
         scope = scope,
+        healerTodayEpochDay = healerTodayEpochDay,
         local = local,
         remoteSessionFactory = { remote() },
         migrator = migrator,
@@ -390,6 +394,119 @@ private fun buildState(
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AffirmityAppStateSwapTest {
+
+    @Test
+    fun `activation uses fresh inventory and aborts if the day changes during reads`() = runTest {
+        for (crossesMidnight in listOf(false, true)) {
+            val events = mutableListOf<String>()
+            val today = DayClock.epochDay()
+            var clockDay = today
+            val rows = (3 downTo 2).map { DailyCompletionEntity(today - it, meditationDone = true, affirmationDone = true) }
+            val uses = FakeStreakHealerRepository(read = {
+                if (crossesMidnight) clockDay++
+                emptyList()
+            })
+            val state = buildState(
+                local = fakeLocal(events, completions = FakeDailyCompletionRepository(read = { rows }), healerUses = uses),
+                remote = { fakeRemote("uid-day-check", events) },
+                migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+                authRepository = FakeAuthRepository(), scope = backgroundScope,
+                healerTodayEpochDay = { clockDay },
+            )
+            runCurrent()
+            // Rendered state has no healer, but the fresh repository reads have earned one.
+            assertFalse(state.streakHealer.value.healerHeld)
+            state.activateStreakHealer()
+            runCurrent()
+            assertEquals(if (crossesMidnight) emptyList() else listOf(today - 1), uses.recorded.toList())
+        }
+    }
+
+    @Test
+    fun `activation aborts when account changes during fresh reads`() = runTest {
+        val events = mutableListOf<String>()
+        val today = DayClock.epochDay()
+        val rows = (3 downTo 2).map { DailyCompletionEntity(today - it, meditationDone = true, affirmationDone = true) }
+        val readStarted = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val uses = FakeStreakHealerRepository(read = {
+            readStarted.complete(Unit)
+            release.await()
+            emptyList()
+        })
+        val auth = FakeAuthRepository()
+        val state = buildState(
+            local = fakeLocal(events, completions = FakeDailyCompletionRepository(read = { rows }), healerUses = uses),
+            remote = { fakeRemote("uid-stale-activation", events) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = auth, scope = backgroundScope,
+        )
+        runCurrent()
+        state.activateStreakHealer()
+        runCurrent()
+        assertTrue(readStarted.isCompleted)
+        auth.emit(AuthState.SignedIn("uid-stale-activation", null, null))
+        runCurrent()
+        release.complete(Unit)
+        runCurrent()
+        assertEquals(emptyList<Long>(), uses.recorded.toList())
+    }
+
+    @Test
+    fun `session change clears a pending celebration and suppresses loaded inventory`() = runTest {
+        val events = mutableListOf<String>()
+        val today = DayClock.epochDay()
+        val fullRows = (0..3).map { DailyCompletionEntity(today - 3 + it, meditationDone = true, affirmationDone = true) }
+        val rows = MutableStateFlow(fullRows.take(2))
+        val auth = FakeAuthRepository()
+        val state = buildState(
+            local = fakeLocal(events, completions = FakeDailyCompletionRepository(rows)),
+            remote = { fakeRemote("uid-healer-swap", events, completions = FakeDailyCompletionRepository(flowOf(fullRows))) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = auth, scope = backgroundScope,
+        )
+        runCurrent()
+        rows.value = fullRows
+        runCurrent()
+        assertTrue(state.healerJustGranted.value)
+        auth.emit(AuthState.SignedIn("uid-healer-swap", null, null))
+        runCurrent()
+        assertEquals(2, state.streakHealer.value.healerCount)
+        assertFalse(state.healerJustGranted.value)
+        auth.emit(AuthState.SignedOut)
+        runCurrent()
+        assertFalse(state.healerJustGranted.value)
+    }
+
+    @Test
+    fun `second observed healer grant celebrates while initialization repeats and spends do not`() = runTest {
+        val events = mutableListOf<String>()
+        val today = DayClock.epochDay()
+        val fullRows = (0..3).map { DailyCompletionEntity(today - 3 + it, meditationDone = true, affirmationDone = true) }
+        val rows = MutableStateFlow(fullRows.take(2))
+        val uses = MutableStateFlow<List<StreakHealerUseEntity>>(emptyList())
+        val state = buildState(
+            local = fakeLocal(events, completions = FakeDailyCompletionRepository(rows), healerUses = FakeStreakHealerRepository(uses)),
+            remote = { fakeRemote("uid-healer", events) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = FakeAuthRepository(), scope = backgroundScope,
+        )
+        runCurrent()
+        assertEquals(1, state.streakHealer.value.healerCount)
+        assertFalse(state.healerJustGranted.value)
+        rows.value = fullRows
+        runCurrent()
+        assertEquals(2, state.streakHealer.value.healerCount)
+        assertTrue(state.healerJustGranted.value)
+        state.acknowledgeHealerGrant()
+        rows.value = fullRows + DailyCompletionEntity(today - 10, meditationDone = true)
+        runCurrent()
+        assertFalse(state.healerJustGranted.value)
+        uses.value = listOf(StreakHealerUseEntity(today - 1, 0))
+        runCurrent()
+        assertEquals(0, state.streakHealer.value.healerCount)
+        assertFalse(state.healerJustGranted.value)
+    }
 
     @Test
     fun `sign-out deletes the departing user's device token before signing out`() = runTest {

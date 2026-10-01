@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  deriveHealerInventory,
   shouldFireHealerAlert,
   isHealerExpiringToday,
   HEALER_EPOCH_START_DAY,
@@ -86,5 +87,74 @@ describe('isHealerExpiringToday', () => {
     const uses: HealerUse[] = [{ healedEpochDay: start + 2 }];
 
     expect(isHealerExpiringToday(rows, uses, start + 3)).toBe(false);
+  });
+});
+
+describe('deriveHealerInventory', () => {
+  it('awards balances zero one one two for four complete days', () => {
+    const rows = [0, 1, 2, 3].map((offset) => fullDay(start + offset));
+    expect([0, 1, 2, 3].map((offset) => deriveHealerInventory(rows, [], start + offset).healerCount))
+      .toEqual([0, 1, 1, 2]);
+    expect([0, 1, 2, 3].map((offset) => deriveHealerInventory(rows, [], start + offset).pairProgress))
+      .toEqual([1, 0, 1, 0]);
+  });
+});
+
+describe('inventory replay parity', () => {
+  it.each([
+    [[{ epochDay: start + 1, meditationDone: true, affirmationDone: false }], []],
+    [[{ epochDay: start + 1, meditationDone: false, affirmationDone: true }], []],
+    [[], []],
+    [[], [{ healedEpochDay: start + 1 }]],
+  ])('interruptions reset a pair without earning', (middle, uses) => {
+    expect(deriveHealerInventory([fullDay(start), ...middle, fullDay(start + 2)], uses, start + 2))
+      .toEqual({ healerCount: 0, pairProgress: 1 });
+  });
+
+  it('does not bank credit at capacity and refills from a fresh activation-day pair', () => {
+    const rows = Array.from({ length: 9 }, (_, offset) => fullDay(start + offset));
+    const uses = [{ healedEpochDay: start + 9 }];
+    expect(deriveHealerInventory(rows, [], start + 8)).toEqual({ healerCount: 2, pairProgress: 0 });
+    expect(deriveHealerInventory(rows, uses, start + 10)).toEqual({ healerCount: 1, pairProgress: 0 });
+    const completedFirst = [...rows, fullDay(start + 10)];
+    expect(deriveHealerInventory(completedFirst, [], start + 10)).toEqual({ healerCount: 2, pairProgress: 0 });
+    expect(deriveHealerInventory(completedFirst, uses, start + 10)).toEqual({ healerCount: 1, pairProgress: 1 });
+    expect(deriveHealerInventory([...completedFirst, fullDay(start + 11)], uses, start + 11))
+      .toEqual({ healerCount: 2, pairProgress: 0 });
+  });
+
+  it('spends one per successive missed day and deduplicates uses', () => {
+    const rows = [0, 1, 2, 3].map((offset) => fullDay(start + offset));
+    const first = [{ healedEpochDay: start + 4 }, { healedEpochDay: start + 4 }];
+    expect(deriveHealerInventory(rows, first, start + 5)).toEqual({ healerCount: 1, pairProgress: 0 });
+    expect(shouldFireHealerAlert(rows, first, start + 5)).toBe(false);
+    expect(shouldFireHealerAlert(rows, first, start + 6)).toBe(true);
+    expect(isHealerExpiringToday(rows, first, start + 6)).toBe(true);
+    const second = [...first, { healedEpochDay: start + 5 }];
+    expect(deriveHealerInventory(rows, second, start + 6)).toEqual({ healerCount: 0, pairProgress: 0 });
+    expect(shouldFireHealerAlert(rows, second, start + 6)).toBe(false);
+  });
+
+  it('preserves orphan and conflicting historical healing without debt or earning', () => {
+    const rows = [0, 1, 2].map((offset) => fullDay(start + offset));
+    const uses = [{ healedEpochDay: start }, { healedEpochDay: start + 1 }, { healedEpochDay: start + 1 }];
+    expect(deriveHealerInventory(rows, uses, start + 2)).toEqual({ healerCount: 0, pairProgress: 1 });
+  });
+
+  it('uses inclusive lookback and rollout bounds', () => {
+    const today = HEALER_EPOCH_START_DAY + 400;
+    const floor = today - 370;
+    const rows = [-2, -1, 0, 1, 2, 3].map((offset) => fullDay(floor + offset));
+    expect(deriveHealerInventory(rows, [], today)).toEqual({ healerCount: 2, pairProgress: 0 });
+    expect(deriveHealerInventory([fullDay(floor - 1), fullDay(floor)], [], today).healerCount).toBe(0);
+    expect(deriveHealerInventory([0, 1, 2, 3].map((offset) => fullDay(HEALER_EPOCH_START_DAY + offset)), [], HEALER_EPOCH_START_DAY + 3).healerCount).toBe(2);
+  });
+
+  it('declining retains both healers after expiry and an active yesterday is ineligible', () => {
+    const rows = [0, 1, 2, 3].map((offset) => fullDay(start + offset));
+    expect(shouldFireHealerAlert(rows, [], start + 5)).toBe(true);
+    expect(shouldFireHealerAlert(rows, [], start + 6)).toBe(false);
+    expect(deriveHealerInventory(rows, [], start + 6).healerCount).toBe(2);
+    expect(shouldFireHealerAlert([...rows, fullDay(start + 5)], [], start + 6)).toBe(false);
   });
 });
