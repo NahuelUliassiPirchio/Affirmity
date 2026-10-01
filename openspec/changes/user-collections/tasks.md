@@ -40,17 +40,17 @@ Paths relative to `app/src/main/java/com/pirxhio/affirmity/`. Tests: `./gradlew 
 
 ## Slice B: AppState + feed union
 
-- [ ] 2.1 RED: `UserCollectionsTest` for `validateCollectionName` (trim, blank, 41, case-insensitive dup, Unicode), `canCreateUserCollection`
-- [ ] 2.2 RED: tests for `resolveEnabledCollectionRows` (dedupe, hidden, locked, owned-only pre-resolution) and `isDraftThemeSelectionValid` collections-only/nothing
-- [ ] 2.3 GREEN: create `data/UserCollections.kt` (model, constants, pure functions)
-- [ ] 2.4 RED: `RecordingUserCollectionRepository` fake + `AffirmityAppStateUserCollectionsTest` (create, Free limit, downgrade, toggle ON bumps / OFF does not, last chip off allowed, Mutex order)
-- [ ] 2.5 RED: feed tests (union, disabled, two collections once, hidden, Pro-locked, pre-resolution, no reshuffle)
-- [ ] 2.6 RED: cleanup tests (`removeAffirmation`, replace-import clears owned ids only)
-- [ ] 2.7 GREEN: `AffirmityAppState.kt` ctor params (`collectionRepository`, clock, id factory), collector, `userCollections`, `canCreateCollection`, `collectionIdsFor`
-- [ ] 2.8 GREEN: write API (create/rename/delete/add/remove/enable/toggle) under `userCollectionMutex`
-- [ ] 2.9 GREEN: collections segment in `filteredAffirmations`, validity rule, cleanup hooks
-- [ ] 2.10 GREEN: wire `RoomUserCollectionRepository` at composition root (~L2121)
-- [ ] 2.11 REFACTOR: tidy, full unit suite green
+- [x] 2.1 RED: `UserCollectionsTest` for `validateCollectionName` (trim, blank, 41, case-insensitive dup, Unicode), `canCreateUserCollection`
+- [x] 2.2 RED: tests for `resolveEnabledCollectionRows` (dedupe, hidden, locked, owned-only pre-resolution) and `isDraftThemeSelectionValid` collections-only/nothing
+- [x] 2.3 GREEN: create `data/UserCollections.kt` (model, constants, pure functions)
+- [x] 2.4 RED: `RecordingUserCollectionRepository` fake + `AffirmityAppStateUserCollectionsTest` (create, Free limit, downgrade, toggle ON bumps / OFF does not, last chip off allowed, Mutex order)
+- [x] 2.5 RED: feed tests (union, disabled, two collections once, hidden, Pro-locked, pre-resolution, no reshuffle)
+- [x] 2.6 RED: cleanup tests (`removeAffirmation`, replace-import clears owned ids only)
+- [x] 2.7 GREEN: `AffirmityAppState.kt` ctor params (`collectionRepository`, clock, id factory), collector, `userCollections`, `canCreateCollection`, `userCollectionIdsFor`
+- [x] 2.8 GREEN: write API (create/rename/delete/add/remove/enable/toggle) under `userCollectionMutex`
+- [x] 2.9 GREEN: collections segment in `filteredAffirmations`, validity rule, cleanup hooks
+- [x] 2.10 GREEN: wire `RoomUserCollectionRepository` at composition root (~L2121)
+- [x] 2.11 REFACTOR: tidy, full unit suite green
 
 ## Slice C: UI
 

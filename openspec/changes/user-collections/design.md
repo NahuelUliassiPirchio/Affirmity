@@ -16,7 +16,7 @@ Verified against the source: `isDraftThemeSelectionValid` is at L306 and `filter
 | D4 | Check name uniqueness in Kotlin (`trim().lowercase(Locale.ROOT)`), re-checked under the Mutex | `COLLATE NOCASE` unique index | NOCASE only folds ASCII, so "Ánimo" and "ánimo" would both pass. It would also change the exported schema. |
 | D5 | Rely on the FK `ON DELETE CASCADE` for items; no FK on `affirmationId` | Manual item delete | Affirmation ids live in two stores (owned in Room/Firestore, catalog `cat_`). Room turns on `PRAGMA foreign_keys` when entities declare FKs. |
 | D6 | Pure generic `resolveEnabledCollectionRows` | Inline logic in the getter | Unit-testable without Compose state. It reuses the same eligibility lambda as favorites. |
-| D7 | `createCollection` validates synchronously against in-memory state and returns a result, then the async write re-validates | `suspend` API / error state field | The UI gets inline errors right away, and the Mutex re-check closes the double-tap race. |
+| D7 | `suspend createCollection`/`renameCollection` validate against the repository under the Mutex and return that authoritative result (revised in the batch 2 fix pass) | Sync in-memory pre-check + async write (returned Ok while the write could silently fail) | The returned value is exactly what was persisted, and the Mutex closes the double-tap race. |
 | D8 | Host the collection picker in MainActivity; `AffirmationsScreen` only emits `onAddToCollection(id)` | Picker inside `AffirmationsScreen` | Keeps the screen presentational and avoids threading 6 more params through it. |
 | D9 | Inject clock and UUID factory as ctor params (`collectionClock`, `collectionIdFactory`) with defaults | `System.currentTimeMillis()` inline | Makes ordering and ids testable in tests. Existing tests are unaffected. |
 
@@ -100,8 +100,8 @@ internal fun isDraftThemeSelectionValid(draftThemeIds: Set<String>, feedSources:
 AppState API:
 - `userCollections: List<UserCollectionUi>`. `resolvedItemCount` is computed from `allAffirmations`, so orphan ids do not count.
 - `canCreateCollection`
-- `collectionIdsFor(affirmationId): Set<String>`
-- `createCollection(name, withAffirmationId: String? = null): CollectionNameResult`
+- `userCollectionIdsFor(affirmationId): Set<String>`
+- `suspend createCollection(name, withAffirmationId: String? = null): CollectionNameResult`
 - `renameCollection(id, name): CollectionNameResult`
 - `deleteCollection(id)`
 - `addToCollection(cid, aid)` and `removeFromCollection(cid, aid)`
@@ -124,7 +124,7 @@ sequenceDiagram
   participant R as UserCollectionRepository
   U->>S: long-press > "Add to collection"
   S->>M: onAddToCollection(aid)
-  M->>A: collectionIdsFor(aid), canCreateCollection
+  M->>A: userCollectionIdsFor(aid), canCreateCollection
   U->>M: "Create new" + name
   M->>A: createCollection(name, aid)
   A-->>M: Ok | Blank | TooLong | Duplicate | LimitReached (sync)
