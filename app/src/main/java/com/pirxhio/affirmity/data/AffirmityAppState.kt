@@ -96,6 +96,7 @@ import com.pirxhio.affirmity.data.repository.DataSession
 import com.pirxhio.affirmity.data.repository.FavoriteAffirmationRepository
 import com.pirxhio.affirmity.data.repository.NoOpCatalogAffirmationRepository
 import com.pirxhio.affirmity.data.repository.NoOpFavoriteAffirmationRepository
+import com.pirxhio.affirmity.data.repository.NoOpUserCollectionRepository
 import com.pirxhio.affirmity.data.repository.RoomAdUnlockRepository
 import com.pirxhio.affirmity.data.repository.RoomAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomCatalogAffirmationRepository
@@ -106,6 +107,8 @@ import com.pirxhio.affirmity.data.repository.RoomFavoriteAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomMeditationPreferencesRepository
 import com.pirxhio.affirmity.data.repository.RoomNotificationSettingsRepository
 import com.pirxhio.affirmity.data.repository.RoomStreakHealerRepository
+import com.pirxhio.affirmity.data.repository.RoomUserCollectionRepository
+import com.pirxhio.affirmity.data.repository.UserCollectionRepository
 import com.pirxhio.affirmity.meditation.SessionEndReason
 import com.pirxhio.affirmity.notifications.FcmMessageHandler
 import com.pirxhio.affirmity.notifications.applyTo
@@ -302,9 +305,14 @@ fun resolveSelectedThemeIds(
  *  zero themes selected (see its kdoc), so requiring a theme on top of that blocked users from
  *  running a feed made entirely of favourites and/or their own affirmations. `personalizadas`
  *  itself never factors in here (scope decision #2) -- it is no longer part of the toggleable
- *  theme selection at all, so it can't satisfy or violate this. */
-internal fun isDraftThemeSelectionValid(draftThemeIds: Set<String>, feedSources: FeedSources): Boolean =
-    draftThemeIds.isNotEmpty() || feedSources.includeFavorites || feedSources.includeOwn
+ *  theme selection at all, so it can't satisfy or violate this. At least one enabled user
+ *  collection ([anyCollectionEnabled]) is also a valid carrier. */
+internal fun isDraftThemeSelectionValid(
+    draftThemeIds: Set<String>,
+    feedSources: FeedSources,
+    anyCollectionEnabled: Boolean = false,
+): Boolean =
+    draftThemeIds.isNotEmpty() || feedSources.includeFavorites || feedSources.includeOwn || anyCollectionEnabled
 
 /**
  * Pure migration-default resolution for the onboarding guide's tri-state "seen" flag (spec R1.3,
@@ -503,6 +511,14 @@ class AffirmityAppState(
     private val feedSeedSource: () -> Long = { Random.nextLong() },
     /** Fresh day reads around activation suspensions; default retains device-local boundaries. */
     private val healerTodayEpochDay: () -> Long = { DayClock.epochDay() },
+    /** Device-local user collections (design D2): deliberately OUTSIDE [DataSession], defaulted to
+     *  [NoOpUserCollectionRepository] so every existing JVM test construction is unaffected. Named
+     *  `collectionRepository` so it never clashes with the [userCollections] UI property. */
+    private val collectionRepository: UserCollectionRepository = NoOpUserCollectionRepository,
+    /** Wall clock for collection writes (design D9): `lastUsedAtMillis`/`createdAtMillis`. */
+    private val collectionClock: () -> Long = { System.currentTimeMillis() },
+    /** Id factory for new collections (design D9). */
+    private val collectionIdFactory: () -> String = { UUID.randomUUID().toString() },
 ) {
     val affirmations = mutableStateListOf<Affirmation>()
 
@@ -543,6 +559,30 @@ class AffirmityAppState(
     private var favoriteOrderedIds = mutableStateOf<List<String>>(emptyList())
     private val favoriteToggleMutex = Mutex()
 
+    /** Latest emission of [collectionRepository], in chip order. */
+    private val collectionsState = mutableStateOf<List<UserCollection>>(emptyList())
+
+    /** Serialises every collection write (and the re-validation each one does) -- design D7. */
+    private val userCollectionMutex = Mutex()
+
+    /** Chips for the UI, in chip order. `resolvedItemCount` only counts affirmations that still
+     *  exist (orphan ids excluded), including Pro-locked or hidden rows -- those stay members. */
+    val userCollections: List<UserCollectionUi>
+        get() = collectionsState.value.toUserCollectionUi(allAffirmations.mapTo(HashSet()) { it.id })
+
+    /** True when at least one collection chip is on. With the feed empty, the UI uses this (plus
+     *  [filteredAffirmations]) to decide between the generic and the collections empty state. */
+    val anyCollectionEnabled: Boolean
+        get() = collectionsState.value.any { it.enabled }
+
+    /** Free tier caps NEW creation at [FREE_COLLECTION_LIMIT]; existing collections stay usable. */
+    val canCreateCollection: Boolean
+        get() = canCreateUserCollection(entitlementTier.value, collectionsState.value.size)
+
+    /** Ids of every collection currently holding [affirmationId], for the picker's toggles. */
+    fun userCollectionIdsFor(affirmationId: String): Set<String> =
+        collectionsState.value.filter { affirmationId in it.affirmationIds }.mapTo(LinkedHashSet()) { it.id }
+
     /** Theme ids the user has committed ("Your feed" refactor). Null until DataStore's first read
      * resolves; the UI shows nothing theme-dependent until then. `personalizadas` is never a
      * member -- it is unconditionally included in the feed instead (scope decision #2). */
@@ -563,7 +603,7 @@ class AffirmityAppState(
      * group-level rule, `personalizadas` never factors in (scope decision #2) -- there is nothing
      * to carve out for it. */
     val isDraftThemeSelectionValid: Boolean
-        get() = isDraftThemeSelectionValid(draftThemeIds.value, draftFeedSources.value)
+        get() = isDraftThemeSelectionValid(draftThemeIds.value, draftFeedSources.value, anyCollectionEnabled)
 
     /** Extended "Actualizar mi feed" dirty check (spec "Extended isDirty Detection"): true when
      *  [draftThemeIds] differs from the committed [selectedThemeIds], or any of
@@ -589,14 +629,23 @@ class AffirmityAppState(
             // toggle either way.
             val own = if (sources.includeOwn) affirmations.filterNot { it.id in hiddenIds } else emptyList()
             val ownIds = affirmations.mapTo(mutableSetOf()) { it.id }
-            // Pre-resolution the feed is owned-rows-only (see kdoc), so a favourite can only
-            // contribute an owned row here -- never a catalog one, whose access cannot be judged
-            // before the theme selection resolves.
+            // Members of every enabled collection that pass [eligible]. Skips building the id map
+            // when no collection is enabled.
+            fun collectionRows(eligible: (Affirmation) -> Boolean): List<Affirmation> =
+                if (!anyCollectionEnabled) {
+                    emptyList()
+                } else {
+                    val byId = allAffirmations.associateBy { it.id }
+                    resolveEnabledCollectionRows(collectionsState.value, byId::get, eligible)
+                }
+            // Pre-resolution the feed is owned-rows-only (see kdoc), so a favourite or collection
+            // member can only contribute an owned row here -- never a catalog one, whose access
+            // cannot be judged before the theme selection resolves.
             val ids = selectedThemeIds.value ?: return orderFeed(
                 (
                     own + favoriteAffirmations.filter {
                         sources.includeFavorites && it.id in ownIds && it.id !in hiddenIds
-                    }
+                    } + collectionRows { it.id in ownIds && it.id !in hiddenIds }
                     ).distinctBy { it.id },
                 sources,
                 idOf = { it.id },
@@ -632,9 +681,16 @@ class AffirmityAppState(
             } else {
                 emptyList()
             }
+            // Enabled collections add to the feed on top of every other source, with the exact same
+            // eligibility as a favourite: hidden outranks membership, Pro-locked catalog rows stay
+            // in the collection but out of the feed.
+            val fromCollections = collectionRows { affirmation ->
+                affirmation.id !in hiddenIds &&
+                    (affirmation.id in ownIds || catalogRowUnlocked(affirmation))
+            }
             return orderFeed(
                 (
-                    own + favorites + catalogAffirmations.filter { affirmation ->
+                    own + favorites + fromCollections + catalogAffirmations.filter { affirmation ->
                         affirmation.id !in hiddenIds &&
                             collectionsById[affirmation.collectionId]?.themeId in ids &&
                             catalogRowUnlocked(affirmation)
@@ -958,6 +1014,11 @@ class AffirmityAppState(
                     favoriteOrderedIds.value = ids
                     favoriteAffirmationIds.value = ids.toSet()
                 }
+        }
+        scope.launch {
+            collectionRepository.observeCollections()
+                .catch { error -> Log.e(TAG, "user collections flow failed", error) }
+                .collect { collectionsState.value = it }
         }
         scope.launch {
             session.flatMapLatest { it.affirmations.observeAll() }
@@ -1489,8 +1550,14 @@ class AffirmityAppState(
         scope.launch {
             val affirmationsRepo = ready().affirmations
             if (replaceExisting) {
+                // Snapshot BEFORE deleteAll(): only the owned rows this wipe removes lose their
+                // collection memberships; catalog memberships and the collections themselves stay.
+                val ownedIds = affirmations.map { it.id }
                 affirmationsRepo.deleteAll()
                 favorites.clear()
+                if (ownedIds.isNotEmpty()) {
+                    userCollectionMutex.withLock { collectionRepository.removeAffirmations(ownedIds) }
+                }
             }
 
             var failedCount = 0
@@ -1529,6 +1596,7 @@ class AffirmityAppState(
         scope.launch {
             ready().affirmations.deleteById(id)
             favorites.remove(id)
+            userCollectionMutex.withLock { collectionRepository.removeAffirmations(listOf(id)) }
             analytics.log(AnalyticsEvent.CustomAffirmationDeleted)
         }
     }
@@ -1564,6 +1632,97 @@ class AffirmityAppState(
         // Same "add" direction as toggleFavorite's add branch (spec "Signal emission at existing
         // feature call sites") -- an undo-restore is still the user choosing to keep this favorited.
         recordPersonalizationSignal(SignalType.AFFIRMATION_SAVED, id)
+    }
+
+    /**
+     * Validates against the repository under [userCollectionMutex] and writes in the same critical
+     * section, so the returned verdict is AUTHORITATIVE: it is exactly what was (or was not)
+     * persisted, closing the double-tap race (design D7). The new collection starts enabled.
+     */
+    suspend fun createCollection(name: String, withAffirmationId: String? = null): CollectionNameResult =
+        userCollectionMutex.withLock {
+            val verdict = validateNewCollection(name, collectionRepository.getCollections(), entitlementTier.value)
+            if (verdict is CollectionNameResult.Ok) {
+                collectionRepository.create(
+                    id = collectionIdFactory(),
+                    name = verdict.name,
+                    nowMillis = collectionClock(),
+                    initialAffirmationId = withAffirmationId,
+                )
+            }
+            verdict
+        }
+
+    /** Rename is never tier-gated: a downgraded user keeps full use of existing collections. The
+     *  returned verdict is authoritative, like [createCollection]'s. */
+    suspend fun renameCollection(userCollectionId: String, name: String): CollectionNameResult =
+        userCollectionMutex.withLock {
+            val verdict = validateCollectionName(
+                name,
+                collectionRepository.getCollections(),
+                excludingId = userCollectionId,
+            )
+            if (verdict is CollectionNameResult.Ok) collectionRepository.rename(userCollectionId, verdict.name)
+            verdict
+        }
+
+    fun deleteCollection(userCollectionId: String) {
+        scope.launch { userCollectionMutex.withLock { collectionRepository.delete(userCollectionId) } }
+    }
+
+    /** Idempotent: re-adding an existing member is a no-op in the repository. A collection deleted
+     *  in the meantime is skipped (the item insert would violate the foreign key). */
+    fun addToCollection(userCollectionId: String, affirmationId: String) {
+        scope.launch {
+            userCollectionMutex.withLock {
+                if (!userCollectionExists(userCollectionId)) return@withLock
+                collectionRepository.addItem(userCollectionId, affirmationId, collectionClock())
+            }
+        }
+    }
+
+    fun removeFromCollection(userCollectionId: String, affirmationId: String) {
+        scope.launch {
+            userCollectionMutex.withLock {
+                if (!userCollectionExists(userCollectionId)) return@withLock
+                collectionRepository.removeItem(userCollectionId, affirmationId)
+            }
+        }
+    }
+
+    /** Chip toggle applied immediately (no draft/commit). Only turning ON bumps `lastUsedAtMillis`;
+     *  turning the last enabled chip OFF is allowed. */
+    fun setCollectionEnabled(userCollectionId: String, enabled: Boolean) {
+        scope.launch {
+            userCollectionMutex.withLock {
+                if (!userCollectionExists(userCollectionId)) return@withLock
+                writeCollectionEnabled(userCollectionId, enabled)
+            }
+        }
+    }
+
+    /** Flips the chip from its persisted state, read under the Mutex so rapid taps alternate. */
+    fun toggleCollection(userCollectionId: String) {
+        scope.launch {
+            userCollectionMutex.withLock {
+                val current = collectionRepository.getCollections().firstOrNull { it.id == userCollectionId }
+                    ?: return@withLock
+                writeCollectionEnabled(userCollectionId, !current.enabled)
+            }
+        }
+    }
+
+    /** Must be called under [userCollectionMutex]. */
+    private suspend fun userCollectionExists(userCollectionId: String): Boolean =
+        collectionRepository.getCollections().any { it.id == userCollectionId }
+
+    /** Must be called under [userCollectionMutex]. */
+    private suspend fun writeCollectionEnabled(userCollectionId: String, enabled: Boolean) {
+        if (enabled) {
+            collectionRepository.enable(userCollectionId, collectionClock())
+        } else {
+            collectionRepository.disable(userCollectionId)
+        }
     }
 
     /** Hides a catalog affirmation from the main feed (pre-launch audit item #1). Device-local,
@@ -2119,6 +2278,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             fcmTokenRepository = FcmTokenRepository(firestore),
             onboardingRepository = FirestoreOnboardingRepository(firestore),
             favorites = RoomFavoriteAffirmationRepository(database.favoriteAffirmationDao()),
+            collectionRepository = RoomUserCollectionRepository(database.userCollectionDao()),
             catalog = RoomCatalogAffirmationRepository(database.catalogAffirmationDao()),
             catalogSeeder = CatalogSeeder(
                 assetReader = AndroidCatalogAssetReader(context.applicationContext),
