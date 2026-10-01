@@ -73,6 +73,7 @@ fun YourFeedScreen(
     feedSources: FeedSources,
     onFeedSourcesChange: (FeedSources) -> Unit,
     modifier: Modifier = Modifier,
+    yourGroups: @Composable () -> Unit = {},
 ) {
     val selectedThemes = draftThemeIds.mapNotNull { catalogThemesById[it] }.sortedBy { it.label }
 
@@ -111,6 +112,9 @@ fun YourFeedScreen(
                 onSeeAllThemes = onSeeAllThemes,
                 modifier = Modifier.padding(bottom = 16.dp),
             )
+            // User collections shelf (design 7a), between what feeds you and the discovery grid.
+            yourGroups()
+            Spacer(modifier = Modifier.height(16.dp))
             DiscoverySurfaceGrid(
                 surfaces = recommendedSurfaces,
                 draftThemeIds = draftThemeIds,
@@ -355,6 +359,7 @@ fun YourFeedSheetContent(
     feedSources: FeedSources,
     onFeedSourcesChange: (FeedSources) -> Unit,
     modifier: Modifier = Modifier,
+    yourGroups: @Composable () -> Unit = {},
 ) {
     Column(modifier = modifier.fillMaxHeight(0.85f)) {
         FeedSelectorPeekRow(
@@ -382,6 +387,7 @@ fun YourFeedSheetContent(
                 feedSources = feedSources,
                 onFeedSourcesChange = onFeedSourcesChange,
                 modifier = Modifier.weight(1f, fill = true),
+                yourGroups = yourGroups,
             )
         }
     }

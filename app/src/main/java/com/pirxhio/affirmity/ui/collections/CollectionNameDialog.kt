@@ -8,12 +8,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.CollectionNameResult
-import kotlinx.coroutines.launch
 
 /**
  * Name input for creating or renaming a collection. [onSubmit] is a suspend call whose returned
@@ -30,9 +28,7 @@ internal fun CollectionNameDialog(
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf(initialName) }
-    var errorRes by remember { mutableStateOf<Int?>(null) }
-    var submitting by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
+    val submitState = rememberNameSubmitState()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -42,33 +38,18 @@ internal fun CollectionNameDialog(
                 value = name,
                 onValueChange = {
                     name = it
-                    errorRes = null
+                    submitState.clearError()
                 },
                 label = { Text(stringResource(R.string.collection_name_label)) },
                 singleLine = true,
-                isError = errorRes != null,
-                supportingText = errorRes?.let { res -> { Text(stringResource(res)) } },
+                isError = submitState.errorRes != null,
+                supportingText = submitState.errorRes?.let { res -> { Text(stringResource(res)) } },
             )
         },
         confirmButton = {
             TextButton(
-                enabled = !submitting,
-                onClick = {
-                    submitting = true
-                    scope.launch {
-                        // finally re-enables the button however onSubmit ends, so a failure cannot
-                        // leave it disabled forever. Exceptions are deliberately NOT caught: they
-                        // (and cancellation) propagate as before; a swallowed repository error would
-                        // look like a silent no-op to the user.
-                        val result = try {
-                            onSubmit(name)
-                        } finally {
-                            submitting = false
-                        }
-                        errorRes = result.errorStringRes()
-                        if (errorRes == null) onDone()
-                    }
-                },
+                enabled = !submitState.submitting,
+                onClick = { submitState.submit(action = { onSubmit(name) }, onDone = onDone) },
             ) { Text(confirmLabel) }
         },
         dismissButton = {

@@ -4,7 +4,9 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.saveable.Saver
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.CollectionNameResult
+import com.pirxhio.affirmity.data.COLLECTION_NAME_MAX
 import com.pirxhio.affirmity.data.UserCollectionUi
+import com.pirxhio.affirmity.ui.theme.GroupHighlight
 
 /*
  * Pure UI decisions for user collections. Composables only render these values, so a redesigned
@@ -131,3 +133,60 @@ private const val KIND_RENAMING = "renaming"
 private const val KIND_CONFIRMING_DELETE = "confirming_delete"
 
 private fun UserCollectionUi.toSaved(kind: String): List<Any> = listOf(kind, id, name, enabled, resolvedItemCount)
+
+// --- "Your groups" shelf and new-group sheet (design 7a / 7b) ---
+
+enum class GroupFeedStatus { InFeed, NotInFeed }
+
+/** One cover on the "Your groups" shelf: what the card shows, already resolved for rendering. */
+internal data class GroupCardUi(
+    val id: String,
+    val name: String,
+    val highlight: GroupHighlight,
+    val status: GroupFeedStatus,
+    val itemCount: Int,
+) {
+    val inFeed: Boolean get() = status == GroupFeedStatus.InFeed
+}
+
+internal fun UserCollectionUi.toGroupCardUi() = GroupCardUi(
+    id = id,
+    name = name,
+    highlight = GroupHighlight.fromId(highlightId),
+    status = if (enabled) GroupFeedStatus.InFeed else GroupFeedStatus.NotInFeed,
+    itemCount = resolvedItemCount,
+)
+
+internal fun List<UserCollectionUi>.toGroupCards(): List<GroupCardUi> = map { it.toGroupCardUi() }
+
+/** "n/40" counter under the name field; code points, like the validation. */
+internal fun nameCounter(name: String): String = "${name.codePointCount(0, name.length)}/$COLLECTION_NAME_MAX"
+
+internal fun canSubmitNewGroup(name: String): Boolean = name.isNotBlank()
+
+/** Cuts [raw] to [COLLECTION_NAME_MAX] code points so the field cannot grow past what validation accepts. */
+internal fun clampGroupName(raw: String): String {
+    if (raw.codePointCount(0, raw.length) <= COLLECTION_NAME_MAX) return raw
+    return raw.substring(0, raw.offsetByCodePoints(0, COLLECTION_NAME_MAX))
+}
+
+/**
+ * "Start with" choices of the new-group sheet. Only [WriteOwn] is backed by business logic today:
+ * seeding a group from favourites or from a theme needs a bulk-create write that does not exist
+ * yet, so those two render disabled instead of pretending to work.
+ */
+internal enum class GroupStartOption(val available: Boolean) {
+    WriteOwn(available = true),
+    FromFavorites(available = false),
+    RemixTheme(available = false),
+}
+
+@StringRes
+internal fun GroupHighlight.labelRes(): Int = when (this) {
+    GroupHighlight.Teal -> R.string.groups_highlight_teal
+    GroupHighlight.Violet -> R.string.groups_highlight_violet
+    GroupHighlight.Amber -> R.string.groups_highlight_amber
+    GroupHighlight.Rose -> R.string.groups_highlight_rose
+    GroupHighlight.Green -> R.string.groups_highlight_green
+    GroupHighlight.Gold -> R.string.groups_highlight_gold
+}

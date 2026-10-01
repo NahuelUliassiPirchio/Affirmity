@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -18,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -28,6 +31,7 @@ import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.UserCollectionUi
+import com.pirxhio.affirmity.ui.theme.GroupHighlight
 
 /**
  * One toggleable chip per collection, in the order given (already chip order from the app state).
@@ -97,11 +101,20 @@ private fun CollectionChip(
             contentColor = if (collection.enabled) colors.onSecondaryContainer else colors.onSurfaceVariant,
             border = if (collection.enabled) null else BorderStroke(1.dp, colors.outline),
         ) {
-            Text(
-                text = collectionChipLabel(collection),
-                style = MaterialTheme.typography.labelLarge,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            )
+            ) {
+                // The group's highlight as a tilted marker stroke, as on the design's chip rail.
+                Box(
+                    modifier = Modifier
+                        .size(width = 14.dp, height = 8.dp)
+                        .rotate(-8f)
+                        .background(GroupHighlight.fromId(collection.highlightId).color, RoundedCornerShape(2.dp)),
+                )
+                Text(text = collectionChipLabel(collection), style = MaterialTheme.typography.labelLarge)
+            }
         }
     }
 }
