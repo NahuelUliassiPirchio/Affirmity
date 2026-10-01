@@ -221,3 +221,9 @@ internal fun SaveToRow.toggle(): SaveToAction = when (this) {
 
 /** The card's + shows a check once the affirmation lives in Favorites or in any group. */
 internal fun isSaved(isFavorite: Boolean, isInAnyGroup: Boolean): Boolean = isFavorite || isInAnyGroup
+
+/** "Play group" needs something to play: it stays disabled for an empty group. */
+internal fun canPlayGroup(itemCount: Int): Boolean = itemCount > 0
+
+/** The player is driven by a saveable request flag, but never shows over a group that has emptied (e.g. removed items). */
+internal fun shouldShowGroupPlayer(requested: Boolean, itemCount: Int): Boolean = requested && canPlayGroup(itemCount)

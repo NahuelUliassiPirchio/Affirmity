@@ -1049,7 +1049,7 @@
     <string name="affirmation_save_state_not_saved">Sin guardar</string>
     <string name="groups_detail_removed_snackbar">Quitada del grupo</string>
     <string name="groups_detail_undo">Deshacer</string>
-    <string name="groups_detail_play_coming_soon">Próximamente</string>
+    <string name="groups_player_close">Cerrar reproductor</string>
     <string name="groups_open_group_action">Abrir grupo</string>
     <string name="groups_new_name_counter_a11y">%1$d de %2$d caracteres</string>
     <string name="status_streak_active_today">Racha activa hoy</string>

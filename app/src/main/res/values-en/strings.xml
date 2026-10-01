@@ -622,7 +622,7 @@
     <string name="affirmation_save_state_not_saved">Not saved</string>
     <string name="groups_detail_removed_snackbar">Removed from group</string>
     <string name="groups_detail_undo">Undo</string>
-    <string name="groups_detail_play_coming_soon">Coming soon</string>
+    <string name="groups_player_close">Close player</string>
     <string name="groups_open_group_action">Open group</string>
     <string name="groups_new_name_counter_a11y">%1$d of %2$d characters</string>
     <string name="status_streak_active_today">Streak active today</string>

@@ -234,8 +234,9 @@ fun AffirmationsScreen(
     }
 }
 
+/** [readOnly] renders just the card (background, scrim, text): no gestures, token editing, save button or actions sheet. */
 @Composable
-private fun AffirmationCard(
+internal fun AffirmationCard(
     affirmation: Affirmation,
     isFavorite: Boolean,
     onToggleFavorite: () -> Unit,
@@ -247,6 +248,7 @@ private fun AffirmationCard(
     onEnterCleanScreen: () -> Unit,
     onAddToCollection: (() -> Unit)?,
     isInAnyGroup: Boolean,
+    readOnly: Boolean = false,
 ) {
     var cardPositionInRoot by remember(affirmation.id) { mutableStateOf(Offset.Zero) }
     var cardSize by remember(affirmation.id) { mutableStateOf(IntSize.Zero) }
@@ -319,12 +321,18 @@ private fun AffirmationCard(
                 cardPositionInRoot = coordinates.positionInRoot()
                 cardSize = coordinates.size
             }
-            .pointerInput(affirmation.id, favoriteGesture) {
-                detectTapGestures(
-                    onDoubleTap = { offset -> requestLikeBurst(offset) },
-                    onLongPress = { showActions = true },
-                )
-            }
+            .then(
+                if (readOnly) {
+                    Modifier
+                } else {
+                    Modifier.pointerInput(affirmation.id, favoriteGesture) {
+                        detectTapGestures(
+                            onDoubleTap = { offset -> requestLikeBurst(offset) },
+                            onLongPress = { showActions = true },
+                        )
+                    }
+                },
+            )
     ) {
         val background = affirmation.background
         if (background is AffirmationBackground.Image) {
@@ -373,9 +381,9 @@ private fun AffirmationCard(
                     style = MaterialTheme.typography.headlineLarge,
                     color = Color.White,
                     tokenStyle = tokenStyle,
-                    editable = true,
+                    editable = !readOnly,
                     onOverrideCommitted = onOverrideCommitted,
-                    favoriteTapEnabled = true,
+                    favoriteTapEnabled = !readOnly,
                     onFavoriteToggleFromToken = {
                         requestLikeBurst(Offset(cardSize.width / 2f, cardSize.height / 2f))
                     },
@@ -396,9 +404,9 @@ private fun AffirmationCard(
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color(0xFFCCCCCC),
                         tokenStyle = tokenStyle,
-                        editable = true,
+                        editable = !readOnly,
                         onOverrideCommitted = onOverrideCommitted,
-                        favoriteTapEnabled = true,
+                        favoriteTapEnabled = !readOnly,
                         onFavoriteToggleFromToken = {
                             requestFavoriteToggle(Offset(cardSize.width / 2f, cardSize.height / 2f))
                         },
@@ -412,7 +420,7 @@ private fun AffirmationCard(
             onBurstFinished = { burstId -> bursts.removeAll { it.id == burstId } },
             modifier = Modifier.fillMaxSize(),
         )
-        if (!isCleanScreen) {
+        if (!isCleanScreen && !readOnly) {
             val saved = isSaved(isFavorite, isInAnyGroup)
             // Stable label; the saved/not-saved state is announced only through stateDescription.
             val saveButtonDescription = stringResource(R.string.affirmation_save_to)

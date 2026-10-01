@@ -28,7 +28,11 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -47,8 +51,8 @@ import com.pirxhio.affirmity.data.UserCollectionUi
 /**
  * Group detail (design 7a): cover, name and count, the group's affirmations and an overflow button that opens the existing rename/delete flow.
  *
- * "Play group" renders disabled and the reorder handle is replaced by a remove button: neither a
- * playback mode for a group nor manual ordering exists in the business logic yet.
+ * "Play group" opens [GroupPlayerDialog] over the sheet; the reorder handle is replaced by a remove
+ * button because manual ordering doesn't exist in the business logic yet.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,6 +65,7 @@ internal fun GroupDetailSheet(
     onDismiss: () -> Unit,
 ) {
     val card = collection.toGroupCardUi()
+    var playing by rememberSaveable { mutableStateOf(false) }
     // The app-level SnackbarHost sits behind modal sheets, so Undo lives in a host of its own here.
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -113,18 +118,13 @@ internal fun GroupDetailSheet(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.Top,
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            // TODO: group playback has no business logic yet; enable once a "play" mode exists.
-                            OutlinedButton(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) {
-                                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Text(stringResource(R.string.groups_detail_play), modifier = Modifier.padding(start = 6.dp))
-                            }
-                            Text(
-                                text = stringResource(R.string.groups_detail_play_coming_soon),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(start = 4.dp, top = 4.dp),
-                            )
+                        OutlinedButton(
+                            onClick = { playing = true },
+                            enabled = canPlayGroup(affirmations.size),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Text(stringResource(R.string.groups_detail_play), modifier = Modifier.padding(start = 6.dp))
                         }
                         OutlinedButton(onClick = onMore) {
                             Icon(
@@ -195,6 +195,9 @@ internal fun GroupDetailSheet(
                 }
             }
             SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
+        }
+        if (shouldShowGroupPlayer(requested = playing, itemCount = affirmations.size)) {
+            GroupPlayerDialog(affirmations = affirmations, onDismiss = { playing = false })
         }
     }
 }
