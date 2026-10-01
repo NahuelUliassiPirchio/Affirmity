@@ -4,6 +4,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import com.pirxhio.affirmity.data.COLLECTION_NAME_MAX
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -58,8 +69,6 @@ private val PreviewCoverSize = 124.dp
 private val PreviewCoverCorner = 18.dp
 private val PreviewNameSize = 21.sp
 
-// Mirrors the Cancel text button's width so the centred title stays centred.
-private val CancelButtonWidth = 72.dp
 private val SwatchSize = 44.dp
 private val SwatchInset = 3.dp
 private const val UnavailableAlpha = 0.5f
@@ -75,7 +84,7 @@ private val SelectedStart = GroupStartOption.WriteOwn
  * Only "Write my own" is selectable: see [GroupStartOption]. [showStartWith] hides that section
  * for entry points that already seed the group ("Add to collection" on an affirmation).
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun NewGroupSheet(
     canCreate: Boolean,
@@ -88,27 +97,33 @@ internal fun NewGroupSheet(
     var highlightId by rememberSaveable { mutableStateOf(GroupHighlight.Default.id) }
     val submitState = rememberNameSubmitState()
     val highlight = GroupHighlight.fromId(highlightId)
+    val canSubmit = canCreate && canSubmitNewGroup(name) && !submitState.submitting
+    val submit = { submitState.submit(action = { onCreate(name, highlight.id) }, onDone = onDismiss) }
+    val counterDescription = stringResource(R.string.groups_new_name_counter_a11y, nameLength(name), COLLECTION_NAME_MAX)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth().imePadding()) {
+            // Three equal-weight slots keep the title centred however wide Cancel gets at large font.
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.collection_cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    TextButton(onClick = onDismiss) {
+                        Text(stringResource(R.string.collection_cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
                 Text(
                     text = stringResource(R.string.groups_new_title),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(2f).semantics { heading() },
                 )
-                Box(modifier = Modifier.size(width = CancelButtonWidth, height = 1.dp))
+                Spacer(modifier = Modifier.weight(1f))
             }
 
             Column(
@@ -137,9 +152,12 @@ internal fun NewGroupSheet(
                             text = nameCounter(name),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.semantics { contentDescription = counterDescription },
                         )
                     },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (canSubmit) submit() }),
                     isError = submitState.errorRes != null,
                     supportingText = submitState.errorRes?.let { res -> { Text(stringResource(res)) } },
                     shape = RoundedCornerShape(13.dp),
@@ -154,10 +172,12 @@ internal fun NewGroupSheet(
                 )
 
                 SectionLabel(R.string.groups_new_highlight_title)
-                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    GroupHighlight.entries.forEach { option ->
+                // FlowRow wraps instead of clipping on narrow widths or large font scales.
+                FlowRow(modifier = Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    GroupHighlight.entries.forEachIndexed { index, option ->
                         HighlightSwatch(
                             option = option,
+                            position = index + 1,
                             selected = option == highlight,
                             onSelect = { highlightId = option.id },
                         )
@@ -169,6 +189,7 @@ internal fun NewGroupSheet(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .selectableGroup()
                             .padding(top = 9.dp)
                             .background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(14.dp)),
                     ) {
@@ -182,8 +203,8 @@ internal fun NewGroupSheet(
             Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 24.dp)) {
                 if (!canCreate) CollectionLimitNotice(onUpgrade = onUpgrade)
                 Button(
-                    enabled = canCreate && canSubmitNewGroup(name) && !submitState.submitting,
-                    onClick = { submitState.submit(action = { onCreate(name, highlight.id) }, onDone = onDismiss) },
+                    enabled = canSubmit,
+                    onClick = { submit() },
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                 ) {
@@ -204,19 +225,25 @@ private fun SectionLabel(textRes: Int) {
         text = stringResource(textRes).uppercase(),
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 16.dp),
+        modifier = Modifier.padding(top = 16.dp).semantics { heading() },
     )
 }
 
 @Composable
-private fun HighlightSwatch(option: GroupHighlight, selected: Boolean, onSelect: () -> Unit) {
-    val label = stringResource(R.string.groups_new_highlight_a11y, stringResource(option.labelRes()))
+private fun HighlightSwatch(option: GroupHighlight, position: Int, selected: Boolean, onSelect: () -> Unit) {
+    val label = stringResource(
+        R.string.groups_new_highlight_a11y,
+        stringResource(option.labelRes()),
+        position,
+        GroupHighlight.entries.size,
+    )
     // 48dp touch target around the swatch; the selection ring sits outside the dot.
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .minimumInteractiveComponentSize()
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect),
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect)
+            .semantics { contentDescription = label },
     ) {
         Box(
             modifier = Modifier
@@ -225,8 +252,7 @@ private fun HighlightSwatch(option: GroupHighlight, selected: Boolean, onSelect:
                     if (selected) Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier,
                 )
                 .padding(SwatchInset)
-                .background(option.color, CircleShape)
-                .semantics { contentDescription = label },
+                .background(option.color, CircleShape),
         )
     }
 }
@@ -238,6 +264,8 @@ private fun StartOptionRow(option: GroupStartOption, selected: Boolean) {
         modifier = Modifier
             .fillMaxWidth()
             .alpha(if (option.available) 1f else UnavailableAlpha)
+            // enabled = false exposes the row as disabled to accessibility, not just dimmed.
+            .selectable(selected = selected, enabled = option.available, role = Role.RadioButton, onClick = {})
             .padding(horizontal = 14.dp, vertical = 13.dp),
     ) {
         Icon(option.icon(), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))

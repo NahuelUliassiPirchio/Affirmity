@@ -60,6 +60,12 @@ class GroupsUiLogicTest {
     }
 
     @Test
+    fun `name length counts code points`() {
+        assertEquals(0, nameLength(""))
+        assertEquals(2, nameLength("a\uD83D\uDE00"))
+    }
+
+    @Test
     fun `create is only enabled for a non blank name`() {
         assertFalse(canSubmitNewGroup("   "))
         assertFalse(canSubmitNewGroup(""))

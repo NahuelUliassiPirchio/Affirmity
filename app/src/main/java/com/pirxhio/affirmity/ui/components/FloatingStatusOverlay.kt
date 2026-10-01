@@ -5,7 +5,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,12 +22,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import com.pirxhio.affirmity.R
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 
 private const val FloatingChromeAlpha = 0.9f
+private val TouchTarget = 48.dp
 
 /** Container colour shared by the floating chrome over the feed (this pill, the Save-to button). */
 @Composable
@@ -55,20 +61,27 @@ fun FloatingStatusOverlay(
         tonalElevation = FloatingChromeElevation,
         shadowElevation = FloatingChromeElevation,
     ) {
+        // Both targets are 48dp tall/wide for touch; the Row and target paddings are chosen so the
+        // visible pill is the same as before (12dp outer edge, 8dp between streak and avatar).
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (showStreak) {
                 Row(
-                    modifier = Modifier.clickable(onClick = onStreakClick),
+                    modifier = Modifier
+                        .heightIn(min = TouchTarget)
+                        .widthIn(min = TouchTarget)
+                        .clickable(role = Role.Button, onClick = onStreakClick)
+                        .padding(start = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
                         imageVector = Icons.Filled.LocalFireDepartment,
-                        contentDescription = if (isTodayDone) "Racha activa hoy" else "Racha pendiente hoy",
+                        contentDescription = stringResource(
+                            if (isTodayDone) R.string.status_streak_active_today else R.string.status_streak_pending_today,
+                        ),
                         tint = if (isTodayDone) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                         modifier = Modifier.size(20.dp),
                     )
@@ -79,30 +92,37 @@ fun FloatingStatusOverlay(
                     )
                 }
             }
+            val profileLabel = stringResource(R.string.status_profile_and_settings)
             Box(
                 modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                    .clickable(onClick = onAvatarClick),
+                    .size(TouchTarget)
+                    .clickable(role = Role.Button, onClick = onAvatarClick),
                 contentAlignment = Alignment.Center,
             ) {
-                if (photoUrl != null) {
-                    AsyncImage(
-                        model = photoUrl,
-                        contentDescription = "Perfil y ajustes",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape),
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Filled.Person,
-                        contentDescription = "Perfil y ajustes",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
-                    )
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (photoUrl != null) {
+                        AsyncImage(
+                            model = photoUrl,
+                            contentDescription = profileLabel,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape),
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Filled.Person,
+                            contentDescription = profileLabel,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
             }
         }

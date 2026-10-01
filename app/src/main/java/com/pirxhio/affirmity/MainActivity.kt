@@ -1707,6 +1707,7 @@ fun AffirmityApp(
                                         onRename = appState::renameCollection,
                                         onDelete = appState::deleteCollection,
                                         onRemoveItem = appState::removeFromCollection,
+                                        onRestoreItem = appState::addToCollection,
                                         onCreate = { name, highlightId ->
                                             appState.createCollection(name, highlightId = highlightId)
                                         },

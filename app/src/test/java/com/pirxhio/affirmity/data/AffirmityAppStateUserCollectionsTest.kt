@@ -189,6 +189,23 @@ class AffirmityAppStateUserCollectionsTest {
     }
 
     @Test
+    fun `undo after a removal re-adds the affirmation to the same group`() = runTest {
+        val repo = RecordingUserCollectionRepository(listOf(uc("c1", items = listOf("a", "b"))))
+        val state = buildUcState(backgroundScope, repo)
+        runCurrent()
+
+        state.removeFromCollection("c1", "a")
+        runCurrent()
+        advanceUntilIdle()
+        state.addToCollection("c1", "a")
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(setOf("a", "b"), repo.current.single().affirmationIds.toSet())
+        assertEquals(listOf("removeItem:c1:a", "addItem:c1:a"), repo.events)
+    }
+
+    @Test
     fun `create normalises an unknown highlight to the default`() = runTest {
         val repo = RecordingUserCollectionRepository()
         val state = buildUcState(backgroundScope, repo, ids = sequenceOf("u").iterator())

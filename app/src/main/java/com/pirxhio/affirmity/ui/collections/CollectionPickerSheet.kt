@@ -32,6 +32,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.CollectionNameResult
@@ -64,6 +66,7 @@ internal fun CollectionPickerSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var creating by remember { mutableStateOf(false) }
+    val createLabel = stringResource(R.string.collection_picker_create)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
@@ -74,7 +77,7 @@ internal fun CollectionPickerSheet(
                 Text(
                     text = stringResource(R.string.collection_picker_title),
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f).padding(vertical = 8.dp),
+                    modifier = Modifier.weight(1f).padding(vertical = 8.dp).semantics { heading() },
                 )
                 TextButton(onClick = onDismiss) { Text(stringResource(R.string.collection_picker_done)) }
             }
@@ -102,7 +105,7 @@ internal fun CollectionPickerSheet(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { creating = true }
+                        .clickable(onClickLabel = createLabel, role = Role.Button) { creating = true }
                         .padding(horizontal = 24.dp, vertical = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -131,6 +134,9 @@ internal fun CollectionPickerSheet(
     }
 }
 
+private val RowCoverSize = 24.dp
+private val RowCoverCorner = 6.dp
+
 @Composable
 private fun SaveToRowItem(row: SaveToRow, onToggle: () -> Unit) {
     Row(
@@ -157,11 +163,12 @@ private fun SaveToRowItem(row: SaveToRow, onToggle: () -> Unit) {
                 )
             }
             is SaveToRow.Group -> {
-                Box(
-                    modifier = Modifier
-                        .padding(start = 18.dp)
-                        .size(width = 14.dp, height = 8.dp)
-                        .background(GroupHighlight.fromId(row.highlightId).color, RoundedCornerShape(2.dp)),
+                GroupCover(
+                    name = null,
+                    highlight = GroupHighlight.fromId(row.highlightId),
+                    size = RowCoverSize,
+                    cornerRadius = RowCoverCorner,
+                    modifier = Modifier.padding(start = 18.dp),
                 )
                 Text(
                     text = row.name,

@@ -13,6 +13,8 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -52,7 +54,6 @@ private val ToggleIndicatorSize = 18.dp
 private val ToggleCheckSize = 12.dp
 private val ToggleRingWidth = 1.5.dp
 private const val InFeedBorderAlpha = 0.5f
-private const val OutOfFeedBorderAlpha = 0.08f
 
 /**
  * "Your groups" shelf of "Your feed" (design 7a): a "New group" tile followed by one square cover
@@ -69,6 +70,7 @@ internal fun YourGroupsSection(
     onRename: suspend (userCollectionId: String, name: String) -> CollectionNameResult,
     onDelete: (userCollectionId: String) -> Unit,
     onRemoveItem: (userCollectionId: String, affirmationId: String) -> Unit,
+    onRestoreItem: (userCollectionId: String, affirmationId: String) -> Unit,
     onCreate: suspend (name: String, highlightId: String) -> CollectionNameResult,
     onUpgrade: () -> Unit,
     modifier: Modifier = Modifier,
@@ -89,7 +91,7 @@ internal fun YourGroupsSection(
             fontFamily = FontFamily.Serif,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.padding(horizontal = 16.dp).semantics { heading() },
         )
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
@@ -113,6 +115,7 @@ internal fun YourGroupsSection(
             affirmations = affirmationsFor(openCollection.id),
             onMore = { manageState = manageState.reduce(CollectionManageEvent.LongPress(openCollection)) },
             onRemoveItem = { affirmationId -> onRemoveItem(openCollection.id, affirmationId) },
+            onRestoreItem = { affirmationId -> onRestoreItem(openCollection.id, affirmationId) },
             onDismiss = { openGroupId = null },
         )
     }
@@ -134,12 +137,14 @@ internal fun YourGroupsSection(
 
 @Composable
 private fun NewGroupTile(onClick: () -> Unit) {
-    Column(modifier = Modifier.width(CoverSize).clickable(onClick = onClick)) {
+    val newGroupLabel = stringResource(R.string.groups_new_card_title)
+    Column(modifier = Modifier.width(CoverSize)) {
         Box(
             modifier = Modifier
                 .size(CoverSize)
                 .clip(RoundedCornerShape(16.dp))
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp)),
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
+                .clickable(onClickLabel = newGroupLabel, role = Role.Button, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
             Icon(Icons.Filled.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -162,15 +167,16 @@ private fun NewGroupTile(onClick: () -> Unit) {
 @Composable
 private fun GroupCardTile(card: GroupCardUi, onClick: () -> Unit, onToggle: () -> Unit) {
     val inFeed = card.inFeed
+    val openLabel = stringResource(R.string.groups_open_group_action)
     Column(modifier = Modifier.width(CoverSize)) {
         GroupCover(
             name = card.name,
             highlight = card.highlight,
             size = CoverSize,
-            modifier = Modifier.clickable(onClick = onClick),
+            modifier = Modifier.clickable(onClickLabel = openLabel, role = Role.Button, onClick = onClick),
             border = BorderStroke(
                 1.dp,
-                if (inFeed) card.highlight.color.copy(alpha = InFeedBorderAlpha) else Color.White.copy(alpha = OutOfFeedBorderAlpha),
+                if (inFeed) card.highlight.color.copy(alpha = InFeedBorderAlpha) else MaterialTheme.colorScheme.outlineVariant,
             ),
         )
         GroupFeedToggle(name = card.name, inFeed = inFeed, onToggle = onToggle)

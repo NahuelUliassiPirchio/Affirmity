@@ -156,7 +156,9 @@ internal fun UserCollectionUi.toGroupCardUi() = GroupCardUi(
 internal fun List<UserCollectionUi>.toGroupCards(): List<GroupCardUi> = map { it.toGroupCardUi() }
 
 /** "n/40" counter under the name field; code points, like the validation. */
-internal fun nameCounter(name: String): String = "${name.codePointCount(0, name.length)}/$COLLECTION_NAME_MAX"
+internal fun nameLength(name: String): Int = name.codePointCount(0, name.length)
+
+internal fun nameCounter(name: String): String = "${nameLength(name)}/$COLLECTION_NAME_MAX"
 
 internal fun canSubmitNewGroup(name: String): Boolean = name.isNotBlank()
 

@@ -414,9 +414,8 @@ private fun AffirmationCard(
         )
         if (!isCleanScreen) {
             val saved = isSaved(isFavorite, isInAnyGroup)
-            val saveButtonDescription = stringResource(
-                if (saved) R.string.affirmation_save_to_saved else R.string.affirmation_save_to,
-            )
+            // Stable label; the saved/not-saved state is announced only through stateDescription.
+            val saveButtonDescription = stringResource(R.string.affirmation_save_to)
             val saveStateDescription = stringResource(
                 if (saved) R.string.affirmation_save_state_saved else R.string.affirmation_save_state_not_saved,
             )

@@ -4,7 +4,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,7 +20,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -48,7 +48,10 @@ internal fun GroupCover(
     val shape = RoundedCornerShape(cornerRadius)
     Box(
         modifier = modifier
-            .size(size)
+            // Width is fixed and height is a minimum, so a long name at a large font scale grows the
+            // tile instead of clipping mid-line; at default scale it stays square.
+            .width(size)
+            .heightIn(min = size)
             .clip(shape)
             .then(if (border != null) Modifier.border(border, shape) else Modifier)
             .drawBehind { drawHighlightBlobs(highlight.color) },
@@ -62,8 +65,6 @@ internal fun GroupCover(
                 fontWeight = FontWeight.SemiBold,
                 fontSize = nameSize,
                 lineHeight = nameSize * 1.1f,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(12.dp),
             )
         }
