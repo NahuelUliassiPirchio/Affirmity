@@ -41,7 +41,7 @@ internal fun BoxScope.CollectionsFeedOverlay(
     onDelete: (userCollectionId: String) -> Unit,
     onAdd: (userCollectionId: String, affirmationId: String) -> Unit,
     onRemove: (userCollectionId: String, affirmationId: String) -> Unit,
-    onCreate: suspend (name: String, affirmationId: String) -> CollectionNameResult,
+    onCreate: suspend (name: String, highlightId: String, affirmationId: String) -> CollectionNameResult,
     onUpgrade: () -> Unit,
     onPickerDismiss: () -> Unit,
 ) {
@@ -72,7 +72,7 @@ internal fun BoxScope.CollectionsFeedOverlay(
             canCreate = canCreate,
             onAdd = { userCollectionId -> onAdd(userCollectionId, affirmationId) },
             onRemove = { userCollectionId -> onRemove(userCollectionId, affirmationId) },
-            onCreate = { name -> onCreate(name, affirmationId) },
+            onCreate = { name, highlightId -> onCreate(name, highlightId, affirmationId) },
             onUpgrade = onUpgrade,
             onDismiss = onPickerDismiss,
         )

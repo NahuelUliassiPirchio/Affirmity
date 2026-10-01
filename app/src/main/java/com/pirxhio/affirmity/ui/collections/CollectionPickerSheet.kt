@@ -35,8 +35,8 @@ import com.pirxhio.affirmity.data.UserCollectionUi
 /**
  * "Add to collection" picker for one affirmation. Stateless about data: the caller passes the
  * collections, the ids this affirmation already belongs to, and callbacks. Tapping a row toggles
- * membership; "Create new collection" opens [CollectionNameDialog] and, on success, the caller's
- * [onCreate] is expected to add this affirmation to the new collection.
+ * membership; "Create new collection" opens [NewGroupSheet] and, on success, the caller's
+ * [onCreate] (name and highlight) is expected to add this affirmation to the new collection.
  *
  * When [canCreate] is false (Free user at the limit) the create action is replaced by the limit
  * message and an optional upgrade button ([onUpgrade]).
@@ -49,7 +49,7 @@ internal fun CollectionPickerSheet(
     canCreate: Boolean,
     onAdd: (userCollectionId: String) -> Unit,
     onRemove: (userCollectionId: String) -> Unit,
-    onCreate: suspend (name: String) -> CollectionNameResult,
+    onCreate: suspend (name: String, highlightId: String) -> CollectionNameResult,
     onUpgrade: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -103,26 +103,19 @@ internal fun CollectionPickerSheet(
                     )
                 }
             } else {
-                Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
-                    Text(
-                        text = stringResource(R.string.collection_limit_reached),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    TextButton(onClick = onUpgrade) { Text(stringResource(R.string.collection_limit_upgrade)) }
-                }
+                CollectionLimitNotice(onUpgrade = onUpgrade, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
             }
         }
     }
 
     if (creating) {
-        CollectionNameDialog(
-            title = stringResource(R.string.collection_name_dialog_create_title),
-            confirmLabel = stringResource(R.string.collection_name_confirm_create),
-            initialName = "",
-            onSubmit = onCreate,
-            onDone = { creating = false },
+        // The affirmation is the seed, so the "Start with" choice is hidden.
+        NewGroupSheet(
+            canCreate = canCreate,
+            onCreate = onCreate,
+            onUpgrade = onUpgrade,
             onDismiss = { creating = false },
+            showStartWith = false,
         )
     }
 }

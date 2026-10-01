@@ -102,6 +102,7 @@ import com.pirxhio.affirmity.notifications.previewBlock
 import com.pirxhio.affirmity.ui.compass.CompassAnswerScreen
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
 import com.pirxhio.affirmity.ui.collections.CollectionsFeedOverlay
+import com.pirxhio.affirmity.ui.collections.YourGroupsSection
 import com.pirxhio.affirmity.ui.collections.feedEmptyState
 import com.pirxhio.affirmity.ui.components.FloatingStatusOverlay
 import com.pirxhio.affirmity.ui.components.SystemBarsEffect
@@ -1697,6 +1698,21 @@ fun AffirmityApp(
                                 onFavoritesClick = { showFavorites = true },
                                 feedSources = appState.draftFeedSources.value,
                                 onFeedSourcesChange = appState::setDraftFeedSources,
+                                yourGroups = {
+                                    YourGroupsSection(
+                                        collections = appState.userCollections,
+                                        canCreate = appState.canCreateCollection,
+                                        affirmationsFor = appState::userCollectionAffirmations,
+                                        onToggle = appState::toggleCollection,
+                                        onRename = appState::renameCollection,
+                                        onDelete = appState::deleteCollection,
+                                        onRemoveItem = appState::removeFromCollection,
+                                        onCreate = { name, highlightId ->
+                                            appState.createCollection(name, highlightId = highlightId)
+                                        },
+                                        onUpgrade = { onUpgradeClick(PaywallSource.OTHER) },
+                                    )
+                                },
                             )
                         },
                     ) {
@@ -1747,8 +1763,8 @@ fun AffirmityApp(
                                 onDelete = appState::deleteCollection,
                                 onAdd = appState::addToCollection,
                                 onRemove = appState::removeFromCollection,
-                                onCreate = { name, affirmationId ->
-                                    appState.createCollection(name, withAffirmationId = affirmationId)
+                                onCreate = { name, highlightId, affirmationId ->
+                                    appState.createCollection(name, withAffirmationId = affirmationId, highlightId = highlightId)
                                 },
                                 onUpgrade = {
                                     collectionPickerAffirmationId = null
