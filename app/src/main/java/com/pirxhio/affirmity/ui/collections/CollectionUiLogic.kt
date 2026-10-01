@@ -34,10 +34,6 @@ internal fun PickerRow.toggle(): PickerToggle = if (checked) PickerToggle.Remove
 internal fun pickerRows(collections: List<UserCollectionUi>, memberIds: Set<String>): List<PickerRow> =
     collections.map { PickerRow(id = it.id, name = it.name, checked = it.id in memberIds) }
 
-/** Chip text: the name plus how many existing affirmations the collection resolves to. */
-internal fun collectionChipLabel(collection: UserCollectionUi): String =
-    "${collection.name} (${collection.resolvedItemCount})"
-
 /** Which message to show when the feed has no affirmations. */
 enum class FeedEmptyState { None, Collections, Generic }
 

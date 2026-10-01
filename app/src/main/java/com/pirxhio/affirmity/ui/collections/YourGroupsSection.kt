@@ -58,7 +58,7 @@ private const val OutOfFeedBorderAlpha = 0.08f
  * "Your groups" shelf of "Your feed" (design 7a): a "New group" tile followed by one square cover
  * per user collection. Also owns the sheets it opens (group detail, new group) and the existing
  * rename/delete flow, so the host screen only passes data and callbacks in. Tapping a cover opens
- * its detail; the on/off switch lives there and goes through the same [onToggle] as the chips.
+ * its detail; the on/off switch lives there and goes through the same [onToggle] as the card toggle.
  */
 @Composable
 internal fun YourGroupsSection(

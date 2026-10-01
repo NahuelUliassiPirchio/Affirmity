@@ -1759,16 +1759,12 @@ fun AffirmityApp(
                             CollectionsFeedOverlay(
                                 collections = appState.userCollections,
                                 canCreate = appState.canCreateCollection,
-                                isCleanScreen = isCleanScreen,
                                 pickerAffirmationId = collectionPickerAffirmationId,
                                 isFavoriteFor = { id -> id in appState.favoriteAffirmationIds.value },
                                 // No undo snackbar here: the host sits behind the modal sheet, and the
                                 // Favorites row itself is the one-tap reversal while the sheet is open.
                                 onToggleFavorite = appState::toggleFavorite,
                                 memberIdsFor = appState::userCollectionIdsFor,
-                                onToggle = appState::toggleCollection,
-                                onRename = appState::renameCollection,
-                                onDelete = appState::deleteCollection,
                                 onToggleInGroup = appState::toggleAffirmationInCollection,
                                 onCreate = { name, highlightId, affirmationId ->
                                     appState.createCollection(name, withAffirmationId = affirmationId, highlightId = highlightId)

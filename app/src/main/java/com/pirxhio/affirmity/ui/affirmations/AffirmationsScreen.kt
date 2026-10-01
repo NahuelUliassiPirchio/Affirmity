@@ -454,14 +454,9 @@ private fun AffirmationCard(
                 },
             ) {
                 if (onAddToCollection != null) {
-                    // Save to...: + until the affirmation is in Favorites or any group, then a check in
-                    // the accent colour. Double-tap / token tap still toggle Favorites and feed this state.
-                    val saved = isSaved(isFavorite, isInAnyGroup)
-                    Icon(
-                        imageVector = if (saved) Icons.Filled.Check else Icons.Filled.Add,
-                        contentDescription = null,
-                        tint = if (saved) MaterialTheme.colorScheme.primary else Color.White,
-                    )
+                    // Save to...: an outlined + until the affirmation is in Favorites or any group, then a
+                    // filled accent check (SaveToIndicator). Double-tap / token tap still toggle Favorites and feed this state.
+                    SaveToIndicator(saved = isSaved(isFavorite, isInAnyGroup))
                 } else {
                     Icon(
                         imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,

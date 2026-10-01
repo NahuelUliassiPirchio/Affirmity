@@ -20,9 +20,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+
+private const val FloatingChromeAlpha = 0.9f
+
+/** Container colour shared by the floating chrome over the feed (this pill, the Save-to button). */
+@Composable
+fun floatingChromeColor(): Color = MaterialTheme.colorScheme.surface.copy(alpha = FloatingChromeAlpha)
+
+/** Tonal and shadow elevation shared by the floating chrome over the feed. */
+val FloatingChromeElevation = 4.dp
 
 /**
  * Mini floating status widget for the corner of a screen: general streak + user avatar.
@@ -41,9 +51,9 @@ fun FloatingStatusOverlay(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-        tonalElevation = 4.dp,
-        shadowElevation = 4.dp,
+        color = floatingChromeColor(),
+        tonalElevation = FloatingChromeElevation,
+        shadowElevation = FloatingChromeElevation,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),

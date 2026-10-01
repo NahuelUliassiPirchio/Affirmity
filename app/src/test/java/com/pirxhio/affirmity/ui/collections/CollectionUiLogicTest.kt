@@ -58,12 +58,6 @@ class CollectionUiLogicTest {
 
     // --- chip label ---
 
-    @Test
-    fun `chip label shows name and resolved count`() {
-        assertEquals("Calm (3)", collectionChipLabel(ui("a", name = "Calm", count = 3)))
-        assertEquals("Calm (0)", collectionChipLabel(ui("a", name = "Calm", count = 0)))
-    }
-
     // --- empty state ---
 
     @Test

@@ -1001,9 +1001,6 @@
     <string name="collection_name_error_blank">Escribe un nombre.</string>
     <string name="collection_name_error_too_long">El nombre es demasiado largo.</string>
     <string name="collection_name_error_duplicate">Ya tienes una colección con ese nombre.</string>
-    <string name="collection_chips_content_description">Colecciones</string>
-    <string name="collection_chip_click_label">Activar o desactivar la colección</string>
-    <string name="collection_chip_long_click_label">Renombrar o eliminar la colección</string>
     <string name="collection_chip_action_rename">Renombrar</string>
     <string name="collection_chip_action_delete">Eliminar</string>
     <string name="collection_delete_title">¿Eliminar colección?</string>

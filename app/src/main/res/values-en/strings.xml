@@ -574,9 +574,6 @@
     <string name="collection_name_error_blank">Enter a name.</string>
     <string name="collection_name_error_too_long">That name is too long.</string>
     <string name="collection_name_error_duplicate">You already have a collection with that name.</string>
-    <string name="collection_chips_content_description">Collections</string>
-    <string name="collection_chip_click_label">Turn collection on or off</string>
-    <string name="collection_chip_long_click_label">Rename or delete collection</string>
     <string name="collection_chip_action_rename">Rename</string>
     <string name="collection_chip_action_delete">Delete</string>
     <string name="collection_delete_title">Delete collection?</string>
