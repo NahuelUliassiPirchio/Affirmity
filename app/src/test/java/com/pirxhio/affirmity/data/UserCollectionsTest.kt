@@ -55,6 +55,28 @@ class UserCollectionsTest {
         )
     }
 
+    @Test
+    fun `ui projection carries the highlight id`() {
+        val ui = listOf(collection("c1").copy(highlightId = "rose")).toUserCollectionUi(knownIds = emptySet())
+        assertEquals("rose", ui.single().highlightId)
+    }
+
+    @Test
+    fun `a collection without a stored highlight uses the default`() {
+        assertEquals(DEFAULT_COLLECTION_HIGHLIGHT_ID, collection("c1").highlightId)
+    }
+
+    // --- resolveCollectionMembers -------------------------------------------------------------
+
+    @Test
+    fun `members resolve in collection order and orphans drop out`() {
+        val known = mapOf("a" to "Alpha", "b" to "Beta")
+
+        val result = resolveCollectionMembers(listOf("b", "orphan", "a"), known::get)
+
+        assertEquals(listOf("Beta", "Alpha"), result)
+    }
+
     // --- validateCollectionName -------------------------------------------------------------
 
     @Test

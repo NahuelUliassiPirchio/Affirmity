@@ -15,6 +15,7 @@ data class UserCollection(
     val enabled: Boolean,
     val lastUsedAtMillis: Long,
     val affirmationIds: List<String>,
+    val highlightId: String = DEFAULT_COLLECTION_HIGHLIGHT_ID,
 )
 
 /** UI-facing projection of a collection: [resolvedItemCount] only counts affirmations that still
@@ -24,7 +25,12 @@ data class UserCollectionUi(
     val name: String,
     val enabled: Boolean,
     val resolvedItemCount: Int,
+    val highlightId: String = DEFAULT_COLLECTION_HIGHLIGHT_ID,
 )
+
+/** Persisted id of the highlight a collection gets when none is chosen. Mirrors
+ *  `GroupHighlight.Default.id` (asserted in a test) and the column's SQL default. */
+const val DEFAULT_COLLECTION_HIGHLIGHT_ID = "teal"
 
 /** Outcome of validating a collection name (and, for create, the tier limit). */
 sealed interface CollectionNameResult {
@@ -84,6 +90,7 @@ internal fun List<UserCollection>.toUserCollectionUi(knownIds: Set<String>): Lis
             name = collection.name,
             enabled = collection.enabled,
             resolvedItemCount = collection.affirmationIds.count { it in knownIds },
+            highlightId = collection.highlightId,
         )
     }
 
@@ -110,3 +117,8 @@ internal fun <T> resolveEnabledCollectionRows(
         .mapNotNull(byId)
         .filter(eligible)
         .toList()
+
+/** Resolves member ids to their affirmations in member order; ids [byId] no longer knows (orphans)
+ *  drop out, same rule as the feed and the chip counts. */
+internal fun <T> resolveCollectionMembers(memberIds: List<String>, byId: (String) -> T?): List<T> =
+    memberIds.mapNotNull(byId)

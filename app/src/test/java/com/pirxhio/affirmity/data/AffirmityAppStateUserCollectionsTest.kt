@@ -103,6 +103,48 @@ class AffirmityAppStateUserCollectionsTest {
     }
 
     @Test
+    fun `create persists the chosen highlight`() = runTest {
+        val repo = RecordingUserCollectionRepository()
+        val state = buildUcState(backgroundScope, repo, ids = sequenceOf("u").iterator())
+        runCurrent()
+
+        state.createCollection("Calm", highlightId = "rose")
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals("rose", repo.current.single().highlightId)
+        assertEquals("rose", state.userCollections.single().highlightId)
+    }
+
+    @Test
+    fun `create from the add-to-collection flow stores the highlight and the seed affirmation together`() = runTest {
+        val repo = RecordingUserCollectionRepository()
+        val state = buildUcState(backgroundScope, repo, ids = sequenceOf("u").iterator())
+        runCurrent()
+
+        state.createCollection("Calm", withAffirmationId = "owned-1", highlightId = "gold")
+        runCurrent()
+        advanceUntilIdle()
+
+        val created = repo.current.single()
+        assertEquals("gold", created.highlightId)
+        assertEquals(listOf("owned-1"), created.affirmationIds)
+    }
+
+    @Test
+    fun `create normalises an unknown highlight to the default`() = runTest {
+        val repo = RecordingUserCollectionRepository()
+        val state = buildUcState(backgroundScope, repo, ids = sequenceOf("u").iterator())
+        runCurrent()
+
+        state.createCollection("Calm", highlightId = "mauve")
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(DEFAULT_COLLECTION_HIGHLIGHT_ID, repo.current.single().highlightId)
+    }
+
+    @Test
     fun `create without an initial affirmation passes null`() = runTest {
         val repo = RecordingUserCollectionRepository()
         val state = buildUcState(backgroundScope, repo, ids = sequenceOf("u").iterator())

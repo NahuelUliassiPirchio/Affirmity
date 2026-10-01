@@ -136,6 +136,7 @@ import com.pirxhio.affirmity.ui.groups.selectableAffirmationGroups
 import com.pirxhio.affirmity.ui.groups.themeAccessDecision
 import com.pirxhio.affirmity.access.isUnlocked
 import com.pirxhio.affirmity.ui.myaffirmations.customAffirmationAccessDecision
+import com.pirxhio.affirmity.ui.theme.GroupHighlight
 import com.pirxhio.affirmity.widget.WeeklyTrackerWidget
 import androidx.glance.appwidget.updateAll
 import java.util.TimeZone
@@ -578,6 +579,15 @@ class AffirmityAppState(
     /** Free tier caps NEW creation at [FREE_COLLECTION_LIMIT]; existing collections stay usable. */
     val canCreateCollection: Boolean
         get() = canCreateUserCollection(entitlementTier.value, collectionsState.value.size)
+
+    /** The affirmations of one collection in member order, for the group detail sheet. Orphaned ids
+     *  (rows that no longer exist) are skipped, like in the chip counts. */
+    fun userCollectionAffirmations(userCollectionId: String): List<Affirmation> {
+        val memberIds = collectionsState.value.firstOrNull { it.id == userCollectionId }?.affirmationIds
+            ?: return emptyList()
+        val byId = allAffirmations.associateBy { it.id }
+        return resolveCollectionMembers(memberIds, byId::get)
+    }
 
     /** Ids of every collection currently holding [affirmationId], for the picker's toggles. */
     fun userCollectionIdsFor(affirmationId: String): Set<String> =
@@ -1639,7 +1649,11 @@ class AffirmityAppState(
      * section, so the returned verdict is AUTHORITATIVE: it is exactly what was (or was not)
      * persisted, closing the double-tap race (design D7). The new collection starts enabled.
      */
-    suspend fun createCollection(name: String, withAffirmationId: String? = null): CollectionNameResult =
+    suspend fun createCollection(
+        name: String,
+        withAffirmationId: String? = null,
+        highlightId: String = DEFAULT_COLLECTION_HIGHLIGHT_ID,
+    ): CollectionNameResult =
         userCollectionMutex.withLock {
             val verdict = validateNewCollection(name, collectionRepository.getCollections(), entitlementTier.value)
             if (verdict is CollectionNameResult.Ok) {
@@ -1648,6 +1662,8 @@ class AffirmityAppState(
                     name = verdict.name,
                     nowMillis = collectionClock(),
                     initialAffirmationId = withAffirmationId,
+                    // Normalised so a stale or foreign id never reaches the column.
+                    highlightId = GroupHighlight.fromId(highlightId).id,
                 )
             }
             verdict
