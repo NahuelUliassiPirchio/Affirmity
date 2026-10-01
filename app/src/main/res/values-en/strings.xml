@@ -386,6 +386,7 @@
     <string name="your_feed_show_all_groups">Show all %1$d groups</string>
     <string name="your_feed_show_fewer_groups">Show fewer groups</string>
     <string name="your_feed_see_all_themes">See all themes</string>
+    <string name="your_feed_hidden_affirmations_link">Hidden affirmations</string>
     <string name="your_feed_update_button">Update my feed</string>
     <string name="your_feed_selected_count">%1$d of %2$d selected</string>
     <string name="your_feed_suggested_for_you">Suggested for you</string>

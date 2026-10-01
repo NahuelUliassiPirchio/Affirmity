@@ -883,6 +883,7 @@
     <string name="your_feed_show_all_groups">Mostrar los %1$d grupos</string>
     <string name="your_feed_show_fewer_groups">Mostrar menos grupos</string>
     <string name="your_feed_see_all_themes">Ver todos los temas</string>
+    <string name="your_feed_hidden_affirmations_link">Afirmaciones ocultas</string>
     <string name="your_feed_update_button">Actualizar mi feed</string>
     <string name="your_feed_selected_count">%1$d de %2$d seleccionados</string>
     <string name="your_feed_suggested_for_you">Sugeridos para ti</string>

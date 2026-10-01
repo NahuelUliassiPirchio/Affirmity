@@ -70,6 +70,7 @@ fun YourFeedScreen(
     onUpdateFeed: () -> Unit,
     onDone: () -> Unit,
     onFavoritesClick: () -> Unit,
+    onOpenHiddenAffirmations: () -> Unit,
     feedSources: FeedSources,
     onFeedSourcesChange: (FeedSources) -> Unit,
     modifier: Modifier = Modifier,
@@ -131,7 +132,11 @@ fun YourFeedScreen(
             )
             FavoritesEntryCard(
                 onClick = onFavoritesClick,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 8.dp),
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp),
+            )
+            HiddenAffirmationsLink(
+                onClick = onOpenHiddenAffirmations,
+                modifier = Modifier.padding(top = 8.dp, bottom = 16.dp),
             )
         }
 
@@ -297,6 +302,23 @@ private fun SeeAllThemesLink(onClick: () -> Unit, modifier: Modifier = Modifier)
     }
 }
 
+/** Deliberately low-key entry to the hidden-affirmations list: a small muted text link at the very
+ *  bottom of "Your feed", so it is findable without competing with the primary tiles above. */
+@Composable
+private fun HiddenAffirmationsLink(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Text(
+            text = stringResource(R.string.your_feed_hidden_affirmations_link),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        )
+    }
+}
+
 /** Relocated from `SeeAllThemesScreen` (feedback: favorites belongs at the bottom of "Your feed",
  *  next to "See all themes", not buried inside the exhaustive theme browser). */
 @Composable
@@ -356,6 +378,7 @@ fun YourFeedSheetContent(
     onDone: () -> Unit,
     onPeekClick: () -> Unit,
     onFavoritesClick: () -> Unit,
+    onOpenHiddenAffirmations: () -> Unit,
     feedSources: FeedSources,
     onFeedSourcesChange: (FeedSources) -> Unit,
     modifier: Modifier = Modifier,
@@ -384,6 +407,7 @@ fun YourFeedSheetContent(
                 onUpdateFeed = onUpdateFeed,
                 onDone = onDone,
                 onFavoritesClick = onFavoritesClick,
+                onOpenHiddenAffirmations = onOpenHiddenAffirmations,
                 feedSources = feedSources,
                 onFeedSourcesChange = onFeedSourcesChange,
                 modifier = Modifier.weight(1f, fill = true),

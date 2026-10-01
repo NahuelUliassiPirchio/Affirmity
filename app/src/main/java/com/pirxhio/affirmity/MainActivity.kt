@@ -1696,6 +1696,7 @@ fun AffirmityApp(
                                     }
                                 },
                                 onFavoritesClick = { showFavorites = true },
+                                onOpenHiddenAffirmations = { showHiddenAffirmations = true },
                                 feedSources = appState.draftFeedSources.value,
                                 onFeedSourcesChange = appState::setDraftFeedSources,
                                 yourGroups = {
