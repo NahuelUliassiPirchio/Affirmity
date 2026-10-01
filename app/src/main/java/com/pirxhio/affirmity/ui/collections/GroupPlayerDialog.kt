@@ -44,7 +44,11 @@ internal fun GroupPlayerDialog(
     ) {
         val pagerState = rememberPagerState(pageCount = { affirmations.size })
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-            VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+            VerticalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+                key = { affirmations[it].id },
+            ) { page ->
                 AffirmationCard(
                     affirmation = affirmations[page],
                     isFavorite = false,
