@@ -32,6 +32,7 @@ import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.SelfImprovement
@@ -82,6 +83,8 @@ import com.pirxhio.affirmity.data.AffirmationBackground
 import com.pirxhio.affirmity.data.AffirmationTemplateParser
 import com.pirxhio.affirmity.data.TemplateField
 import com.pirxhio.affirmity.data.backgroundColor
+import com.pirxhio.affirmity.ui.collections.FeedEmptyState
+import com.pirxhio.affirmity.ui.collections.messageRes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -117,6 +120,10 @@ fun AffirmationsScreen(
     favoriteGesture: FavoriteGesture = FavoriteGesture.DOUBLE_TAP,
     isCleanScreen: Boolean = false,
     onCleanScreenChange: (Boolean) -> Unit = {},
+    /** Null hides the "Add to collection" action. Called with the long-pressed affirmation's id. */
+    onAddToCollection: ((affirmationId: String) -> Unit)? = null,
+    /** Which message to show while [affirmations] is empty; decided by [feedEmptyState]. */
+    emptyState: FeedEmptyState = FeedEmptyState.Generic,
 ) {
     if (affirmations.isEmpty()) {
         Box(
@@ -126,7 +133,7 @@ fun AffirmationsScreen(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "Agrega tu primera afirmación desde Progreso.",
+                text = stringResource(emptyState.messageRes()),
                 color = Color.White,
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
@@ -196,6 +203,7 @@ fun AffirmationsScreen(
                 favoriteGesture = favoriteGesture,
                 isCleanScreen = isCleanScreen,
                 onEnterCleanScreen = { onCleanScreenChange(true) },
+                onAddToCollection = onAddToCollection?.let { callback -> { callback(affirmation.id) } },
             )
         }
         if (isCleanScreen) {
@@ -231,6 +239,7 @@ private fun AffirmationCard(
     favoriteGesture: FavoriteGesture,
     isCleanScreen: Boolean,
     onEnterCleanScreen: () -> Unit,
+    onAddToCollection: (() -> Unit)?,
 ) {
     var cardPositionInRoot by remember(affirmation.id) { mutableStateOf(Offset.Zero) }
     var cardSize by remember(affirmation.id) { mutableStateOf(IntSize.Zero) }
@@ -465,6 +474,12 @@ private fun AffirmationCard(
                 showActions = false
                 onEnterCleanScreen()
             },
+            onAddToCollection = onAddToCollection?.let { callback ->
+                {
+                    showActions = false
+                    callback()
+                }
+            },
             onDismiss = { showActions = false },
         )
     }
@@ -478,6 +493,7 @@ private fun AffirmationActionsSheet(
     onShareImage: () -> Unit,
     onHide: () -> Unit,
     onCleanScreen: () -> Unit,
+    onAddToCollection: (() -> Unit)?,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -498,6 +514,13 @@ private fun AffirmationActionsSheet(
                 label = stringResource(R.string.affirmation_clean_screen_content_description),
                 onClick = onCleanScreen,
             )
+            if (onAddToCollection != null) {
+                AffirmationActionRow(
+                    icon = Icons.AutoMirrored.Filled.PlaylistAdd,
+                    label = stringResource(R.string.collection_add_to_collection),
+                    onClick = onAddToCollection,
+                )
+            }
         }
     }
 }

@@ -101,6 +101,8 @@ import com.pirxhio.affirmity.notifications.notificationSkipEvent
 import com.pirxhio.affirmity.notifications.previewBlock
 import com.pirxhio.affirmity.ui.compass.CompassAnswerScreen
 import com.pirxhio.affirmity.ui.affirmations.AffirmationsScreen
+import com.pirxhio.affirmity.ui.collections.CollectionsFeedOverlay
+import com.pirxhio.affirmity.ui.collections.feedEmptyState
 import com.pirxhio.affirmity.ui.components.FloatingStatusOverlay
 import com.pirxhio.affirmity.ui.components.SystemBarsEffect
 import com.pirxhio.affirmity.ui.favorites.FavoritesScreen
@@ -803,6 +805,9 @@ fun AffirmityApp(
 
     // Clean (immersive) mode is owned here because the chrome it hides lives in this composable.
     var isCleanScreen by rememberSaveable { mutableStateOf(false) }
+    // The collection picker is keyed by the long-pressed affirmation's id (survives recreation);
+    // the rest of the collections UI state lives inside CollectionsFeedOverlay.
+    var collectionPickerAffirmationId by rememberSaveable { mutableStateOf<String?>(null) }
     val chrome = CleanScreenChrome.resolve(
         isCleanScreen = isCleanScreen,
         isFeedDestination = currentDestination == AppDestinations.AFIRMACIONES,
@@ -1725,6 +1730,31 @@ fun AffirmityApp(
                                 onAffirmationShared = appState::recordAffirmationShared,
                                 isCleanScreen = isCleanScreen,
                                 onCleanScreenChange = { isCleanScreen = it },
+                                onAddToCollection = { id -> collectionPickerAffirmationId = id },
+                                emptyState = feedEmptyState(
+                                    feedIsEmpty = appState.filteredAffirmations.isEmpty(),
+                                    hasCollections = appState.userCollections.isNotEmpty(),
+                                ),
+                            )
+                            CollectionsFeedOverlay(
+                                collections = appState.userCollections,
+                                canCreate = appState.canCreateCollection,
+                                isCleanScreen = isCleanScreen,
+                                pickerAffirmationId = collectionPickerAffirmationId,
+                                memberIdsFor = appState::userCollectionIdsFor,
+                                onToggle = appState::toggleCollection,
+                                onRename = appState::renameCollection,
+                                onDelete = appState::deleteCollection,
+                                onAdd = appState::addToCollection,
+                                onRemove = appState::removeFromCollection,
+                                onCreate = { name, affirmationId ->
+                                    appState.createCollection(name, withAffirmationId = affirmationId)
+                                },
+                                onUpgrade = {
+                                    collectionPickerAffirmationId = null
+                                    onUpgradeClick(PaywallSource.OTHER)
+                                },
+                                onPickerDismiss = { collectionPickerAffirmationId = null },
                             )
                             if (chrome.showSuggestionCard) divergenceSuggestion?.let { suggestion ->
                                 DivergenceSuggestionCard(
