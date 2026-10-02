@@ -106,8 +106,6 @@ import kotlinx.coroutines.withContext
  * index with modulo arithmetic against a very large virtual page count, rather than
  * a strict non-looping pager.
  */
-private const val LOOP_MULTIPLIER = 10_000
-
 private data class FavoriteToggleIntent(
     val origin: Offset,
     val targetFavorite: Boolean,
@@ -154,25 +152,19 @@ fun AffirmationsScreen(
     }
 
     val virtualPageCount = affirmations.size * LOOP_MULTIPLIER
-    val startPage = virtualPageCount / 2 - (virtualPageCount / 2) % affirmations.size
+    val startPage = centeredStartPage(affirmations.size)
     val pagerState: PagerState = rememberPagerState(
         initialPage = startPage,
         pageCount = { virtualPageCount }
     )
 
-    // VerticalPager's pageCount lambda re-evaluates live on every recomposition (so it already
-    // reflects a shrunk/grown `affirmations` after a "Your feed" update), but the library does NOT
-    // reclaim `currentPage` when pageCount shrinks below it: if the user was deep into the virtual
-    // range and the feed then shrinks enough that their absolute page is now >= the new
-    // virtualPageCount, there are no higher-indexed pages left to scroll forward into -- forward
-    // swipes look permanently stuck while backward swipes keep working (plenty of lower-indexed
-    // virtual pages remain). Only re-centers when that's actually happened, so a feed update that
-    // leaves the current page safely in range never disturbs the user's position.
+    // pageCount re-evaluates live, but when the feed shrinks Compose CLAMPS currentPage to the last
+    // page (it never leaves it above the count). The user is then parked on the final virtual
+    // page: forward swipes are dead while backward ones still work. Re-center onto the same feed
+    // index so the card on screen does not change.
     LaunchedEffect(virtualPageCount) {
-        if (pagerState.currentPage >= virtualPageCount) {
-            val safePage = virtualPageCount / 2 - (virtualPageCount / 2) % affirmations.size
-            pagerState.scrollToPage(safePage)
-        }
+        recenteredPageOrNull(pagerState.currentPage, virtualPageCount, affirmations.size)
+            ?.let { pagerState.scrollToPage(it) }
     }
 
     // Counts as "viewed" once the swipe settles on a new page, matching what a user

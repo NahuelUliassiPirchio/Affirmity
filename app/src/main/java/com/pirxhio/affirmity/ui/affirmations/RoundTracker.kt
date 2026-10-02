@@ -3,6 +3,9 @@ package com.pirxhio.affirmity.ui.affirmations
 /** A feed this small is not worth a "round": an interstitial every few swipes would be spam. */
 const val MIN_ROUND_SIZE = 10
 
+/** Virtual pages per feed item: the pager is `feedSize * LOOP_MULTIPLIER` pages long. */
+const val LOOP_MULTIPLIER = 10_000
+
 /**
  * Pure bookkeeping for "the user has seen every affirmation in their current feed".
  *
@@ -45,3 +48,21 @@ class RoundTracker(private val minRoundSize: Int = MIN_ROUND_SIZE) {
  */
 fun settledAffirmationIndex(page: Int, feedSize: Int): Int? =
     if (feedSize <= 0 || page < 0) null else page % feedSize
+
+/** Middle of the virtual range, aligned so it lands on feed index 0. */
+fun centeredStartPage(feedSize: Int): Int {
+    val virtualPageCount = feedSize * LOOP_MULTIPLIER
+    return virtualPageCount / 2 - (virtualPageCount / 2) % feedSize
+}
+
+/**
+ * Page to jump to when the pager has been left without room to scroll forward, else null.
+ *
+ * Compose clamps `currentPage` to the last page when `pageCount` shrinks (it never leaves it
+ * above the count), so "stuck" shows up as `currentPage` within the final cycle, not past the end.
+ * The target keeps the same feed index, so the card on screen does not change.
+ */
+fun recenteredPageOrNull(currentPage: Int, virtualPageCount: Int, feedSize: Int): Int? {
+    if (feedSize <= 0 || currentPage < virtualPageCount - feedSize) return null
+    return centeredStartPage(feedSize) + currentPage % feedSize
+}

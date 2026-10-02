@@ -194,4 +194,22 @@ class RoundTrackerTest {
         assertEquals(null, settledAffirmationIndex(page = 3, feedSize = 0))
         assertEquals(null, settledAffirmationIndex(page = -1, feedSize = 10))
     }
+
+    /** Compose clamps currentPage to the last page when pageCount shrinks, so a shrunk feed leaves
+     * the user parked on the final virtual page: forward swipes dead, backward ones fine. */
+    @Test
+    fun `recenters when a shrunk feed clamped the user onto the last virtual page`() {
+        val feedSize = 5
+        val count = feedSize * 10_000
+        val target = recenteredPageOrNull(currentPage = count - 1, virtualPageCount = count, feedSize = feedSize)
+
+        assertEquals(count / 2 - (count / 2) % feedSize + (count - 1) % feedSize, target)
+        // Same card stays on screen: no visible jump.
+        assertEquals((count - 1) % feedSize, target!! % feedSize)
+    }
+
+    @Test
+    fun `leaves the page alone when there is room to scroll forward`() {
+        assertEquals(null, recenteredPageOrNull(currentPage = 25_000, virtualPageCount = 50_000, feedSize = 5))
+    }
 }
