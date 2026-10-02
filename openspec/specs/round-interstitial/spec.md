@@ -30,13 +30,13 @@ A round MUST complete when the user has settled on every distinct affirmation of
 
 ### Requirement: Interstitial gating
 
-On round completion a free-tier user MUST be shown one interstitial, provided the last one was shown at least 5 minutes ago (ROUND_INTERSTITIAL_COOLDOWN_MS). Pro users MUST never see it. The cooldown MUST start only when an interstitial was actually shown.
+On every round completion a free-tier user MUST be shown one interstitial, with no minimum gap between two of them: finishing a round, watching the ad and finishing the next round shows another ad. Pro users MUST never see it.
 
 #### Scenario: Free user
 
-- GIVEN a free user, no interstitial in the last 5 minutes, and a loaded ad
+- GIVEN a free user and a loaded ad
 - WHEN a round completes
-- THEN one interstitial is shown and the timestamp is stored
+- THEN one interstitial is shown
 
 #### Scenario: Pro user
 
@@ -44,15 +44,15 @@ On round completion a free-tier user MUST be shown one interstitial, provided th
 - WHEN a round completes
 - THEN no interstitial is requested or shown
 
-#### Scenario: Cooldown
+#### Scenario: Back-to-back rounds
 
-- GIVEN an interstitial was shown 4 minutes 59 seconds ago
-- WHEN another round completes
-- THEN none is shown; at 5 minutes 0 seconds one is shown
+- GIVEN a free user who just completed a round and saw the interstitial
+- WHEN the user completes the next round, however soon
+- THEN another interstitial is shown (if one is loaded)
 
 ### Requirement: Silent degradation
 
-The interstitial MUST NOT block, delay or visibly alter the feed. Consent MUST be checked passively (`canRequestAds()`); a consent form MUST NOT be shown. If consent is missing, the ad is not loaded, the app is backgrounded, or loading or showing fails, nothing visible happens, no cooldown starts, and loads are throttled (no tight retry loop).
+The interstitial MUST NOT block, delay or visibly alter the feed. Consent MUST be checked passively (`canRequestAds()`); a consent form MUST NOT be shown. If consent is missing, the ad is not loaded, the app is backgrounded, or loading or showing fails, nothing visible happens and loads are throttled (no tight retry loop).
 
 #### Scenario: No consent
 
@@ -86,7 +86,7 @@ A build-time flag (`ROUND_INTERSTITIAL_ENABLED`, default true; override with `-P
 - Round progress is intentionally in-memory: it resets on rotation, process death and leaving the screen.
 - Any change to the feed's id list or order resets progress and never completes a round. An identical list (e.g. refresh) keeps progress.
 - Nothing is reported while a scroll is in progress.
-- The cooldown is also kept in memory, so a failing persistence write cannot cause back-to-back ads; if the persisted value cannot be read, the ad is skipped.
+- No ad-frequency state is persisted or kept in memory: there is no cooldown, so the only gate besides tier and consent is that an ad is loaded.
 
 ### Requirement: Ad expiry and Activity safety
 
@@ -95,5 +95,5 @@ A preloaded ad older than 50 minutes MUST be discarded and reloaded (throttled) 
 ### Requirement: Operational notes
 
 - The kill switch value is parsed case-insensitively; any value other than `true`/`false` FAILS the build with an explicit error instead of silently leaving the feature on.
-- A `show()` that never reports back is abandoned after 30 s (ROUND_INTERSTITIAL_SHOW_TIMEOUT_MS) so later rounds are not queued behind it. If the caller is cancelled after the ad was shown, the cooldown still starts (the shown hook writes the process-level in-memory last-shown time, which also survives Activity recreation).
-- After a dismiss, the 60 s load throttle usually means the next ad is not ready for a round that completes very soon after; that round is silently skipped (`not_loaded`). The throttle is intentionally unchanged.
+- A `show()` that never reports back is abandoned after 30 s (ROUND_INTERSTITIAL_SHOW_TIMEOUT_MS) so later rounds are not queued behind it.
+- The 60 s load throttle (INTERSTITIAL_LOAD_THROTTLE_MS) applies to retries after a no-fill or a show failure. A reload triggered by a dismiss MUST bypass it: a dismissal proves the unit just filled, so the next round's ad is requested immediately and cannot become a retry loop. If AdMob still has no fill, that round is silently skipped (`not_loaded`).
