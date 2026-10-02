@@ -41,7 +41,6 @@ internal class GoogleRoundInterstitialGateway private constructor(
     private val adUnitId: String,
     private val activityProvider: () -> Activity?,
     private val onLoadFailed: (AdFailureReason) -> Unit,
-    private val onShown: () -> Unit,
     private val elapsedRealtime: () -> Long = { SystemClock.elapsedRealtime() },
 ) : RoundInterstitialGateway {
 
@@ -53,12 +52,11 @@ internal class GoogleRoundInterstitialGateway private constructor(
             context: Context,
             adUnitId: String,
             onLoadFailed: (AdFailureReason) -> Unit,
-            onShown: () -> Unit,
         ): GoogleRoundInterstitialGateway = instance ?: synchronized(this) {
             instance ?: run {
                 val app = context.applicationContext as Application
                 ResumedActivityTracker.register(app)
-                GoogleRoundInterstitialGateway(app, adUnitId, ResumedActivityTracker::resumed, onLoadFailed, onShown)
+                GoogleRoundInterstitialGateway(app, adUnitId, ResumedActivityTracker::resumed, onLoadFailed)
                     .also { instance = it }
             }
         }
@@ -133,9 +131,6 @@ internal class GoogleRoundInterstitialGateway private constructor(
         suspendCancellableCoroutine { continuation ->
             loaded.fullScreenContentCallback = object : FullScreenContentCallback() {
                 override fun onAdShowedFullScreenContent() {
-                    // Fires even if the caller was cancelled after show(): the ad is on screen, so the
-                    // cooldown must still start.
-                    onShown()
                     if (continuation.isActive) continuation.resume(RoundInterstitialResult.Shown)
                 }
 
@@ -153,7 +148,7 @@ internal class GoogleRoundInterstitialGateway private constructor(
                 }
             }
             // Only clear the callback if show() was never invoked; afterwards the Shown/dismiss
-            // signals must still reach us (cooldown + reload).
+            // signals must still reach us (reload).
             var showInvoked = false
             continuation.invokeOnCancellation { if (!showInvoked) loaded.fullScreenContentCallback = null }
             showInvoked = true

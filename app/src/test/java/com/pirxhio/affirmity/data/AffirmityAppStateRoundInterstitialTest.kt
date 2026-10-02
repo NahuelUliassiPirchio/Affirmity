@@ -5,7 +5,6 @@ import com.pirxhio.affirmity.access.AdUnlockOutcome
 import com.pirxhio.affirmity.ads.RoundInterstitialCoordinator
 import com.pirxhio.affirmity.ads.RoundInterstitialGateway
 import com.pirxhio.affirmity.ads.RoundInterstitialResult
-import com.pirxhio.affirmity.ads.RoundInterstitialStore
 import com.pirxhio.affirmity.analytics.FakeAnalyticsLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,12 +24,6 @@ private class CountingGateway : RoundInterstitialGateway {
     }
 }
 
-private class MemoryStore : RoundInterstitialStore {
-    var last: Long? = null
-    override suspend fun lastShownAtMillis(): Long? = last
-    override suspend fun saveLastShownAtMillis(millis: Long) { last = millis }
-}
-
 class AffirmityAppStateRoundInterstitialTest {
 
     private class Fixture(enabled: Boolean = true, withCoordinator: Boolean = true) {
@@ -46,7 +39,7 @@ class AffirmityAppStateRoundInterstitialTest {
                 ) = AdUnlockOutcome.Earned
             },
             roundInterstitial = if (withCoordinator) {
-                RoundInterstitialCoordinator(gateway, MemoryStore(), FakeAnalyticsLogger(), { 1_000_000L }, enabled)
+                RoundInterstitialCoordinator(gateway, FakeAnalyticsLogger(), enabled)
             } else {
                 null
             },

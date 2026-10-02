@@ -6,10 +6,9 @@ import com.pirxhio.affirmity.analytics.AnalyticsEvent
 import com.pirxhio.affirmity.analytics.FakeAnalyticsLogger
 import com.pirxhio.affirmity.analytics.FeedSizeBucket
 import com.pirxhio.affirmity.analytics.RoundSkipReason
-import com.pirxhio.affirmity.ui.affirmations.ROUND_INTERSTITIAL_COOLDOWN_MS
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -29,35 +28,17 @@ private class FakeGateway(var result: RoundInterstitialResult = RoundInterstitia
     }
 }
 
-private class FakeStore(var last: Long? = null) : RoundInterstitialStore {
-    var throwOnRead = false
-    var throwOnWrite = false
-
-    override suspend fun lastShownAtMillis(): Long? {
-        if (throwOnRead) error("read boom")
-        return last
-    }
-
-    override suspend fun saveLastShownAtMillis(millis: Long) {
-        if (throwOnWrite) error("write boom")
-        last = millis
-    }
-}
-
 class RoundInterstitialCoordinatorTest {
 
-    private var now = 50_000_000L
     private val gateway = FakeGateway()
-    private val store = FakeStore()
     private val analytics = FakeAnalyticsLogger()
-    private val coordinator = RoundInterstitialCoordinator(gateway, store, analytics, nowMillis = { now })
+    private val coordinator = RoundInterstitialCoordinator(gateway, analytics)
 
     @Test
-    fun `free user at round end sees the interstitial once and the timestamp is stored`() = runBlocking {
+    fun `free user at round end sees the interstitial`() = runBlocking {
         coordinator.onRoundCompleted(AccessTier.FREE, feedSize = 12)
 
         assertEquals(1, gateway.showCalls)
-        assertEquals(now, store.last)
         assertTrue(analytics.recorded.contains(AnalyticsEvent.RoundCompleted(FeedSizeBucket.SIZE_10_24)))
         assertTrue(analytics.recorded.contains(AnalyticsEvent.RoundInterstitialShown))
     }
@@ -67,47 +48,39 @@ class RoundInterstitialCoordinatorTest {
         coordinator.onRoundCompleted(AccessTier.PRO, feedSize = 12)
 
         assertEquals(0, gateway.showCalls)
-        assertNull(store.last)
         assertTrue(analytics.recorded.contains(AnalyticsEvent.RoundInterstitialSkipped(RoundSkipReason.PREMIUM)))
     }
 
     @Test
-    fun `second round inside the cooldown is skipped and after it is shown`() = runBlocking {
+    fun `free rounds back to back each show an interstitial`() = runBlocking {
         coordinator.onRoundCompleted(AccessTier.FREE, 12)
-        now += ROUND_INTERSTITIAL_COOLDOWN_MS - 1_000L
         coordinator.onRoundCompleted(AccessTier.FREE, 12)
-        assertEquals(1, gateway.showCalls)
-        assertTrue(analytics.recorded.contains(AnalyticsEvent.RoundInterstitialSkipped(RoundSkipReason.COOLDOWN)))
+        coordinator.onRoundCompleted(AccessTier.FREE, 12)
 
-        now += 1_000L
-        coordinator.onRoundCompleted(AccessTier.FREE, 12)
-        assertEquals(2, gateway.showCalls)
+        assertEquals(3, gateway.showCalls)
     }
 
     @Test
-    fun `no consent is silent and does not start the cooldown`() = runBlocking {
+    fun `no consent is silent`() = runBlocking {
         gateway.result = RoundInterstitialResult.NoConsent
         coordinator.onRoundCompleted(AccessTier.FREE, 12)
 
-        assertNull(store.last)
         assertTrue(analytics.recorded.contains(AnalyticsEvent.RoundInterstitialSkipped(RoundSkipReason.NO_CONSENT)))
     }
 
     @Test
-    fun `an ad that is not loaded is silent and does not start the cooldown`() = runBlocking {
+    fun `an ad that is not loaded is silent`() = runBlocking {
         gateway.result = RoundInterstitialResult.NotReady
         coordinator.onRoundCompleted(AccessTier.FREE, 12)
 
-        assertNull(store.last)
         assertTrue(analytics.recorded.contains(AnalyticsEvent.RoundInterstitialSkipped(RoundSkipReason.NOT_LOADED)))
     }
 
     @Test
-    fun `a show failure is reported with a bounded reason and starts no cooldown`() = runBlocking {
+    fun `a show failure is reported with a bounded reason`() = runBlocking {
         gateway.result = RoundInterstitialResult.ShowFailed("Ad failed to show")
         coordinator.onRoundCompleted(AccessTier.FREE, 12)
 
-        assertNull(store.last)
         assertTrue(analytics.recorded.contains(AnalyticsEvent.RoundInterstitialFailed(AdFailureReason.SHOW_FAILED)))
     }
 
@@ -116,7 +89,14 @@ class RoundInterstitialCoordinatorTest {
         gateway.throwOnShow = true
         coordinator.onRoundCompleted(AccessTier.FREE, 12)
 
-        assertNull(store.last)
+        assertFalse(analytics.recorded.contains(AnalyticsEvent.RoundInterstitialShown))
+
+        // The failure must not poison the next round.
+        gateway.throwOnShow = false
+        coordinator.onRoundCompleted(AccessTier.FREE, 12)
+
+        assertEquals(2, gateway.showCalls)
+        assertTrue(analytics.recorded.contains(AnalyticsEvent.RoundInterstitialShown))
     }
 
     @Test
@@ -129,7 +109,6 @@ class RoundInterstitialCoordinatorTest {
 
     @Test
     fun `debug trigger bypasses policy but still goes through the gateway`() = runBlocking {
-        store.last = now
         coordinator.triggerForDebug()
 
         assertEquals(1, gateway.showCalls)
@@ -147,7 +126,7 @@ class RoundInterstitialCoordinatorTest {
 
     @Test
     fun `kill switch off means no preload no show and no analytics`() = runBlocking {
-        val off = RoundInterstitialCoordinator(gateway, store, analytics, { now }, enabled = false)
+        val off = RoundInterstitialCoordinator(gateway, analytics, enabled = false)
         off.preload(AccessTier.FREE)
         off.onRoundCompleted(AccessTier.FREE, 12)
         off.triggerForDebug()
@@ -155,37 +134,6 @@ class RoundInterstitialCoordinatorTest {
         assertEquals(0, gateway.preloadCalls)
         assertEquals(0, gateway.showCalls)
         assertTrue(analytics.recorded.isEmpty())
-    }
-
-    @Test
-    fun `a failing cooldown read skips the show`() = runBlocking {
-        store.throwOnRead = true
-        coordinator.onRoundCompleted(AccessTier.FREE, 12)
-
-        assertEquals(0, gateway.showCalls)
-    }
-
-    @Test
-    fun `a failing cooldown write cannot cause ad spam`() = runBlocking {
-        store.throwOnWrite = true
-        coordinator.onRoundCompleted(AccessTier.FREE, 12)
-        coordinator.onRoundCompleted(AccessTier.FREE, 12)
-
-        assertEquals(1, gateway.showCalls)
-        assertTrue(analytics.recorded.contains(AnalyticsEvent.RoundInterstitialSkipped(RoundSkipReason.COOLDOWN)))
-    }
-
-    @Test
-    fun `cooldown survives a rebuilt coordinator when the persisted write failed`() = runBlocking {
-        val shared = LastShownMemory()
-        store.throwOnWrite = true
-        RoundInterstitialCoordinator(gateway, store, analytics, nowMillis = { now }, lastShown = shared)
-            .onRoundCompleted(AccessTier.FREE, 12)
-        // Activity recreation: brand new coordinator, same process-level memory, nothing persisted.
-        RoundInterstitialCoordinator(gateway, store, analytics, nowMillis = { now }, lastShown = shared)
-            .onRoundCompleted(AccessTier.FREE, 12)
-
-        assertEquals(1, gateway.showCalls)
     }
 
     @Test
@@ -198,7 +146,7 @@ class RoundInterstitialCoordinatorTest {
                 kotlinx.coroutines.awaitCancellation()
             }
         }
-        val c = RoundInterstitialCoordinator(hanging, store, analytics, nowMillis = { now }, showTimeoutMs = 100L)
+        val c = RoundInterstitialCoordinator(hanging, analytics, showTimeoutMs = 100L)
         c.onRoundCompleted(AccessTier.FREE, 12)
         c.onRoundCompleted(AccessTier.FREE, 12)
 

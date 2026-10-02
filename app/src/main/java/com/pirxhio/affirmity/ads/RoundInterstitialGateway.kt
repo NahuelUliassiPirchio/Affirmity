@@ -22,12 +22,6 @@ sealed interface RoundInterstitialResult {
     data class ShowFailed(val reason: String) : RoundInterstitialResult
 }
 
-/** Persists when the last round-end interstitial was shown (the cooldown's source of truth). */
-interface RoundInterstitialStore {
-    suspend fun lastShownAtMillis(): Long?
-    suspend fun saveLastShownAtMillis(millis: Long)
-}
-
 /** A preloaded interstitial older than this is discarded (AdMob invalidates cached ads after ~1h). */
 const val INTERSTITIAL_MAX_AGE_MS = 50 * 60 * 1000L
 

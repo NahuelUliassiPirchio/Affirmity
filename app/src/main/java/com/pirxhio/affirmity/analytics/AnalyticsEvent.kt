@@ -73,7 +73,7 @@ enum class AnalyticsParam(val wireName: String) {
 enum class FeedSizeBucket { SIZE_10_24, SIZE_25_49, SIZE_50_99, SIZE_100_PLUS }
 
 /** Why a completed round did not produce an interstitial. */
-enum class RoundSkipReason { PREMIUM, COOLDOWN, NO_CONSENT, NOT_LOADED }
+enum class RoundSkipReason { PREMIUM, NO_CONSENT, NOT_LOADED }
 
 /** Bounded mapping of the wire `family` token (design §7's `V2FcmData.family`) carried by every
  *  notification-related client analytics event (design §9). `UNKNOWN` is the safe fallback for a

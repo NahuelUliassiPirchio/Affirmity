@@ -51,7 +51,6 @@ import com.pirxhio.affirmity.analytics.toAdFailureReason
 import com.pirxhio.affirmity.ads.GoogleRewardedAdGateway
 import com.pirxhio.affirmity.ads.GoogleRoundInterstitialGateway
 import com.pirxhio.affirmity.ads.RoundInterstitialCoordinator
-import com.pirxhio.affirmity.ads.RoundInterstitialStore
 import com.pirxhio.affirmity.ads.findActivity
 import com.pirxhio.affirmity.auth.AuthError
 import com.pirxhio.affirmity.auth.AuthException
@@ -2271,9 +2270,6 @@ class AffirmityAppState(
     }
 }
 
-/** Outlives Activity recreation (and every AffirmityAppState rebuild): the cooldown's in-memory fallback. */
-private val processLastShown = com.pirxhio.affirmity.ads.LastShownMemory()
-
 /**
  * Kill switch (design.md's "Migration/Rollout"): flip to `false` to force every session back to
  * [DataSession.Local] without reverting any code, e.g. if Firestore rules/rollout need a pause.
@@ -2415,17 +2411,9 @@ fun rememberAffirmityAppState(): AffirmityAppState {
                     context = context.applicationContext,
                     adUnitId = BuildConfig.ADMOB_INTERSTITIAL_UNIT,
                     onLoadFailed = { reason -> sharedAnalytics.log(AnalyticsEvent.RoundInterstitialFailed(reason)) },
-                    onShown = { processLastShown.value = System.currentTimeMillis() },
                 ),
-                store = object : RoundInterstitialStore {
-                    override suspend fun lastShownAtMillis(): Long? = trackerPreferences.lastRoundInterstitialAtMillis()
-                    override suspend fun saveLastShownAtMillis(millis: Long) =
-                        trackerPreferences.saveLastRoundInterstitialAtMillis(millis)
-                },
                 analytics = sharedAnalytics,
-                nowMillis = { System.currentTimeMillis() },
                 enabled = BuildConfig.ROUND_INTERSTITIAL_ENABLED,
-                lastShown = processLastShown,
             ),
         )
     }
