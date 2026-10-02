@@ -26,3 +26,14 @@ sealed interface RoundInterstitialResult {
 const val INTERSTITIAL_MAX_AGE_MS = 50 * 60 * 1000L
 
 fun isInterstitialExpired(loadedAt: Long, now: Long): Boolean = now - loadedAt > INTERSTITIAL_MAX_AGE_MS
+
+/** Minimum gap between two load attempts, so a failing unit (no fill) is never retried in a loop. */
+internal const val INTERSTITIAL_LOAD_THROTTLE_MS = 60_000L
+
+/**
+ * Whether a new load must wait. [afterDismiss] bypasses the window: a dismissal proves the unit
+ * just filled and showed, so reloading for the next round cannot become a no-fill retry loop, and
+ * waiting would leave a fast swiper's next completed round without an ad.
+ */
+internal fun isInterstitialLoadThrottled(lastAttemptAt: Long?, now: Long, afterDismiss: Boolean): Boolean =
+    !afterDismiss && lastAttemptAt != null && now - lastAttemptAt < INTERSTITIAL_LOAD_THROTTLE_MS

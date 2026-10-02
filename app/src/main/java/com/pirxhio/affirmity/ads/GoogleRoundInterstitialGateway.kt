@@ -19,9 +19,6 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 
-/** Minimum gap between two load attempts, so a failing unit (no fill) is never retried in a loop. */
-internal const val INTERSTITIAL_LOAD_THROTTLE_MS = 60_000L
-
 private const val TAG = "RoundInterstitialAd"
 
 /**
@@ -84,15 +81,14 @@ internal class GoogleRoundInterstitialGateway private constructor(
         }
     }
 
-    private fun canStartLoad(): Boolean {
+    private fun canStartLoad(afterDismiss: Boolean = false): Boolean {
         if (ad != null || loading || adUnitId.isBlank() || !consentAllows()) return false
-        val last = lastLoadAttemptAt
-        return last == null || elapsedRealtime() - last >= INTERSTITIAL_LOAD_THROTTLE_MS
+        return !isInterstitialLoadThrottled(lastLoadAttemptAt, elapsedRealtime(), afterDismiss)
     }
 
     /** Main thread only. MobileAds must already be initialized (it is whenever an ad was loaded). */
-    private fun loadNow() {
-        if (!canStartLoad()) return
+    private fun loadNow(afterDismiss: Boolean = false) {
+        if (!canStartLoad(afterDismiss)) return
         lastLoadAttemptAt = elapsedRealtime()
         loading = true
         InterstitialAd.load(
@@ -144,7 +140,7 @@ internal class GoogleRoundInterstitialGateway private constructor(
                 override fun onAdDismissedFullScreenContent() {
                     loaded.fullScreenContentCallback = null
                     Log.i(TAG, "interstitial dismissed; reloading next")
-                    loadNow()
+                    loadNow(afterDismiss = true)
                 }
             }
             // Only clear the callback if show() was never invoked; afterwards the Shown/dismiss
