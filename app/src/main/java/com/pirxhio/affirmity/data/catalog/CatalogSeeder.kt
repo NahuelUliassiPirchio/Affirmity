@@ -17,12 +17,15 @@ class CatalogSeeder(
     private val knownCollectionIds: () -> Set<String> = { catalogCollectionsById().keys },
 ) {
 
-    /** No-op when `prefs.observeSeededCatalogVersion() == bundled version`. Idempotent by full
-     * replace otherwise. */
+    /** No-op when `prefs.observeSeededCatalogVersion() == bundled version` AND the table holds
+     * rows. Idempotent by full replace otherwise. */
     suspend fun seedIfNeeded() {
         val bundled = CatalogAssetParser.parse(assetReader.readCatalogJson(), knownCollectionIds())
         val seededVersion = prefs.observeSeededCatalogVersion().first()
-        if (seededVersion == bundled.version) return
+        // The marker lives in DataStore, which Auto Backup restores, while the Room DB is excluded
+        // from backup. A matching marker over an empty table therefore means "restored/cleared
+        // DB", not "already seeded" -- trusting the marker alone leaves the catalog empty forever.
+        if (seededVersion == bundled.version && dao.count() > 0) return
 
         dao.replaceAll(bundled.affirmations)
         // MARKER LAST (design D13): if this throws, the rows are already committed and the next

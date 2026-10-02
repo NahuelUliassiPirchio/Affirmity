@@ -27,14 +27,14 @@ private fun catalogJson(version: String, rowCount: Int = 1) = buildString {
     append("]}")
 }
 
-private class RecordingFakeDao : CatalogAffirmationDao {
+private class RecordingFakeDao(private val existingRows: Int? = null) : CatalogAffirmationDao {
     val calls = mutableListOf<String>()
     var lastReplaced: List<CatalogAffirmationEntity> = emptyList()
 
     override fun observeAll(): Flow<List<CatalogAffirmationEntity>> = throw NotImplementedError()
     override fun observeByGroupIds(groupIds: Set<String>): Flow<List<CatalogAffirmationEntity>> = throw NotImplementedError()
     override suspend fun getByIds(ids: List<String>): List<CatalogAffirmationEntity> = emptyList()
-    override suspend fun count(): Int = lastReplaced.size
+    override suspend fun count(): Int = existingRows ?: lastReplaced.size
 
     override suspend fun replaceAll(rows: List<CatalogAffirmationEntity>) {
         calls += "replaceAll"
@@ -107,14 +107,29 @@ class CatalogSeederTest {
     }
 
     @Test
-    fun `no-ops when the marker already matches the bundled version`() = runBlocking {
-        val dao = RecordingFakeDao()
+    fun `no-ops when the marker already matches the bundled version and rows exist`() = runBlocking {
+        val dao = RecordingFakeDao(existingRows = 1)
         val prefs = RecordingFakePrefs(initial = "1.0.0")
         val seeder = CatalogSeeder({ catalogJson("1.0.0") }, dao, prefs) { KNOWN_COLLECTION_IDS }
 
         seeder.seedIfNeeded()
 
         assertTrue(dao.calls.isEmpty())
+    }
+
+    /** Auto Backup restores DataStore (the marker) but excludes the Room DB, so a restored or
+     * cleared-DB install has a matching marker over an empty table. The marker alone must not
+     * gate seeding. */
+    @Test
+    fun `re-seeds when the marker matches but the catalog table is empty`() = runBlocking {
+        val dao = RecordingFakeDao(existingRows = 0)
+        val prefs = RecordingFakePrefs(initial = "1.0.0")
+        val seeder = CatalogSeeder({ catalogJson("1.0.0") }, dao, prefs) { KNOWN_COLLECTION_IDS }
+
+        seeder.seedIfNeeded()
+
+        assertEquals(listOf("replaceAll"), dao.calls)
+        assertEquals(1, dao.lastReplaced.size)
     }
 
     @Test
