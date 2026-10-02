@@ -48,6 +48,21 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Kill switch for the round-end interstitial (default ON). Flip per build with
+        // -Padmob.roundInterstitialEnabled=false, local.properties, or ROUND_INTERSTITIAL_ENABLED=false.
+        // Parsed case-insensitively; any other value FAILS the build rather than silently failing open.
+        val roundInterstitialRaw = adSecret("admob.roundInterstitialEnabled", "ROUND_INTERSTITIAL_ENABLED")
+        val roundInterstitialEnabled = when (roundInterstitialRaw?.trim()?.lowercase()) {
+            null -> true
+            "true" -> true
+            "false" -> false
+            else -> error(
+                "Invalid admob.roundInterstitialEnabled / ROUND_INTERSTITIAL_ENABLED value " +
+                    "'$roundInterstitialRaw': expected true or false.",
+            )
+        }
+        buildConfigField("boolean", "ROUND_INTERSTITIAL_ENABLED", roundInterstitialEnabled.toString())
     }
 
     buildTypes {
@@ -57,6 +72,7 @@ android {
             buildConfigField("String", "ADMOB_REWARDED_UNIT_ONE_TIME_TRIAL", "\"ca-app-pub-3940256099942544/5224354917\"")
             buildConfigField("String", "ADMOB_REWARDED_UNIT_TIMED_REPEATABLE", "\"ca-app-pub-3940256099942544/5224354917\"")
             buildConfigField("String", "ADMOB_BANNER_UNIT", "\"ca-app-pub-3940256099942544/6300978111\"")
+            buildConfigField("String", "ADMOB_INTERSTITIAL_UNIT", "\"ca-app-pub-3940256099942544/1033173712\"")
             buildConfigField(
                 "String",
                 "ADMOB_TEST_DEVICE_HASH",
@@ -97,6 +113,12 @@ android {
                 "String",
                 "ADMOB_BANNER_UNIT",
                 "\"${requiredAdSecret("admob.bannerUnit", "ADMOB_BANNER_UNIT")}\"",
+            )
+            // REQUIRED for the same reason as the banner: no sane fallback unit for an interstitial.
+            buildConfigField(
+                "String",
+                "ADMOB_INTERSTITIAL_UNIT",
+                "\"${requiredAdSecret("admob.interstitialUnit", "ADMOB_INTERSTITIAL_UNIT")}\"",
             )
         }
     }

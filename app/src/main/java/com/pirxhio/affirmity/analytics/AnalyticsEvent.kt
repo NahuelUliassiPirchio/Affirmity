@@ -30,6 +30,11 @@ enum class AnalyticsEventName(val wireName: String) {
     NOTIFICATION_OPENED("notification_opened"),
     NOTIFICATION_ACTION_CLICKED("notification_action_clicked"),
     NOTIFICATION_COMPLETED("notification_completed"),
+    // Round-end interstitial: a "round" is the user having seen every affirmation in their feed.
+    ROUND_COMPLETED("round_completed"),
+    ROUND_INTERSTITIAL_SHOWN("round_interstitial_shown"),
+    ROUND_INTERSTITIAL_FAILED("round_interstitial_failed"),
+    ROUND_INTERSTITIAL_SKIPPED("round_interstitial_skipped"),
 }
 
 /** Wire name for every declared parameter across the 19 events (REQ-4.5). */
@@ -60,7 +65,15 @@ enum class AnalyticsParam(val wireName: String) {
     // locale/destination on the six events. Reserved for a future band-aware client event.
     STREAK_COUNT_BAND("streak_count_band"),
     INACTIVE_DAYS_BAND("inactive_days_band"),
+    FEED_SIZE_BUCKET("feed_size_bucket"),
+    SKIP_REASON("skip_reason"),
 }
+
+/** Bounded feed size at round completion (rounds only count from 10 affirmations up). */
+enum class FeedSizeBucket { SIZE_10_24, SIZE_25_49, SIZE_50_99, SIZE_100_PLUS }
+
+/** Why a completed round did not produce an interstitial. */
+enum class RoundSkipReason { PREMIUM, COOLDOWN, NO_CONSENT, NOT_LOADED }
 
 /** Bounded mapping of the wire `family` token (design §7's `V2FcmData.family`) carried by every
  *  notification-related client analytics event (design §9). `UNKNOWN` is the safe fallback for a
@@ -320,5 +333,27 @@ sealed interface AnalyticsEvent {
         val locale: NotificationLocaleValue,
     ) : AnalyticsEvent {
         override val name = AnalyticsEventName.NOTIFICATION_COMPLETED
+    }
+
+    data class RoundCompleted(
+        val feedSize: FeedSizeBucket,
+    ) : AnalyticsEvent {
+        override val name = AnalyticsEventName.ROUND_COMPLETED
+    }
+
+    data object RoundInterstitialShown : AnalyticsEvent {
+        override val name = AnalyticsEventName.ROUND_INTERSTITIAL_SHOWN
+    }
+
+    data class RoundInterstitialFailed(
+        val failureReason: AdFailureReason,
+    ) : AnalyticsEvent {
+        override val name = AnalyticsEventName.ROUND_INTERSTITIAL_FAILED
+    }
+
+    data class RoundInterstitialSkipped(
+        val reason: RoundSkipReason,
+    ) : AnalyticsEvent {
+        override val name = AnalyticsEventName.ROUND_INTERSTITIAL_SKIPPED
     }
 }

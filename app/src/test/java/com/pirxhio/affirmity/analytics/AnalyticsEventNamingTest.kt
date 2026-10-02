@@ -12,10 +12,10 @@ class AnalyticsEventNamingTest {
     private val snakeCase = Regex("^[a-z][a-z0-9_]*$")
 
     @Test
-    fun `all 22 event names are declared`() {
+    fun `all 26 event names are declared`() {
         // 19 (spec §5 PART 1) + 3 (Notifications V2 design §9: notification_opened/
-        // notification_action_clicked/notification_completed).
-        assertEquals(22, AnalyticsEventName.entries.size)
+        // notification_action_clicked/notification_completed) + 4 (round-end interstitial).
+        assertEquals(26, AnalyticsEventName.entries.size)
     }
 
     @Test

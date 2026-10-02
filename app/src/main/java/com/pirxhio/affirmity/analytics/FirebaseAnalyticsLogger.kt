@@ -93,6 +93,16 @@ class FirebaseAnalyticsLogger(private val sink: FirebaseAnalyticsSink) : Analyti
         is AnalyticsEvent.NotificationCompleted -> notificationParams(
             event.family, event.variantKey, event.destination, event.locale,
         )
+        is AnalyticsEvent.RoundCompleted -> listOf(
+            text(AnalyticsParam.FEED_SIZE_BUCKET, event.feedSize.name),
+        )
+        AnalyticsEvent.RoundInterstitialShown -> emptyList()
+        is AnalyticsEvent.RoundInterstitialFailed -> listOf(
+            text(AnalyticsParam.FAILURE_REASON, event.failureReason.name),
+        )
+        is AnalyticsEvent.RoundInterstitialSkipped -> listOf(
+            text(AnalyticsParam.SKIP_REASON, event.reason.name),
+        )
     }
 
     /** Shared param mapping for the three notification_* events (design §9): all four declared

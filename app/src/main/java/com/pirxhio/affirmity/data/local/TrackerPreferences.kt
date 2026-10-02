@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.trackerDataStore by preferencesDataStore(name = "tracker_prefs")
@@ -149,7 +150,16 @@ class TrackerPreferences(private val context: Context) {
         }
     }
 
+    /** Epoch millis of the last round-end interstitial (cooldown source of truth); null = never. */
+    suspend fun lastRoundInterstitialAtMillis(): Long? =
+        context.trackerDataStore.data.map { it[ROUND_INTERSTITIAL_LAST_SHOWN_AT] }.first()
+
+    suspend fun saveLastRoundInterstitialAtMillis(millis: Long) {
+        context.trackerDataStore.edit { it[ROUND_INTERSTITIAL_LAST_SHOWN_AT] = millis }
+    }
+
     private companion object {
+        val ROUND_INTERSTITIAL_LAST_SHOWN_AT = longPreferencesKey("round_interstitial_last_shown_at")
         val AFFIRMATIONS_VIEWED_EPOCH_DAY = longPreferencesKey("affirmations_viewed_epoch_day")
         val AFFIRMATIONS_VIEWED_COUNT = intPreferencesKey("affirmations_viewed_count")
         val MEDITATION_DURATION_SECONDS = intPreferencesKey("meditation_duration_seconds")

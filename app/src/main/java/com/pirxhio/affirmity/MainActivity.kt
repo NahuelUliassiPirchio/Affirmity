@@ -1741,9 +1741,15 @@ fun AffirmityApp(
                                     }
                                 }
                             }
+                            // Warm the round-end interstitial while the feed is on screen; re-keyed on the resolved
+                            // entitlement: nothing preloads until it is known, and never for Pro.
+                            LaunchedEffect(appState.entitlementResolved.value, appState.entitlementTier.value) {
+                                appState.preloadRoundInterstitial()
+                            }
                             AffirmationsScreen(
                                 affirmations = appState.filteredAffirmations,
                                 onAffirmationViewed = { appState.recordAffirmationViewed() },
+                                onRoundCompleted = appState::onFeedRoundCompleted,
                                 onOverrideCommitted = appState::setTokenOverride,
                                 favoriteIds = appState.favoriteAffirmationIds.value,
                                 onToggleFavorite = toggleFavoriteWithUndo,

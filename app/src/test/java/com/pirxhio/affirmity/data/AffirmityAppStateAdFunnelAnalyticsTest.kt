@@ -121,10 +121,11 @@ private class FixedOutcomeAdUnlockSource(private val outcome: AdUnlockOutcome) :
     override suspend fun requestUnlock(key: ContentKey, policy: AdUnlockPolicy): AdUnlockOutcome = outcome
 }
 
-private fun buildAnalyticsState(
+internal fun buildAnalyticsState(
     scope: CoroutineScope,
     analytics: AnalyticsLogger,
     adUnlockSource: AdUnlockSource,
+    roundInterstitial: com.pirxhio.affirmity.ads.RoundInterstitialCoordinator? = null,
 ): AffirmityAppState {
     val local = DataSession.Local(
         affirmations = NoopAffirmationRepository2(),
@@ -180,6 +181,7 @@ private fun buildAnalyticsState(
         knownGroupIds = setOf("personalizadas", "fuerza_de_voluntad"),
         adUnlockSource = adUnlockSource,
         analytics = analytics,
+        roundInterstitial = roundInterstitial,
     )
 }
 

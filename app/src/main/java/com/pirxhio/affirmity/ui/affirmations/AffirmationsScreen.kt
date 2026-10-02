@@ -56,6 +56,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -91,6 +92,7 @@ import com.pirxhio.affirmity.ui.collections.messageRes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -115,6 +117,9 @@ private data class FavoriteToggleIntent(
 fun AffirmationsScreen(
     affirmations: List<Affirmation>,
     onAffirmationViewed: () -> Unit,
+    /** Fired once each time the user has seen every affirmation of a feed of at least
+     *  [MIN_ROUND_SIZE]; the argument is the feed size. */
+    onRoundCompleted: (feedSize: Int) -> Unit = {},
     onOverrideCommitted: (affirmationId: String, tokenKey: String, value: String) -> Unit = { _, _, _ -> },
     favoriteIds: Set<String> = emptySet(),
     onToggleFavorite: (affirmationId: String) -> Unit = {},
@@ -180,6 +185,24 @@ fun AffirmationsScreen(
             .drop(1)
             .distinctUntilChanged()
             .collect { onAffirmationViewed() }
+    }
+
+    // Round detection: every settle (the initial page included, hence no drop(1)) is reported with
+    // the CURRENT feed ids. snapshotFlow also re-emits when the feed itself changes under a
+    // stationary pager; the tracker then resets (it never completes on a feed change) and counts the
+    // card the user is sitting on. Nothing is reported while a scroll is still in progress.
+    val currentAffirmations by rememberUpdatedState(affirmations)
+    val currentOnRoundCompleted by rememberUpdatedState(onRoundCompleted)
+    val roundTracker = remember { RoundTracker() }
+    LaunchedEffect(pagerState) {
+        snapshotFlow {
+            Triple(pagerState.settledPage, currentAffirmations.map { it.id }, pagerState.isScrollInProgress)
+        }
+            .filter { (_, _, scrolling) -> !scrolling }
+            .collect { (page, ids, _) ->
+                val index = settledAffirmationIndex(page, ids.size) ?: return@collect
+                if (roundTracker.onSettled(ids, index)) currentOnRoundCompleted(ids.size)
+            }
     }
 
     val pagerScope = rememberCoroutineScope()

@@ -49,6 +49,9 @@ import com.pirxhio.affirmity.analytics.NotificationLocaleValue
 import com.pirxhio.affirmity.analytics.firebase.AndroidFirebaseAnalyticsSink
 import com.pirxhio.affirmity.analytics.toAdFailureReason
 import com.pirxhio.affirmity.ads.GoogleRewardedAdGateway
+import com.pirxhio.affirmity.ads.GoogleRoundInterstitialGateway
+import com.pirxhio.affirmity.ads.RoundInterstitialCoordinator
+import com.pirxhio.affirmity.ads.RoundInterstitialStore
 import com.pirxhio.affirmity.ads.findActivity
 import com.pirxhio.affirmity.auth.AuthError
 import com.pirxhio.affirmity.auth.AuthException
@@ -521,6 +524,9 @@ class AffirmityAppState(
     private val collectionClock: () -> Long = { System.currentTimeMillis() },
     /** Id factory for new collections (design D9). */
     private val collectionIdFactory: () -> String = { UUID.randomUUID().toString() },
+    /** Round-end interstitial orchestration. Null (the default) keeps every existing JVM test
+     *  construction ad-free; the real composition root provides one. */
+    private val roundInterstitial: RoundInterstitialCoordinator? = null,
 ) {
     val affirmations = mutableStateListOf<Affirmation>()
 
@@ -789,6 +795,12 @@ class AffirmityAppState(
     /** Current Free/Pro gating tier, resolved from the live entitlement repository (design.md
      * D5/D8). Read by [rememberAffirmityAppState]'s callers to drive `GroupAccessPolicy`. */
     var entitlementTier = mutableStateOf(AccessTier.FREE)
+        private set
+
+    /** True only once the repository has emitted a real entitlement for the current session.
+     *  [entitlementTier] defaults to FREE, so anything that must never leak to a paying user
+     *  (ads) has to wait for this instead of trusting that default. Reset on every session swap. */
+    var entitlementResolved = mutableStateOf(false)
         private set
 
     /** True right after a live entitlement transition from Pro to Free is observed (design.md D8,
@@ -1315,6 +1327,7 @@ class AffirmityAppState(
             // spurious lapse notice for a session that happens to load an already-Free state.
             session.flatMapLatest { s ->
                 entitlementFlowInitialized = false
+                entitlementResolved.value = false
                 s.entitlements.observe()
             }.catch { error -> Log.e(TAG, "entitlement flow failed", error) }
                 .collect { entitlement ->
@@ -1353,6 +1366,7 @@ class AffirmityAppState(
                     }
                     entitlementFlowInitialized = true
                     entitlementTier.value = entitlement.tier
+                    entitlementResolved.value = true
                 }
         }
     }
@@ -1871,6 +1885,22 @@ class AffirmityAppState(
         }
     }
 
+    /** The user has seen every affirmation of a feed of [feedSize] (>= MIN_ROUND_SIZE). Fire and forget:
+     *  the interstitial decision/IO never runs on, or blocks, the feed. */
+    fun onFeedRoundCompleted(feedSize: Int) {
+        val coordinator = roundInterstitial ?: return
+        scope.launch { coordinator.onRoundCompleted(resolvedTierOrNull(), feedSize) }
+    }
+
+    /** Warms the next round-end interstitial. Cheap and throttled; a no-op for Pro. */
+    fun preloadRoundInterstitial() {
+        val coordinator = roundInterstitial ?: return
+        scope.launch { coordinator.preload(resolvedTierOrNull()) }
+    }
+
+    /** Null until the entitlement resolved: ads must never rely on the FREE default. */
+    private fun resolvedTierOrNull(): AccessTier? = entitlementTier.value.takeIf { entitlementResolved.value }
+
     /** Call once per affirmation the user settles on while swiping the feed. */
     fun recordAffirmationViewed() {
         scope.launch {
@@ -2241,6 +2271,9 @@ class AffirmityAppState(
     }
 }
 
+/** Outlives Activity recreation (and every AffirmityAppState rebuild): the cooldown's in-memory fallback. */
+private val processLastShown = com.pirxhio.affirmity.ads.LastShownMemory()
+
 /**
  * Kill switch (design.md's "Migration/Rollout"): flip to `false` to force every session back to
  * [DataSession.Local] without reverting any code, e.g. if Firestore rules/rollout need a pause.
@@ -2293,6 +2326,19 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             notifications = RoomNotificationSettingsRepository(notificationPreferences),
             adUnlocks = RoomAdUnlockRepository(database.adUnlockDao(), database.timedAdUnlockDao()),
             catalogOverrides = RoomCatalogOverrideRepository(database.catalogOverrideDao()),
+        )
+        val sharedAnalytics = ConsentGatedAnalyticsLogger(
+            // Real delegate as of PR7 -- delivers nothing end-to-end until spec §9.1 item 4
+            // (Firebase console Analytics enablement + a regenerated google-services.json) is
+            // done; until then this is exactly as inert as NoOpAnalyticsLogger was.
+            delegate = FirebaseAnalyticsLogger(
+                AndroidFirebaseAnalyticsSink(FirebaseAnalytics.getInstance(context.applicationContext)),
+            ),
+            // PD-1: default-DENY, globally. UNKNOWN and DENIED both suppress fully. This
+            // lambda is the ONE place a future consent surface (spec §9.1 item 3) plugs in
+            // (design D5) -- swapping this whole `analytics` argument for NoOpAnalyticsLogger
+            // is the one-line kill switch (design D1/REQ-4.6).
+            consentState = { AnalyticsConsentState.UNKNOWN },
         )
         AffirmityAppState(
             scope = scope,
@@ -2358,22 +2404,28 @@ fun rememberAffirmityAppState(): AffirmityAppState {
                     timedRepeatable = BuildConfig.ADMOB_REWARDED_UNIT_TIMED_REPEATABLE,
                 ),
             ),
-            analytics = ConsentGatedAnalyticsLogger(
-                // Real delegate as of PR7 -- delivers nothing end-to-end until spec §9.1 item 4
-                // (Firebase console Analytics enablement + a regenerated google-services.json) is
-                // done; until then this is exactly as inert as NoOpAnalyticsLogger was.
-                delegate = FirebaseAnalyticsLogger(
-                    AndroidFirebaseAnalyticsSink(FirebaseAnalytics.getInstance(context.applicationContext)),
-                ),
-                // PD-1: default-DENY, globally. UNKNOWN and DENIED both suppress fully. This
-                // lambda is the ONE place a future consent surface (spec §9.1 item 3) plugs in
-                // (design D5) -- swapping this whole `analytics` argument for NoOpAnalyticsLogger
-                // is the one-line kill switch (design D1/REQ-4.6).
-                consentState = { AnalyticsConsentState.UNKNOWN },
-            ),
+            analytics = sharedAnalytics,
             personalizationSignalRecorder = RoomPersonalizationSignalRecorder(
                 dao = database.personalizationSignalDao(),
                 scope = scope,
+            ),
+            roundInterstitial = RoundInterstitialCoordinator(
+                gateway = GoogleRoundInterstitialGateway.shared(
+                    // Process-scoped; resolves the current resumed Activity weakly at show time.
+                    context = context.applicationContext,
+                    adUnitId = BuildConfig.ADMOB_INTERSTITIAL_UNIT,
+                    onLoadFailed = { reason -> sharedAnalytics.log(AnalyticsEvent.RoundInterstitialFailed(reason)) },
+                    onShown = { processLastShown.value = System.currentTimeMillis() },
+                ),
+                store = object : RoundInterstitialStore {
+                    override suspend fun lastShownAtMillis(): Long? = trackerPreferences.lastRoundInterstitialAtMillis()
+                    override suspend fun saveLastShownAtMillis(millis: Long) =
+                        trackerPreferences.saveLastRoundInterstitialAtMillis(millis)
+                },
+                analytics = sharedAnalytics,
+                nowMillis = { System.currentTimeMillis() },
+                enabled = BuildConfig.ROUND_INTERSTITIAL_ENABLED,
+                lastShown = processLastShown,
             ),
         )
     }

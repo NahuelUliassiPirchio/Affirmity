@@ -13,3 +13,11 @@ internal fun String.toAdFailureReason(): AdFailureReason = when {
     contains("config", ignoreCase = true) || contains("invalid", ignoreCase = true) -> AdFailureReason.CONFIG
     else -> AdFailureReason.UNKNOWN
 }
+
+/** Maps an AdMob `LoadAdError.code` (AdRequest.ERROR_CODE_*) to the bounded [AdFailureReason]. */
+internal fun adLoadErrorCodeToReason(code: Int): AdFailureReason = when (code) {
+    3 -> AdFailureReason.NO_FILL
+    2 -> AdFailureReason.NETWORK
+    1, 8 -> AdFailureReason.CONFIG
+    else -> AdFailureReason.UNKNOWN
+}
