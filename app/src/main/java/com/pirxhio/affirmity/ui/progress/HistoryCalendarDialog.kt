@@ -1,16 +1,20 @@
 package com.pirxhio.affirmity.ui.progress
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -32,6 +36,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
@@ -218,13 +223,13 @@ private fun WeekdayHeaderRow() {
         val offset = firstDayOfWeek - Calendar.SUNDAY
         List(7) { index -> letters[(index + offset) % 7] }
     }
-    Row(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+    Row(modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp)) {
         rotated.forEach { letter ->
             Text(
                 text = letter,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Center,
             )
         }
@@ -240,22 +245,40 @@ private fun MonthGrid(
 ) {
     val cells: List<HistoryDay?> = List(leadingBlanks) { null } + days
     val rows = cells.chunked(7)
-    Column(modifier = Modifier.padding(top = 4.dp)) {
+    // Every cell, including the leading/trailing blanks, gets the same equal-width bordered square
+    // so the days read as one visible grid instead of loose circles. outlineVariant is a theme
+    // role, so the lines follow light/dark automatically.
+    val gridLine = MaterialTheme.colorScheme.outlineVariant
+    Column(
+        modifier = Modifier
+            .padding(top = 4.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .border(1.dp, gridLine, RoundedCornerShape(12.dp)),
+    ) {
         rows.forEach { rowCells ->
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(modifier = Modifier.fillMaxWidth()) {
                 rowCells.forEach { day ->
-                    if (day == null) {
-                        Box(modifier = Modifier.size(36.dp))
-                    } else {
-                        DayCell(day = day, isSelected = day.epochDay == selectedDay, onTap = { onDayTap(day) })
+                    GridCell(gridLine) {
+                        if (day != null) {
+                            DayCell(day = day, isSelected = day.epochDay == selectedDay, onTap = { onDayTap(day) })
+                        }
                     }
                 }
-                repeat(7 - rowCells.size) {
-                    Box(modifier = Modifier.size(36.dp))
-                }
+                repeat(7 - rowCells.size) { GridCell(gridLine) {} }
             }
         }
     }
+}
+
+@Composable
+private fun RowScope.GridCell(lineColor: Color, content: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .aspectRatio(1f)
+            .border(0.5.dp, lineColor),
+        contentAlignment = Alignment.Center,
+    ) { content() }
 }
 
 @Composable
