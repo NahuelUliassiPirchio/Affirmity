@@ -66,6 +66,13 @@ class BreathingFamilyCustomizationTest {
     }
 
     @Test
+    fun `wim_hof custom rounds and breaths per round drive phase count`() {
+        val entry = requireNotNull(findMeditationCatalogEntry("wim_hof"))
+        // Per round: breaths * 2 (inhale + exhale) + exhale hold + recovery hold.
+        assertEquals(2 * (20 * 2 + 2), phaseCount(entry, mapOf("rounds" to "2", "breathsPerRound" to "20")))
+    }
+
+    @Test
     fun `nadi_shodhana out-of-range persisted rounds is clamped instead of crashing`() {
         val entry = requireNotNull(findMeditationCatalogEntry("nadi_shodhana"))
 

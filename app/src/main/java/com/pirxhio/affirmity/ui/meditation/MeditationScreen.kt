@@ -61,6 +61,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -591,7 +592,7 @@ private fun CategoryPillsRow(
     LazyRow(
         contentPadding = PaddingValues(horizontal = 24.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.padding(top = 12.dp, bottom = 2.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 2.dp),
     ) {
         item {
             CategoryPill(
@@ -643,7 +644,10 @@ private fun MeditationShelf(
     onEvent: (AnalyticsEvent) -> Unit,
     subtitle: String? = null,
 ) {
-    Column(modifier = Modifier.padding(top = 26.dp)) {
+    // fillMaxWidth: the screen's LazyColumn centers its items horizontally, so without it a shelf
+    // narrower than the screen (e.g. "Recent" with one or two cards) shrinks to its content and the
+    // whole shelf, header included, floats to the centre instead of lining up with the others.
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 26.dp)) {
         Text(
             text = label,
             style = MaterialTheme.typography.titleMedium,
@@ -793,10 +797,14 @@ private fun MeditationSessionCard(
         val cardHeadlineRes = entry.primer?.cardHeadlineRes
         Text(
             text = stringResource(cardHeadlineRes ?: entry.titleRes),
-            style = MaterialTheme.typography.bodySmall,
+            // LineBreak.Heading balances the two lines (no one-word orphan on the second line and
+            // no break in the middle of a short phrase); the ellipsis only guards titles that
+            // genuinely need a third line.
+            style = MaterialTheme.typography.bodySmall.copy(lineBreak = LineBreak.Heading),
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 7.dp),
         )
         val durationLabel = stringResource(R.string.guided_meditation_idle_duration_minutes, remember(entry) { listDurationMinutes(entry) })

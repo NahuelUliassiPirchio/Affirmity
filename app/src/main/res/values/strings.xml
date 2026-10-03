@@ -1056,4 +1056,15 @@
     <string name="status_streak_active_today">Racha activa hoy</string>
     <string name="status_streak_pending_today">Racha pendiente hoy</string>
     <string name="status_profile_and_settings">Perfil y ajustes</string>
+
+    <!-- Wim Hof breathing -->
+    <string name="meditation_catalog_wim_hof_title">Respiración Wim Hof</string>
+    <string name="meditation_catalog_wim_hof_description">Rondas guiadas de respiraciones profundas, seguidas de una retención con los pulmones vacíos y una inhalación de recuperación. Seguridad: nunca la practiques en el agua ni mientras conduces, y detente si te mareas.</string>
+    <string name="meditation_wimhof_exhale_hold">Exhala y sostén con los pulmones vacíos. Toca cuando necesites respirar.</string>
+    <string name="meditation_wimhof_recovery_hold">Inhala profundo y sostén.</string>
+    <string name="meditation_customization_wimhof_rounds">Rondas</string>
+    <string name="meditation_customization_wimhof_breaths_per_round">Respiraciones por ronda</string>
+    <string name="meditation_customization_wimhof_breaths_20">20</string>
+    <string name="meditation_customization_wimhof_breaths_30">30</string>
+    <string name="meditation_customization_wimhof_breaths_40">40</string>
 </resources>

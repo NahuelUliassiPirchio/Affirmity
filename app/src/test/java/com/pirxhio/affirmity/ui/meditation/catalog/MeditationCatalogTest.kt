@@ -78,9 +78,9 @@ class MeditationCatalogTest {
     // --- 1. Exactly 7 entries, in §4.6 order, with the exact ids and access companions ----------
 
     @Test
-    fun `1 - exactly 38 entries, REQ-4-6's 7 first in order, then the breathing-technique batch, then the mindfulness-silence-movement-mantra batch, then the prayer-contemplation batch, then the body-mind batch, then the visualization-and-christian-prayer batch, then the breathing-affirmations hybrid, with the exact ids and access companions`() {
+    fun `1 - exactly 39 entries, REQ-4-6's 7 first in order, then the breathing-technique batch, then the mindfulness-silence-movement-mantra batch, then the prayer-contemplation batch, then the body-mind batch, then the visualization-and-christian-prayer batch, then the breathing-affirmations hybrid, then wim_hof, with the exact ids and access companions`() {
         val catalog = meditationCatalog()
-        assertEquals(38, catalog.size)
+        assertEquals(39, catalog.size)
         assertEquals(
             listOf(
                 "reset_rapido" to ContentAccess.Free,
@@ -121,6 +121,7 @@ class MeditationCatalogTest {
                 "jesus_prayer" to ContentAccess.ProOrAdTrial,
                 "lectio_divina" to ContentAccess.Pro,
                 "breathing_affirmations" to ContentAccess.Pro,
+                "wim_hof" to ContentAccess.ProOrAdTrial,
             ),
             catalog.map { it.id to it.access },
         )
@@ -164,7 +165,7 @@ class MeditationCatalogTest {
                 "dhikr", "muraqabah", "hitbodedut", "selfcompassionbreak",
                 "trataka", "yoganidra", "openawareness", "noting", "progressivemusclerelaxation",
                 "visualization", "gratitudemeditation", "centeringprayer", "jesusprayer", "lectiodivina",
-                "breathingaffirmations",
+                "breathingaffirmations", "wimhof",
             ),
             definitionIds,
         )

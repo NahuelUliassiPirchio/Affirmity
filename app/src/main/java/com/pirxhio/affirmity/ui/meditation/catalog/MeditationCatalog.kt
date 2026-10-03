@@ -111,6 +111,10 @@ import com.pirxhio.affirmity.meditation.visualization.visualizationMeditationDef
 import com.pirxhio.affirmity.meditation.walking.WalkingConfig
 import com.pirxhio.affirmity.meditation.walking.WalkingMeditationText
 import com.pirxhio.affirmity.meditation.walking.walkingMeditationDefinition
+import com.pirxhio.affirmity.meditation.wimhof.WimHofConfig
+import com.pirxhio.affirmity.meditation.wimhof.WimHofPhaseIds
+import com.pirxhio.affirmity.meditation.wimhof.WimHofText
+import com.pirxhio.affirmity.meditation.wimhof.wimHofMeditationDefinition
 import com.pirxhio.affirmity.meditation.yoganidra.YogaNidraConfig
 import com.pirxhio.affirmity.meditation.yoganidra.YogaNidraText
 import com.pirxhio.affirmity.meditation.yoganidra.yogaNidraMeditationDefinition
@@ -206,6 +210,8 @@ private fun affirmationTextsFromConfig(config: Map<String, String>): List<String
         .takeWhile { it != null }
         .filterNotNull()
         .toList()
+
+private val WIM_HOF_BREATHS_OPTIONS = listOf(20, WimHofConfig.DEFAULT_BREATHS_PER_ROUND, 40)
 
 fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
     MeditationCatalogEntry(
@@ -2447,6 +2453,78 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                 key = "shuffleAffirmations",
                 labelRes = R.string.meditation_customization_breathing_affirmations_shuffle,
                 default = false,
+            ),
+        ),
+    ),
+    MeditationCatalogEntry(
+        id = "wim_hof",
+        titleRes = R.string.meditation_catalog_wim_hof_title,
+        descriptionRes = R.string.meditation_catalog_wim_hof_description,
+        categoryRes = R.string.meditation_catalog_category_energia,
+        icon = Icons.Filled.Bolt,
+        approxDurationMinutes = 9,
+        access = ContentAccess.ProOrAdTrial,
+        definition = { config ->
+            wimHofMeditationDefinition(
+                WimHofConfig(
+                    rounds = config["rounds"]?.toIntOrNull() ?: WimHofConfig.DEFAULT_ROUNDS,
+                    // An Options value has no clamp (unlike IntSlider): reject anything off-list.
+                    breathsPerRound = config["breathsPerRound"]?.toIntOrNull()
+                        ?.takeIf { it in WIM_HOF_BREATHS_OPTIONS }
+                        ?: WimHofConfig.DEFAULT_BREATHS_PER_ROUND,
+                ),
+            )
+        },
+        presentation = MeditationPresentation(
+            textResources = mapOf(
+                BreathingText.INHALE to R.string.guided_meditation_inhale,
+                BreathingText.EXHALE to R.string.guided_meditation_exhale,
+                WimHofText.EXHALE_HOLD to R.string.meditation_wimhof_exhale_hold,
+                WimHofText.RECOVERY_HOLD to R.string.meditation_wimhof_recovery_hold,
+            ),
+            audioResources = emptyMap(),
+            counters = listOf(
+                MeditationCounter(
+                    repeatId = "rounds",
+                    total = WimHofConfig.DEFAULT_ROUNDS,
+                    labelRes = R.string.guided_meditation_round_label,
+                    emphasis = CounterEmphasis.PRIMARY,
+                    totalFromCustomizationKey = "rounds",
+                ),
+                MeditationCounter(
+                    repeatId = "breathing",
+                    total = WimHofConfig.DEFAULT_BREATHS_PER_ROUND,
+                    labelRes = R.string.guided_meditation_breath_label,
+                    emphasis = CounterEmphasis.SECONDARY,
+                    totalFromCustomizationKey = "breathsPerRound",
+                ),
+            ),
+            // The exhale hold is only a ceiling: the practitioner releases it when they need air.
+            manualRelease = ManualRelease(
+                phaseId = WimHofPhaseIds.EXHALE_HOLD,
+                hintRes = R.string.guided_meditation_retention_hint,
+            ),
+        ),
+        customizationFields = listOf(
+            CustomizationField.IntSlider(
+                key = "rounds",
+                labelRes = R.string.meditation_customization_wimhof_rounds,
+                default = WimHofConfig.DEFAULT_ROUNDS,
+                min = 1,
+                max = 4,
+            ),
+            CustomizationField.Options(
+                key = "breathsPerRound",
+                labelRes = R.string.meditation_customization_wimhof_breaths_per_round,
+                default = WimHofConfig.DEFAULT_BREATHS_PER_ROUND,
+                options = WIM_HOF_BREATHS_OPTIONS,
+                optionLabelRes = { option ->
+                    when (option) {
+                        20 -> R.string.meditation_customization_wimhof_breaths_20
+                        40 -> R.string.meditation_customization_wimhof_breaths_40
+                        else -> R.string.meditation_customization_wimhof_breaths_30
+                    }
+                },
             ),
         ),
     ),
