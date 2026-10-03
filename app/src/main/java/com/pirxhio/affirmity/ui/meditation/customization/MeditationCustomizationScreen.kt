@@ -43,6 +43,8 @@ import com.pirxhio.affirmity.meditation.customization.decodeMultiSelect
 import com.pirxhio.affirmity.meditation.customization.storageKey
 import com.pirxhio.affirmity.ui.meditation.catalog.MeditationCatalogEntry
 import kotlin.math.roundToInt
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardCapitalization
 
 /**
  * Pre-session customization step (spec: meditation-customization). Renders one control per
@@ -238,6 +240,7 @@ private fun CustomizationFieldBody(
                 onValueChange = { onValuesChange(values + (key to it)) },
                 placeholder = field.placeholderRes?.let { { Text(stringResource(it)) } }
                     ?: { Text(stringResource(R.string.meditation_customization_free_text_placeholder)) },
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 10.dp),

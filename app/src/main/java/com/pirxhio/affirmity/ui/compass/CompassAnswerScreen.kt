@@ -21,6 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardCapitalization
 
 /**
  * Minimal Compass/Reflection answer sheet (Notifications V2 scope-expansion decision, mid-Phase-5
@@ -64,6 +66,7 @@ fun CompassAnswerScreen(
                 placeholder = { Text(stringResource(R.string.compass_answer_note_placeholder)) },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
             )
             Button(
                 onClick = { onSave(note.trim().ifEmpty { null }) },

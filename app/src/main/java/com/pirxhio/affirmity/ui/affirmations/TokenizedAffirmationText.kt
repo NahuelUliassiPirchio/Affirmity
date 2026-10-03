@@ -42,6 +42,7 @@ import com.pirxhio.affirmity.data.AffirmationTemplate
 import com.pirxhio.affirmity.data.AffirmationTemplateParser
 import com.pirxhio.affirmity.data.TemplateSegment
 import kotlinx.coroutines.delay
+import androidx.compose.ui.text.input.KeyboardCapitalization
 
 /**
  * Proportional-font width approximation for the inline edit field (design.md Open Question: needs
@@ -184,7 +185,7 @@ fun TokenizedAffirmationText(
                     onValueChange = { editingValue = it },
                     singleLine = true,
                     textStyle = style.merge(tokenStyle),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { commit() }),
                     modifier = Modifier
                         .focusRequester(focusRequester)

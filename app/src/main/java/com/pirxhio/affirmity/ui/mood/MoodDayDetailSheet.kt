@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pirxhio.affirmity.R
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardCapitalization
 
 /**
  * Bottom sheet to log or edit a single day's mood: emoji + label preview, a 1-5 emoji picker, an
@@ -127,6 +129,7 @@ fun MoodDayDetailSheet(
                         }
                     },
                 minLines = 3,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
             )
             Button(
                 onClick = {

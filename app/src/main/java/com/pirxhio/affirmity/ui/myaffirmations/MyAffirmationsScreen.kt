@@ -54,6 +54,8 @@ import com.pirxhio.affirmity.data.AffirmationTemplateParser
 import com.pirxhio.affirmity.data.TemplateField
 import com.pirxhio.affirmity.ui.affirmations.TokenizedAffirmationText
 import com.pirxhio.affirmity.ui.affirmations.defaultTokenStyle
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardCapitalization
 
 private val swatches = listOf(
     "#2A9D8F", "#00696F", "#5BBCC3", "#5E5E5E", "#8F4D22", "#BA1A1A"
@@ -176,6 +178,7 @@ private fun AddAffirmationCard(
                     label = { Text(stringResource(R.string.progress_title_field_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     isError = showValidationError && title.isBlank(),
                     supportingText = if (showValidationError && title.isBlank()) {
                         { Text(stringResource(R.string.progress_title_field_error)) }
@@ -187,6 +190,7 @@ private fun AddAffirmationCard(
                     label = { Text(stringResource(R.string.progress_subtitle_field_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

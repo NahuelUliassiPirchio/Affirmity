@@ -12,6 +12,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.CollectionNameResult
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardCapitalization
 
 /**
  * Name input for creating or renaming a collection. [onSubmit] is a suspend call whose returned
@@ -42,6 +44,7 @@ internal fun CollectionNameDialog(
                 },
                 label = { Text(stringResource(R.string.collection_name_label)) },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 isError = submitState.errorRes != null,
                 supportingText = submitState.errorRes?.let { res -> { Text(stringResource(res)) } },
             )
