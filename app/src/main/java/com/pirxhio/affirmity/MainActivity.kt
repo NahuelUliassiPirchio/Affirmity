@@ -1699,6 +1699,7 @@ fun AffirmityApp(
                                 onOpenHiddenAffirmations = { showHiddenAffirmations = true },
                                 feedSources = appState.draftFeedSources.value,
                                 onFeedSourcesChange = appState::setDraftFeedSources,
+                                isLoading = !appState.isFeedDraftReady,
                                 yourGroups = {
                                     YourGroupsSection(
                                         collections = appState.userCollections,

@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
@@ -74,6 +75,7 @@ fun YourFeedScreen(
     feedSources: FeedSources,
     onFeedSourcesChange: (FeedSources) -> Unit,
     modifier: Modifier = Modifier,
+    isLoading: Boolean = false,
     yourGroups: @Composable () -> Unit = {},
 ) {
     val selectedThemes = draftThemeIds.mapNotNull { catalogThemesById[it] }.sortedBy { it.label }
@@ -97,6 +99,20 @@ fun YourFeedScreen(
                     contentDescription = stringResource(R.string.your_feed_done),
                 )
             }
+        }
+
+        if (isLoading) {
+            // The persisted selection has not resolved yet: the drafts are empty placeholders, so
+            // rendering them would flash an empty feed (0 affirmations, disabled update button).
+            Box(
+                modifier = Modifier
+                    .weight(1f, fill = true)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
+            }
+            return@Column
         }
 
         Column(
@@ -382,6 +398,7 @@ fun YourFeedSheetContent(
     feedSources: FeedSources,
     onFeedSourcesChange: (FeedSources) -> Unit,
     modifier: Modifier = Modifier,
+    isLoading: Boolean = false,
     yourGroups: @Composable () -> Unit = {},
 ) {
     Column(modifier = modifier.fillMaxHeight(0.85f)) {
@@ -411,6 +428,7 @@ fun YourFeedSheetContent(
                 feedSources = feedSources,
                 onFeedSourcesChange = onFeedSourcesChange,
                 modifier = Modifier.weight(1f, fill = true),
+                isLoading = isLoading,
                 yourGroups = yourGroups,
             )
         }

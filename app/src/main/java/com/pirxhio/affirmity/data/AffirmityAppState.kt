@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -617,6 +618,15 @@ class AffirmityAppState(
 
     private var themeDraftInitialized = false
 
+    /** True once both drafts are seeded (from DataStore, or from defaults if a read failed). Until
+     *  then they are placeholders and "Your feed" must show a loading state. */
+    var isFeedDraftReady by mutableStateOf(false)
+        private set
+
+    private fun markFeedDraftReadyIfSeeded() {
+        if (themeDraftInitialized && feedSourcesDraftInitialized) isFeedDraftReady = true
+    }
+
     /** True when [draftThemeIds] is non-empty, or when [draftFeedSources] can carry the feed on its
      * own (Favorites and/or Mine). Reads the DRAFT, not the committed [feedSources] -- otherwise
      * turning a source off in the draft would still validate against the stale committed value
@@ -1139,12 +1149,22 @@ class AffirmityAppState(
             }
         }
         scope.launch {
-            trackerPreferences.observeFeedSources().collect { sources ->
-                feedSources.value = sources
-                if (!feedSourcesDraftInitialized) {
-                    draftFeedSources.value = sources
-                    feedSourcesDraftInitialized = true
+            trackerPreferences.observeFeedSources()
+                .catch { error -> Log.e(TAG, "feed sources flow failed", error) }
+                .collect { sources ->
+                    feedSources.value = sources
+                    if (!feedSourcesDraftInitialized) {
+                        draftFeedSources.value = sources
+                        feedSourcesDraftInitialized = true
+                        markFeedDraftReadyIfSeeded()
+                    }
                 }
+            // The flow ended without ever emitting (failed read): seed the default draft so the
+            // "Your feed" loading state cannot stay up forever.
+            if (!feedSourcesDraftInitialized) {
+                draftFeedSources.value = feedSources.value
+                feedSourcesDraftInitialized = true
+                markFeedDraftReadyIfSeeded()
             }
         }
         scope.launch {
@@ -1285,7 +1305,12 @@ class AffirmityAppState(
             // themePreferences' own store has never been written (scope decision #4); once the
             // migration (or a fresh commit) lands, every later emission carries a non-null
             // persisted value and this snapshot is never consulted again.
-            val legacyGroupIds = legacyGroupIdsProvider()
+            val legacyGroupIds = runCatching { legacyGroupIdsProvider() }
+                .onFailure { error ->
+                    if (error is CancellationException) throw error
+                    Log.e(TAG, "legacy group ids read failed", error)
+                }
+                .getOrNull()
             themePreferences.observeSelectedThemeIds()
                 .catch { error -> Log.e(TAG, "theme selection flow failed", error) }
                 .collect { persisted ->
@@ -1294,6 +1319,7 @@ class AffirmityAppState(
                 if (!themeDraftInitialized) {
                     draftThemeIds.value = resolved
                     themeDraftInitialized = true
+                    markFeedDraftReadyIfSeeded()
                 }
                 // Persist the migrated (or defaulted) result immediately once, exactly when it was
                 // derived from the legacy path (scope decision #4: "written to the new store
@@ -1302,6 +1328,15 @@ class AffirmityAppState(
                 if (persisted == null && legacyGroupIds != null) {
                     scope.launch { themePreferences.saveSelectedThemeIds(resolved) }
                 }
+            }
+            // The flow ended without ever emitting (failed read): seed the default selection (not
+            // persisted) so the "Your feed" loading state cannot stay up forever.
+            if (!themeDraftInitialized) {
+                val resolved = resolveSelectedThemeIds(null, legacyGroupIds, knownThemeIds, defaultThematicThemeIds)
+                selectedThemeIds.value = resolved
+                draftThemeIds.value = resolved
+                themeDraftInitialized = true
+                markFeedDraftReadyIfSeeded()
             }
         }
         scope.launch {

@@ -41,7 +41,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -217,6 +220,75 @@ class AffirmityAppStateFeedSourcesDraftTest {
         assertTrue(state.draftFeedSources.value.randomizeOrder)
     }
 
+    // --- Your feed: the draft is only meaningful once DataStore has delivered both reads ------
+
+    @Test
+    fun `isFeedDraftReady is false until the persisted selection and sources have resolved`() = runTest {
+        val state = buildState(backgroundScope)
+
+        assertFalse(state.isFeedDraftReady)
+
+        runCurrent()
+        advanceUntilIdle()
+
+        assertTrue(state.isFeedDraftReady)
+    }
+
+    @Test
+    fun `isFeedDraftReady becomes true when the theme flow fails before emitting`() = runTest {
+        val state = buildState(backgroundScope, themeFlow = flow { throw IllegalStateException("datastore corrupt") })
+        runCurrent()
+        advanceUntilIdle()
+
+        assertTrue(state.isFeedDraftReady)
+    }
+
+    @Test
+    fun `isFeedDraftReady becomes true when the feed-sources flow fails before emitting`() = runTest {
+        val state = buildState(backgroundScope, feedSourcesFlow = flow { throw IllegalStateException("datastore corrupt") })
+        runCurrent()
+        advanceUntilIdle()
+
+        assertTrue(state.isFeedDraftReady)
+        assertEquals(FeedSources(), state.draftFeedSources.value)
+    }
+
+    @Test
+    fun `isFeedDraftReady becomes true when the legacy group-id read throws`() = runTest {
+        val state = buildState(backgroundScope, legacyGroupIdsProvider = { throw IllegalStateException("legacy store") })
+        runCurrent()
+        advanceUntilIdle()
+
+        assertTrue(state.isFeedDraftReady)
+    }
+
+    @Test
+    fun `isFeedDraftReady waits for the slower flow whichever order they emit in`() = runTest {
+        // Theme selection resolves first, feed sources later.
+        val themeFirst = buildState(
+            backgroundScope,
+            feedSourcesFlow = flow { delay(1_000); emit(FeedSources()) },
+        )
+        runCurrent()
+        assertFalse(themeFirst.isFeedDraftReady)
+        // Delayed work lives in backgroundScope, which advanceUntilIdle does not wait for.
+        advanceTimeBy(1_001)
+        runCurrent()
+        assertTrue(themeFirst.isFeedDraftReady)
+
+        // Feed sources resolve first, theme selection later.
+        val sourcesFirst = buildState(
+            backgroundScope,
+            themeFlow = flow { delay(1_000); emit(setOf(THEME_ID)) },
+        )
+        runCurrent()
+        assertFalse(sourcesFirst.isFeedDraftReady)
+        // Delayed work lives in backgroundScope, which advanceUntilIdle does not wait for.
+        advanceTimeBy(1_001)
+        runCurrent()
+        assertTrue(sourcesFirst.isFeedDraftReady)
+    }
+
     @Test
     fun `isFeedDraftDirty is false with no pending changes and true once the draft diverges`() = runTest {
         val state = buildState(backgroundScope, committedFeedSources = FeedSources(randomizeOrder = false))
@@ -236,11 +308,14 @@ private fun buildState(
     committedFeedSources: FeedSources = FeedSources(),
     trackerPreferences: TrackerPreferences = mock(TrackerPreferences::class.java),
     feedSeedSource: () -> Long = { 0L },
+    themeFlow: Flow<Set<String>?> = flowOf(setOf(THEME_ID)),
+    feedSourcesFlow: Flow<FeedSources> = flowOf(committedFeedSources),
+    legacyGroupIdsProvider: suspend () -> Set<String>? = { null },
 ): AffirmityAppState {
     whenever(trackerPreferences.observeAffirmationsViewedToday())
         .thenReturn(flowOf(DailyViewCount(epochDay = -1L, count = 0)))
     whenever(trackerPreferences.observeHiddenAffirmationIds()).thenReturn(flowOf(emptySet()))
-    whenever(trackerPreferences.observeFeedSources()).thenReturn(flowOf(committedFeedSources))
+    whenever(trackerPreferences.observeFeedSources()).thenReturn(feedSourcesFlow)
     val notificationDebugLog = mock(NotificationDebugLog::class.java)
     whenever(notificationDebugLog.entries).thenReturn(flowOf(emptyList()))
     val onboardingPreferences = mock(OnboardingPreferences::class.java)
@@ -275,7 +350,8 @@ private fun buildState(
         fcmTokenRepository = mock(FcmTokenRepository::class.java),
         onboardingRepository = mock(FirestoreOnboardingRepository::class.java),
         knownGroupIds = setOf(PERSONALIZADAS_GROUP_ID, UNIVERSE_ID),
-        themePreferences = FixedThemeSelectionPreferencesDraft(setOf(THEME_ID)),
+        themePreferences = FixedThemeSelectionPreferencesDraft(themeFlow),
+        legacyGroupIdsProvider = legacyGroupIdsProvider,
         knownThemeIds = setOf(THEME_ID),
         defaultThematicThemeIds = emptySet(),
         favorites = EmptyFavoritesRepositoryDraft,
@@ -354,8 +430,8 @@ private class FakeEntitlementRepositoryDraft(private val tier: AccessTier) : Ent
     override fun observe(): Flow<Entitlement> = flowOf(Entitlement(tier))
 }
 
-private class FixedThemeSelectionPreferencesDraft(private val ids: Set<String>) : ThemeSelectionPreferences {
-    override fun observeSelectedThemeIds(): Flow<Set<String>?> = flowOf(ids)
+private class FixedThemeSelectionPreferencesDraft(private val flow: Flow<Set<String>?>) : ThemeSelectionPreferences {
+    override fun observeSelectedThemeIds(): Flow<Set<String>?> = flow
     override suspend fun saveSelectedThemeIds(ids: Set<String>) = Unit
 }
 
