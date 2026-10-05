@@ -9,29 +9,51 @@ const val LOOP_MULTIPLIER = 10_000
 /**
  * Pure bookkeeping for "the user has seen every affirmation in their current feed".
  *
- * Tracks the distinct ids the user settled on during the current round. Set semantics make
- * backward swipes and wrap-around revisits harmless. Progress is scoped to the exact feed id
- * list: any change (hide, sources, randomize/seed, shrink or grow) discards it, so a stale set
- * can never complete a round for a feed the user did not actually walk through.
+ * Tracks the distinct ids the user saw during the current round. Set semantics make backward
+ * swipes and wrap-around revisits harmless. A card counts as seen when the pager settles on it, and
+ * also when it flew past in a forward fling shorter than the feed (so a fast swipe from card 4 to
+ * card 8 counts 5..7 too). Backward moves, jumps of a full feed or more, and the first settle after
+ * a reset count only the landed card. Progress is scoped to the exact feed id list: any change
+ * (hide, sources, randomize/seed, shrink or grow) discards it and the remembered previous page, so a
+ * stale set can never complete a round for a feed the user did not actually walk through.
  */
 class RoundTracker(private val minRoundSize: Int = MIN_ROUND_SIZE) {
 
     private var feedIds: List<String> = emptyList()
     private val seen = mutableSetOf<String>()
+    private var previousPage: Int? = null
+
+    /** Distinct cards counted so far in the current round; exposed for tests. */
+    internal val seenCount: Int get() = seen.size
 
     /**
-     * Records that the pager settled on [settledIndex] (already reduced modulo the feed size)
-     * of [currentFeedIds]. Returns true exactly once per round: on the settle that completes it.
-     * The id the round ended on seeds the next round.
+     * Records that the pager settled on virtual [settledPage] of [currentFeedIds]. Returns true
+     * exactly once per round: on the settle that completes it. The id the round ended on seeds the
+     * next round.
      */
-    fun onSettled(currentFeedIds: List<String>, settledIndex: Int): Boolean {
+    fun onSettled(currentFeedIds: List<String>, settledPage: Int): Boolean {
         if (currentFeedIds != feedIds) {
             feedIds = currentFeedIds
             seen.clear()
+            previousPage = null
         }
-        val id = currentFeedIds.getOrNull(settledIndex) ?: return false
-        val isNewInRound = seen.add(id)
-        if (!isNewInRound) return false
+        val feedSize = currentFeedIds.size
+        val index = settledAffirmationIndex(settledPage, feedSize) ?: return false
+        val id = currentFeedIds[index]
+
+        val previous = previousPage
+        previousPage = settledPage
+
+        var addedAny = seen.add(id)
+        if (previous != null) {
+            val jump = settledPage - previous
+            if (jump > 1 && jump < feedSize) {
+                for (page in previous + 1 until settledPage) {
+                    if (seen.add(currentFeedIds[page % feedSize])) addedAny = true
+                }
+            }
+        }
+        if (!addedAny) return false
 
         val distinct = currentFeedIds.toSet()
         if (distinct.size < minRoundSize || !seen.containsAll(distinct)) return false

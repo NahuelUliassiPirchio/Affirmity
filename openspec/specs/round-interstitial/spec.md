@@ -8,7 +8,7 @@ Defines when the app shows an interstitial ad after the user completes a round o
 
 ### Requirement: Round completion
 
-A round MUST complete when the user has settled on every distinct affirmation of the current feed, the initial page included, and the feed holds at least 10 affirmations (MIN_ROUND_SIZE). Revisiting an affirmation (backward swipe, wrap-around) MUST NOT count twice. Each round MUST complete exactly once. Progress MUST reset when the feed's id list changes (hide, sources, randomize or seed, size change) and MUST restart after a completed round.
+A round MUST complete when the user has settled on every distinct affirmation of the current feed, the initial page included, and the feed holds at least 10 affirmations (MIN_ROUND_SIZE). Affirmations passed over in a forward fling shorter than the feed count as seen. Revisiting an affirmation (backward swipe, wrap-around) MUST NOT count twice. Each round MUST complete exactly once. Progress MUST reset when the feed's id list changes (hide, sources, randomize or seed, size change) and MUST restart after a completed round.
 
 #### Scenario: Full feed seen
 
@@ -52,7 +52,7 @@ On every round completion a free-tier user MUST be shown one interstitial, with 
 
 ### Requirement: Silent degradation
 
-The interstitial MUST NOT block, delay or visibly alter the feed. Consent MUST be checked passively (`canRequestAds()`); a consent form MUST NOT be shown. If consent is missing, the ad is not loaded, the app is backgrounded, or loading or showing fails, nothing visible happens and loads are throttled (no tight retry loop).
+The interstitial MUST NOT block, delay or visibly alter the feed. Consent MUST be checked passively (`canRequestAds()`); the consent form MUST NOT be shown mid-feed (the UMP flow runs once at app launch, outside the feed). If consent is missing, the ad is not loaded, the app is backgrounded, or loading or showing fails, nothing visible happens and loads are throttled (no tight retry loop).
 
 #### Scenario: No consent
 

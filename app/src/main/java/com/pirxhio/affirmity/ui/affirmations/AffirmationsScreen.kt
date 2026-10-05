@@ -192,8 +192,7 @@ fun AffirmationsScreen(
         }
             .filter { (_, _, scrolling) -> !scrolling }
             .collect { (page, ids, _) ->
-                val index = settledAffirmationIndex(page, ids.size) ?: return@collect
-                if (roundTracker.onSettled(ids, index)) currentOnRoundCompleted(ids.size)
+                if (roundTracker.onSettled(ids, page)) currentOnRoundCompleted(ids.size)
             }
     }
 

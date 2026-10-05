@@ -128,7 +128,81 @@ class RoundTrackerTest {
         val tracker = RoundTracker()
         assertFalse(tracker.onSettled(emptyList(), 0))
         assertFalse(tracker.onSettled(feed(10), -1))
-        assertFalse(tracker.onSettled(feed(10), 10))
+    }
+
+    @Test
+    fun `a forward fast fling counts the cards it passed over`() {
+        val tracker = RoundTracker()
+        val ids = feed(10)
+        assertFalse(tracker.onSettled(ids, 0))
+        assertFalse(tracker.onSettled(ids, 4)) // seen: 0, 1..3 skipped, 4
+        assertEquals(5, tracker.seenCount)
+        // 5..8 flew past on the way to 9: the round completes on this single settle.
+        assertTrue(tracker.onSettled(ids, 9))
+    }
+
+    @Test
+    fun `a backward swipe counts only the landing card`() {
+        val tracker = RoundTracker()
+        val ids = feed(12)
+        tracker.onSettled(ids, 8)
+        tracker.onSettled(ids, 2)
+        assertEquals(2, tracker.seenCount)
+    }
+
+    @Test
+    fun `a jump of a full feed or more counts only the landing card`() {
+        val tracker = RoundTracker()
+        val ids = feed(10)
+        tracker.onSettled(ids, 0)
+        tracker.onSettled(ids, 10) // exactly one feed length: not inferred
+        assertEquals(1, tracker.seenCount)
+        tracker.onSettled(ids, 35) // 25 pages: not inferred
+        assertEquals(2, tracker.seenCount)
+    }
+
+    @Test
+    fun `a fling across the wrap boundary counts the wrapped cards`() {
+        val tracker = RoundTracker()
+        val ids = feed(12)
+        tracker.onSettled(ids, 10) // index 10
+        tracker.onSettled(ids, 13) // pages 11, 12 -> indices 11, 0; landed on index 1
+        assertEquals(4, tracker.seenCount)
+    }
+
+    @Test
+    fun `the first settle after a feed change infers no intermediates`() {
+        val tracker = RoundTracker()
+        val ids = feed(12)
+        tracker.onSettled(ids, 0)
+        val other = List(12) { "b$it" }
+        tracker.onSettled(other, 6) // would be a forward jump of 6 if the previous page leaked
+        assertEquals(1, tracker.seenCount)
+        tracker.onSettled(other, 9) // same feed again: 7, 8 inferred
+        assertEquals(4, tracker.seenCount)
+    }
+
+    @Test
+    fun `a fling that completes the round fires exactly once and seeds the next round`() {
+        val tracker = RoundTracker()
+        val ids = feed(10)
+        tracker.onSettled(ids, 0)
+        assertTrue(tracker.onSettled(ids, 9))
+        assertEquals(1, tracker.seenCount) // seeded with the landed id
+        assertFalse(tracker.onSettled(ids, 9))
+        // Next round: from page 9 forward-fling to page 18 (wraps over 0..7) lands on index 8.
+        assertTrue(tracker.onSettled(ids, 18))
+    }
+
+    @Test
+    fun `previous page memory is updated after completion`() {
+        val tracker = RoundTracker()
+        val ids = feed(10)
+        tracker.onSettled(ids, 0)
+        assertTrue(tracker.onSettled(ids, 9))
+        // Adjacent forward move from the completing page infers nothing extra.
+        assertFalse(tracker.onSettled(ids, 10))
+        assertEquals(2, tracker.seenCount)
     }
 
     @Test
