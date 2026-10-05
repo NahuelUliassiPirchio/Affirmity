@@ -5,6 +5,9 @@ import android.util.Log
 import com.google.android.ump.ConsentDebugSettings
 import com.google.android.ump.ConsentRequestParameters
 import com.google.android.ump.UserMessagingPlatform
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
@@ -18,43 +21,39 @@ internal sealed interface ConsentGatherResult {
 }
 
 /**
- * Pure once-per-process decision for the launch-time consent flow: at most one run in flight, and
- * no re-run after a successful one (recreation must not re-request). A failed run may be retried
- * by a later launch. Kept free of SDK types so it is unit-tested.
- */
-internal class ConsentLaunchGuard {
-    private var running = false
-    private var done = false
-
-    @Synchronized
-    fun tryStart(): Boolean {
-        if (running || done) return false
-        running = true
-        return true
-    }
-
-    @Synchronized
-    fun finish(succeeded: Boolean) {
-        running = false
-        if (succeeded) done = true
-    }
-}
-
-/**
  * Thin SDK adapter running the UMP flow (`requestConsentInfoUpdate` +
  * `loadAndShowConsentFormIfRequired`). Shared by the launch-time gather in `MainActivity` and the
  * rewarded-ad path. The interstitial and banner stay passive-only: they never call this.
  *
+ * The request is SINGLE-FLIGHT process-wide ([ConsentSingleFlight]): a caller that arrives while
+ * one is in flight (a recreated Activity, a rewarded tap during the launch gather) awaits the same
+ * result instead of starting a second request or form. The request runs in a process-scoped
+ * coroutine, so cancelling a caller (Activity recreation cancels the launch effect) only cancels
+ * its await. The request is started with the Activity of the FIRST caller; if that Activity is
+ * recreated meanwhile, the SDK keeps it referenced until the form callback fires, a bounded,
+ * SDK-owned temporary reference. Later callers still read `canRequestAds()` from their own Activity.
+ *
  * ACCEPTED AS UNTESTED, same precedent as the other gateways ([UserMessagingPlatform] is static
- * and final). Its decision logic lives in [ConsentLaunchGuard].
+ * and final). Its decision logic lives in [ConsentSingleFlight].
  */
 internal object ConsentGatherer {
 
-    private val launchGuard = ConsentLaunchGuard()
+    private val singleFlight =
+        ConsentSingleFlight(CoroutineScope(SupervisorJob() + Dispatchers.Main))
 
-    /** Must be called on the main thread. Includes the debug-geography EEA settings when
-     *  [isDebug] and [testDeviceHash] is set. */
+    /** Single-flight gather: joins a request already in flight, else starts one (always fresh
+     *  after the previous one ended). Includes the debug-geography EEA settings when [isDebug] and
+     *  [testDeviceHash] is set. */
     suspend fun gather(
+        activity: Activity,
+        testDeviceHash: String,
+        isDebug: Boolean,
+    ): ConsentGatherResult = singleFlight.run { request(activity, testDeviceHash, isDebug) }
+
+    /** The raw SDK flow; runs on the main thread inside the process-scoped single-flight, which
+     *  bounds it with a timeout. The `isActive` guards stay: after a timeout the continuation is
+     *  cancelled and a late SDK callback must not resume it. */
+    private suspend fun request(
         activity: Activity,
         testDeviceHash: String,
         isDebug: Boolean,
@@ -94,8 +93,10 @@ internal object ConsentGatherer {
     }
 
     /**
-     * Launch-time, fire-and-forget consent. Runs at most once per process (see
-     * [ConsentLaunchGuard]); never throws. When consent allows ads, initializes Mobile Ads and
+     * Launch-time, fire-and-forget consent. Joins any request in flight (including a rewarded
+     * one) and does nothing once a request has completed successfully in this process (see
+     * [ConsentSingleFlight.runOnceAfterSuccess]); a failure may be retried by a later launch.
+     * Cancellation only stops waiting, never the request. Never throws (besides cancellation). When consent allows ads, initializes Mobile Ads and
      * invokes [onConsentAvailable] so the caller can preload. Call on the main thread.
      */
     suspend fun gatherAtLaunch(
@@ -104,11 +105,9 @@ internal object ConsentGatherer {
         isDebug: Boolean,
         onConsentAvailable: () -> Unit,
     ) {
-        if (!launchGuard.tryStart()) return
-        var succeeded = false
         try {
-            val result = gather(activity, testDeviceHash, isDebug)
-            succeeded = result is ConsentGatherResult.Completed
+            singleFlight.runOnceAfterSuccess { request(activity, testDeviceHash, isDebug) }
+                ?: return
             val canRequestAds = UserMessagingPlatform.getConsentInformation(activity).canRequestAds()
             if (canRequestAds) {
                 MobileAdsInitializer.ensureInitialized(activity.applicationContext)
@@ -118,8 +117,6 @@ internal object ConsentGatherer {
             throw cancelled
         } catch (t: Throwable) {
             Log.w(TAG, "launch consent flow failed: ${t.javaClass.simpleName}")
-        } finally {
-            launchGuard.finish(succeeded)
         }
     }
 }
