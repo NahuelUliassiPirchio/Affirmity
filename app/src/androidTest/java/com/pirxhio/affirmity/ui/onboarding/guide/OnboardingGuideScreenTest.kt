@@ -1,8 +1,14 @@
 package com.pirxhio.affirmity.ui.onboarding.guide
 
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
@@ -92,6 +98,21 @@ class OnboardingGuideScreenTest {
         ).performClick()
 
         assertEquals("completing the last slide must dismiss exactly once", 1, dismissCount)
+    }
+
+    @Test
+    fun guideBlocksTouchesFromReachingContentBeneathIt() {
+        var underneathClicks = 0
+        composeTestRule.setContent {
+            Box(modifier = Modifier.fillMaxSize()) {
+                Box(modifier = Modifier.fillMaxSize().clickable { underneathClicks++ })
+                OnboardingGuideScreen(onDismiss = {})
+            }
+        }
+
+        composeTestRule.onRoot().performTouchInput { click(center) }
+
+        assertEquals("the guide must swallow taps on its empty areas", 0, underneathClicks)
     }
 
     @Test

@@ -11,6 +11,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -49,62 +50,69 @@ fun OnboardingGuideScreen(
     // resumable at a later slide.
     BackHandler(onBack = onDismiss)
 
-    Column(
+    // Opaque Surface: the guide is overlaid on OnboardingScreen, which has already advanced to the
+    // first question. Without it the question shows through and taps reach its options.
+    Surface(
         modifier = modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.End,
-        ) {
-            // R4.2: Skip is available on EVERY slide, regardless of current page.
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.onboarding_guide_skip_button))
-            }
-        }
-
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.weight(1f),
-        ) { page ->
-            OnboardingGuideSlideContent(slide = resolvedSlides[page])
-        }
-
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.fillMaxSize(),
         ) {
-            OnboardingGuideDots(
-                pageCount = resolvedSlides.size,
-                currentPage = pagerState.settledPage,
-            )
-
-            Button(
-                onClick = {
-                    if (isLastPage) {
-                        // R4.3: completing the last slide is behaviorally equivalent to Skip in
-                        // its persistence outcome (dismiss + mark seen).
-                        onDismiss()
-                    } else {
-                        scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
-                    }
-                },
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.End,
             ) {
-                Text(
-                    // R4.1: the last slide's primary action reads as a completion action, never
-                    // "Next".
-                    text = stringResource(
-                        if (isLastPage) {
-                            R.string.onboarding_guide_get_started_button
-                        } else {
-                            R.string.onboarding_guide_next_button
-                        },
-                    ),
+                // R4.2: Skip is available on EVERY slide, regardless of current page.
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.onboarding_guide_skip_button))
+                }
+            }
+
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.weight(1f),
+            ) { page ->
+                OnboardingGuideSlideContent(slide = resolvedSlides[page])
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                OnboardingGuideDots(
+                    pageCount = resolvedSlides.size,
+                    currentPage = pagerState.settledPage,
                 )
+
+                Button(
+                    onClick = {
+                        if (isLastPage) {
+                            // R4.3: completing the last slide is behaviorally equivalent to Skip in
+                            // its persistence outcome (dismiss + mark seen).
+                            onDismiss()
+                        } else {
+                            scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+                        }
+                    },
+                ) {
+                    Text(
+                        // R4.1: the last slide's primary action reads as a completion action, never
+                        // "Next".
+                        text = stringResource(
+                            if (isLastPage) {
+                                R.string.onboarding_guide_get_started_button
+                            } else {
+                                R.string.onboarding_guide_next_button
+                            },
+                        ),
+                    )
+                }
             }
         }
     }
