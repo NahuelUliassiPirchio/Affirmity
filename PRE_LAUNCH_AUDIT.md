@@ -118,6 +118,30 @@ Audit of the 8 items from Nahuel's pre-launch checklist against the actual codeb
 
 ---
 
+## 9. AdMob interstitial unit (release builds)
+
+**Status:** ⚙️ Config-only (not a code task)
+
+**Evidence:**
+- `app/build.gradle.kts` — the `release` build type reads `ADMOB_INTERSTITIAL_UNIT` through `requiredAdSecret("admob.interstitialUnit", "ADMOB_INTERSTITIAL_UNIT")`, which fails the build when the secret is missing. This is deliberate: a release must never ship Google's public test units.
+- `debug` builds use Google's test interstitial unit, so none of this is needed for local testing.
+- `local.properties` already has `admob.appId`, `admob.bannerUnit` and the rewarded units; only `admob.interstitialUnit` is missing.
+
+**Gap:** Create the unit and wire the secret before the first `assembleRelease` / `bundleRelease`:
+1. AdMob console → **Apps** → Affirmity (add the app first if it is not listed).
+2. **Ad units → Add ad unit → Interstitial**, name it e.g. `round_end_interstitial`, create it.
+3. Copy the **ad unit ID** (`ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY`, with a `/`; not the app ID, which has a `~`).
+4. Add `admob.interstitialUnit=<that id>` to `local.properties`. In CI, set the environment variable `ADMOB_INTERSTITIAL_UNIT` instead.
+
+**Notes:**
+- A brand-new ad unit can take a few hours to start serving; "no fill" right after creation is normal.
+- Never tap your own ads in a release build (account-ban risk); use a registered test device instead.
+- Round length is capped at 40 cards (`MAX_ROUND_SIZE` in `RoundTracker.kt`), minimum feed size 10 (`MIN_ROUND_SIZE`).
+
+**Effort:** Config-only, about 10 minutes plus the serving delay.
+
+---
+
 ## Prioritized Punch List
 
 **Blocks first release (real bugs/gaps a user will hit):**
@@ -125,9 +149,10 @@ Audit of the 8 items from Nahuel's pre-launch checklist against the actual codeb
 2. **#8 — Premium pricing.** Not a code gap, but the paywall is literally non-functional (no prices, disabled buttons) until Play Console is set up — needs doing before *any* premium-path QA is meaningful.
 3. **#1 — Share/hide.** Share is a small, expected feature for an affirmations app; its total absence will read as unfinished. Hide is lower priority than share.
 4. **#4 — Missing descriptions on Discover.** Cheap fix, real content already exists — high value-to-effort ratio, and directly addresses "meditations that are unclear."
+5. **#9 — AdMob interstitial unit.** Config-only, but release builds fail without `admob.interstitialUnit` in `local.properties` / `ADMOB_INTERSTITIAL_UNIT`; create the unit in AdMob first (the new unit can take hours to serve).
 
 **Nice-to-have polish (can ship without, iterate after):**
-5. **#7 — Ambient/voice volume.** The cue-mute toggle already shipped; extending to full volume control is a "nice, not blocking" enhancement.
-6. **#5 — Recent meditations.** Pure discoverability polish, no correctness or trust issue.
-7. **#2 — Personal meditations.** Large net-new feature — treat as a post-launch roadmap item, not a pre-launch blocker.
-8. **#3 — Combos.** Same as #2: a genuinely new feature area, not a fix. Push to post-launch.
+6. **#7 — Ambient/voice volume.** The cue-mute toggle already shipped; extending to full volume control is a "nice, not blocking" enhancement.
+7. **#5 — Recent meditations.** Pure discoverability polish, no correctness or trust issue.
+8. **#2 — Personal meditations.** Large net-new feature — treat as a post-launch roadmap item, not a pre-launch blocker.
+9. **#3 — Combos.** Same as #2: a genuinely new feature area, not a fix. Push to post-launch.
