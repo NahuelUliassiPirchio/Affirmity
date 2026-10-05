@@ -8,13 +8,19 @@ Defines when the app shows an interstitial ad after the user completes a round o
 
 ### Requirement: Round completion
 
-A round MUST complete when the user has settled on every distinct affirmation of the current feed, the initial page included, and the feed holds at least 10 affirmations (MIN_ROUND_SIZE). Affirmations passed over in a forward fling shorter than the feed count as seen. Revisiting an affirmation (backward swipe, wrap-around) MUST NOT count twice. Each round MUST complete exactly once. Progress MUST reset when the feed's id list changes (hide, sources, randomize or seed, size change) and MUST restart after a completed round.
+A round MUST complete when the user has seen min(distinct feed size, 40) distinct affirmations of the current feed (MAX_ROUND_SIZE = 40), the initial page included, and the feed holds at least 10 distinct affirmations (MIN_ROUND_SIZE). A huge feed therefore never needs to be seen in full. Affirmations passed over in a forward fling shorter than the feed count as seen. Revisiting an affirmation (backward swipe, wrap-around) MUST NOT count twice. Each round MUST complete exactly once. Progress MUST reset when the feed's id list changes (hide, sources, randomize or seed, size change) and MUST restart after a completed round.
 
 #### Scenario: Full feed seen
 
 - GIVEN a feed of 10 affirmations and the user is on the first one
 - WHEN the user settles on the other 9 at least once each
 - THEN the round completes once
+
+#### Scenario: Large feed is capped
+
+- GIVEN a feed of 500 affirmations and the user is on the first one
+- WHEN the user has seen 40 distinct affirmations in total
+- THEN the round completes once, and the next round again needs 40 distinct ones
 
 #### Scenario: Small feed
 

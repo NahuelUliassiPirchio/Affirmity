@@ -3,11 +3,15 @@ package com.pirxhio.affirmity.ui.affirmations
 /** A feed this small is not worth a "round": an interstitial every few swipes would be spam. */
 const val MIN_ROUND_SIZE = 10
 
+/** A round never asks for more than this many distinct cards: a huge feed is never seen in full. */
+const val MAX_ROUND_SIZE = 40
+
 /** Virtual pages per feed item: the pager is `feedSize * LOOP_MULTIPLIER` pages long. */
 const val LOOP_MULTIPLIER = 10_000
 
 /**
- * Pure bookkeeping for "the user has seen every affirmation in their current feed".
+ * Pure bookkeeping for "the user has seen enough of their current feed to finish a round": every
+ * distinct card, capped at [maxRoundSize] (so a round is `min(distinct feed size, 40)` cards).
  *
  * Tracks the distinct ids the user saw during the current round. Set semantics make backward
  * swipes and wrap-around revisits harmless. A card counts as seen when the pager settles on it, and
@@ -17,7 +21,13 @@ const val LOOP_MULTIPLIER = 10_000
  * (hide, sources, randomize/seed, shrink or grow) discards it and the remembered previous page, so a
  * stale set can never complete a round for a feed the user did not actually walk through.
  */
-class RoundTracker(private val minRoundSize: Int = MIN_ROUND_SIZE) {
+class RoundTracker(
+    private val minRoundSize: Int = MIN_ROUND_SIZE,
+    private val maxRoundSize: Int = MAX_ROUND_SIZE,
+) {
+    init {
+        require(maxRoundSize >= minRoundSize) { "maxRoundSize must be >= minRoundSize" }
+    }
 
     private var feedIds: List<String> = emptyList()
     private val seen = mutableSetOf<String>()
@@ -56,7 +66,9 @@ class RoundTracker(private val minRoundSize: Int = MIN_ROUND_SIZE) {
         if (!addedAny) return false
 
         val distinct = currentFeedIds.toSet()
-        if (distinct.size < minRoundSize || !seen.containsAll(distinct)) return false
+        if (distinct.size < minRoundSize) return false
+        // seen only holds ids of this feed, and a fling may overshoot the target: use >=, not ==.
+        if (seen.size < minOf(distinct.size, maxRoundSize)) return false
 
         seen.clear()
         seen.add(id)

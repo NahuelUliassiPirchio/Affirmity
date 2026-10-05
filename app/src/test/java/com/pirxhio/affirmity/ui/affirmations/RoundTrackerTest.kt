@@ -257,6 +257,85 @@ class RoundTrackerTest {
     }
 
     @Test
+    fun `max round size is forty`() {
+        assertEquals(40, MAX_ROUND_SIZE)
+    }
+
+    @Test
+    fun `a 500 card feed completes after 40 distinct cards not 500`() {
+        val tracker = RoundTracker()
+        val ids = feed(500)
+        (0 until 39).forEach { assertFalse("page $it", tracker.onSettled(ids, it)) }
+        assertTrue(tracker.onSettled(ids, 39))
+    }
+
+    @Test
+    fun `a 40 card feed completes at 40 and a 25 card feed at 25`() {
+        val forty = RoundTracker()
+        assertEquals(1, (0 until 40).count { forty.onSettled(feed(40), it) })
+        val twentyFive = RoundTracker()
+        val ids = feed(25)
+        (0 until 24).forEach { assertFalse(twentyFive.onSettled(ids, it)) }
+        assertTrue(twentyFive.onSettled(ids, 24))
+    }
+
+    @Test
+    fun `a 41 card feed completes at 40 distinct cards`() {
+        val tracker = RoundTracker()
+        val ids = feed(41)
+        (0 until 39).forEach { assertFalse(tracker.onSettled(ids, it)) }
+        assertTrue(tracker.onSettled(ids, 39))
+    }
+
+    @Test
+    fun `a capped round seeds the next one which also needs 40`() {
+        val tracker = RoundTracker()
+        val ids = feed(500)
+        (0 until 40).forEach { tracker.onSettled(ids, it) }
+        assertEquals(1, tracker.seenCount)
+        // Seeded with a39; 38 more distinct cards are not enough, the 39th is.
+        (40 until 78).forEach { assertFalse("page $it", tracker.onSettled(ids, it)) }
+        assertTrue(tracker.onSettled(ids, 78))
+    }
+
+    @Test
+    fun `a fling past the target fires once and seeds with the landed card`() {
+        val tracker = RoundTracker()
+        val ids = feed(500)
+        assertFalse(tracker.onSettled(ids, 0))
+        assertTrue(tracker.onSettled(ids, 100)) // 99 intermediates, far past 40
+        assertEquals(1, tracker.seenCount)
+        assertFalse(tracker.onSettled(ids, 100))
+        assertFalse(tracker.onSettled(ids, 101))
+    }
+
+    @Test
+    fun `a feed change resets a capped round`() {
+        val tracker = RoundTracker()
+        val ids = feed(500)
+        (0 until 39).forEach { tracker.onSettled(ids, it) }
+        val other = List(500) { "b$it" }
+        assertFalse(tracker.onSettled(other, 39))
+        assertEquals(1, tracker.seenCount)
+    }
+
+    @Test
+    fun `the cap is injectable and the ten card minimum still applies`() {
+        val small = RoundTracker(maxRoundSize = 12)
+        val ids = feed(100)
+        (0 until 11).forEach { assertFalse(small.onSettled(ids, it)) }
+        assertTrue(small.onSettled(ids, 11))
+        val nine = RoundTracker()
+        assertEquals(0, (0 until 9).count { nine.onSettled(feed(9), it) })
+    }
+
+    @Test
+    fun `a cap below the minimum is rejected`() {
+        val result = runCatching { RoundTracker(maxRoundSize = MIN_ROUND_SIZE - 1) }
+        assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+    }
+
+    @Test
     fun `settled index wraps around the virtual page range`() {
         assertEquals(2, settledAffirmationIndex(page = 2, feedSize = 10))
         assertEquals(2, settledAffirmationIndex(page = 10 * 3 + 2, feedSize = 10))
