@@ -10,9 +10,6 @@ import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.OnUserEarnedRewardListener
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
-import com.google.android.ump.ConsentDebugSettings
-import com.google.android.ump.ConsentInformation
-import com.google.android.ump.ConsentRequestParameters
 import com.google.android.ump.UserMessagingPlatform
 import com.pirxhio.affirmity.access.AdPreparation
 import com.pirxhio.affirmity.access.RewardedAdGateway
@@ -30,7 +27,7 @@ import kotlin.coroutines.resume
  * in [com.pirxhio.affirmity.access.RewardedAdUnlockSource] (design D2/D3) and is unit-tested there.
  *
  * ACCEPTED AS UNTESTED, EXPLICITLY. [RewardedAd], [RewardedAdLoadCallback],
- * [FullScreenContentCallback], [ConsentInformation] and [UserMessagingPlatform] are final classes
+ * [FullScreenContentCallback], [UserMessagingPlatform] are final classes
  * and static factories with no injectable construction, so a plain-JVM JUnit test cannot exercise
  * this file. This is the SAME precedent Specs 1-4 set for Compose routing code: the untestable
  * boundary is kept as thin as possible and everything above it is fully covered.
@@ -49,9 +46,11 @@ internal class GoogleRewardedAdGateway(
         val consentInformation = UserMessagingPlatform.getConsentInformation(activity)
 
         val consentResult = withContext(Dispatchers.Main) {
-            gatherConsent(activity, consentInformation)
+            ConsentGatherer.gather(activity, testDeviceHash, isDebug)
         }
-        if (consentResult != null) return consentResult
+        if (consentResult is ConsentGatherResult.Failed) {
+            return AdPreparation.ConsentUnavailable(consentResult.reason)
+        }
 
         if (!consentInformation.canRequestAds()) {
             return AdPreparation.ConsentUnavailable("canRequestAds() == false after consent flow")
@@ -70,45 +69,6 @@ internal class GoogleRewardedAdGateway(
             }
         }
         return AdPreparation.Ready
-    }
-
-    /** Returns a non-null [AdPreparation] only when consent gathering itself failed/declined;
-     *  returns `null` when the caller should proceed to check [ConsentInformation.canRequestAds]. */
-    private suspend fun gatherConsent(
-        activity: Activity,
-        consentInformation: ConsentInformation,
-    ): AdPreparation? = suspendCancellableCoroutine { continuation ->
-        val debugSettings = if (isDebug && testDeviceHash.isNotBlank()) {
-            ConsentDebugSettings.Builder(activity)
-                .setDebugGeography(ConsentDebugSettings.DebugGeography.DEBUG_GEOGRAPHY_EEA)
-                .addTestDeviceHashedId(testDeviceHash)
-                .build()
-        } else {
-            null
-        }
-        val paramsBuilder = ConsentRequestParameters.Builder()
-        if (debugSettings != null) paramsBuilder.setConsentDebugSettings(debugSettings)
-        val params = paramsBuilder.build()
-
-        consentInformation.requestConsentInfoUpdate(
-            activity,
-            params,
-            {
-                UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity) { formError ->
-                    if (!continuation.isActive) return@loadAndShowConsentFormIfRequired
-                    if (formError != null) {
-                        continuation.resume(AdPreparation.ConsentUnavailable(formError.message))
-                    } else {
-                        continuation.resume(null)
-                    }
-                }
-            },
-            { updateError ->
-                if (continuation.isActive) {
-                    continuation.resume(AdPreparation.ConsentUnavailable(updateError.message))
-                }
-            },
-        )
     }
 
     override suspend fun loadAndShow(adUnitId: String): RewardedAdResult = withContext(Dispatchers.Main) {

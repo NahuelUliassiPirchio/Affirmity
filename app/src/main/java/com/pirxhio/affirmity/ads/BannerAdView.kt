@@ -36,7 +36,7 @@ private enum class BannerPhase { Pending, Loaded, Failed }
  * Consent is checked passively via [UserMessagingPlatform.getConsentInformation] — this NEVER
  * triggers a UMP consent form (design D5, resolved tradeoff): a banner is a passive placement,
  * and popping a consent sheet mid-meditation would be hostile. A user who never gathered consent
- * elsewhere (e.g. the rewarded-ad CTA) silently never sees this banner either.
+ * elsewhere (the launch-time ConsentGatherer, or the rewarded-ad CTA) silently never sees this banner either.
  */
 @Composable
 fun BannerAdView(

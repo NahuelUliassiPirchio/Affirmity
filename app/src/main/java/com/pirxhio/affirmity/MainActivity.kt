@@ -90,6 +90,9 @@ import com.pirxhio.affirmity.data.GuideGateResolution
 import com.pirxhio.affirmity.data.MOOD_MAX
 import com.pirxhio.affirmity.data.PreSurveyGuideResolution
 import com.pirxhio.affirmity.data.rememberAffirmityAppState
+import com.pirxhio.affirmity.ads.ConsentGatherer
+import com.pirxhio.affirmity.ads.ResumedActivityTracker
+import com.pirxhio.affirmity.ads.findActivity
 import com.pirxhio.affirmity.data.resolveGuideGate
 import com.pirxhio.affirmity.data.resolvePreSurveyGuideGate
 import com.pirxhio.affirmity.meditation.SessionEndReason
@@ -624,6 +627,9 @@ class MainActivity : AppCompatActivity() {
         splashScreen.setKeepOnScreenCondition { keepSplashOnScreen }
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Must register before the first resume: callbacks registered later (e.g. lazily on first
+        // composition) miss this Activity's onResume and the tracker would never see it.
+        ResumedActivityTracker.register(application)
         applyStartExtras(intent)
         setContent {
             AffirmityTheme {
@@ -721,6 +727,21 @@ fun AffirmityApp(
     // is unrepresentable. Every trigger surface supplies its own PaywallSource (spec §5.3).
     var paywallSource by rememberSaveable { mutableStateOf<PaywallSource?>(null) }
     val appState = rememberAffirmityAppState()
+    // Launch-time UMP consent (outside the feed, fire-and-forget, once per process): without it
+    // canRequestAds() stays false on a fresh install and the round interstitial never loads.
+    // Re-preloads once consent is available; the entitlement-keyed preload effect below covers
+    // the opposite ordering.
+    val consentActivity = LocalContext.current.findActivity()
+    LaunchedEffect(consentActivity) {
+        if (consentActivity != null) {
+            ConsentGatherer.gatherAtLaunch(
+                activity = consentActivity,
+                testDeviceHash = BuildConfig.ADMOB_TEST_DEVICE_HASH,
+                isDebug = BuildConfig.DEBUG,
+                onConsentAvailable = { appState.preloadRoundInterstitial() },
+            )
+        }
+    }
     // Notifications V2 Phase 6 (design §9): fires `notification_opened`/`notification_action_clicked`
     // exactly once per qualifying launch (keyed on startNotification.eventKey the same way the Mood/
     // Compass effects above are), and records the launch's attribution so whichever family's

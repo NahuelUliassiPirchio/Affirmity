@@ -32,6 +32,7 @@ private const val TAG = "RoundInterstitialAd"
  * code mapping) ARE tested.
  *
  * Consent is checked PASSIVELY via `canRequestAds()` -- this NEVER shows a UMP form mid-feed.
+ * The UMP flow itself runs once at app launch ([ConsentGatherer.gatherAtLaunch]), not here.
  */
 internal class GoogleRoundInterstitialGateway private constructor(
     private val appContext: Context,
