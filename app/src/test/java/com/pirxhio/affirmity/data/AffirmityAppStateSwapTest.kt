@@ -18,6 +18,7 @@ import com.pirxhio.affirmity.data.local.ThemeSelectionPreferences
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.OnboardingGuidePreferences
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
+import com.pirxhio.affirmity.personalization.goals.GoalCatalog
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
 import com.pirxhio.affirmity.data.local.FeedSources
@@ -341,6 +342,8 @@ private fun buildState(
     fcmTokenProvider: suspend () -> String = { "test-token" },
     fcmTokenOwnershipCoordinator: FcmTokenOwnershipCoordinator = FcmTokenOwnershipCoordinator(),
     healerTodayEpochDay: () -> Long = { DayClock.epochDay() },
+    legacyGroupIdsProvider: suspend () -> Set<String>? = { null },
+    goalIdsProvider: suspend () -> Set<String>? = { null },
 ): AffirmityAppState {
     val trackerPreferences = mock(TrackerPreferences::class.java)
     whenever(trackerPreferences.observeAffirmationsViewedToday())
@@ -389,6 +392,8 @@ private fun buildState(
         knownThemeIds = knownThemeIds,
         defaultThematicThemeIds = defaultThematicThemeIds,
         proOnlyThemeIds = proOnlyThemeIds,
+        legacyGroupIdsProvider = legacyGroupIdsProvider,
+        goalIdsProvider = goalIdsProvider,
     )
 }
 
@@ -1082,6 +1087,143 @@ class AffirmityAppStateSwapTest {
         )
 
         scope.cancel()
+    }
+
+    // --- Initial theme selection derived from survey goals on completeOnboarding() -------------
+
+    private val initialThemeIds = GoalCatalog.allMappedThemeIds + setOf("x.1")
+    private val calmDerived = deriveInitialThemeIds(setOf("calm"), initialThemeIds)
+
+    private suspend fun completeFreshOnboarding(
+        themePrefs: FakeThemeSelectionPreferences,
+        completedAtStart: Boolean = false,
+        legacy: Set<String>? = null,
+        goalIds: suspend () -> Set<String>? = { setOf("calm") },
+        block: suspend (AffirmityAppState) -> Unit,
+    ) {
+        val events = mutableListOf<String>()
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val onboardingPreferences = mock(OnboardingPreferences::class.java)
+        whenever(onboardingPreferences.observeHasCompletedOnboarding())
+            .thenReturn(EventedFlow("onboarding-completed", mutableListOf(), listOf(completedAtStart)))
+        val state = buildState(
+            local = fakeLocal(events, id = "local-initial-themes"),
+            remote = { fakeRemote("uid-initial-themes", events) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = FakeAuthRepository(),
+            scope = scope,
+            themePreferences = themePrefs,
+            knownThemeIds = initialThemeIds,
+            defaultThematicThemeIds = initialThemeIds,
+            onboardingPreferencesOverride = onboardingPreferences,
+            legacyGroupIdsProvider = { legacy },
+            goalIdsProvider = goalIds,
+        )
+        delay(50)
+        block(state)
+        scope.cancel()
+    }
+
+    @Test
+    fun `completeOnboarding derives the initial selection from goals, persists once, updates draft and selection`() = runBlocking {
+        val prefs = FakeThemeSelectionPreferences()
+        completeFreshOnboarding(prefs) { state ->
+            assertEquals(initialThemeIds, state.selectedThemeIds.value)
+
+            state.completeOnboarding()
+            delay(50)
+
+            assertEquals(calmDerived, state.selectedThemeIds.value)
+            assertEquals(calmDerived, state.draftThemeIds.value)
+            assertEquals(listOf(calmDerived), prefs.saved.toList())
+            assertTrue(calmDerived.size <= MAX_INITIAL_THEMES)
+        }
+    }
+
+    @Test
+    fun `completeOnboarding derives only once`() = runBlocking {
+        val prefs = FakeThemeSelectionPreferences()
+        completeFreshOnboarding(prefs) { state ->
+            state.completeOnboarding()
+            delay(50)
+            state.completeOnboarding()
+            delay(50)
+
+            assertEquals(1, prefs.saved.size)
+        }
+    }
+
+    @Test
+    fun `completeOnboarding does not derive when theme ids are already persisted`() = runBlocking {
+        val prefs = FakeThemeSelectionPreferences(initial = setOf("x.1"))
+        completeFreshOnboarding(prefs) { state ->
+            state.completeOnboarding()
+            delay(50)
+
+            assertTrue(prefs.saved.isEmpty())
+            assertEquals(setOf("x.1"), state.selectedThemeIds.value)
+        }
+    }
+
+    @Test
+    fun `completeOnboarding does not derive when legacy group ids exist`() = runBlocking {
+        val prefs = FakeThemeSelectionPreferences()
+        completeFreshOnboarding(prefs, legacy = setOf("some_legacy_group")) { state ->
+            val before = state.selectedThemeIds.value
+            state.completeOnboarding()
+            delay(50)
+
+            assertEquals(before, state.selectedThemeIds.value)
+            assertTrue(prefs.saved.size <= 1)
+            assertTrue(prefs.saved.none { it == calmDerived })
+        }
+    }
+
+    @Test
+    fun `an install that already completed onboarding keeps the full default selection`() = runBlocking {
+        val prefs = FakeThemeSelectionPreferences()
+        completeFreshOnboarding(prefs, completedAtStart = true) { state ->
+            assertEquals(initialThemeIds, state.selectedThemeIds.value)
+
+            state.completeOnboarding()
+            delay(50)
+
+            assertEquals(initialThemeIds, state.selectedThemeIds.value)
+            assertTrue(prefs.saved.isEmpty())
+        }
+    }
+
+    @Test
+    fun `a selection committed while goals are being read is never overwritten`() = runBlocking {
+        val prefs = FakeThemeSelectionPreferences()
+        completeFreshOnboarding(
+            prefs,
+            goalIds = {
+                prefs.saveSelectedThemeIds(setOf("x.1"))
+                kotlinx.coroutines.yield() // let the theme collector observe the commit, as DataStore would
+                setOf("calm")
+            },
+        ) { state ->
+            state.completeOnboarding()
+            delay(50)
+
+            assertEquals(listOf(setOf("x.1")), prefs.saved.toList())
+            assertEquals(setOf("x.1"), state.selectedThemeIds.value)
+        }
+    }
+
+    @Test
+    fun `no goals means nothing is persisted and the default selection stays`() = runBlocking {
+        listOf<Set<String>?>(null, emptySet()).forEach { goals ->
+            val prefs = FakeThemeSelectionPreferences()
+            completeFreshOnboarding(prefs, goalIds = { goals }) { state ->
+                state.completeOnboarding()
+                delay(50)
+
+                assertTrue(prefs.saved.isEmpty())
+                assertEquals(initialThemeIds, state.selectedThemeIds.value)
+            }
+        }
     }
 
     // --- Spec R7.1: completeOnboarding() arms the guide as one atomic addition ----------------

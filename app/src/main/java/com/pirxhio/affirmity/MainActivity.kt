@@ -726,7 +726,12 @@ fun AffirmityApp(
     // D8: replaces the old showPaywall boolean -- null means hidden, and "shown without a source"
     // is unrepresentable. Every trigger surface supplies its own PaywallSource (spec §5.3).
     var paywallSource by rememberSaveable { mutableStateOf<PaywallSource?>(null) }
-    val appState = rememberAffirmityAppState()
+    val context = LocalContext.current
+    // Device-local by design: goals survive account changes and never enter AffirmityAppState's
+    // DataSession/Firestore swap boundary.
+    val userGoalsStore = remember(context) { UserGoalsPreferences(context.applicationContext) }
+    // Goals feed the one-time initial theme selection derived when the survey completes.
+    val appState = rememberAffirmityAppState(userGoalsStore)
     // Launch-time UMP consent (outside the feed, fire-and-forget, once per process): without it
     // canRequestAds() stays false on a fresh install and the round interstitial never loads.
     // Re-preloads once consent is available; the entitlement-keyed preload effect below covers
@@ -771,10 +776,6 @@ fun AffirmityApp(
             locale = startNotification.locale,
         )?.let { appState.logAnalyticsEvent(it) }
     }
-    val context = LocalContext.current
-    // Device-local by design: goals survive account changes and never enter AffirmityAppState's
-    // DataSession/Firestore swap boundary.
-    val userGoalsStore = remember(context) { UserGoalsPreferences(context.applicationContext) }
     val database = remember(context) { AffirmityDatabase.getInstance(context.applicationContext) }
     val personalizationSignalDao = remember(database) { database.personalizationSignalDao() }
     // Local-only, deliberately outside AffirmityAppState/DataSession (see

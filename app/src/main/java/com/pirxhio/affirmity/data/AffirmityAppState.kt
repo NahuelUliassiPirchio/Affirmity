@@ -121,6 +121,8 @@ import com.pirxhio.affirmity.notifications.NotificationCanceller
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.notifications.Notifier
 import com.pirxhio.affirmity.notifications.FcmTokenOwnershipCoordinator
+import com.pirxhio.affirmity.personalization.goals.GoalCatalog
+import com.pirxhio.affirmity.personalization.goals.UserGoalsStore
 import com.pirxhio.affirmity.personalization.signal.NoOpPersonalizationSignalRecorder
 import com.pirxhio.affirmity.personalization.signal.PersonalizationSignal
 import com.pirxhio.affirmity.personalization.signal.PersonalizationSignalRecorder
@@ -302,6 +304,48 @@ fun resolveSelectedThemeIds(
     }
     val filtered = persistedThemeIds?.filter { it in knownThemeIds }?.toSet()
     return if (filtered.isNullOrEmpty()) defaultThemeIds else filtered
+}
+
+/** Upper bound on the themes a freshly onboarded install starts with, so the first feed is a
+ *  focused handful instead of every free theme (~400 affirmations). */
+const val MAX_INITIAL_THEMES = 5
+
+/**
+ * Pure derivation of the initial theme selection from the survey's goals, applied only when the
+ * survey completes on a fresh install (see [AffirmityAppState.completeOnboarding]). Reuses the
+ * hand-authored [goalThemeIds] bridge and keeps only themes in [freeThemeIds] (unlocked for a FREE
+ * user). Ranking is deterministic: goals are visited in sorted-id order and their themes are taken
+ * round-robin (each goal's first theme, then each goal's second, ...), so every chosen goal is
+ * represented before any gets a second theme, up to [max]. With no goals, or when no goal maps to
+ * a free theme, falls back to the broad starter mix of every goal (same round-robin), and finally
+ * to the first [max] of [freeThemeIds] in sorted order.
+ */
+fun deriveInitialThemeIds(
+    goalIds: Set<String>?,
+    freeThemeIds: Set<String>,
+    goalThemeIds: Map<String, Set<String>> = GoalCatalog.themeIdsByGoalId,
+    max: Int = MAX_INITIAL_THEMES,
+): Set<String> {
+    fun roundRobin(ids: Collection<String>): Set<String> {
+        val queues = ids.sorted().mapNotNull { goalThemeIds[it] }
+            .map { themes -> themes.filter { it in freeThemeIds }.sorted() }
+        val picked = linkedSetOf<String>()
+        var rank = 0
+        while (picked.size < max && queues.any { rank < it.size }) {
+            for (queue in queues) {
+                if (picked.size >= max) break
+                queue.getOrNull(rank)?.let { picked.add(it) }
+            }
+            rank++
+        }
+        return picked
+    }
+
+    val fromGoals = if (goalIds.isNullOrEmpty()) emptySet() else roundRobin(goalIds)
+    if (fromGoals.isNotEmpty()) return fromGoals
+    val broad = roundRobin(goalThemeIds.keys)
+    if (broad.isNotEmpty()) return broad
+    return freeThemeIds.sorted().take(max).toSet()
 }
 
 /** Minimum-selection rule used by the "Your feed" screen before it commits a draft: at least one
@@ -487,6 +531,11 @@ class AffirmityAppState(
      * value of its own by the time this is even consulted. Defaulted to `{ null }` so every
      * existing JVM test that constructs this class directly is unaffected. */
     private val legacyGroupIdsProvider: suspend () -> Set<String>? = { null },
+    /** One-shot read of the survey's saved goal ids, consulted ONLY by [completeOnboarding] to
+     * derive a freshly onboarded install's initial theme selection ([deriveInitialThemeIds]).
+     * `null` means no goals were saved. Defaulted to `{ null }` so existing JVM tests are
+     * unaffected. */
+    private val goalIdsProvider: suspend () -> Set<String>? = { null },
     /** The seam Spec 5 replaces (design §9): the only way an ad unlock is ever created.
      *  Defaulted to [NoAdUnlockSource] -- the same injection convention as [deviceTimeZoneId] /
      *  [themePreferences] / [knownThemeIds] -- so Spec 5's entire integration into this class is
@@ -617,6 +666,18 @@ class AffirmityAppState(
         private set
 
     private var themeDraftInitialized = false
+
+    /** Whether the theme store holds anything yet, as seen by the theme collector. Gates
+     * [completeOnboarding]'s one-time goal-driven derivation. */
+    private enum class ThemeStoreState {
+        /** The collector has not emitted yet. */
+        UNRESOLVED,
+        /** Nothing persisted and no legacy group ids: the only state that may derive. */
+        EMPTY,
+        /** Persisted ids or legacy-migrated ids exist (or were just derived). */
+        POPULATED,
+    }
+    private var themeStoreState = ThemeStoreState.UNRESOLVED
 
     /** True once both drafts are seeded (from DataStore, or from defaults if a read failed). Until
      *  then they are placeholders and "Your feed" must show a loading state. */
@@ -1314,21 +1375,26 @@ class AffirmityAppState(
             themePreferences.observeSelectedThemeIds()
                 .catch { error -> Log.e(TAG, "theme selection flow failed", error) }
                 .collect { persisted ->
-                val resolved = resolveSelectedThemeIds(persisted, legacyGroupIds, knownThemeIds, defaultThematicThemeIds)
-                selectedThemeIds.value = resolved
-                if (!themeDraftInitialized) {
-                    draftThemeIds.value = resolved
-                    themeDraftInitialized = true
-                    markFeedDraftReadyIfSeeded()
+                    themeStoreState = if (persisted == null && legacyGroupIds == null) {
+                        ThemeStoreState.EMPTY
+                    } else {
+                        ThemeStoreState.POPULATED
+                    }
+                    val resolved = resolveSelectedThemeIds(persisted, legacyGroupIds, knownThemeIds, defaultThematicThemeIds)
+                    selectedThemeIds.value = resolved
+                    if (!themeDraftInitialized) {
+                        draftThemeIds.value = resolved
+                        themeDraftInitialized = true
+                        markFeedDraftReadyIfSeeded()
+                    }
+                    // Persist the migrated (or defaulted) result immediately once, exactly when it was
+                    // derived from the legacy path (scope decision #4: "written to the new store
+                    // immediately") -- a fresh install with no legacy data stays unpersisted until the
+                    // user actually commits a draft, matching the old group-level behavior.
+                    if (persisted == null && legacyGroupIds != null) {
+                        scope.launch { themePreferences.saveSelectedThemeIds(resolved) }
+                    }
                 }
-                // Persist the migrated (or defaulted) result immediately once, exactly when it was
-                // derived from the legacy path (scope decision #4: "written to the new store
-                // immediately") -- a fresh install with no legacy data stays unpersisted until the
-                // user actually commits a draft, matching the old group-level behavior.
-                if (persisted == null && legacyGroupIds != null) {
-                    scope.launch { themePreferences.saveSelectedThemeIds(resolved) }
-                }
-            }
             // The flow ended without ever emitting (failed read): seed the default selection (not
             // persisted) so the "Your feed" loading state cannot stay up forever.
             if (!themeDraftInitialized) {
@@ -1405,9 +1471,48 @@ class AffirmityAppState(
         }
     }
 
+    /**
+     * One-time, goal-driven initial theme selection. Runs only for a survey finished in this
+     * process on a fresh install ([ThemeStoreState.EMPTY]); the survey persists its goals
+     * (`onSurveyCompleted`) BEFORE calling [completeOnboarding], which is why this lives here and
+     * not in the theme collector (that one runs at app start, before any goals exist). With no
+     * goals nothing is derived or persisted and the default selection stays.
+     */
+    private suspend fun deriveInitialThemeSelection() {
+        when (themeStoreState) {
+            ThemeStoreState.UNRESOLVED -> {
+                Log.w(TAG, "initial theme derivation skipped: theme selection not resolved yet")
+                return
+            }
+            ThemeStoreState.POPULATED -> return
+            ThemeStoreState.EMPTY -> Unit
+        }
+        val selectionBeforeRead = selectedThemeIds.value
+        val goalIds = runCatching { goalIdsProvider() }
+            .onFailure { error ->
+                if (error is CancellationException) throw error
+                Log.e(TAG, "goal ids read failed", error)
+            }
+            .getOrNull()
+        if (goalIds.isNullOrEmpty()) return
+        // Re-checked after the suspending read: a commit (or migration) that landed meanwhile wins.
+        if (themeStoreState != ThemeStoreState.EMPTY || selectedThemeIds.value != selectionBeforeRead) return
+        val derived = deriveInitialThemeIds(goalIds, defaultThematicThemeIds)
+        selectedThemeIds.value = derived
+        draftThemeIds.value = derived
+        themeStoreState = ThemeStoreState.POPULATED
+        // Persisted once, like the legacy migration, so later survey edits never silently rewrite
+        // the user's selection.
+        themePreferences.saveSelectedThemeIds(derived)
+    }
+
     fun completeOnboarding() {
+        // Captured BEFORE the flag flips: only a survey finished in this process derives an initial
+        // selection, so an install that already completed onboarding is never rewritten.
+        val completedNow = hasCompletedOnboarding.value == false
         hasCompletedOnboarding.value = true
         val uid = (authState.value as? AuthState.SignedIn)?.uid
+        if (completedNow) scope.launch { deriveInitialThemeSelection() }
         scope.launch {
             onboardingPreferences.setCompleted()
             if (uid != null) {
@@ -2312,7 +2417,7 @@ class AffirmityAppState(
 private const val USE_REMOTE_SESSION = true
 
 @Composable
-fun rememberAffirmityAppState(): AffirmityAppState {
+fun rememberAffirmityAppState(userGoalsStore: UserGoalsStore): AffirmityAppState {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     // Resolved here, in the composable body, not inside `remember` — a locale switch recreates
@@ -2419,6 +2524,7 @@ fun rememberAffirmityAppState(): AffirmityAppState {
             defaultThematicThemeIds = defaultThematicThemeIds,
             proOnlyThemeIds = proOnlyThemeIds,
             legacyGroupIdsProvider = { readLegacySelectedGroupIds(context.applicationContext) },
+            goalIdsProvider = { userGoalsStore.observeGoalIds().first() },
             adUnlockSource = RewardedAdUnlockSource(
                 gateway = GoogleRewardedAdGateway(
                     // Re-resolved per call from the composable's own captured `context`, never
