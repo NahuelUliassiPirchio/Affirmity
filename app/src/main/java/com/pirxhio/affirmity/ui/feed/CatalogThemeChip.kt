@@ -12,6 +12,7 @@ import com.pirxhio.affirmity.analytics.provenance
 import com.pirxhio.affirmity.ui.groups.AffirmationGroupAccessBadge
 import com.pirxhio.affirmity.ui.groups.CatalogTheme
 import com.pirxhio.affirmity.ui.groups.GroupBadge
+import com.pirxhio.affirmity.ui.groups.displayLabel
 import com.pirxhio.affirmity.ui.groups.isThemeToggleable
 
 /** One theme as a chip: a selectable [InputChip] when unlocked (tap toggles it in/out of the
@@ -45,7 +46,7 @@ internal fun CatalogThemeChip(
         InputChip(
             selected = checked,
             onClick = { onToggleTheme(theme.id) },
-            label = { Text(theme.label) },
+            label = { Text(theme.displayLabel()) },
         )
     } else {
         AssistChip(
@@ -59,7 +60,7 @@ internal fun CatalogThemeChip(
                 )
                 onUpgradeClick()
             },
-            label = { Text(theme.label) },
+            label = { Text(theme.displayLabel()) },
             trailingIcon = if (showBadge) {
                 { AffirmationGroupAccessBadge(decision.lockedThemeBadge()) }
             } else {

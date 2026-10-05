@@ -39,6 +39,7 @@ import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.ui.groups.AffirmationGroup
 import com.pirxhio.affirmity.ui.groups.CatalogTheme
 import com.pirxhio.affirmity.ui.groups.catalogUniverseGroups
+import com.pirxhio.affirmity.ui.groups.displayLabel
 
 /** Theme chips shown collapsed before a group offers a "+N more" expander -- keeps a large
  *  selection scannable at a glance instead of always paying its full wrapped height upfront. */
@@ -216,11 +217,11 @@ private fun FeedThemeGroupCard(
                     InputChip(
                         selected = true,
                         onClick = { onRemoveTheme(theme.id) },
-                        label = { Text(theme.label) },
+                        label = { Text(theme.displayLabel()) },
                         trailingIcon = {
                             Icon(
                                 imageVector = Icons.Filled.Close,
-                                contentDescription = stringResource(R.string.your_feed_remove_theme_a11y, theme.label),
+                                contentDescription = stringResource(R.string.your_feed_remove_theme_a11y, theme.displayLabel()),
                                 modifier = Modifier.size(InputChipDefaults.IconSize),
                             )
                         },

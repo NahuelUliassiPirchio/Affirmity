@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -404,9 +406,9 @@ internal fun AffirmationCard(
                         requestLikeBurst(Offset(cardSize.width / 2f, cardSize.height / 2f))
                     },
                     textAlign = TextAlign.Center,
+                    shrinkToKeepWordsWhole = true,
                     modifier = Modifier.padding(top = 8.dp)
                 )
-                    shrinkToKeepWordsWhole = true,
                 if (affirmation.subtitle.isNotBlank()) {
                     Box(
                         modifier = Modifier
@@ -496,6 +498,7 @@ internal fun AffirmationCard(
     // matches the double-tap-to-favorite gesture this screen already teaches.
     if (showActions) {
         AffirmationActionsSheet(
+            origin = remember(affirmation.id) { affirmationOrigin(affirmation) },
             onShareImage = {
                 showActions = false
                 if (!sharing) coroutineScope.launch {
@@ -538,6 +541,7 @@ internal fun AffirmationCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AffirmationActionsSheet(
+    origin: AffirmationOrigin?,
     onShareImage: () -> Unit,
     onHide: () -> Unit,
     onCleanScreen: () -> Unit,
@@ -546,6 +550,7 @@ private fun AffirmationActionsSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
+            origin?.let { AffirmationOriginHeader(it) }
             AffirmationActionRow(
                 icon = Icons.Filled.Image,
                 label = stringResource(R.string.affirmation_share_image_content_description),
@@ -560,6 +565,41 @@ private fun AffirmationActionsSheet(
                 icon = Icons.Filled.Fullscreen,
                 label = stringResource(R.string.affirmation_clean_screen_content_description),
                 onClick = onCleanScreen,
+            )
+        }
+    }
+}
+
+/** "Universe > Theme"; the chevron reads as containment. Owned rows have no theme, so only the group shows. */
+@Composable
+private fun AffirmationOriginHeader(origin: AffirmationOrigin) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(origin.universeTitleRes),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        val themeText = origin.themeTitleRes?.let { stringResource(it) } ?: origin.themeFallbackLabel
+        themeText?.let { theme ->
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 4.dp),
+            )
+            Text(
+                text = theme,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
             )
         }
     }

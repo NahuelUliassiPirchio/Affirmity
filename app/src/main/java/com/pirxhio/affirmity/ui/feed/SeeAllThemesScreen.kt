@@ -40,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,6 +52,7 @@ import com.pirxhio.affirmity.ui.groups.AffirmationGroup
 import com.pirxhio.affirmity.ui.groups.CatalogTheme
 import com.pirxhio.affirmity.ui.groups.catalogThemes
 import com.pirxhio.affirmity.ui.groups.catalogUniverseGroups
+import com.pirxhio.affirmity.ui.groups.displayLabel
 import com.pirxhio.affirmity.ui.groups.isThemeToggleable
 
 private enum class ThemeFilter { ALL, SELECTED, FREE, PREMIUM }
@@ -91,13 +93,14 @@ fun SeeAllThemesScreen(
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(ThemeFilter.ALL) }
 
-    val allThemes = remember { catalogThemes().sortedBy { it.label } }
+    val resources = LocalContext.current.resources
+    val allThemes = remember(resources) { catalogThemes().sortedBy { it.displayLabel(resources) } }
     // Keyed on query/filter/draftThemeIds so a keystroke in the search field doesn't re-run a
     // full catalog filter (incl. an accessDecisionFor call per theme for FREE/PREMIUM) on every
     // recomposition.
-    val visibleThemes = remember(query, filter, draftThemeIds) {
+    val visibleThemes = remember(query, filter, draftThemeIds, resources) {
         allThemes.filter { theme ->
-            val matchesQuery = query.isBlank() || theme.label.contains(query, ignoreCase = true)
+            val matchesQuery = query.isBlank() || theme.displayLabel(resources).contains(query, ignoreCase = true)
             val matchesFilter = when (filter) {
                 ThemeFilter.ALL -> true
                 ThemeFilter.SELECTED -> theme.id in draftThemeIds

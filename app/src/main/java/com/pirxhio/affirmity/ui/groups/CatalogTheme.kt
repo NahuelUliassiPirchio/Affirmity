@@ -1,23 +1,33 @@
 package com.pirxhio.affirmity.ui.groups
 
+import android.content.res.Resources
+import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+
 /**
  * The theme grain within a universe ("Your feed" refactor, scope decision #5): `id` is the same
  * dotted string already carried by [CatalogCollection.themeId] (format `"<universeId>.<slug>"`).
  * Hand-authored, unlike [CatalogCollection] -- `CatalogTaxonomy.kt` is generated and has no
  * first-class theme concept, only the id embedded in each collection.
  *
- * [label] is a PLACEHOLDER (scope decision #1): humanized from the slug half of [id]
- * (`stop_procrastinating` -> "Stop procrastinating"), not a real localized string -- there is no
- * per-theme string resource in `CatalogTaxonomy.kt` ("DO NOT EDIT BY HAND") to draw from, and
- * hand-authoring ~60-90 new localized strings for every theme slug is out of scope for this pass.
- * Swappable for real i18n later without touching any call site, since callers only ever read
- * [CatalogTheme.label].
+ * [label] is the English fallback, humanized from the slug half of [id]. User-visible text comes
+ * from [titleRes] (see `CatalogThemeTitles.kt`) via [displayLabel]; never use [label] in the UI
+ * or in analytics (use [id]).
  */
 data class CatalogTheme(
     val id: String,
     val universeId: String,
     val label: String,
+    @StringRes val titleRes: Int? = null,
 )
+
+/** Localized theme label for composition; falls back to the English [CatalogTheme.label]. */
+@Composable
+fun CatalogTheme.displayLabel(): String = titleRes?.let { stringResource(it) } ?: label
+
+/** Localized theme label outside composition (e.g. sorting, search matching). */
+fun CatalogTheme.displayLabel(resources: Resources): String = titleRes?.let(resources::getString) ?: label
 
 /** Humanizes a snake_case slug into a sentence-cased label: `stop_procrastinating` ->
  *  "Stop procrastinating". Internal -- [catalogThemes] is the only intended caller for now. */
@@ -40,6 +50,7 @@ private val catalogThemesCache: List<CatalogTheme> by lazy {
                 id = collection.themeId,
                 universeId = collection.universeId,
                 label = humanizeSlug(collection.themeId.substringAfterLast('.')),
+                titleRes = catalogThemeTitleRes[collection.themeId],
             )
         }
 }
