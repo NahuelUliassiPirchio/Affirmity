@@ -406,6 +406,7 @@ internal fun AffirmationCard(
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 8.dp)
                 )
+                    shrinkToKeepWordsWhole = true,
                 if (affirmation.subtitle.isNotBlank()) {
                     Box(
                         modifier = Modifier

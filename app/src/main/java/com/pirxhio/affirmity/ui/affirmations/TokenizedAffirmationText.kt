@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -20,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -38,6 +40,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.isSpecified
 import com.pirxhio.affirmity.data.AffirmationTemplate
 import com.pirxhio.affirmity.data.AffirmationTemplateParser
 import com.pirxhio.affirmity.data.TemplateSegment
@@ -76,8 +79,11 @@ fun TokenizedAffirmationText(
     favoriteTapEnabled: Boolean = false,
     onFavoriteToggleFromToken: () -> Unit = {},
     textAlign: TextAlign? = null,
+    shrinkToKeepWordsWhole: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    var sizeStep by remember(template, overrides, style) { mutableIntStateOf(0) }
+    var fitWidth by remember(template, overrides, style) { mutableIntStateOf(0) }
     var editingKey by remember(template) { mutableStateOf<String?>(null) }
     var editingValue by remember(template) { mutableStateOf(TextFieldValue()) }
     var pendingEditKey by remember(template) { mutableStateOf<String?>(null) }
@@ -223,16 +229,46 @@ fun TokenizedAffirmationText(
         Modifier
     }
 
+    // While a token is being edited the placeholder width follows the keystrokes, so fitting is paused.
+    val fitting = shrinkToKeepWordsWhole && editingKey == null
+    val scale = if (shrinkToKeepWordsWhole) WORD_FIT_SCALES[sizeStep] else 1f
+    // Hide the frames that still break a word so the shrink never shows as a flicker.
+    val settled = !fitting || sizeStep == WORD_FIT_SCALES.lastIndex ||
+        textLayoutResult?.let { !it.breaksInsideWord(annotated.text) } == true
+
     Text(
         text = annotated,
-        style = style,
+        style = if (scale == 1f) style else style.copy(
+            fontSize = if (style.fontSize.isSpecified) style.fontSize * scale else style.fontSize,
+            lineHeight = if (style.lineHeight.isSpecified) style.lineHeight * scale else style.lineHeight,
+        ),
         color = color,
         textAlign = textAlign,
         inlineContent = inlineContent,
-        onTextLayout = { textLayoutResult = it },
-        modifier = modifier.then(favoritePointerModifier),
+        onTextLayout = { result ->
+            textLayoutResult = result
+            if (fitting) {
+                val width = result.layoutInput.constraints.maxWidth
+                if (width != fitWidth) {
+                    // Rotation, split-screen or padding changes: the old step no longer applies, refit from full size.
+                    fitWidth = width
+                    sizeStep = 0
+                } else if (sizeStep < WORD_FIT_SCALES.lastIndex && result.breaksInsideWord(annotated.text)) {
+                    sizeStep++
+                }
+            }
+        },
+        modifier = modifier
+            .then(favoritePointerModifier)
+            .drawWithContent { if (settled) drawContent() },
     )
 }
+
+/** Title size steps tried in order until no word is split across lines (1f = the theme size). */
+private val WORD_FIT_SCALES = floatArrayOf(1f, 0.92f, 0.85f, 0.78f, 0.72f, 0.66f)
+
+private fun TextLayoutResult.breaksInsideWord(text: CharSequence): Boolean =
+    breaksInsideWord(text, (0 until lineCount).map { getLineEnd(it) })
 
 private data class ClickableTokenRange(
     val key: String,
