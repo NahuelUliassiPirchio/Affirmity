@@ -1,14 +1,15 @@
 schema: spec-driven
 
 context: |
-  Native Android app, Kotlin 2.2.10 + Jetpack Compose (BOM 2025.12.00), single
-  Gradle module :app, package com.pirxhio.affirmity. minSdk 24 / targetSdk 36 /
-  compileSdk 36, AGP 9.3.1. Persistence today: Room 2.8.4 + DataStore
-  Preferences 1.2.1, notifications via WorkManager 2.11.2
-  (NotificationScheduler/ReminderWorker/ReflectionPromptWorker), home-screen
-  widget via Glance 1.1.1. Upcoming change: migrate persistence/notifications
-  to Firebase (Auth, Firestore, FCM via Cloud Functions + Cloud Scheduler),
-  replacing WorkManager scheduling failing under Doze/battery optimization.
+  Native Android app: Kotlin 2.2.10, Jetpack Compose BOM 2025.12.00, AGP 9.3.1,
+  Gradle 9.5.0; single :app module, package com.pirxhio.affirmity.
+  minSdk 24 / targetSdk 36 / compileSdk 36 (minor API 1).
+  Room 2.8.4, DataStore Preferences 1.2.1, WorkManager 2.11.2, Glance 1.1.1;
+  Firebase Auth, Firestore, Messaging, Analytics (BOM 34.16.0).
+  Backend: functions/, Node 22, strict TypeScript, Firebase Cloud Functions,
+  Admin SDK and Cloud Tasks; Vitest 2.1.4 plus Firestore emulator rule tests.
+  Android dependencies use gradle/libs.versions.toml. Run commands from repo
+  root on macOS; instrumented tests require a connected device/emulator.
 
 rules:
   proposal:
@@ -30,10 +31,10 @@ rules:
       - Follow existing code patterns (single-activity Compose, libs.versions.toml
         catalog, no inline dependency coordinates)
     tdd: true
-    test_command: "gradlew.bat testDebugUnitTest"
+    test_command: "./gradlew :app:testDebugUnitTest"
   verify:
-    test_command: "gradlew.bat testDebugUnitTest"
-    build_command: "gradlew.bat assembleDebug"
+    test_command: "./gradlew :app:testDebugUnitTest"
+    build_command: "./gradlew :app:assembleDebug"
     coverage_threshold: 0
   archive:
     - Warn before merging destructive deltas
@@ -41,28 +42,39 @@ rules:
 testing:
   strict_tdd: true
   test_runner:
-    command: "gradlew.bat testDebugUnitTest"
+    command: "./gradlew :app:testDebugUnitTest"
     framework: "JUnit 4 (4.13.2), Android Gradle Plugin unit test task"
   test_layers:
     unit:
       available: true
       tool: "JUnit 4 (app/src/test)"
     integration:
-      available: false
-      tool: null
+      available: true
+      tool: "Room/DataStore instrumented tests; Firestore security-rule emulator tests"
     e2e:
       available: true
-      tool: "Espresso 3.5.1 + Compose UI Test (androidx-compose-ui-test-junit4), app/src/androidTest, run via gradlew.bat connectedDebugAndroidTest (needs device/emulator)"
+      tool: "Espresso 3.5.1 + Compose UI Test, app/src/androidTest; ./gradlew :app:connectedDebugAndroidTest (needs device/emulator)"
   coverage:
     available: false
     command: null
   quality_tools:
     linter:
       available: true
-      command: "gradlew.bat lint"
+      command: "./gradlew :app:lintDebug"
     type_checker:
       available: true
-      command: "part of gradlew.bat assembleDebug (Kotlin compiler)"
+      command: "./gradlew :app:assembleDebug (Kotlin compiler); npm --prefix functions run build (strict TypeScript)"
     formatter:
       available: false
       command: null
+  backend:
+    runtime: "Node 22"
+    test_runner:
+      command: "npm --prefix functions test"
+      framework: "Vitest 2.1.4; default config excludes Firestore emulator tests"
+    integration_command: "npm --prefix functions run test:rules"
+    integration_prerequisites: "Firebase CLI and Firestore emulator prerequisites"
+    build_command: "npm --prefix functions run build"
+    coverage_available: false
+    linter_available: false
+    formatter_available: false
