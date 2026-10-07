@@ -2,19 +2,24 @@ package com.pirxhio.affirmity.meditation.zazen
 
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationSequence
+import com.pirxhio.affirmity.meditation.Phase
 import com.pirxhio.affirmity.meditation.PhaseDuration
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
+import com.pirxhio.affirmity.meditation.authoring.withEntryCue
 import com.pirxhio.affirmity.meditation.authoring.RestKind
 import com.pirxhio.affirmity.meditation.authoring.bellPhase
 import com.pirxhio.affirmity.meditation.authoring.cuedPhase
 import com.pirxhio.affirmity.meditation.authoring.restPhase
 
 /**
- * Zazen: opening bell, an optional posture cue, long silence, closing bell. Opening and closing
- * bells are two distinct [bellPhase] repeats (distinct ids, since a single `Repeat` node cannot
- * represent two separate strike sequences at different points in the tree). [intervalBellMinutes]
- * (periodic bell strikes during the silence span) has no engine-level effect yet -- a fixed-duration
- * silence [Phase] can't be interrupted mid-span without restructuring the tree into N sub-segments,
- * deferred to a future stage -- recorded in [MeditationDefinition.variables] only.
+ * Zazen: opening strikes, an optional posture cue, long silence, closing strikes. The opening and
+ * closing sound comes from the engine's global SessionStart/SessionEnd cues, so the strike phases
+ * are kept (distinct [bellPhase] repeats, for their pacing and counters) but carry no audio of
+ * their own -- otherwise the bells would double.
+ *
+ * [intervalBellMinutes] > 0 splits the silence into segments that sum exactly to [silenceMillis],
+ * ringing a ZazenBell cue at each interval boundary strictly inside the span (never at its start
+ * or end). 0, or an interval at or beyond the silence span, leaves a single silent phase.
  */
 data class ZazenConfig(
     val openingBellCount: Int = 3,
@@ -29,10 +34,6 @@ object ZazenText {
     const val POSTURE = "meditation.zazen.posture"
 }
 
-object ZazenAudio {
-    const val BELL = "meditation.zazen.bell"
-}
-
 fun zazenMeditationDefinition(
     config: ZazenConfig = ZazenConfig(),
 ): MeditationDefinition {
@@ -41,7 +42,7 @@ fun zazenMeditationDefinition(
             bellPhase(
                 id = "opening_bell",
                 count = config.openingBellCount,
-                audioId = ZazenAudio.BELL,
+                audioId = null,
                 strikeId = "opening_strike",
             ),
         )
@@ -54,18 +55,12 @@ fun zazenMeditationDefinition(
                 ),
             )
         }
-        add(
-            restPhase(
-                id = "silence",
-                kind = RestKind.SILENCE,
-                duration = PhaseDuration.Fixed(config.silenceMillis),
-            ),
-        )
+        addAll(silenceSegments(config))
         add(
             bellPhase(
                 id = "closing_bell",
                 count = config.closingBellCount,
-                audioId = ZazenAudio.BELL,
+                audioId = null,
                 strikeId = "closing_strike",
             ),
         )
@@ -77,3 +72,25 @@ fun zazenMeditationDefinition(
         root = MeditationSequence(id = "zazen", children = children),
     )
 }
+
+private fun silenceSegments(config: ZazenConfig): List<Phase> {
+    val intervalMillis = config.intervalBellMinutes * 60_000L
+    val ringsInside = intervalMillis > 0L && intervalMillis < config.silenceMillis
+    if (!ringsInside) return listOf(silencePhase("silence", config.silenceMillis))
+
+    val segments = mutableListOf<Phase>()
+    var remaining = config.silenceMillis
+    var index = 1
+    while (remaining > 0L) {
+        val millis = minOf(intervalMillis, remaining)
+        val id = if (index == 1) "silence" else "silence_$index"
+        val phase = silencePhase(id, millis)
+        segments += if (index == 1) phase else phase.withEntryCue(MeditationCue.ZazenBell)
+        remaining -= millis
+        index++
+    }
+    return segments
+}
+
+private fun silencePhase(id: String, millis: Long): Phase =
+    restPhase(id = id, kind = RestKind.SILENCE, duration = PhaseDuration.Fixed(millis))

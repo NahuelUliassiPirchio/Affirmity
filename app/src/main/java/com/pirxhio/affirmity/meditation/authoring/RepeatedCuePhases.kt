@@ -10,12 +10,12 @@ import com.pirxhio.affirmity.meditation.ShowText
 
 const val DEFAULT_BELL_STRIKE_MILLIS = 2_000L
 
-/** [count] strikes of [audioId], each held for [strikeDurationMillis] (zazen's opening/closing
+/** [count] strikes of [audioId] (silent when null -- the phase still paces the strike), each held for [strikeDurationMillis] (zazen's opening/closing
  * bells). */
 fun bellPhase(
     id: String,
     count: Int,
-    audioId: String,
+    audioId: String?,
     strikeDurationMillis: Long = DEFAULT_BELL_STRIKE_MILLIS,
     strikeId: String = "strike",
 ): Repeat {
@@ -25,7 +25,7 @@ fun bellPhase(
         child = Phase(
             id = strikeId,
             duration = PhaseDuration.Fixed(strikeDurationMillis),
-            onEnter = listOf(PlayAudio(audioId)),
+            onEnter = listOfNotNull(audioId?.let { PlayAudio(it) }),
         ),
         strategy = FixedCountRepetition(count),
     )
