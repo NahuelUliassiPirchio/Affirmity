@@ -62,4 +62,24 @@
         android:layout_marginTop="2dp"
         android:textColor="@color/notif_streak_text"
         android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/streak_breakdown_meditation"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textColor="@color/notif_streak_text"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/streak_breakdown_affirmations"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:textColor="@color/notif_streak_text"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
 </LinearLayout>

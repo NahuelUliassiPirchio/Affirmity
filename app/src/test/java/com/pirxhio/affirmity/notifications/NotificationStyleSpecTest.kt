@@ -20,6 +20,35 @@ class NotificationStyleSpecTest {
     }
 
     @Test
+    fun `streak breakdown carries each activity streak and drops non-positive ones`() {
+        val both = notificationStyleSpec(
+            NotificationChannelSpec.STREAK, "t", "b",
+            NotificationAttribution(streakCount = "7", meditationStreak = "7", affirmationsStreak = "4"),
+        ) as NotificationStyleSpec.Streak
+        val medOnly = notificationStyleSpec(
+            NotificationChannelSpec.STREAK, "t", "b",
+            NotificationAttribution(streakCount = "5", meditationStreak = "5", affirmationsStreak = "0"),
+        ) as NotificationStyleSpec.Streak
+        val affOnly = notificationStyleSpec(
+            NotificationChannelSpec.STREAK, "t", "b",
+            NotificationAttribution(streakCount = "5", meditationStreak = "0", affirmationsStreak = "5"),
+        ) as NotificationStyleSpec.Streak
+        val absent = notificationStyleSpec(
+            NotificationChannelSpec.STREAK, "t", "b", NotificationAttribution(streakCount = "5"),
+        ) as NotificationStyleSpec.Streak
+
+        assertEquals(7, both.count)
+        assertEquals(7, both.meditationDays)
+        assertEquals(4, both.affirmationsDays)
+        assertEquals(5, medOnly.meditationDays)
+        assertNull(medOnly.affirmationsDays)
+        assertNull(affOnly.meditationDays)
+        assertEquals(5, affOnly.affirmationsDays)
+        assertNull(absent.meditationDays)
+        assertNull(absent.affirmationsDays)
+    }
+
+    @Test
     fun `streak with a known activity carries the activity`() {
         val spec = notificationStyleSpec(
             NotificationChannelSpec.STREAK,

@@ -236,6 +236,44 @@ class FcmMessageHandlerTest {
     }
 
     @Test
+    fun `parses the per-activity streak breakdown fields and forwards them into the attribution`() = runBlocking {
+        val action = handler.resolve(
+            mapOf(
+                "channel" to "streak",
+                "streakCount" to "7",
+                "meditationStreak" to "7",
+                "affirmationsStreak" to "4",
+            ),
+        ) as FcmAction.Post
+        var seen: NotificationAttribution? = null
+        val poster = object : NotificationPoster {
+            override suspend fun notify(
+                channel: NotificationChannelSpec,
+                title: String,
+                body: String,
+                attribution: NotificationAttribution,
+            ) {
+                seen = attribution
+            }
+        }
+
+        action.applyTo(poster) {}
+
+        assertEquals("7", action.meditationStreak)
+        assertEquals("4", action.affirmationsStreak)
+        assertEquals("7", seen?.meditationStreak)
+        assertEquals("4", seen?.affirmationsStreak)
+    }
+
+    @Test
+    fun `breakdown fields are null when the payload omits them (old servers)`() {
+        val action = handler.resolve(mapOf("channel" to "streak", "streakCount" to "5")) as FcmAction.Post
+
+        assertEquals(null, action.meditationStreak)
+        assertEquals(null, action.affirmationsStreak)
+    }
+
+    @Test
     fun `activity is null when the payload omits it (backwards compatible)`() {
         val action = handler.resolve(mapOf("channel" to "streak", "streakCount" to "5")) as FcmAction.Post
 

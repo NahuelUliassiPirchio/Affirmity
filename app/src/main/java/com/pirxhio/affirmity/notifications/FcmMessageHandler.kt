@@ -20,8 +20,12 @@ data class NotificationAttribution(
     val locale: String? = null,
     /** Streak count the server rendered into the copy (streak channel only). */
     val streakCount: String? = null,
-    /** Set only for an activity-specific streak alert: `meditation` or `affirmations`. */
+    /** Legacy: set only by older servers for an activity-specific streak alert. No longer sent. */
     val activity: String? = null,
+    /** Meditation's own streak in days (streak channel only; `0` when it is not live). */
+    val meditationStreak: String? = null,
+    /** Affirmations' own streak in days (streak channel only; `0` when it is not live). */
+    val affirmationsStreak: String? = null,
 )
 
 /** Something that can post a notification for a given channel. Implemented by [Notifier]. */
@@ -56,8 +60,10 @@ sealed interface FcmAction {
         val inactiveDays: String? = null,
         val questionId: String? = null,
         val expiringToday: Boolean = false,
-        /** Optional (backwards compatible): activity an activity-specific streak alert is about. */
+        /** Optional (backwards compatible): activity an old-server activity-specific alert is about. */
         val activity: String? = null,
+        val meditationStreak: String? = null,
+        val affirmationsStreak: String? = null,
     ) : FcmAction
     data object RefreshWidget : FcmAction
     data object Ignore : FcmAction
@@ -94,6 +100,8 @@ class FcmMessageHandler(private val strings: (NotificationChannelSpec) -> Pair<S
             questionId = data["questionId"],
             expiringToday = data["expiringToday"] == "true",
             activity = data["activity"],
+            meditationStreak = data["meditationStreak"],
+            affirmationsStreak = data["affirmationsStreak"],
         )
     }
 }
@@ -114,6 +122,8 @@ suspend fun FcmAction.applyTo(poster: NotificationPoster, refreshWidget: suspend
                 locale = locale,
                 streakCount = streakCount,
                 activity = activity,
+                meditationStreak = meditationStreak,
+                affirmationsStreak = affirmationsStreak,
             ),
         )
         FcmAction.RefreshWidget -> refreshWidget()

@@ -30,6 +30,11 @@
     <!-- Notifications V2 task 5.3: one CTA label per family, resolved from the server's `ctaKey`. -->
     <string name="notification_streak_activity_meditation">Meditación</string>
     <string name="notification_streak_activity_affirmations">Afirmaciones</string>
+    <plurals name="notification_streak_days">
+        <item quantity="one">%d día</item>
+        <item quantity="other">%d días</item>
+    </plurals>
+    <string name="notification_streak_breakdown_line">%1$s: %2$s</string>
     <string name="notification_cta_affirmations">Ver afirmaciones</string>
     <string name="notification_cta_mood">Registrar ánimo</string>
     <string name="notification_cta_reflection">Responder</string>
@@ -142,18 +147,18 @@
     <string name="notification_debug_send_test_mood_button">Enviar notificación de ánimo de prueba</string>
     <string name="notification_debug_preview_section_title">Previsualizar estilos de notificación</string>
     <string name="notification_debug_preview_section_hint">Publica una notificación local real por el mismo camino que un mensaje FCM.</string>
-    <string name="notification_debug_preview_streak_general">Racha general (5 días)</string>
-    <string name="notification_debug_preview_streak_meditation">Racha: meditación (5 días)</string>
-    <string name="notification_debug_preview_streak_affirmations">Racha: afirmaciones (5 días)</string>
+    <string name="notification_debug_preview_streak_both">Racha general (7 días, ambas)</string>
+    <string name="notification_debug_preview_streak_meditation_only">Racha general (5 días, solo meditación)</string>
+    <string name="notification_debug_preview_streak_affirmations_only">Racha general (5 días, solo afirmaciones)</string>
+    <string name="notification_debug_preview_streak_both_title">Tu racha general de 7 días está en riesgo 🔥</string>
+    <string name="notification_debug_preview_streak_both_body">Meditación: 7 días · Afirmaciones: 4 días. Cualquiera de las dos hoy la mantiene viva.</string>
+    <string name="notification_debug_preview_streak_meditation_only_title">Tu racha general de 5 días está en riesgo 🔥</string>
+    <string name="notification_debug_preview_streak_meditation_only_body">Meditación: 5 días. Una meditación o una afirmación hoy la mantiene viva.</string>
+    <string name="notification_debug_preview_streak_affirmations_only_title">Tu racha general de 5 días está en riesgo 🔥</string>
+    <string name="notification_debug_preview_streak_affirmations_only_body">Afirmaciones: 5 días. Una afirmación o una meditación hoy la mantiene viva.</string>
     <string name="notification_debug_preview_reflection">Pregunta Brújula</string>
     <string name="notification_debug_preview_mood">Chequeo de ánimo</string>
     <string name="notification_debug_preview_plain">Estilo simple (BigText)</string>
-    <string name="notification_debug_preview_streak_general_title">Tu racha de 5 días está en riesgo 🔥</string>
-    <string name="notification_debug_preview_streak_general_body">Todavía puedes mantenerla antes de que termine el día.</string>
-    <string name="notification_debug_preview_streak_meditation_title">Llevas 5 días meditando, no paremos ahora 🧘</string>
-    <string name="notification_debug_preview_streak_meditation_body">Un momento de calma hoy mantiene viva tu racha.</string>
-    <string name="notification_debug_preview_streak_affirmations_title">Llevas 5 días con tus afirmaciones, no paremos ahora ✨</string>
-    <string name="notification_debug_preview_streak_affirmations_body">Lee una hoy y mantén viva tu racha.</string>
     <string name="notification_debug_preview_reflection_title">Un momento de honestidad</string>
     <string name="notification_debug_preview_reflection_body">¿Qué decisión estás evitando tomar?</string>
     <string name="notification_debug_preview_mood_title">¿Cómo te sentiste hoy?</string>

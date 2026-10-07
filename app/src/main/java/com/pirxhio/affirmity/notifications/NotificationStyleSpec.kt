@@ -1,6 +1,6 @@
 package com.pirxhio.affirmity.notifications
 
-/** Activity an activity-specific streak notification is about (wire values of the FCM `activity`). */
+/** Activity of a legacy activity-specific streak notification (wire values of the FCM `activity`). */
 enum class StreakActivity(val wireValue: String) {
     MEDITATION("meditation"),
     AFFIRMATIONS("affirmations"),
@@ -20,12 +20,18 @@ sealed interface NotificationStyleSpec {
     val title: String
     val body: String
 
-    /** Warm/energetic: flame + prominent [count]. [activity] is set for activity-specific alerts. */
+    /**
+     * Warm/energetic: flame + prominent overall [count]. [meditationDays]/[affirmationsDays] are
+     * each activity's own streak (null when not live, never 0) for the expanded breakdown.
+     * [activity] is only set by legacy payloads from older servers.
+     */
     data class Streak(
         override val title: String,
         override val body: String,
         val count: Int?,
         val activity: StreakActivity?,
+        val meditationDays: Int? = null,
+        val affirmationsDays: Int? = null,
     ) : NotificationStyleSpec
 
     /** Calm, quote-like: [body] is the question and is rendered large. */
@@ -47,13 +53,17 @@ internal fun notificationStyleSpec(
     NotificationChannelSpec.STREAK -> NotificationStyleSpec.Streak(
         title = title,
         body = body,
-        count = attribution.streakCount?.toIntOrNull()?.takeIf { it > 0 },
+        count = attribution.streakCount.positiveIntOrNull(),
         activity = StreakActivity.fromWire(attribution.activity),
+        meditationDays = attribution.meditationStreak.positiveIntOrNull(),
+        affirmationsDays = attribution.affirmationsStreak.positiveIntOrNull(),
     )
     NotificationChannelSpec.REFLECTION -> NotificationStyleSpec.Reflection(title, body)
     NotificationChannelSpec.MOOD -> NotificationStyleSpec.Mood(title, body)
     else -> NotificationStyleSpec.Plain(title, body)
 }
+
+private fun String?.positiveIntOrNull(): Int? = this?.toIntOrNull()?.takeIf { it > 0 }
 
 /** True for the specs rendered with custom RemoteViews (the ones that may need a plain fallback). */
 internal fun NotificationStyleSpec.usesCustomViews(): Boolean = this !is NotificationStyleSpec.Plain
@@ -80,3 +90,21 @@ internal inline fun postWithPlainFallback(
         postPlain()
     }
 }
+
+/** Pure decision for one expanded-streak breakdown row (JVM-testable; [Notifier] applies it). */
+sealed interface BreakdownRow {
+    data object Hidden : BreakdownRow
+    data class Visible(val text: String) : BreakdownRow
+}
+
+/**
+ * Hidden when [days] is null or not positive (a 0-day streak is never printed); otherwise the
+ * "label: N days" line, with pluralization delegated to [daysText] (an Android plurals lookup).
+ */
+fun breakdownRow(
+    days: Int?,
+    label: String,
+    daysText: (Int) -> String,
+    line: (label: String, days: String) -> String,
+): BreakdownRow =
+    if (days == null || days <= 0) BreakdownRow.Hidden else BreakdownRow.Visible(line(label, daysText(days)))

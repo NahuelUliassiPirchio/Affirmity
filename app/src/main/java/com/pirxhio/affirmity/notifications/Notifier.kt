@@ -8,7 +8,9 @@ import android.os.Build
 import android.util.Log
 import android.view.View
 import android.widget.RemoteViews
+import androidx.annotation.IdRes
 import androidx.annotation.LayoutRes
+import androidx.annotation.StringRes
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.pirxhio.affirmity.EXTRA_NOTIFICATION_ACTIVITY
@@ -191,8 +193,19 @@ class Notifier(
             } else {
                 setViewVisibility(R.id.streak_count, View.GONE)
             }
-            // The chip only exists in the expanded layout; activity-specific alerts name the activity.
+            // Chip and breakdown rows only exist in the expanded layout. The chip is legacy (old
+            // servers); the rows explain which activities hold the overall streak.
             if (layout == R.layout.notification_streak_expanded) {
+                bindBreakdownRow(
+                    R.id.streak_breakdown_meditation,
+                    R.string.notification_streak_activity_meditation,
+                    spec.meditationDays,
+                )
+                bindBreakdownRow(
+                    R.id.streak_breakdown_affirmations,
+                    R.string.notification_streak_activity_affirmations,
+                    spec.affirmationsDays,
+                )
                 if (spec.activity != null) {
                     setTextViewText(R.id.streak_activity, context.getString(spec.activity.labelRes()))
                     setViewVisibility(R.id.streak_activity, View.VISIBLE)
@@ -219,6 +232,22 @@ class Notifier(
             setTextViewText(R.id.mood_body, spec.body)
             setOnClickPendingIntent(R.id.mood_root, tap)
         }
+
+    private fun RemoteViews.bindBreakdownRow(@IdRes viewId: Int, @StringRes labelRes: Int, days: Int?) {
+        val row = breakdownRow(
+            days = days,
+            label = context.getString(labelRes),
+            daysText = { count -> context.resources.getQuantityString(R.plurals.notification_streak_days, count, count) },
+            line = { label, daysText -> context.getString(R.string.notification_streak_breakdown_line, label, daysText) },
+        )
+        when (row) {
+            BreakdownRow.Hidden -> setViewVisibility(viewId, View.GONE)
+            is BreakdownRow.Visible -> {
+                setTextViewText(viewId, row.text)
+                setViewVisibility(viewId, View.VISIBLE)
+            }
+        }
+    }
 
     private fun StreakActivity.labelRes(): Int = when (this) {
         StreakActivity.MEDITATION -> R.string.notification_streak_activity_meditation

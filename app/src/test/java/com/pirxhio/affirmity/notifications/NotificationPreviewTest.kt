@@ -15,31 +15,36 @@ class NotificationPreviewTest {
         handler.resolve(notificationPreviewData(case, "T", "B", "en")) as FcmAction.Post
 
     @Test
-    fun `streak general has 5 days and no activity`() {
-        val post = resolve(NotificationPreviewCase.STREAK_GENERAL)
+    fun `streak both carries the overall count and both activity streaks and no activity`() {
+        val post = resolve(NotificationPreviewCase.STREAK_BOTH)
 
         assertEquals(NotificationChannelSpec.STREAK, post.channel)
-        assertEquals("5", post.streakCount)
+        assertEquals("7", post.streakCount)
+        assertEquals("7", post.meditationStreak)
+        assertEquals("4", post.affirmationsStreak)
         assertNull(post.activity)
         assertEquals("streak", post.family)
         assertEquals("streak_action", post.destination)
     }
 
     @Test
-    fun `streak meditation carries the meditation activity`() {
-        val post = resolve(NotificationPreviewCase.STREAK_MEDITATION)
+    fun `streak meditation only has a zero affirmations streak`() {
+        val post = resolve(NotificationPreviewCase.STREAK_MEDITATION_ONLY)
 
-        assertEquals(NotificationChannelSpec.STREAK, post.channel)
         assertEquals("5", post.streakCount)
-        assertEquals("meditation", post.activity)
+        assertEquals("5", post.meditationStreak)
+        assertEquals("0", post.affirmationsStreak)
+        assertNull(post.activity)
     }
 
     @Test
-    fun `streak affirmations carries the affirmations activity`() {
-        val post = resolve(NotificationPreviewCase.STREAK_AFFIRMATIONS)
+    fun `streak affirmations only has a zero meditation streak`() {
+        val post = resolve(NotificationPreviewCase.STREAK_AFFIRMATIONS_ONLY)
 
-        assertEquals("affirmations", post.activity)
         assertEquals("5", post.streakCount)
+        assertEquals("0", post.meditationStreak)
+        assertEquals("5", post.affirmationsStreak)
+        assertNull(post.activity)
     }
 
     @Test

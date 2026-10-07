@@ -13,33 +13,38 @@ import com.pirxhio.affirmity.data.local.NotificationLogEvent
 enum class NotificationPreviewCase(
     val channel: NotificationChannelSpec,
     val streakCount: Int? = null,
-    val activity: StreakActivity? = null,
+    val meditationStreak: Int? = null,
+    val affirmationsStreak: Int? = null,
     @StringRes val labelRes: Int,
     @StringRes val titleRes: Int,
     @StringRes val bodyRes: Int,
 ) {
-    STREAK_GENERAL(
+    STREAK_BOTH(
         channel = NotificationChannelSpec.STREAK,
-        streakCount = PREVIEW_STREAK_DAYS,
-        labelRes = R.string.notification_debug_preview_streak_general,
-        titleRes = R.string.notification_debug_preview_streak_general_title,
-        bodyRes = R.string.notification_debug_preview_streak_general_body,
+        streakCount = 7,
+        meditationStreak = 7,
+        affirmationsStreak = 4,
+        labelRes = R.string.notification_debug_preview_streak_both,
+        titleRes = R.string.notification_debug_preview_streak_both_title,
+        bodyRes = R.string.notification_debug_preview_streak_both_body,
     ),
-    STREAK_MEDITATION(
+    STREAK_MEDITATION_ONLY(
         channel = NotificationChannelSpec.STREAK,
         streakCount = PREVIEW_STREAK_DAYS,
-        activity = StreakActivity.MEDITATION,
-        labelRes = R.string.notification_debug_preview_streak_meditation,
-        titleRes = R.string.notification_debug_preview_streak_meditation_title,
-        bodyRes = R.string.notification_debug_preview_streak_meditation_body,
+        meditationStreak = PREVIEW_STREAK_DAYS,
+        affirmationsStreak = 0,
+        labelRes = R.string.notification_debug_preview_streak_meditation_only,
+        titleRes = R.string.notification_debug_preview_streak_meditation_only_title,
+        bodyRes = R.string.notification_debug_preview_streak_meditation_only_body,
     ),
-    STREAK_AFFIRMATIONS(
+    STREAK_AFFIRMATIONS_ONLY(
         channel = NotificationChannelSpec.STREAK,
         streakCount = PREVIEW_STREAK_DAYS,
-        activity = StreakActivity.AFFIRMATIONS,
-        labelRes = R.string.notification_debug_preview_streak_affirmations,
-        titleRes = R.string.notification_debug_preview_streak_affirmations_title,
-        bodyRes = R.string.notification_debug_preview_streak_affirmations_body,
+        meditationStreak = 0,
+        affirmationsStreak = PREVIEW_STREAK_DAYS,
+        labelRes = R.string.notification_debug_preview_streak_affirmations_only,
+        titleRes = R.string.notification_debug_preview_streak_affirmations_only_title,
+        bodyRes = R.string.notification_debug_preview_streak_affirmations_only_body,
     ),
     REFLECTION(
         channel = NotificationChannelSpec.REFLECTION,
@@ -88,7 +93,8 @@ fun notificationPreviewData(
     put("locale", locale)
     put("variantKey", "debug_preview_${case.name.lowercase()}")
     case.streakCount?.let { put("streakCount", it.toString()) }
-    case.activity?.let { put("activity", it.wireValue) }
+    case.meditationStreak?.let { put("meditationStreak", it.toString()) }
+    case.affirmationsStreak?.let { put("affirmationsStreak", it.toString()) }
     if (case.channel == NotificationChannelSpec.REFLECTION) put("questionId", "debug_preview_question")
 }
 
