@@ -40,6 +40,7 @@ object SleepAudio {
 
 fun sleepMeditationDefinition(): MeditationDefinition = MeditationDefinition(
     id = "sleep",
+    sessionCues = false, // ends quietly: no start bell, no closing gong
     root = MeditationSequence(
         id = "sleep",
         children = listOf(

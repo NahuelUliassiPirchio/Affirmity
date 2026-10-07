@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.meditation
 
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
 import java.util.ArrayDeque
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,6 +11,9 @@ import kotlinx.coroutines.flow.asStateFlow
  * to [MeditationEvent]s, dispatching [MeditationCommand]s to [commandExecutor] as a side effect of
  * each transition. It never depends on a clock, on audio, or on any concrete meditation type —
  * see [SessionClock]/[TimerCommandExecutor] for how timing is bridged in as "just another command".
+ *
+ * Engine-issued lifecycle cues: `PlayCue(SessionStart)` once on initial phase entry and
+ * `PlayCue(SessionEnd)` once on natural completion (never on cancel).
  *
  * [send] is synchronous and serialized with a monitor-protected event queue rather than a
  * coroutine channel/actor: every transition is a pure, non-suspending computation. The queue also
@@ -128,13 +132,18 @@ class MeditationEngine(
             elapsedInPhaseMillis = 0L,
             remainingInPhaseMillis = null,
         )
-        enterPhase(leaf, baseState)
+        enterPhase(leaf, baseState, isSessionStart = true)
     }
 
     private fun exitCurrentPhaseAndAdvance() {
         val phase = currentPhase ?: return
-        phase.onExit.forEach(::dispatch)
-        when (val result = advance(frames, _state.value)) {
+        val exitingGeneration = _state.value.timerGeneration
+        val result = advance(frames, _state.value)
+        // The global end cue takes priority at the completion boundary: the final phase's own
+        // cues (e.g. a last-round RoundEnd) are dropped so only SessionEnd rings.
+        val dropCues = result is AdvanceResult.SessionCompleted && definition.sessionCues
+        phase.onExit.forEach { if (!(dropCues && it is PlayCue)) dispatch(it, exitingGeneration) }
+        when (result) {
             is AdvanceResult.EnterPhase -> {
                 frames = result.frames
                 currentPhase = result.phase
@@ -157,6 +166,9 @@ class MeditationEngine(
                     remainingInPhaseMillis = null,
                 )
                 dispatch(EndSession(SessionEndReason.Completed))
+                // After EndSession on purpose: the executor's graceful courtesy fade must not
+                // fade out the closing gong it would otherwise find still playing.
+                if (definition.sessionCues) dispatch(PlayCue(MeditationCue.SessionEnd, _state.value.timerGeneration))
             }
         }
     }
@@ -165,10 +177,11 @@ class MeditationEngine(
      * [MeditationRuntimeState.timerGeneration], then runs the phase's onEnter commands and starts
      * its timer — in that order, so a StartTimer completion can never race a not-yet-dispatched
      * onEnter command. */
-    private fun enterPhase(phase: Phase, baseState: MeditationRuntimeState) {
+    private fun enterPhase(phase: Phase, baseState: MeditationRuntimeState, isSessionStart: Boolean = false) {
         val generation = baseState.timerGeneration + 1
         _state.value = baseState.copy(timerGeneration = generation)
-        phase.onEnter.forEach(::dispatch)
+        if (isSessionStart && definition.sessionCues) dispatch(PlayCue(MeditationCue.SessionStart, generation))
+        phase.onEnter.forEach { dispatch(it, generation) }
         val durationMillis = when (val duration = phase.duration) {
             is PhaseDuration.Fixed -> duration.millis
             PhaseDuration.Manual -> null
@@ -177,6 +190,15 @@ class MeditationEngine(
     }
 
     private fun dispatch(command: MeditationCommand) = commandExecutor.execute(command)
+
+    /** Stamps [PlayCue]s authored in a phase's onEnter/onExit with the phase-entry key
+     * ([entry] = the timer generation of the entry they belong to); everything else passes through. */
+    private fun dispatch(command: MeditationCommand, entry: Int) {
+        if (command !is PlayCue) return dispatch(command)
+        val repeatId = command.onlyAtFirstIterationOf
+        if (repeatId != null && _state.value.iterationCounts[repeatId] != 0) return
+        dispatch(if (command.phaseEntry == null) command.copy(phaseEntry = entry) else command)
+    }
 
     private fun pathOf(frames: List<Frame>, leaf: Phase): List<String> =
         frames.map { it.node.id } + leaf.id

@@ -52,6 +52,7 @@ object WindDownText {
 
 fun windDownMeditationDefinition(): MeditationDefinition = MeditationDefinition(
     id = "winddown",
+    sessionCues = false, // ends quietly: no start bell, no closing gong
     root = MeditationSequence(
         id = "winddown",
         children = listOf(

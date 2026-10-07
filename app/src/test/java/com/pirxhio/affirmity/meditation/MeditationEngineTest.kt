@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.meditation
 
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
 import com.pirxhio.affirmity.meditation.breathing.BreathingConfig
 import com.pirxhio.affirmity.meditation.breathing.BreathingText
 import com.pirxhio.affirmity.meditation.breathing.breathingMeditationDefinition
@@ -52,7 +53,9 @@ class MeditationEngineTest {
         assertEquals(SessionStatus.Running, state.status)
         assertEquals(listOf("rounds", "round", "breathing", "breath", "inhale"), state.activePath)
         assertEquals(
-            listOf<MeditationCommand>(ShowText(BreathingText.INHALE), StartTimer(1_000, 1)),
+            listOf<MeditationCommand>(PlayCue(MeditationCue.SessionStart, 1),
+                PlayCue(MeditationCue.RoundStart, 1, onlyAtFirstIterationOf = "breathing"),
+                ShowText(BreathingText.INHALE), StartTimer(1_000, 1)),
             executor.commands,
         )
     }
@@ -321,7 +324,7 @@ class MeditationEngineTest {
 
         assertEquals(
             listOf<MeditationCommand>(StopAmbient(5_000L), EndSession(SessionEndReason.Completed)),
-            fadeExecutor.commands.takeLast(2),
+            fadeExecutor.commands.dropLast(1).takeLast(2),
         )
     }
 
@@ -348,6 +351,163 @@ class MeditationEngineTest {
         val current = reentrantEngine.state.value
         assertEquals("rest", current.currentPhaseId)
         assertEquals(StartTimer(45_000L, current.timerGeneration), reentrantExecutor.commands.last())
+    }
+
+    // --- Session lifecycle cues ---------------------------------------------------------------
+
+    private val twoPhaseDefinition = MeditationDefinition(
+        id = "cue-demo",
+        root = MeditationSequence(
+            id = "root",
+            children = listOf(
+                Phase(id = "a", duration = PhaseDuration.Fixed(1_000L)),
+                Phase(id = "b", duration = PhaseDuration.Fixed(1_000L)),
+            ),
+        ),
+    )
+
+    private fun cuesOf(commands: List<MeditationCommand>) =
+        commands.filterIsInstance<PlayCue>().map { it.cue }
+
+    private fun lastGenOf(exec: RecordingCommandExecutor) =
+        (exec.commands.last { it is StartTimer } as StartTimer).generation
+
+    @Test
+    fun `start emits SessionStart exactly once, stamped with the first phase entry`() {
+        val exec = RecordingCommandExecutor()
+        val cueEngine = MeditationEngine(twoPhaseDefinition, exec)
+
+        cueEngine.send(MeditationEvent.Start)
+        cueEngine.send(MeditationEvent.Start)
+
+        assertEquals(listOf(PlayCue(MeditationCue.SessionStart, 1)), exec.commands.filterIsInstance<PlayCue>())
+    }
+
+    @Test
+    fun `a definition that opts out of session cues emits neither SessionStart nor SessionEnd`() {
+        val exec = RecordingCommandExecutor()
+        val quiet = MeditationEngine(twoPhaseDefinition.copy(sessionCues = false), exec)
+        quiet.send(MeditationEvent.Start)
+        repeat(2) { quiet.send(MeditationEvent.TimerCompleted(lastGenOf(exec))) }
+
+        assertEquals(SessionStatus.Completed, quiet.state.value.status)
+        assertTrue(cuesOf(exec.commands).isEmpty())
+        assertEquals(EndSession(SessionEndReason.Completed), exec.commands.last())
+    }
+
+    @Test
+    fun `pause and resume emit no extra cues`() {
+        val exec = RecordingCommandExecutor()
+        val cueEngine = MeditationEngine(twoPhaseDefinition, exec)
+        cueEngine.send(MeditationEvent.Start)
+
+        cueEngine.send(MeditationEvent.Pause)
+        cueEngine.send(MeditationEvent.Resume)
+
+        assertEquals(listOf(MeditationCue.SessionStart), cuesOf(exec.commands))
+    }
+
+    @Test
+    fun `natural completion emits SessionEnd once, after EndSession`() {
+        val exec = RecordingCommandExecutor()
+        val cueEngine = MeditationEngine(twoPhaseDefinition, exec)
+        cueEngine.send(MeditationEvent.Start)
+        cueEngine.send(MeditationEvent.TimerCompleted(lastGenOf(exec)))
+        cueEngine.send(MeditationEvent.TimerCompleted(lastGenOf(exec)))
+        cueEngine.send(MeditationEvent.TimerCompleted(lastGenOf(exec)))
+
+        assertEquals(listOf(MeditationCue.SessionStart, MeditationCue.SessionEnd), cuesOf(exec.commands))
+        assertEquals(
+            listOf<MeditationCommand>(EndSession(SessionEndReason.Completed), PlayCue(MeditationCue.SessionEnd, 2)),
+            exec.commands.takeLast(2),
+        )
+    }
+
+    @Test
+    fun `cancel emits no SessionEnd`() {
+        val exec = RecordingCommandExecutor()
+        val cueEngine = MeditationEngine(twoPhaseDefinition, exec)
+        cueEngine.send(MeditationEvent.Start)
+
+        cueEngine.send(MeditationEvent.Cancel)
+
+        assertEquals(listOf(MeditationCue.SessionStart), cuesOf(exec.commands))
+    }
+
+    @Test
+    fun `a fresh engine emits SessionStart again`() {
+        val exec = RecordingCommandExecutor()
+        MeditationEngine(twoPhaseDefinition, exec).send(MeditationEvent.Start)
+        MeditationEngine(twoPhaseDefinition, exec).send(MeditationEvent.Start)
+
+        assertEquals(listOf(MeditationCue.SessionStart, MeditationCue.SessionStart), cuesOf(exec.commands))
+    }
+
+    @Test
+    fun `authored cues in onEnter and onExit are stamped with their phase entry`() {
+        val exec = RecordingCommandExecutor()
+        val def = MeditationDefinition(
+            id = "stamp-demo",
+            root = MeditationSequence(
+                id = "root",
+                children = listOf(
+                    Phase(
+                        id = "a",
+                        duration = PhaseDuration.Fixed(1_000L),
+                        onEnter = listOf(PlayCue(MeditationCue.RoundStart)),
+                        onExit = listOf(PlayCue(MeditationCue.RoundEnd)),
+                    ),
+                    Phase(id = "b", duration = PhaseDuration.Fixed(1_000L), onEnter = listOf(PlayCue(MeditationCue.SectionTransition))),
+                ),
+            ),
+        )
+        val e = MeditationEngine(def, exec)
+        e.send(MeditationEvent.Start)
+        e.send(MeditationEvent.TimerCompleted(lastGenOf(exec)))
+
+        assertEquals(
+            listOf(
+                PlayCue(MeditationCue.SessionStart, 1),
+                PlayCue(MeditationCue.RoundStart, 1),
+                PlayCue(MeditationCue.RoundEnd, 1),
+                PlayCue(MeditationCue.SectionTransition, 2),
+            ),
+            exec.commands.filterIsInstance<PlayCue>(),
+        )
+    }
+
+    private fun finalExitCueDefinition(sessionCues: Boolean) = MeditationDefinition(
+        id = "final-exit",
+        sessionCues = sessionCues,
+        root = Phase(
+            id = "only",
+            duration = PhaseDuration.Fixed(1_000L),
+            onExit = listOf(StopAmbient(100L), PlayCue(MeditationCue.RoundEnd), StopAudio("x")),
+        ),
+    )
+
+    @Test
+    fun `with session cues the final phase onExit cues are dropped and other onExit commands keep their order`() {
+        val exec = RecordingCommandExecutor()
+        val e = MeditationEngine(finalExitCueDefinition(sessionCues = true), exec)
+        e.send(MeditationEvent.Start)
+        e.send(MeditationEvent.TimerCompleted(lastGenOf(exec)))
+
+        assertEquals(listOf(MeditationCue.SessionStart, MeditationCue.SessionEnd), cuesOf(exec.commands))
+        assertEquals(
+            listOf<MeditationCommand>(StopAmbient(100L), StopAudio("x"), EndSession(SessionEndReason.Completed)),
+            exec.commands.filter { it is StopAmbient || it is StopAudio || it is EndSession },
+        )
+    }
+
+    @Test
+    fun `without session cues the final phase onExit cues are kept`() {
+        val exec = RecordingCommandExecutor()
+        val e = MeditationEngine(finalExitCueDefinition(sessionCues = false), exec)
+        e.send(MeditationEvent.Start)
+        e.send(MeditationEvent.TimerCompleted(lastGenOf(exec)))
+
+        assertEquals(listOf(MeditationCue.RoundEnd), cuesOf(exec.commands))
     }
 
     private class RecordingCommandExecutor : MeditationCommandExecutor {

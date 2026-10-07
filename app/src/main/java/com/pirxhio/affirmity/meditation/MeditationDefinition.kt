@@ -65,4 +65,7 @@ data class MeditationDefinition(
     val id: String,
     val variables: Map<String, Any?> = emptyMap(),
     val root: MeditationNode,
+    /** Whether the engine rings the global SessionStart/SessionEnd cues. Sleep-oriented
+     * meditations that must end quietly (no gong) opt out. */
+    val sessionCues: Boolean = true,
 )
