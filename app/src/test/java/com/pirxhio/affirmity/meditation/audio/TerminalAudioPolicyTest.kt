@@ -58,4 +58,31 @@ class TerminalAudioPolicyTest {
             actions,
         )
     }
+
+    @Test
+    fun `graceful completion lets ring-out ids finish but still fades the rest`() {
+        val actions = TerminalAudioPolicy.plan(
+            reason = SessionEndReason.Completed,
+            playingAudioIds = setOf("bed", "cue:1"),
+            rampingToSilenceAudioIds = emptySet(),
+            ringOutAudioIds = setOf("cue:1"),
+        )
+
+        assertEquals(
+            listOf(TerminalAudioAction.FadeOut("bed", TerminalAudioPolicy.GRACEFUL_END_FADE_MILLIS)),
+            actions,
+        )
+    }
+
+    @Test
+    fun `cancellation stops ring-out ids too`() {
+        val actions = TerminalAudioPolicy.plan(
+            reason = SessionEndReason.Cancelled,
+            playingAudioIds = setOf("cue:1"),
+            rampingToSilenceAudioIds = emptySet(),
+            ringOutAudioIds = setOf("cue:1"),
+        )
+
+        assertEquals(listOf(TerminalAudioAction.StopNow("cue:1")), actions)
+    }
 }

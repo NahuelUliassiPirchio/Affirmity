@@ -11,6 +11,7 @@ import com.pirxhio.affirmity.meditation.MeditationEvent
 import com.pirxhio.affirmity.meditation.Phase
 import com.pirxhio.affirmity.meditation.PhaseDuration
 import com.pirxhio.affirmity.meditation.PlayAudio
+import com.pirxhio.affirmity.meditation.PlayCue
 import com.pirxhio.affirmity.meditation.PlayVoice
 import com.pirxhio.affirmity.meditation.SessionStatus
 import com.pirxhio.affirmity.meditation.ShowText
@@ -272,7 +273,7 @@ class MeditationCatalogTest {
     @Test
     fun `9 - DC-1 guard - the union of all commands across all entries is a subset of the whitelist`() {
         val whitelist =
-            setOf(ShowText::class, PlayVoice::class, StartAmbient::class, StopAmbient::class, PlayAudio::class)
+            setOf(ShowText::class, PlayVoice::class, StartAmbient::class, StopAmbient::class, PlayAudio::class, PlayCue::class)
         meditationCatalog().forEach { entry ->
             collectCommands(entry.definition(emptyMap()).root).forEach { command ->
                 assertTrue("${entry.id}: unexpected command ${command::class}", command::class in whitelist)

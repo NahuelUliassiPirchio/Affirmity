@@ -2,6 +2,8 @@ package com.pirxhio.affirmity.ui.meditation
 
 import android.content.Context
 import android.media.MediaPlayer
+import android.util.Log
+import com.pirxhio.affirmity.BuildConfig
 import com.pirxhio.affirmity.meditation.AudioChannel
 import com.pirxhio.affirmity.meditation.DEFAULT_DUCK_FADE_MILLIS
 import com.pirxhio.affirmity.meditation.EndSession
@@ -13,12 +15,16 @@ import com.pirxhio.affirmity.meditation.MeditationEvent
 import com.pirxhio.affirmity.meditation.MonotonicTimeSource
 import com.pirxhio.affirmity.meditation.PauseTimer
 import com.pirxhio.affirmity.meditation.PlayAudio
+import com.pirxhio.affirmity.meditation.PlayCue
 import com.pirxhio.affirmity.meditation.PlayVoice
 import com.pirxhio.affirmity.meditation.ResumeTimer
 import com.pirxhio.affirmity.meditation.SessionEndReason
 import com.pirxhio.affirmity.meditation.StartAmbient
 import com.pirxhio.affirmity.meditation.StopAmbient
 import com.pirxhio.affirmity.meditation.StopAudio
+import com.pirxhio.affirmity.meditation.audio.CuePlaybackGuard
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
+import com.pirxhio.affirmity.meditation.audio.MeditationSoundRegistry
 import com.pirxhio.affirmity.meditation.audio.TerminalAudioAction
 import com.pirxhio.affirmity.meditation.audio.TerminalAudioPolicy
 import com.pirxhio.affirmity.meditation.audio.VolumeRamp
@@ -82,11 +88,18 @@ class GuidedMeditationAudioExecutor(
     /** ids paused by the last [PauseTimer], to be resumed by the next [ResumeTimer]. */
     private var pausedIds: Set<String> = emptySet()
 
+    /** Dedupes [PlayCue]s per phase entry; reset when the session ends. */
+    private val cueGuard = CuePlaybackGuard()
+
+    /** Set once the session ended naturally, so [release] lets the closing gong ring out. */
+    private var endedCompleted = false
+
     private data class RampJob(val job: Job, val ramp: VolumeRamp, val startedAtMillis: Long)
 
     override fun execute(command: MeditationCommand) {
         when (command) {
             is PlayAudio -> playSound(command.audioId)
+            is PlayCue -> playCue(command)
             is PlayVoice -> playVoice(command)
             is StartAmbient -> startAmbient(command)
             is StopAmbient -> execute(Fade(FadeTarget.Channel(AudioChannel.AMBIENT), 0f, command.fadeOutMillis))
@@ -107,6 +120,42 @@ class GuidedMeditationAudioExecutor(
         channelOf[audioId] = AudioChannel.SOUND
         player.seekTo(0)
         player.start()
+    }
+
+    // --- Semantic cues (global registry assets, separate from per-meditation audioResources) ----
+
+    /** One player per registry resource (so cues sharing an asset, e.g. SessionStart/RoundStart,
+     * restart from 0 instead of stacking). Registered in [players] under a `cue:` id so
+     * pause/resume and cancel treat it exactly like any other SOUND-channel player. Never throws. */
+    private fun playCue(command: PlayCue) {
+        if (!isCueSoundEnabled()) return
+        if (!cueGuard.shouldPlay(command.cue, command.phaseEntry)) return
+        val sound = MeditationSoundRegistry.soundFor(command.cue)
+        if (sound == null) {
+            debugWarn("No sound registered for cue ${command.cue}")
+            return
+        }
+        val id = cuePlayerId(sound.resId)
+        try {
+            val player = players[id] ?: MediaPlayer.create(context, sound.resId)?.also { players[id] = it }
+            if (player == null) {
+                debugWarn("Could not create player for cue ${command.cue}")
+                return
+            }
+            ramps.remove(id)?.job?.cancel()
+            channelOf[id] = AudioChannel.SOUND
+            applyVolume(player, id, sound.gain * MeditationSoundRegistry.MASTER_CUE_VOLUME)
+            player.seekTo(0)
+            player.start()
+        } catch (e: Exception) {
+            debugWarn("Cue ${command.cue} failed: $e")
+        }
+    }
+
+    private fun cuePlayerId(resId: Int) = "$CUE_PLAYER_PREFIX$resId"
+
+    private fun debugWarn(message: String) {
+        if (BuildConfig.DEBUG) Log.w(TAG, message)
     }
 
     // --- Voice: ducking + the AudioCompleted producer (REQ-5.8, EC-3) --------------------------
@@ -291,9 +340,12 @@ class GuidedMeditationAudioExecutor(
     // --- Session end (REQ-5.11 half; the other half is release() ordering below) ---------------
 
     private fun endSession(reason: SessionEndReason) {
+        cueGuard.reset()
+        endedCompleted = reason == SessionEndReason.Completed
         val playing = players.filterValues { it.isPlaying }.keys
         val rampingToSilence = ramps.filterValues { it.ramp.toVolume == 0f }.keys
-        val actions = TerminalAudioPolicy.plan(reason, playing, rampingToSilence)
+        val ringOut = playing.filterTo(mutableSetOf()) { it.startsWith(CUE_PLAYER_PREFIX) }
+        val actions = TerminalAudioPolicy.plan(reason, playing, rampingToSilence, ringOut)
         actions.forEach { action ->
             when (action) {
                 is TerminalAudioAction.FadeOut ->
@@ -343,12 +395,25 @@ class GuidedMeditationAudioExecutor(
         ramps.values.forEach { it.job.cancel() }
         ramps.clear()
         frozenRamps.clear()
-        players.values.forEach { it.release() }
+        players.forEach { (id, player) ->
+            // The closing gong (a cue player, started after EndSession(Completed)) must ring out.
+            if (endedCompleted && id.startsWith(CUE_PLAYER_PREFIX)) {
+                releaseAfterPlayback(player.asReleasablePlayer())
+            } else {
+                player.release()
+            }
+        }
         players.clear()
         channelOf.clear()
         nominalVolume.clear()
         currentVolume.clear()
         duckHeldBy = null
         pausedIds = emptySet()
+        cueGuard.reset()
+    }
+
+    private companion object {
+        const val TAG = "MeditationAudio"
+        const val CUE_PLAYER_PREFIX = "cue:"
     }
 }

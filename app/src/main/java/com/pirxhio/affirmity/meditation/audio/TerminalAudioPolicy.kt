@@ -26,6 +26,9 @@ object TerminalAudioPolicy {
         /** Ids with a ramp already in flight whose target volume is exactly 0f — i.e. already on
          * their way to silence and already scheduled to self-stop. */
         rampingToSilenceAudioIds: Set<String>,
+        /** Ids (short cues, the closing gong) that must ring out on a graceful end instead of being
+         * faded. Ignored on cancellation: the user asked for silence. */
+        ringOutAudioIds: Set<String> = emptySet(),
         gracefulFadeMillis: Long = GRACEFUL_END_FADE_MILLIS,
     ): List<TerminalAudioAction> = when (reason) {
         // The user asked for it to stop. Stop. Cancels in-flight ramps too.
@@ -36,7 +39,7 @@ object TerminalAudioPolicy {
         // audible (including a bed left ducked by a voice that never restored) gets the courtesy
         // fade so nothing survives the session.
         SessionEndReason.Completed ->
-            (playingAudioIds - rampingToSilenceAudioIds).sorted()
+            (playingAudioIds - rampingToSilenceAudioIds - ringOutAudioIds).sorted()
                 .map { TerminalAudioAction.FadeOut(it, gracefulFadeMillis) }
     }
 }

@@ -1,5 +1,7 @@
 package com.pirxhio.affirmity.meditation
 
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
+
 /**
  * Marker for a side effect a phase declares (on entry/exit) or the engine issues as a structural
  * consequence of a transition (e.g. [StartTimer]). The engine only ever holds and forwards these
@@ -12,6 +14,19 @@ interface MeditationCommand
 data class PlayAudio(val audioId: String) : MeditationCommand
 data class StopAudio(val audioId: String? = null) : MeditationCommand
 data class ShowText(val textId: String) : MeditationCommand
+
+/**
+ * Plays a semantic [MeditationCue] (resolved to an asset by `MeditationSoundRegistry`). Authors
+ * write `PlayCue(cue)`; the engine stamps [phaseEntry] with the timer generation of the phase
+ * entry that dispatched it, which is what `CuePlaybackGuard` dedupes on. Null = unstamped.
+ */
+data class PlayCue(
+    val cue: MeditationCue,
+    val phaseEntry: Int? = null,
+    /** When set, the cue only sounds while the [Repeat] with this id is on its first iteration --
+     * how a round-start cue rides the first inhale of a breathing block without ringing per breath. */
+    val onlyAtFirstIterationOf: String? = null,
+) : MeditationCommand
 
 /** Like [ShowText], but carries the string to display directly instead of an id the catalog
  * resolves through `MeditationPresentation.textResources`. For content that only exists at
