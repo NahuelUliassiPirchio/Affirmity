@@ -7,6 +7,8 @@ import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.Phase
 import com.pirxhio.affirmity.meditation.PhaseDuration
 import com.pirxhio.affirmity.meditation.PlayAudio
+import com.pirxhio.affirmity.meditation.PlayCue
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
 import com.pirxhio.affirmity.meditation.Repeat
 import com.pirxhio.affirmity.meditation.ShowText
 import com.pirxhio.affirmity.meditation.StartLap
@@ -67,6 +69,7 @@ fun breathingMeditationDefinition(config: BreathingConfig): MeditationDefinition
                 breaths = config.breathsPerRound,
                 inhaleMillis = config.inhaleMillis,
                 exhaleMillis = config.exhaleMillis,
+                entryCue = MeditationCue.RoundStart,
                 inhaleTextId = BreathingText.INHALE,
                 exhaleTextId = BreathingText.EXHALE,
                 breathId = "breath",
@@ -78,7 +81,7 @@ fun breathingMeditationDefinition(config: BreathingConfig): MeditationDefinition
                 duration = PhaseDuration.Fixed(config.retentionMillis),
                 onEnter = listOf(
                     ShowText(BreathingText.RETENTION),
-                    PlayAudio(BreathingAudio.RETENTION_START),
+                    PlayCue(MeditationCue.ImportantTransition),
                     StartLap(BREATHING_RETENTION_LAP_ID),
                 ),
                 onExit = listOf(EndLap(BREATHING_RETENTION_LAP_ID)),
@@ -87,7 +90,8 @@ fun breathingMeditationDefinition(config: BreathingConfig): MeditationDefinition
             Phase(
                 id = "recovery",
                 duration = PhaseDuration.Fixed(config.recoveryMillis),
-                onEnter = listOf(ShowText(BreathingText.RECOVERY)),
+                onEnter = listOf(PlayCue(MeditationCue.SectionTransition), ShowText(BreathingText.RECOVERY)),
+                onExit = listOf(PlayCue(MeditationCue.RoundEnd)),
             ),
         ),
     )

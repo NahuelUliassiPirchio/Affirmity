@@ -4,7 +4,9 @@ import com.pirxhio.affirmity.meditation.FixedCountRepetition
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.Phase
 import com.pirxhio.affirmity.meditation.PhaseDuration
+import com.pirxhio.affirmity.meditation.PlayCue
 import com.pirxhio.affirmity.meditation.Repeat
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
 import com.pirxhio.affirmity.meditation.ShowText
 import com.pirxhio.affirmity.meditation.breathing.BreathingText
 
@@ -37,13 +39,18 @@ fun breathingBlock(
     exhaleId: String = "exhale",
     holdAfterInhaleId: String = "hold_in",
     holdAfterExhaleId: String = "hold_out",
+    /** Rung once, on the first inhale of the block (e.g. [MeditationCue.RoundStart]) -- never per breath. */
+    entryCue: MeditationCue? = null,
 ): Repeat {
     val children = buildList {
         add(
             Phase(
                 id = inhaleId,
                 duration = PhaseDuration.Fixed(inhaleMillis),
-                onEnter = listOf(ShowText(inhaleTextId)),
+                onEnter = listOfNotNull(
+                    entryCue?.let { PlayCue(it, onlyAtFirstIterationOf = id) },
+                    ShowText(inhaleTextId),
+                ),
             ),
         )
         if (holdAfterInhaleMillis > 0L) {

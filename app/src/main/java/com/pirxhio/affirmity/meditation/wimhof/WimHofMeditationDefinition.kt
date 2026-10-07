@@ -4,6 +4,9 @@ import com.pirxhio.affirmity.meditation.FixedCountRepetition
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.PhaseDuration
+import com.pirxhio.affirmity.meditation.PlayCue
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
+import com.pirxhio.affirmity.meditation.authoring.withEntryCue
 import com.pirxhio.affirmity.meditation.Repeat
 import com.pirxhio.affirmity.meditation.authoring.breathingBlock
 import com.pirxhio.affirmity.meditation.authoring.cuedPhase
@@ -52,18 +55,21 @@ fun wimHofMeditationDefinition(config: WimHofConfig = WimHofConfig()): Meditatio
                 breaths = config.breathsPerRound,
                 inhaleMillis = config.inhaleMillis,
                 exhaleMillis = config.exhaleMillis,
+                entryCue = MeditationCue.RoundStart,
             ),
             cuedPhase(
                 id = WimHofPhaseIds.EXHALE_HOLD,
                 duration = PhaseDuration.Fixed(config.exhaleHoldMillis),
                 cueTextId = WimHofText.EXHALE_HOLD,
                 skippable = true,
-            ),
+            ).withEntryCue(MeditationCue.ImportantTransition),
             cuedPhase(
                 id = WimHofPhaseIds.RECOVERY_HOLD,
                 duration = PhaseDuration.Fixed(config.recoveryHoldMillis),
                 cueTextId = WimHofText.RECOVERY_HOLD,
-            ),
+            ).withEntryCue(MeditationCue.SectionTransition).let {
+                it.copy(onExit = it.onExit + PlayCue(MeditationCue.RoundEnd))
+            },
         ),
     )
 

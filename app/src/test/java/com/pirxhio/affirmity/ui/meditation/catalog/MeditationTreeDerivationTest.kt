@@ -6,11 +6,11 @@ import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.Phase
 import com.pirxhio.affirmity.meditation.PhaseDuration
-import com.pirxhio.affirmity.meditation.PlayAudio
+import com.pirxhio.affirmity.meditation.PlayCue
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
 import com.pirxhio.affirmity.meditation.Repeat
 import com.pirxhio.affirmity.meditation.ShowText
 import com.pirxhio.affirmity.meditation.StartLap
-import com.pirxhio.affirmity.meditation.breathing.BreathingAudio
 import com.pirxhio.affirmity.meditation.breathing.BreathingConfig
 import com.pirxhio.affirmity.meditation.breathing.BreathingText
 import com.pirxhio.affirmity.meditation.breathing.breathingMeditationDefinition
@@ -129,11 +129,12 @@ class MeditationTreeDerivationTest {
         assertTrue(commands.contains(ShowText(BreathingText.INHALE)))
         assertTrue(commands.contains(ShowText(BreathingText.EXHALE)))
         assertTrue(commands.contains(ShowText(BreathingText.RETENTION)))
-        assertTrue(commands.contains(PlayAudio(BreathingAudio.RETENTION_START)))
+        assertTrue(commands.contains(PlayCue(MeditationCue.ImportantTransition)))
         assertTrue(commands.contains(StartLap("retention")))
         assertTrue(commands.contains(EndLap("retention")))
         assertTrue(commands.contains(ShowText(BreathingText.RECOVERY)))
-        // inhale onEnter(1) + exhale onEnter(1) + retention onEnter(3) + onExit(1) + recovery onEnter(1) = 7
-        assertEquals(7, commands.size)
+        // inhale onEnter(2: RoundStart cue + text) + exhale onEnter(1) + retention onEnter(3) + onExit(1)
+        // + recovery onEnter(2: cue + text) + onExit(1: RoundEnd) = 10
+        assertEquals(10, commands.size)
     }
 }
