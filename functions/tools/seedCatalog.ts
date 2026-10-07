@@ -7,7 +7,9 @@
  * developer, via the Admin SDK, which bypasses rules entirely.
  *
  * Usage (from `functions/`):
- *   npx tsx tools/seedCatalog.ts --catalog /path/to/affirmations-catalog.v1.json
+ *   npx tsx tools/seedCatalog.ts --catalog /path/to/affirmations-catalog.v1.json --project <firebase-project-id>
+ *
+ * The target project must be explicit (`--project` or `GOOGLE_CLOUD_PROJECT`); see seedProject.ts.
  *
  * The `--catalog` argument MUST be the FULL source JSON (the same file passed to
  * `tools/catalog/generate-catalog.mjs`, shape `{ catalogVersion, universes, themes, collections,
@@ -27,6 +29,8 @@
  * produces the identical document either way, and never leaves stale fields from a prior schema
  * version behind.
  */
+
+import { resolveSeedProject } from './seedProject';
 
 export const CATALOG_ID_PREFIX = 'cat_';
 
@@ -465,7 +469,9 @@ async function main(): Promise<void> {
   const { catalogPath } = parseArgs(process.argv.slice(2));
   const catalog = parseSourceCatalog(JSON.parse(readFileSync(catalogPath, 'utf8')));
 
-  initializeApp();
+  const projectId = resolveSeedProject(process.argv.slice(2), process.env);
+  console.log(`[seedCatalog] target project: ${projectId}`);
+  initializeApp({ projectId });
   const db = getFirestore();
 
   // Fix 5: orphan detection (log-only, no deletion -- see findOrphanCatalogDocIds's doc comment).

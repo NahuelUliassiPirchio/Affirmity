@@ -5,7 +5,11 @@
  * on `notificationCopy`, so only the Admin SDK (which bypasses rules) can ever populate it.
  *
  * Usage (from `functions/`):
- *   npx tsx tools/seedCopyCatalog.ts --catalog tools/notification-copy.v1.json
+ *   npx tsx tools/seedCopyCatalog.ts --catalog tools/notification-copy.v1.json --project <firebase-project-id>
+ *
+ * The target project must be explicit (`--project` or `GOOGLE_CLOUD_PROJECT`). Without it
+ * `initializeApp()` silently falls back to the ADC file's quota project, which can be a different
+ * Firebase project than the one the functions are deployed to.
  *
  * Idempotent: every write is `set(..., { merge: true })`, batched at `MAX_OPS_PER_BATCH` (450,
  * same headroom-under-500 rationale as `seedCatalog.ts`), so a re-run (including after a partial
@@ -13,6 +17,7 @@
  * a re-run, as long as the corresponding key/fields in this JSON stay stable.
  */
 
+import { resolveSeedProject } from './seedProject';
 import type { CopyLocale, CopyVariant, NotificationFamily } from '../src/copyCatalog';
 
 export const MAX_OPS_PER_BATCH = 450;
@@ -88,7 +93,9 @@ async function main(): Promise<void> {
   const { catalogPath } = parseArgs(process.argv.slice(2));
   const catalog = JSON.parse(readFileSync(catalogPath, 'utf8')) as CopyCatalogFile;
 
-  initializeApp();
+  const projectId = resolveSeedProject(process.argv.slice(2), process.env);
+  console.log(`[seedCopyCatalog] target project: ${projectId}`);
+  initializeApp({ projectId });
   const db = getFirestore();
 
   const committer: CopyCommitter = {
@@ -114,4 +121,5 @@ if (require.main === module) {
 
 // Re-exported for callers that only need the type surface (kept explicit rather than `export *`
 // to avoid ambiguity with this file's own value exports).
+export { resolveSeedProject };
 export type { CopyLocale, CopyVariant, NotificationFamily };

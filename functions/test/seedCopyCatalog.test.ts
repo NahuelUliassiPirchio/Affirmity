@@ -7,6 +7,7 @@ import { selectVariant } from '../src/copyCatalog';
 import {
   buildCopyWritePlan,
   chunkCopyWrites,
+  resolveSeedProject,
   seedCopyCatalog,
   type CopyCatalogFile,
   type CopyCommitter,
@@ -284,5 +285,33 @@ describe('notification-copy.v1.json data quality', () => {
         }
       }
     }
+  });
+});
+
+describe('resolveSeedProject', () => {
+  it('uses the --project flag when given', () => {
+    expect(resolveSeedProject(['--catalog', 'c.json', '--project', 'proj-a'], {})).toBe('proj-a');
+  });
+
+  it('prefers the --project flag over GOOGLE_CLOUD_PROJECT', () => {
+    expect(
+      resolveSeedProject(['--project', 'proj-a'], { GOOGLE_CLOUD_PROJECT: 'proj-b' }),
+    ).toBe('proj-a');
+  });
+
+  it('falls back to GOOGLE_CLOUD_PROJECT', () => {
+    expect(resolveSeedProject(['--catalog', 'c.json'], { GOOGLE_CLOUD_PROJECT: 'proj-b' })).toBe(
+      'proj-b',
+    );
+  });
+
+  it('refuses to guess a project (ADC quota project could be a different one)', () => {
+    expect(() => resolveSeedProject(['--catalog', 'c.json'], {})).toThrow(/project/i);
+  });
+
+  it('rejects a --project flag with no value', () => {
+    expect(() => resolveSeedProject(['--project'], { GOOGLE_CLOUD_PROJECT: 'proj-b' })).toThrow(
+      /project/i,
+    );
   });
 });
