@@ -5,6 +5,8 @@ import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.Phase
 import com.pirxhio.affirmity.meditation.PhaseDuration
 import com.pirxhio.affirmity.meditation.ShowText
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
+import com.pirxhio.affirmity.meditation.authoring.withEntryCue
 import com.pirxhio.affirmity.meditation.authoring.RestKind
 import com.pirxhio.affirmity.meditation.authoring.breathingBlock
 import com.pirxhio.affirmity.meditation.authoring.restPhase
@@ -68,19 +70,19 @@ fun bodyScanMeditationDefinition(config: BodyScanConfig = BodyScanConfig()): Med
             kind = RestKind.BREATH_AWARENESS,
             duration = PhaseDuration.Fixed(config.perRegionMillis),
             cueTextId = textId,
-        )
+        ).withEntryCue(MeditationCue.SectionTransition)
     } + listOf(
         restPhase(
             id = "bs_whole",
             kind = RestKind.OPEN_AWARENESS,
             duration = PhaseDuration.Fixed(config.perRegionMillis),
             cueTextId = BodyScanText.WHOLE,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
         Phase(
             id = "bs_close",
             duration = PhaseDuration.Fixed(40_000L),
             onEnter = listOf(ShowText(BodyScanText.CLOSING)),
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
     )
 
     return MeditationDefinition(

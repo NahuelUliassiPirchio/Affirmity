@@ -3,6 +3,8 @@ package com.pirxhio.affirmity.meditation.yoganidra
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.PhaseDuration
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
+import com.pirxhio.affirmity.meditation.authoring.withEntryCue
 import com.pirxhio.affirmity.meditation.authoring.RestKind
 import com.pirxhio.affirmity.meditation.authoring.cuedPhase
 import com.pirxhio.affirmity.meditation.authoring.restPhase
@@ -63,31 +65,31 @@ fun yogaNidraMeditationDefinition(
             id = "intention",
             duration = PhaseDuration.Fixed(config.intentionMillis),
             cueTextId = YogaNidraText.INTENTION,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
     ) + bodyRegions.map { (region, textId) ->
         restPhase(
             id = "body_$region",
             kind = RestKind.BREATH_AWARENESS,
             duration = PhaseDuration.Fixed(config.bodyRegionMillis),
             cueTextId = textId,
-        )
+        ).withEntryCue(MeditationCue.SectionTransition)
     } + listOf(
         restPhase(
             id = "breath_awareness",
             kind = RestKind.BREATH_AWARENESS,
             duration = PhaseDuration.Fixed(config.breathAwarenessMillis),
             cueTextId = YogaNidraText.BREATH_AWARENESS,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
         cuedPhase(
             id = "visualization",
             duration = PhaseDuration.Fixed(config.visualizationMillis),
             cueTextId = YogaNidraText.VISUALIZATION,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
         cuedPhase(
             id = "return",
             duration = PhaseDuration.Fixed(config.returnMillis),
             cueTextId = YogaNidraText.RETURN,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
     )
 
     return MeditationDefinition(

@@ -3,6 +3,8 @@ package com.pirxhio.affirmity.meditation.metta
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.PhaseDuration
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
+import com.pirxhio.affirmity.meditation.authoring.withEntryCue
 import com.pirxhio.affirmity.meditation.authoring.cuedPhase
 
 /**
@@ -44,8 +46,9 @@ fun mettaMeditationDefinition(
     require(selected.isNotEmpty()) { "targets must include at least one of $TARGET_ORDER" }
 
     val duration = PhaseDuration.Fixed(config.secondsPerTargetMillis)
-    val children = selected.map { target ->
-        cuedPhase(id = target, duration = duration, cueTextId = requireNotNull(TARGET_TEXT[target]))
+    val children = selected.mapIndexed { index, target ->
+        val phase = cuedPhase(id = target, duration = duration, cueTextId = requireNotNull(TARGET_TEXT[target]))
+        if (index == 0) phase else phase.withEntryCue(MeditationCue.SectionTransition)
     }
 
     return MeditationDefinition(

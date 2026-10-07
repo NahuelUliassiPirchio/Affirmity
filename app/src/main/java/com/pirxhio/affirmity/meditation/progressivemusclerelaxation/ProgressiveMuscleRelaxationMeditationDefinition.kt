@@ -3,6 +3,8 @@ package com.pirxhio.affirmity.meditation.progressivemusclerelaxation
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.PhaseDuration
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
+import com.pirxhio.affirmity.meditation.authoring.withEntryCue
 import com.pirxhio.affirmity.meditation.authoring.RestKind
 import com.pirxhio.affirmity.meditation.authoring.cuedPhase
 import com.pirxhio.affirmity.meditation.authoring.restPhase
@@ -44,7 +46,7 @@ fun progressiveMuscleRelaxationMeditationDefinition(
                 id = "tense_$group",
                 duration = PhaseDuration.Fixed(config.tenseMillis),
                 cueTextId = ProgressiveMuscleRelaxationText.TENSE,
-            ),
+            ).withEntryCue(MeditationCue.SectionTransition),
             cuedPhase(
                 id = "relax_$group",
                 duration = PhaseDuration.Fixed(config.relaxMillis),
@@ -56,7 +58,7 @@ fun progressiveMuscleRelaxationMeditationDefinition(
             id = "whole_body_rest",
             kind = RestKind.SILENCE,
             duration = PhaseDuration.Fixed(config.wholeBodyRestMillis),
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
     )
 
     return MeditationDefinition(

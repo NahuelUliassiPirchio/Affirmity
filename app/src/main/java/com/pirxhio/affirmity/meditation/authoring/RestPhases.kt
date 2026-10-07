@@ -59,3 +59,8 @@ fun restPhase(
         exitEvents = if (skippable) setOf(MeditationEvent.UserAction::class) else emptySet(),
     )
 }
+
+/** Returns this phase with [cue] dispatched first on entry. Opt-in marker for section boundaries;
+ * the first phase of a meditation never needs one (the engine's SessionStart covers it). */
+fun Phase.withEntryCue(cue: com.pirxhio.affirmity.meditation.audio.MeditationCue): Phase =
+    copy(onEnter = listOf(com.pirxhio.affirmity.meditation.PlayCue(cue)) + onEnter)
