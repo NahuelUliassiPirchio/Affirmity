@@ -28,6 +28,16 @@ class NotificationPreviewTest {
     }
 
     @Test
+    fun `format args feed the preview copy from the same values as the payload`() {
+        NotificationPreviewCase.entries.filter { it.streakCount != null }.forEach { case ->
+            val post = resolve(case)
+            assertEquals(post.streakCount, case.headlineArgs.single().toString())
+            assertEquals(post.meditationStreak, case.bodyArgs[0].toString())
+            assertEquals(post.affirmationsStreak, case.bodyArgs[1].toString())
+        }
+    }
+
+    @Test
     fun `streak meditation only has a zero affirmations streak`() {
         val post = resolve(NotificationPreviewCase.STREAK_MEDITATION_ONLY)
 

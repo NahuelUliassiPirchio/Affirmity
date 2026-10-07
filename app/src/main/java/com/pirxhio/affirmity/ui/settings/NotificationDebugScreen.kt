@@ -76,7 +76,7 @@ fun NotificationDebugScreen(
 
         items(NotificationPreviewCase.entries, key = { it.name }) { case ->
             OutlinedButton(onClick = { onSendPreview(case) }, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(case.labelRes))
+                Text(stringResource(case.labelRes, *case.headlineArgs))
             }
         }
 

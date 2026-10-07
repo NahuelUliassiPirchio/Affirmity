@@ -107,7 +107,15 @@ export function renderCopy(
   };
 }
 
-/** Localized day count with correct singular/plural, e.g. "1 day" / "4 días". */
+/**
+ * Localized day count with correct singular/plural, e.g. "1 day" / "4 días".
+ *
+ * Any locale other than `'en'` deliberately falls back to Spanish, matching the server-wide
+ * locale resolution in `index.ts` (missing/unsupported locale resolves to `'es'`).
+ *
+ * The Android client has its own plurals (`notification_streak_days`); keep both in sync when
+ * adding a locale or changing the wording.
+ */
 export function formatDays(count: number, locale: CopyLocale): string {
   if (locale === 'en') return `${count} ${count === 1 ? 'day' : 'days'}`;
   return `${count} ${count === 1 ? 'día' : 'días'}`;

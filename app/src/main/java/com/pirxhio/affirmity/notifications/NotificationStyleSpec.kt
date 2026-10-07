@@ -1,6 +1,9 @@
 package com.pirxhio.affirmity.notifications
 
-/** Activity of a legacy activity-specific streak notification (wire values of the FCM `activity`). */
+/**
+ * Activity of a legacy activity-specific streak notification (wire values of the FCM `activity`).
+ * LEGACY-REMOVAL: exists only for payloads from servers older than commit fa0b50b (which stopped sending `activity`). Delete once the functions version containing fa0b50b has been live long enough that no queued Cloud Tasks from the previous version remain (check the Cloud Tasks streak queue is empty of pre-fa0b50b tasks), then drop `activity`, StreakActivity and the chip.
+ */
 enum class StreakActivity(val wireValue: String) {
     MEDITATION("meditation"),
     AFFIRMATIONS("affirmations"),

@@ -195,6 +195,8 @@ class Notifier(
             }
             // Chip and breakdown rows only exist in the expanded layout. The chip is legacy (old
             // servers); the rows explain which activities hold the overall streak.
+            // LEGACY-REMOVAL: the chip exists only for pre-fa0b50b server payloads; delete it with
+            // `StreakActivity` once no queued tasks from older functions versions remain.
             if (layout == R.layout.notification_streak_expanded) {
                 bindBreakdownRow(
                     R.id.streak_breakdown_meditation,

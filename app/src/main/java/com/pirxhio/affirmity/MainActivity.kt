@@ -1113,8 +1113,8 @@ fun AffirmityApp(
                         null -> appState.sendNotificationPreview(
                             notificationPreviewData(
                                 case = case,
-                                title = context.getString(case.titleRes),
-                                body = context.getString(case.bodyRes),
+                                title = context.getString(case.titleRes, *case.headlineArgs),
+                                body = context.getString(case.bodyRes, *case.bodyArgs),
                                 locale = Locale.getDefault().language.takeIf { it == "es" || it == "en" } ?: "en",
                             ),
                         )

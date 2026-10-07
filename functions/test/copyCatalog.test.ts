@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CATALOG_CACHE_TTL_MILLIS,
   formatDays,
+  type CopyLocale,
   loadCopyCatalog,
   renderCopy,
   resetCopyCatalogCacheForTests,
@@ -178,6 +179,11 @@ describe('loadCopyCatalog', () => {
 });
 
 describe('formatDays', () => {
+  it('falls back to Spanish for an unknown locale, consistent with server locale resolution', () => {
+    expect(formatDays(1, 'fr' as CopyLocale)).toBe('1 día');
+    expect(formatDays(3, 'fr' as CopyLocale)).toBe('3 días');
+  });
+
   it('pluralizes per locale', () => {
     expect(formatDays(1, 'en')).toBe('1 day');
     expect(formatDays(4, 'en')).toBe('4 days');

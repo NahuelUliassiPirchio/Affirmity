@@ -765,6 +765,14 @@ describe('sendNotification', () => {
       expect(logged).toContain('notification_copy_variant_missing');
       expect(logged).toContain('"family":"streak"');
       expect(logged).toContain('streak_meditation_only');
+      const entry = JSON.parse(String(warnSpy.mock.calls[0][0])) as Record<string, unknown>;
+      expect(entry).toMatchObject({
+        event: 'notification_copy_variant_missing',
+        family: 'streak',
+        channel: 'streak',
+        locale: expect.any(String),
+        contexts: [['streak_1_3', 'streak_meditation_only'], ['streak_generic']],
+      });
       warnSpy.mockRestore();
     });
   });

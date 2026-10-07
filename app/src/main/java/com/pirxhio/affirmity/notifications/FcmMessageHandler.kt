@@ -20,7 +20,10 @@ data class NotificationAttribution(
     val locale: String? = null,
     /** Streak count the server rendered into the copy (streak channel only). */
     val streakCount: String? = null,
-    /** Legacy: set only by older servers for an activity-specific streak alert. No longer sent. */
+    /**
+     * Legacy: set only by older servers for an activity-specific streak alert. No longer sent.
+     * LEGACY-REMOVAL: exists only for payloads from servers older than commit fa0b50b (which stopped sending `activity`). Delete once the functions version containing fa0b50b has been live long enough that no queued Cloud Tasks from the previous version remain (check the Cloud Tasks streak queue is empty of pre-fa0b50b tasks), then drop `activity`, StreakActivity and the chip.
+     */
     val activity: String? = null,
     /** Meditation's own streak in days (streak channel only; `0` when it is not live). */
     val meditationStreak: String? = null,

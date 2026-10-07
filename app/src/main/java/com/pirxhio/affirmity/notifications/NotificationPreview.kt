@@ -21,9 +21,9 @@ enum class NotificationPreviewCase(
 ) {
     STREAK_BOTH(
         channel = NotificationChannelSpec.STREAK,
-        streakCount = 7,
-        meditationStreak = 7,
-        affirmationsStreak = 4,
+        streakCount = PREVIEW_BOTH_MEDITATION_DAYS,
+        meditationStreak = PREVIEW_BOTH_MEDITATION_DAYS,
+        affirmationsStreak = PREVIEW_BOTH_AFFIRMATIONS_DAYS,
         labelRes = R.string.notification_debug_preview_streak_both,
         titleRes = R.string.notification_debug_preview_streak_both_title,
         bodyRes = R.string.notification_debug_preview_streak_both_body,
@@ -64,9 +64,22 @@ enum class NotificationPreviewCase(
         titleRes = R.string.notification_debug_preview_plain_title,
         bodyRes = R.string.notification_debug_preview_plain_body,
     ),
+    ;
+
+    /** Format args for [labelRes] and [titleRes]: the overall streak (`%1$d`). */
+    val headlineArgs: Array<Any> get() = arrayOf(streakCount ?: 0)
+
+    /** Format args for [bodyRes]: meditation (`%1$d`) and affirmations (`%2$d`) streaks. */
+    val bodyArgs: Array<Any> get() = arrayOf(meditationStreak ?: 0, affirmationsStreak ?: 0)
 }
 
 private const val PREVIEW_STREAK_DAYS = 5
+
+// STREAK_BOTH shows two different per-activity streaks so the breakdown rows are distinguishable.
+// The overall streak is the longer one. The preview strings render these through format
+// placeholders, so they cannot drift from the copy.
+private const val PREVIEW_BOTH_MEDITATION_DAYS = 7
+private const val PREVIEW_BOTH_AFFIRMATIONS_DAYS = 4
 
 /** Wire `destination` token per channel, mirroring `DESTINATION_BY_CHANNEL` in functions/src/index.ts. */
 private fun wireDestination(channel: NotificationChannelSpec): String = when (channel) {

@@ -555,11 +555,15 @@ export const sendNotification = onRequest(async (req, res) => {
     );
   }
   if (!variant) {
+    // Structured (JSON) so Cloud Logging exposes jsonPayload.event / .family for a log-based metric.
+    // Alert filter: jsonPayload.event="notification_copy_variant_missing" AND jsonPayload.family="streak"
+    // (fire when it exceeds ~1% of streak sends). Keep the event name stable.
     console.warn(
       JSON.stringify({
         event: 'notification_copy_variant_missing',
         uid,
         family,
+        channel,
         locale,
         contexts: attempts.map((attempt) => attempt.context),
       }),
