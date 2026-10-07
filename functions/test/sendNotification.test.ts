@@ -160,10 +160,14 @@ function fakeFirestore(state: HandlerState) {
         // `firestoreCatalogSource` (index.ts) calls `.collection('notificationCopy').where(...).get()`.
         // Returns `state.catalogVariants` (default `[]`, preserving every pre-existing test's
         // legacy-pass-through behavior); tests exercising real server-rendered copy seed it.
-        where() {
+        where(field?: string, _op?: string, value?: unknown) {
           return {
             async get() {
-              return { docs: state.catalogVariants.map((variant) => queryDoc(variant.key, variant)) };
+              // Honor the `enabled == true` filter `firestoreCatalogSource` relies on.
+              const docs = state.catalogVariants.filter((variant) =>
+                field === 'enabled' ? (variant as unknown as Record<string, unknown>).enabled === value : true,
+              );
+              return { docs: docs.map((variant) => queryDoc(variant.key, variant)) };
             },
           };
         },
@@ -531,57 +535,37 @@ describe('sendNotification', () => {
     expect(response.status).toHaveBeenCalledWith(200);
   });
 
-  describe('streak alert: general vs activity-specific', () => {
+  describe('streak alert: single general alert with per-activity breakdown', () => {
     const meditationOnly = [3, 2, 1].map((back) => ({
       epochDay: LOCAL_DAY - back,
       meditationDone: true,
       affirmationDone: false,
     }));
-
-    it('counts the general streak across mixed activities and sends no activity field', async () => {
-      const general = makeVariant({
-        key: 'general_1_3',
+    const bothLive = [2, 1].map((back) => ({
+      epochDay: LOCAL_DAY - back,
+      meditationDone: true,
+      affirmationDone: true,
+    }));
+    it('sends general count, both per-activity streaks and no activity field when both are live', async () => {
+      const both = makeVariant({
+        key: 'overall_both',
         family: 'streak',
-        context: ['streak_1_3'],
-        placeholders: ['streakCount'],
-      });
-      const state = baseState({
-        catalogVariants: [general],
-        completions: [
-          { epochDay: LOCAL_DAY - 2, meditationDone: true, affirmationDone: false },
-          { epochDay: LOCAL_DAY - 1, meditationDone: false, affirmationDone: true },
-        ],
+        context: ['streak_1_3', 'streak_both'],
+        placeholders: ['streakCount', 'meditationDays', 'affirmationsDays'],
       });
       boundary.messagingSend.mockResolvedValue('message-id');
 
-      await invoke(task('streak'), state);
+      await invoke(task('streak'), baseState({ catalogVariants: [both], completions: bothLive }));
 
       const sent = boundary.messagingSend.mock.calls[0][0] as { data: Record<string, string> };
       expect(sent.data.streakCount).toBe('2');
+      expect(sent.data.meditationStreak).toBe('2');
+      expect(sent.data.affirmationsStreak).toBe('2');
       expect(sent.data.activity).toBeUndefined();
-      expect(sent.data.variantKey).toBe('general_1_3');
+      expect(sent.data.variantKey).toBe('overall_both');
     });
 
-    it('falls back to the general band variant, without activity, when activity variants are missing', async () => {
-      const general = makeVariant({
-        key: 'general_1_3',
-        family: 'streak',
-        context: ['streak_1_3'],
-        placeholders: ['streakCount'],
-      });
-      const state = baseState({ catalogVariants: [general], completions: meditationOnly });
-      boundary.messagingSend.mockResolvedValue('message-id');
-
-      await invoke(task('streak'), state);
-
-      const sent = boundary.messagingSend.mock.calls[0][0] as { data: Record<string, string> };
-      expect(sent.data.variantKey).toBe('general_1_3');
-      expect(sent.data.activity).toBeUndefined();
-      // Count in the general copy is the general streak (3 here), not tied to the activity.
-      expect(sent.data.streakCount).toBe('3');
-    });
-
-    it('drops a stale planned activity when send-time selection is general', async () => {
+    it('counts the general streak across mixed activities', async () => {
       const state = baseState({
         catalogVariants: [],
         completions: [
@@ -591,30 +575,186 @@ describe('sendNotification', () => {
       });
       boundary.messagingSend.mockResolvedValue('message-id');
 
+      await invoke(task('streak'), state);
+
+      const sent = boundary.messagingSend.mock.calls[0][0] as { data: Record<string, string> };
+      expect(sent.data.streakCount).toBe('2');
+      expect(sent.data.meditationStreak).toBe('0');
+      expect(sent.data.affirmationsStreak).toBe('1');
+    });
+
+    it('selects the meditation-only variant and renders localized day counts without printing 0 days', async () => {
+      const meditationVariant = makeVariant({
+        key: 'overall_meditation_only',
+        family: 'streak',
+        context: ['streak_1_3', 'streak_meditation_only'],
+        placeholders: ['streakCount', 'meditationDays'],
+        locales: {
+          es: { title: 'T {streakCount}', body: 'M: {meditationDays}' },
+          en: { title: 'T {streakCount}', body: 'M: {meditationDays}' },
+        },
+      });
+      const bothVariant = makeVariant({
+        key: 'overall_both',
+        family: 'streak',
+        context: ['streak_1_3', 'streak_both'],
+        placeholders: ['streakCount', 'meditationDays', 'affirmationsDays'],
+      });
+      boundary.messagingSend.mockResolvedValue('message-id');
+
+      await invoke(task('streak'), baseState({ catalogVariants: [bothVariant, meditationVariant], completions: meditationOnly }));
+
+      const sent = boundary.messagingSend.mock.calls[0][0] as { data: Record<string, string> };
+      expect(sent.data.variantKey).toBe('overall_meditation_only');
+      expect(sent.data.streakCount).toBe('3');
+      expect(sent.data.meditationStreak).toBe('3');
+      expect(sent.data.affirmationsStreak).toBe('0');
+      expect(sent.data.body).toMatch(/3 d/);
+    });
+
+    it('selects the affirmations-only variant', async () => {
+      const affirmationsVariant = makeVariant({
+        key: 'overall_affirmations_only',
+        family: 'streak',
+        context: ['streak_1_3', 'streak_affirmations_only'],
+        placeholders: ['streakCount', 'affirmationsDays'],
+      });
+      const completions = [2, 1].map((back) => ({
+        epochDay: LOCAL_DAY - back,
+        meditationDone: false,
+        affirmationDone: true,
+      }));
+      boundary.messagingSend.mockResolvedValue('message-id');
+
+      await invoke(task('streak'), baseState({ catalogVariants: [affirmationsVariant], completions }));
+
+      const sent = boundary.messagingSend.mock.calls[0][0] as { data: Record<string, string> };
+      expect(sent.data.variantKey).toBe('overall_affirmations_only');
+      expect(sent.data.meditationStreak).toBe('0');
+      expect(sent.data.affirmationsStreak).toBe('2');
+    });
+
+    it('never sends an activity field and drops a stale planned activity', async () => {
+      const state = baseState({ catalogVariants: [], completions: meditationOnly });
+      boundary.messagingSend.mockResolvedValue('message-id');
+
       await invoke({ ...task('streak'), data: { streakCount: '9', activity: 'meditation' } }, state);
 
       const sent = boundary.messagingSend.mock.calls[0][0] as { data: Record<string, string> };
       expect(sent.data.activity).toBeUndefined();
-      expect(sent.data.streakCount).toBe('2');
+      expect(sent.data.streakCount).toBe('3');
     });
 
-    it('adds the activity when send-time selection is activity-specific but the plan had none', async () => {
-      const meditation = makeVariant({
-        key: 'streak_activity_meditation_a',
+    it('falls back to the generic "overall" variant (with the count) when the breakdown variant is absent', async () => {
+      const generic = makeVariant({
+        key: 'overall_generic',
         family: 'streak',
-        context: ['streak_activity', 'activity_meditation'],
+        context: ['streak_generic'],
         placeholders: ['streakCount'],
+        locales: {
+          es: { title: 'Racha general {streakCount}', body: 'B' },
+          en: { title: 'Overall streak {streakCount}', body: 'B' },
+        },
       });
-      const state = baseState({ catalogVariants: [meditation], completions: meditationOnly });
       boundary.messagingSend.mockResolvedValue('message-id');
 
-      await invoke({ ...task('streak'), data: { streakCount: '3' } }, state);
+      await invoke(task('streak'), baseState({ catalogVariants: [generic], completions: meditationOnly }));
 
       const sent = boundary.messagingSend.mock.calls[0][0] as { data: Record<string, string> };
-      expect(sent.data.activity).toBe('meditation');
+      expect(sent.data.variantKey).toBe('overall_generic');
+      expect(sent.data.title).toBe('Racha general 3');
+      expect(sent.data.streakCount).toBe('3');
+      expect(sent.data.meditationStreak).toBe('3');
     });
 
-    it('logs a structured warning with family and context tags when no variant matches', async () => {
+    it('prefers the breakdown variant over the generic fallback when both exist', async () => {
+      const generic = makeVariant({
+        key: 'overall_generic',
+        family: 'streak',
+        context: ['streak_generic'],
+        placeholders: ['streakCount'],
+      });
+      const meditationVariant = makeVariant({
+        key: 'overall_meditation_only',
+        family: 'streak',
+        context: ['streak_1_3', 'streak_meditation_only'],
+        placeholders: ['streakCount', 'meditationDays'],
+      });
+      boundary.messagingSend.mockResolvedValue('message-id');
+
+      await invoke(task('streak'), baseState({ catalogVariants: [generic, meditationVariant], completions: meditationOnly }));
+
+      const sent = boundary.messagingSend.mock.calls[0][0] as { data: Record<string, string> };
+      expect(sent.data.variantKey).toBe('overall_meditation_only');
+    });
+
+    it('falls back when the breakdown variant lacks a locale the user needs', async () => {
+      const brokenBreakdown = makeVariant({
+        key: 'overall_meditation_only',
+        family: 'streak',
+        context: ['streak_1_3', 'streak_meditation_only'],
+        placeholders: ['streakCount', 'meditationDays'],
+        locales: { es: undefined, en: { title: 'T', body: 'B' } } as unknown as CopyVariant['locales'],
+      });
+      const generic = makeVariant({
+        key: 'overall_generic',
+        family: 'streak',
+        context: ['streak_generic'],
+        placeholders: ['streakCount'],
+      });
+      boundary.messagingSend.mockResolvedValue('message-id');
+
+      await invoke(task('streak'), baseState({ catalogVariants: [brokenBreakdown, generic], completions: meditationOnly }));
+
+      const sent = boundary.messagingSend.mock.calls[0][0] as { data: Record<string, string> };
+      expect(sent.data.variantKey).toBe('overall_generic');
+    });
+
+    it('never selects disabled legacy streak_risk_* variants; the enabled overall variant wins', async () => {
+      const legacy = makeVariant({
+        key: 'streak_risk_1_3_a',
+        family: 'streak',
+        context: ['streak_1_3'],
+        placeholders: ['streakCount'],
+        enabled: false,
+      });
+      const overall = makeVariant({
+        key: 'overall_meditation_only',
+        family: 'streak',
+        context: ['streak_1_3', 'streak_meditation_only'],
+        placeholders: ['streakCount', 'meditationDays'],
+      });
+      boundary.messagingSend.mockResolvedValue('message-id');
+
+      await invoke(task('streak'), baseState({ catalogVariants: [legacy, overall], completions: meditationOnly }));
+
+      const sent = boundary.messagingSend.mock.calls[0][0] as { data: Record<string, string> };
+      expect(sent.data.variantKey).toBe('overall_meditation_only');
+    });
+
+    it('uses the client default (no variantKey) when only disabled legacy variants exist, and warns with both contexts', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const legacy = makeVariant({
+        key: 'streak_risk_1_3_a',
+        family: 'streak',
+        context: ['streak_1_3'],
+        placeholders: ['streakCount'],
+        enabled: false,
+      });
+      boundary.messagingSend.mockResolvedValue('message-id');
+
+      await invoke(task('streak'), baseState({ catalogVariants: [legacy], completions: meditationOnly }));
+
+      const sent = boundary.messagingSend.mock.calls[0][0] as { data: Record<string, string> };
+      expect(sent.data.variantKey).toBeUndefined();
+      const logged = warnSpy.mock.calls.map((call) => String(call[0])).join('\n');
+      expect(logged).toContain('notification_copy_variant_missing');
+      expect(logged).toContain('streak_meditation_only');
+      expect(logged).toContain('streak_generic');
+      warnSpy.mockRestore();
+    });
+
+    it('logs a structured warning with family and both context tags when no variant matches', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
       const state = baseState({ catalogVariants: [], completions: meditationOnly });
       boundary.messagingSend.mockResolvedValue('message-id');
@@ -624,41 +764,8 @@ describe('sendNotification', () => {
       const logged = warnSpy.mock.calls.map((call) => String(call[0])).join('\n');
       expect(logged).toContain('notification_copy_variant_missing');
       expect(logged).toContain('"family":"streak"');
-      expect(logged).toContain('activity_meditation');
+      expect(logged).toContain('streak_meditation_only');
       warnSpy.mockRestore();
-    });
-
-    it('sends an activity-specific alert with the activity field and activity-tagged copy', async () => {
-      const general = makeVariant({
-        key: 'general_1_3',
-        family: 'streak',
-        context: ['streak_1_3'],
-        placeholders: ['streakCount'],
-      });
-      const meditation = makeVariant({
-        key: 'streak_activity_meditation_a',
-        family: 'streak',
-        context: ['streak_activity', 'activity_meditation'],
-        placeholders: ['streakCount'],
-      });
-      const affirmations = makeVariant({
-        key: 'streak_activity_affirmations_a',
-        family: 'streak',
-        context: ['streak_activity', 'activity_affirmations'],
-        placeholders: ['streakCount'],
-      });
-      const state = baseState({
-        catalogVariants: [general, meditation, affirmations],
-        completions: meditationOnly,
-      });
-      boundary.messagingSend.mockResolvedValue('message-id');
-
-      await invoke(task('streak'), state);
-
-      const sent = boundary.messagingSend.mock.calls[0][0] as { data: Record<string, string> };
-      expect(sent.data.streakCount).toBe('3');
-      expect(sent.data.activity).toBe('meditation');
-      expect(sent.data.variantKey).toBe('streak_activity_meditation_a');
     });
   });
 

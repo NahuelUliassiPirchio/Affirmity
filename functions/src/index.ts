@@ -37,10 +37,11 @@ import {
 import { taskName } from './tasks';
 import { hasTransientFcmFailures, sendAndPrune, type FcmClient, type TokenStore } from './fcm';
 import { evaluateSendEligibility, notificationTtl, type SendTimeSettings } from './sendPolicy';
-import { currentStreak, selectStreakAlert, streakBand, type Completion } from './streak';
+import { currentStreak, selectStreakAlert, streakBand, streakBreakdownContext, type Completion } from './streak';
 import { isHealerExpiringToday, type HealerUse } from './healer';
 import { shouldFireMeditationReturn, type MeditationReturnState } from './meditationReturn';
 import {
+  formatDays,
   loadCopyCatalog,
   renderCopy,
   selectVariant,
@@ -462,11 +463,10 @@ export const sendNotification = onRequest(async (req, res) => {
   // catalog at send time -- any `title`/`body` in the request body is only a legacy pass-through
   // fallback (design §7's backward-compat guarantee: pre-deploy Cloud Tasks need no migration).
   // ---------------------------------------------------------------------------------------------
-  // General streak by default; an activity-specific alert only when a single activity has its own
-  // live streak of 3+ days (see `selectStreakAlert`). If the activity copy is not in the catalog
-  // the send falls back to the general look (count, context, payload all switch together).
+  // ONE streak alert per day, always about the GENERAL streak (see `selectStreakAlert`). The copy
+  // context is the streak band plus which activities hold it; the per-activity streaks are
+  // rendered into the body and also sent in the payload for the expanded notification.
   const streakAlert = channel === 'streak' ? selectStreakAlert(completions, localDay) : null;
-  const generalStreakValue = channel === 'streak' ? String(currentStreak(completions, localDay - 1)) : undefined;
   const healerStreakValue =
     channel === 'healer'
       ? // The streak count being protected/recovered by the healer -- the streak held through the
@@ -474,24 +474,42 @@ export const sendNotification = onRequest(async (req, res) => {
         String(currentStreak(completions, localDay - 2))
       : undefined;
 
+  const STREAK_GENERIC_CONTEXT = 'streak_generic';
   interface CopyAttempt {
     context: string[];
     streakCount: string | undefined;
-    activity?: string;
+    /** Extra payload fields for this attempt (streak per-activity breakdown). */
+    extraData: Record<string, string>;
+    /** Extra placeholder values for this attempt. */
+    extraPlaceholders: Record<string, string>;
   }
   const attempts: CopyAttempt[] = [];
-  if (channel === 'streak' && streakAlert?.activity) {
-    attempts.push({
-      context: ['streak_activity', `activity_${streakAlert.activity}`],
-      streakCount: String(streakAlert.streakCount),
-      activity: streakAlert.activity,
-    });
-  }
   if (channel === 'streak') {
-    attempts.push({
-      context: generalStreakValue !== undefined ? [streakBand(Number(generalStreakValue))] : [],
-      streakCount: generalStreakValue,
-    });
+    if (streakAlert) {
+      const primary: CopyAttempt = {
+        context: [streakBand(streakAlert.streakCount), streakBreakdownContext(streakAlert)],
+        streakCount: String(streakAlert.streakCount),
+        extraData: {
+          meditationStreak: String(streakAlert.meditationStreak),
+          affirmationsStreak: String(streakAlert.affirmationsStreak),
+        },
+        extraPlaceholders: {
+          meditationDays: formatDays(streakAlert.meditationStreak, locale),
+          affirmationsDays: formatDays(streakAlert.affirmationsStreak, locale),
+        },
+      };
+      // Fallback when the breakdown variant is missing/disabled/malformed: still says "overall" and
+      // carries the count. `streak_generic` appears ONLY here, so it never matches the primary
+      // context, and the primary context (band + breakdown) never matches these variants.
+      attempts.push(primary, { ...primary, context: [STREAK_GENERIC_CONTEXT] });
+    } else {
+      attempts.push({
+        context: [],
+        streakCount: String(currentStreak(completions, localDay - 1)),
+        extraData: {},
+        extraPlaceholders: {},
+      });
+    }
   } else {
     attempts.push({
       context:
@@ -501,6 +519,8 @@ export const sendNotification = onRequest(async (req, res) => {
             ? [meditationReturnDecision.band]
             : [],
       streakCount: healerStreakValue,
+      extraData: {},
+      extraPlaceholders: {},
     });
   }
 
@@ -517,7 +537,9 @@ export const sendNotification = onRequest(async (req, res) => {
     const recentKeys = notificationState.variantHistory[family] ?? [];
     for (const attempt of attempts) {
       const placeholderValues: Record<string, string> =
-        attempt.streakCount !== undefined ? { streakCount: attempt.streakCount } : {};
+        attempt.streakCount !== undefined
+          ? { streakCount: attempt.streakCount, ...attempt.extraPlaceholders }
+          : { ...attempt.extraPlaceholders };
       const candidate = selectVariant(catalog, family, attempt.context, recentKeys);
       const candidateRendered = candidate ? renderCopy(candidate, locale, placeholderValues) : null;
       usedAttempt = attempt;
@@ -543,15 +565,13 @@ export const sendNotification = onRequest(async (req, res) => {
       }),
     );
   }
-  // Payload, copy and tags must agree: `activity`/`streakCount` reflect the attempt actually used.
   const streakCountValue = usedAttempt.streakCount;
-  const sentActivity = variant ? usedAttempt.activity : undefined;
 
   const title = rendered?.title ?? legacyTitle;
   const body = rendered?.body ?? legacyBody;
   const variantKey = rendered ? variant?.key : undefined;
 
-  // A planned `activity` hint is never trusted (it can be stale); it is re-derived above.
+  // The server no longer sends `activity`; drop it from any already-queued legacy task payload.
   const { activity: _stalePlannedActivity, ...legacyDataWithoutActivity } = legacyData ?? {};
   const v2Data: Record<string, string> = {
     ...legacyDataWithoutActivity,
@@ -561,7 +581,7 @@ export const sendNotification = onRequest(async (req, res) => {
     locale,
     ...(variantKey ? { variantKey } : {}),
     ...(streakCountValue !== undefined ? { streakCount: streakCountValue } : {}),
-    ...(sentActivity ? { activity: sentActivity } : {}),
+    ...usedAttempt.extraData,
     ...(channel === 'meditation_return' && meditationReturnDecision?.inactiveDays !== undefined
       ? { inactiveDays: String(meditationReturnDecision.inactiveDays) }
       : {}),

@@ -6,7 +6,7 @@ import {
   currentStreak,
   streakBand,
   selectStreakAlert,
-  ACTIVITY_STREAK_MIN_DAYS,
+  streakBreakdownContext,
   type Completion,
 } from '../src/streak';
 
@@ -127,49 +127,77 @@ describe('selectStreakAlert', () => {
   const aff = (day: number): Completion => ({ epochDay: day, meditationDone: false, affirmationDone: true });
   const both = (day: number): Completion => ({ epochDay: day, meditationDone: true, affirmationDone: true });
 
-  it('exposes the per-activity threshold as 3 days', () => {
-    expect(ACTIVITY_STREAK_MIN_DAYS).toBe(3);
-  });
-
-  it('returns the general streak when no single activity has a live streak of 3+', () => {
-    const rows = [med(MONDAY - 3), aff(MONDAY - 2), med(MONDAY - 1)];
-
-    expect(selectStreakAlert(rows, MONDAY)).toEqual({ streakCount: 3 });
-  });
-
-  it('returns a meditation-specific alert when only meditation has a live streak of 3+ through yesterday', () => {
-    const rows = [med(MONDAY - 5), med(MONDAY - 4), med(MONDAY - 3), med(MONDAY - 2), med(MONDAY - 1)];
-
-    expect(selectStreakAlert(rows, MONDAY)).toEqual({ streakCount: 5, activity: 'meditation' });
-  });
-
-  it('returns an affirmations-specific alert when only affirmations has a live streak of 3+', () => {
-    const rows = [aff(MONDAY - 3), aff(MONDAY - 2), aff(MONDAY - 1)];
-
-    expect(selectStreakAlert(rows, MONDAY)).toEqual({ streakCount: 3, activity: 'affirmations' });
-  });
-
-  it('uses the activity streak count, not the general one, for an activity alert', () => {
-    // General streak is 4 (aff on -4, then med x3); meditation alone is 3.
-    const rows = [aff(MONDAY - 4), med(MONDAY - 3), med(MONDAY - 2), med(MONDAY - 1)];
-
-    expect(selectStreakAlert(rows, MONDAY)).toEqual({ streakCount: 3, activity: 'meditation' });
-  });
-
-  it('falls back to the general alert when both activities have live streaks of 3+', () => {
+  it('returns the general count with both per-activity streaks when both are live', () => {
     const rows = [both(MONDAY - 3), both(MONDAY - 2), both(MONDAY - 1)];
 
-    expect(selectStreakAlert(rows, MONDAY)).toEqual({ streakCount: 3 });
+    expect(selectStreakAlert(rows, MONDAY)).toEqual({ streakCount: 3, meditationStreak: 3, affirmationsStreak: 3 });
   });
 
-  it('keeps the general alert when the activity streak is below the threshold', () => {
-    const rows = [med(MONDAY - 2), med(MONDAY - 1)];
+  it('keeps the general count across mixed days and reports each own streak', () => {
+    // General 4 (aff on -4, then med x3); meditation alone 3; affirmations ended before yesterday.
+    const rows = [aff(MONDAY - 4), med(MONDAY - 3), med(MONDAY - 2), med(MONDAY - 1)];
 
-    expect(selectStreakAlert(rows, MONDAY)).toEqual({ streakCount: 2 });
+    expect(selectStreakAlert(rows, MONDAY)).toEqual({ streakCount: 4, meditationStreak: 3, affirmationsStreak: 0 });
+  });
+
+  it('reports a zero affirmations streak when only meditation is live (no minimum days)', () => {
+    expect(selectStreakAlert([med(MONDAY - 1)], MONDAY)).toEqual({
+      streakCount: 1,
+      meditationStreak: 1,
+      affirmationsStreak: 0,
+    });
+  });
+
+  it('reports a zero meditation streak when only affirmations is live', () => {
+    const rows = [aff(MONDAY - 2), aff(MONDAY - 1)];
+
+    expect(selectStreakAlert(rows, MONDAY)).toEqual({ streakCount: 2, meditationStreak: 0, affirmationsStreak: 2 });
+  });
+
+  it('never carries an activity field', () => {
+    const rows = [med(MONDAY - 5), med(MONDAY - 4), med(MONDAY - 3), med(MONDAY - 2), med(MONDAY - 1)];
+
+    expect(selectStreakAlert(rows, MONDAY)).not.toHaveProperty('activity');
   });
 
   it('returns null when there is no live general streak through yesterday', () => {
     expect(selectStreakAlert([med(MONDAY - 3)], MONDAY)).toBeNull();
+  });
+});
+
+describe('streakBreakdownContext', () => {
+  it('tags both / meditation-only / affirmations-only', () => {
+    expect(streakBreakdownContext({ streakCount: 5, meditationStreak: 5, affirmationsStreak: 2 })).toBe('streak_both');
+    expect(streakBreakdownContext({ streakCount: 5, meditationStreak: 5, affirmationsStreak: 0 })).toBe(
+      'streak_meditation_only',
+    );
+    expect(streakBreakdownContext({ streakCount: 5, meditationStreak: 0, affirmationsStreak: 5 })).toBe(
+      'streak_affirmations_only',
+    );
+  });
+});
+
+describe('both-zero breakdown guard', () => {
+  it('streakBreakdownContext throws on the impossible both-zero state instead of guessing a tag', () => {
+    expect(() => streakBreakdownContext({ streakCount: 3, meditationStreak: 0, affirmationsStreak: 0 })).toThrow(
+      /both.*0|impossible/i,
+    );
+  });
+
+  it('selectStreakAlert never yields a both-zero selection (exhaustive over 5 days x 4 states)', () => {
+    const states: Array<[boolean, boolean]> = [[false, false], [true, false], [false, true], [true, true]];
+    const days = [0, 1, 2, 3, 4];
+    for (let mask = 0; mask < states.length ** days.length; mask++) {
+      const rows: Completion[] = days.map((offset, index) => {
+        const [meditationDone, affirmationDone] = states[Math.floor(mask / states.length ** index) % states.length];
+        return { epochDay: MONDAY - 5 + offset, meditationDone, affirmationDone };
+      });
+      const selection = selectStreakAlert(rows, MONDAY);
+      if (selection) {
+        expect(selection.meditationStreak + selection.affirmationsStreak).toBeGreaterThan(0);
+        expect(() => streakBreakdownContext(selection)).not.toThrow();
+      }
+    }
   });
 });
 

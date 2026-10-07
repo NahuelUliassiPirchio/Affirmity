@@ -69,8 +69,10 @@ export interface PlannedTask {
 
 export interface NotificationData {
   streakCount?: string;
-  /** Set only for an activity-specific streak alert ('meditation' | 'affirmations'). */
-  activity?: string;
+  /** Meditation's own streak through yesterday (streak alert only). */
+  meditationStreak?: string;
+  /** Affirmations' own streak through yesterday (streak alert only). */
+  affirmationsStreak?: string;
 }
 
 export type PlanStatus = 'planned' | 'skipped' | 'failed';
@@ -160,7 +162,8 @@ export function planUserTasks(
       atMillis: slotInstant(localDay, zone, STREAK_ALERT_MINUTE, STREAK_ALERT_MINUTE, rng).getTime(),
       data: {
         streakCount: String(streakAlert.streakCount),
-        ...(streakAlert.activity ? { activity: streakAlert.activity } : {}),
+        meditationStreak: String(streakAlert.meditationStreak),
+        affirmationsStreak: String(streakAlert.affirmationsStreak),
       },
     };
     if (isSafelyFuture(task.atMillis, planGeneratedAtMillis)) tasks.push(task);

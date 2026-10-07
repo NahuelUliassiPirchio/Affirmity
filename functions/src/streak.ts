@@ -1,7 +1,7 @@
 /**
  * Port of `DailyCompletionStats.streakOf` (app/src/main/java/com/pirxhio/affirmity/data/DailyCompletionStats.kt)
  * plus the server-side streak channel decisions (spec's "Streak-About-to-End Channel"
- * requirement): general streak, at-risk trigger, and general-vs-activity alert selection.
+ * requirement): general streak, at-risk trigger, and the single general-streak alert selection.
  */
 
 export interface Completion {
@@ -37,15 +37,13 @@ export function currentStreak(rows: Completion[], todayEpochDay: number): number
   return streakOf(rows, todayEpochDay, (row) => row.meditationDone || row.affirmationDone);
 }
 
-export type StreakActivity = 'meditation' | 'affirmations';
-
-/** Minimum own-streak length for an activity-specific streak notification. */
-export const ACTIVITY_STREAK_MIN_DAYS = 3;
-
 export interface StreakAlertSelection {
+  /** The GENERAL streak (activity on either channel) through yesterday. */
   streakCount: number;
-  /** Present only for an activity-specific alert. */
-  activity?: StreakActivity;
+  /** Meditation's own streak through yesterday (0 when it did not happen yesterday). */
+  meditationStreak: number;
+  /** Affirmations' own streak through yesterday (0 when it did not happen yesterday). */
+  affirmationsStreak: number;
 }
 
 /**
@@ -63,24 +61,34 @@ export function shouldFireStreakAlert(rows: Completion[], todayEpochDay: number)
 }
 
 /**
- * Picks what the streak alert talks about. Defaults to the general streak; switches to an
- * activity-specific alert only when exactly ONE activity has its own live streak of
- * `ACTIVITY_STREAK_MIN_DAYS`+ days through yesterday (when both do, the general streak already
- * describes the user). Returns null when there is no live general streak through yesterday.
+ * Builds the single streak alert: always about the GENERAL streak, plus each activity's own streak
+ * through yesterday so the copy can explain what is holding it. Returns null when there is no live
+ * general streak through yesterday. At least one per-activity streak is >= 1 when non-null.
  */
 export function selectStreakAlert(rows: Completion[], todayEpochDay: number): StreakAlertSelection | null {
   const yesterday = todayEpochDay - 1;
   const general = currentStreak(rows, yesterday);
   if (general < 1) return null;
 
-  const meditation = streakOf(rows, yesterday, (row) => row.meditationDone);
-  const affirmations = streakOf(rows, yesterday, (row) => row.affirmationDone);
-  const meditationLive = meditation >= ACTIVITY_STREAK_MIN_DAYS;
-  const affirmationsLive = affirmations >= ACTIVITY_STREAK_MIN_DAYS;
+  return {
+    streakCount: general,
+    meditationStreak: streakOf(rows, yesterday, (row) => row.meditationDone),
+    affirmationsStreak: streakOf(rows, yesterday, (row) => row.affirmationDone),
+  };
+}
 
-  if (meditationLive && !affirmationsLive) return { streakCount: meditation, activity: 'meditation' };
-  if (affirmationsLive && !meditationLive) return { streakCount: affirmations, activity: 'affirmations' };
-  return { streakCount: general };
+export type StreakBreakdownContext = 'streak_both' | 'streak_meditation_only' | 'streak_affirmations_only';
+
+/** Copy-context tag for which activities currently hold the general streak (never prints "0 days"). */
+export function streakBreakdownContext(selection: StreakAlertSelection): StreakBreakdownContext {
+  // A live general streak through yesterday means at least one activity was done yesterday, so its
+  // own streak is >= 1. Both being 0 is impossible for a `selectStreakAlert` result: fail loudly
+  // rather than silently tagging an arbitrary breakdown.
+  if (selection.meditationStreak <= 0 && selection.affirmationsStreak <= 0) {
+    throw new Error('streakBreakdownContext: impossible state, both activity streaks are 0 with a live general streak');
+  }
+  if (selection.meditationStreak > 0 && selection.affirmationsStreak > 0) return 'streak_both';
+  return selection.meditationStreak > 0 ? 'streak_meditation_only' : 'streak_affirmations_only';
 }
 
 export type StreakBand = 'streak_1_3' | 'streak_4_13' | 'streak_14plus';

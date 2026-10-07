@@ -160,7 +160,7 @@ describe('planAllUsers', () => {
     expect(streakTask?.body).toBeUndefined();
   });
 
-  it('includes the activity when a single activity has its own live streak of 3+ days', async () => {
+  it('includes the per-activity streaks and no activity when only one activity holds the streak', async () => {
     const store = makeStore();
     const enqueuer = makeEnqueuer();
     const localDay = baseInput.localDay;
@@ -177,12 +177,12 @@ describe('planAllUsers', () => {
     await planUser(input, store, enqueuer);
 
     const streakTask = enqueuer.calls.find((task) => (task as { channel: string }).channel === 'streak') as
-      | { data?: { streakCount?: string; activity?: string } }
+      | { data?: Record<string, string> }
       | undefined;
-    expect(streakTask?.data).toEqual({ streakCount: '3', activity: 'meditation' });
+    expect(streakTask?.data).toEqual({ streakCount: '3', meditationStreak: '3', affirmationsStreak: '0' });
   });
 
-  it('omits the activity for a general streak', async () => {
+  it('includes both per-activity streaks for a mixed general streak', async () => {
     const store = makeStore();
     const enqueuer = makeEnqueuer();
     const localDay = baseInput.localDay;
@@ -202,7 +202,7 @@ describe('planAllUsers', () => {
     const streakTask = enqueuer.calls.find((task) => (task as { channel: string }).channel === 'streak') as
       | { data?: Record<string, string> }
       | undefined;
-    expect(streakTask?.data).toEqual({ streakCount: '2' });
+    expect(streakTask?.data).toEqual({ streakCount: '2', meditationStreak: '2', affirmationsStreak: '2' });
   });
 
   describe('streak task selection edge cases', () => {
@@ -225,7 +225,7 @@ describe('planAllUsers', () => {
       expect(streakTaskOf(enqueuer)).toBeUndefined();
     });
 
-    it('enqueues a general task without activity when both activities have live streaks of 3+', async () => {
+    it('enqueues one general task with both per-activity streaks when both are live', async () => {
       const enqueuer = makeEnqueuer();
       const day = baseInput.localDay;
 
@@ -235,7 +235,7 @@ describe('planAllUsers', () => {
         enqueuer,
       );
 
-      expect(streakTaskOf(enqueuer)?.data).toEqual({ streakCount: '3' });
+      expect(streakTaskOf(enqueuer)?.data).toEqual({ streakCount: '3', meditationStreak: '3', affirmationsStreak: '3' });
     });
 
     it('enqueues no streak task when an activity is already done today', async () => {

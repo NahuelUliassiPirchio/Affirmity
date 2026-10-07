@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "variants": [
     {
       "key": "affirmation_a",
@@ -314,219 +314,885 @@
       }
     },
     {
-      "key": "streak_activity_meditation_a",
+      "key": "streak_overall_both_1_3_a",
       "family": "streak",
-      "context": ["streak_activity", "activity_meditation"],
-      "placeholders": ["streakCount"],
+      "context": [
+        "streak_1_3",
+        "streak_both"
+      ],
+      "placeholders": [
+        "streakCount",
+        "meditationDays",
+        "affirmationsDays"
+      ],
       "enabled": true,
       "order": 1,
       "locales": {
-        "es": { "title": "Llevas {streakCount} días meditando, no paremos ahora", "body": "Un momento de calma hoy mantiene viva tu racha." },
-        "en": { "title": "You've been meditating for {streakCount} days, let's not stop now", "body": "A moment of calm today keeps your streak alive." }
+        "es": {
+          "title": "Tu racha general de {streakCount} días está en riesgo 🔥",
+          "body": "Meditación: {meditationDays} · Afirmaciones: {affirmationsDays}. Cualquiera de las dos hoy la mantiene viva."
+        },
+        "en": {
+          "title": "Your {streakCount}-day overall streak is at risk 🔥",
+          "body": "Meditation: {meditationDays} · Affirmations: {affirmationsDays}. Either one today keeps it alive."
+        }
+      }
+    },
+    {
+      "key": "streak_overall_meditation_1_3_a",
+      "family": "streak",
+      "context": [
+        "streak_1_3",
+        "streak_meditation_only"
+      ],
+      "placeholders": [
+        "streakCount",
+        "meditationDays"
+      ],
+      "enabled": true,
+      "order": 1,
+      "locales": {
+        "es": {
+          "title": "Tu racha general de {streakCount} días está en riesgo 🔥",
+          "body": "Meditación: {meditationDays}. Una meditación o una afirmación hoy la mantiene viva."
+        },
+        "en": {
+          "title": "Your {streakCount}-day overall streak is at risk 🔥",
+          "body": "Meditation: {meditationDays}. A meditation or an affirmation today keeps it alive."
+        }
+      }
+    },
+    {
+      "key": "streak_overall_affirmations_1_3_a",
+      "family": "streak",
+      "context": [
+        "streak_1_3",
+        "streak_affirmations_only"
+      ],
+      "placeholders": [
+        "streakCount",
+        "affirmationsDays"
+      ],
+      "enabled": true,
+      "order": 1,
+      "locales": {
+        "es": {
+          "title": "Tu racha general de {streakCount} días está en riesgo 🔥",
+          "body": "Afirmaciones: {affirmationsDays}. Una afirmación o una meditación hoy la mantiene viva."
+        },
+        "en": {
+          "title": "Your {streakCount}-day overall streak is at risk 🔥",
+          "body": "Affirmations: {affirmationsDays}. An affirmation or a meditation today keeps it alive."
+        }
+      }
+    },
+    {
+      "key": "streak_overall_both_1_3_b",
+      "family": "streak",
+      "context": [
+        "streak_1_3",
+        "streak_both"
+      ],
+      "placeholders": [
+        "streakCount",
+        "meditationDays",
+        "affirmationsDays"
+      ],
+      "enabled": true,
+      "order": 2,
+      "locales": {
+        "es": {
+          "title": "Mantén viva tu racha general: {streakCount} días 🔥",
+          "body": "Meditación: {meditationDays} · Afirmaciones: {affirmationsDays}. Cualquiera de las dos hoy la mantiene viva."
+        },
+        "en": {
+          "title": "Keep your overall streak alive: {streakCount} days 🔥",
+          "body": "Meditation: {meditationDays} · Affirmations: {affirmationsDays}. Either one today keeps it alive."
+        }
+      }
+    },
+    {
+      "key": "streak_overall_meditation_1_3_b",
+      "family": "streak",
+      "context": [
+        "streak_1_3",
+        "streak_meditation_only"
+      ],
+      "placeholders": [
+        "streakCount",
+        "meditationDays"
+      ],
+      "enabled": true,
+      "order": 2,
+      "locales": {
+        "es": {
+          "title": "Mantén viva tu racha general: {streakCount} días 🔥",
+          "body": "Meditación: {meditationDays}. Una meditación o una afirmación hoy la mantiene viva."
+        },
+        "en": {
+          "title": "Keep your overall streak alive: {streakCount} days 🔥",
+          "body": "Meditation: {meditationDays}. A meditation or an affirmation today keeps it alive."
+        }
+      }
+    },
+    {
+      "key": "streak_overall_affirmations_1_3_b",
+      "family": "streak",
+      "context": [
+        "streak_1_3",
+        "streak_affirmations_only"
+      ],
+      "placeholders": [
+        "streakCount",
+        "affirmationsDays"
+      ],
+      "enabled": true,
+      "order": 2,
+      "locales": {
+        "es": {
+          "title": "Mantén viva tu racha general: {streakCount} días 🔥",
+          "body": "Afirmaciones: {affirmationsDays}. Una afirmación o una meditación hoy la mantiene viva."
+        },
+        "en": {
+          "title": "Keep your overall streak alive: {streakCount} days 🔥",
+          "body": "Affirmations: {affirmationsDays}. An affirmation or a meditation today keeps it alive."
+        }
+      }
+    },
+    {
+      "key": "streak_overall_both_4_13_a",
+      "family": "streak",
+      "context": [
+        "streak_4_13",
+        "streak_both"
+      ],
+      "placeholders": [
+        "streakCount",
+        "meditationDays",
+        "affirmationsDays"
+      ],
+      "enabled": true,
+      "order": 1,
+      "locales": {
+        "es": {
+          "title": "Tu racha general de {streakCount} días necesita tu práctica de hoy 🔥",
+          "body": "Meditación: {meditationDays} · Afirmaciones: {affirmationsDays}. Cualquiera de las dos hoy la mantiene viva."
+        },
+        "en": {
+          "title": "Your {streakCount}-day overall streak needs you today 🔥",
+          "body": "Meditation: {meditationDays} · Affirmations: {affirmationsDays}. Either one today keeps it alive."
+        }
+      }
+    },
+    {
+      "key": "streak_overall_meditation_4_13_a",
+      "family": "streak",
+      "context": [
+        "streak_4_13",
+        "streak_meditation_only"
+      ],
+      "placeholders": [
+        "streakCount",
+        "meditationDays"
+      ],
+      "enabled": true,
+      "order": 1,
+      "locales": {
+        "es": {
+          "title": "Tu racha general de {streakCount} días necesita tu práctica de hoy 🔥",
+          "body": "Meditación: {meditationDays}. Una meditación o una afirmación hoy la mantiene viva."
+        },
+        "en": {
+          "title": "Your {streakCount}-day overall streak needs you today 🔥",
+          "body": "Meditation: {meditationDays}. A meditation or an affirmation today keeps it alive."
+        }
+      }
+    },
+    {
+      "key": "streak_overall_affirmations_4_13_a",
+      "family": "streak",
+      "context": [
+        "streak_4_13",
+        "streak_affirmations_only"
+      ],
+      "placeholders": [
+        "streakCount",
+        "affirmationsDays"
+      ],
+      "enabled": true,
+      "order": 1,
+      "locales": {
+        "es": {
+          "title": "Tu racha general de {streakCount} días necesita tu práctica de hoy 🔥",
+          "body": "Afirmaciones: {affirmationsDays}. Una afirmación o una meditación hoy la mantiene viva."
+        },
+        "en": {
+          "title": "Your {streakCount}-day overall streak needs you today 🔥",
+          "body": "Affirmations: {affirmationsDays}. An affirmation or a meditation today keeps it alive."
+        }
+      }
+    },
+    {
+      "key": "streak_overall_both_4_13_b",
+      "family": "streak",
+      "context": [
+        "streak_4_13",
+        "streak_both"
+      ],
+      "placeholders": [
+        "streakCount",
+        "meditationDays",
+        "affirmationsDays"
+      ],
+      "enabled": true,
+      "order": 2,
+      "locales": {
+        "es": {
+          "title": "{streakCount} días seguidos en tu racha general. Que hoy no sea el corte 🔥",
+          "body": "Meditación: {meditationDays} · Afirmaciones: {affirmationsDays}. Cualquiera de las dos hoy la mantiene viva."
+        },
+        "en": {
+          "title": "{streakCount} days in a row overall. Don't let today break it 🔥",
+          "body": "Meditation: {meditationDays} · Affirmations: {affirmationsDays}. Either one today keeps it alive."
+        }
+      }
+    },
+    {
+      "key": "streak_overall_meditation_4_13_b",
+      "family": "streak",
+      "context": [
+        "streak_4_13",
+        "streak_meditation_only"
+      ],
+      "placeholders": [
+        "streakCount",
+        "meditationDays"
+      ],
+      "enabled": true,
+      "order": 2,
+      "locales": {
+        "es": {
+          "title": "{streakCount} días seguidos en tu racha general. Que hoy no sea el corte 🔥",
+          "body": "Meditación: {meditationDays}. Una meditación o una afirmación hoy la mantiene viva."
+        },
+        "en": {
+          "title": "{streakCount} days in a row overall. Don't let today break it 🔥",
+          "body": "Meditation: {meditationDays}. A meditation or an affirmation today keeps it alive."
+        }
+      }
+    },
+    {
+      "key": "streak_overall_affirmations_4_13_b",
+      "family": "streak",
+      "context": [
+        "streak_4_13",
+        "streak_affirmations_only"
+      ],
+      "placeholders": [
+        "streakCount",
+        "affirmationsDays"
+      ],
+      "enabled": true,
+      "order": 2,
+      "locales": {
+        "es": {
+          "title": "{streakCount} días seguidos en tu racha general. Que hoy no sea el corte 🔥",
+          "body": "Afirmaciones: {affirmationsDays}. Una afirmación o una meditación hoy la mantiene viva."
+        },
+        "en": {
+          "title": "{streakCount} days in a row overall. Don't let today break it 🔥",
+          "body": "Affirmations: {affirmationsDays}. An affirmation or a meditation today keeps it alive."
+        }
+      }
+    },
+    {
+      "key": "streak_overall_both_14plus_a",
+      "family": "streak",
+      "context": [
+        "streak_14plus",
+        "streak_both"
+      ],
+      "placeholders": [
+        "streakCount",
+        "meditationDays",
+        "affirmationsDays"
+      ],
+      "enabled": true,
+      "order": 1,
+      "locales": {
+        "es": {
+          "title": "{streakCount} días en tu racha general. No la dejes caer ahora 🔥",
+          "body": "Meditación: {meditationDays} · Afirmaciones: {affirmationsDays}. Cualquiera de las dos hoy la mantiene viva."
+        },
+        "en": {
+          "title": "{streakCount} days on your overall streak. Don't let it drop now 🔥",
+          "body": "Meditation: {meditationDays} · Affirmations: {affirmationsDays}. Either one today keeps it alive."
+        }
+      }
+    },
+    {
+      "key": "streak_overall_meditation_14plus_a",
+      "family": "streak",
+      "context": [
+        "streak_14plus",
+        "streak_meditation_only"
+      ],
+      "placeholders": [
+        "streakCount",
+        "meditationDays"
+      ],
+      "enabled": true,
+      "order": 1,
+      "locales": {
+        "es": {
+          "title": "{streakCount} días en tu racha general. No la dejes caer ahora 🔥",
+          "body": "Meditación: {meditationDays}. Una meditación o una afirmación hoy la mantiene viva."
+        },
+        "en": {
+          "title": "{streakCount} days on your overall streak. Don't let it drop now 🔥",
+          "body": "Meditation: {meditationDays}. A meditation or an affirmation today keeps it alive."
+        }
+      }
+    },
+    {
+      "key": "streak_overall_affirmations_14plus_a",
+      "family": "streak",
+      "context": [
+        "streak_14plus",
+        "streak_affirmations_only"
+      ],
+      "placeholders": [
+        "streakCount",
+        "affirmationsDays"
+      ],
+      "enabled": true,
+      "order": 1,
+      "locales": {
+        "es": {
+          "title": "{streakCount} días en tu racha general. No la dejes caer ahora 🔥",
+          "body": "Afirmaciones: {affirmationsDays}. Una afirmación o una meditación hoy la mantiene viva."
+        },
+        "en": {
+          "title": "{streakCount} days on your overall streak. Don't let it drop now 🔥",
+          "body": "Affirmations: {affirmationsDays}. An affirmation or a meditation today keeps it alive."
+        }
+      }
+    },
+    {
+      "key": "streak_overall_both_14plus_b",
+      "family": "streak",
+      "context": [
+        "streak_14plus",
+        "streak_both"
+      ],
+      "placeholders": [
+        "streakCount",
+        "meditationDays",
+        "affirmationsDays"
+      ],
+      "enabled": true,
+      "order": 2,
+      "locales": {
+        "es": {
+          "title": "Tu racha general de {streakCount} días está en juego 🔥",
+          "body": "Meditación: {meditationDays} · Afirmaciones: {affirmationsDays}. Cualquiera de las dos hoy la mantiene viva."
+        },
+        "en": {
+          "title": "Your {streakCount}-day overall streak is on the line 🔥",
+          "body": "Meditation: {meditationDays} · Affirmations: {affirmationsDays}. Either one today keeps it alive."
+        }
+      }
+    },
+    {
+      "key": "streak_overall_meditation_14plus_b",
+      "family": "streak",
+      "context": [
+        "streak_14plus",
+        "streak_meditation_only"
+      ],
+      "placeholders": [
+        "streakCount",
+        "meditationDays"
+      ],
+      "enabled": true,
+      "order": 2,
+      "locales": {
+        "es": {
+          "title": "Tu racha general de {streakCount} días está en juego 🔥",
+          "body": "Meditación: {meditationDays}. Una meditación o una afirmación hoy la mantiene viva."
+        },
+        "en": {
+          "title": "Your {streakCount}-day overall streak is on the line 🔥",
+          "body": "Meditation: {meditationDays}. A meditation or an affirmation today keeps it alive."
+        }
+      }
+    },
+    {
+      "key": "streak_overall_affirmations_14plus_b",
+      "family": "streak",
+      "context": [
+        "streak_14plus",
+        "streak_affirmations_only"
+      ],
+      "placeholders": [
+        "streakCount",
+        "affirmationsDays"
+      ],
+      "enabled": true,
+      "order": 2,
+      "locales": {
+        "es": {
+          "title": "Tu racha general de {streakCount} días está en juego 🔥",
+          "body": "Afirmaciones: {affirmationsDays}. Una afirmación o una meditación hoy la mantiene viva."
+        },
+        "en": {
+          "title": "Your {streakCount}-day overall streak is on the line 🔥",
+          "body": "Affirmations: {affirmationsDays}. An affirmation or a meditation today keeps it alive."
+        }
+      }
+    },
+    {
+      "key": "streak_activity_meditation_a",
+      "family": "streak",
+      "context": [
+        "streak_activity",
+        "activity_meditation"
+      ],
+      "placeholders": [
+        "streakCount"
+      ],
+      "enabled": false,
+      "order": 1,
+      "locales": {
+        "es": {
+          "title": "Llevas {streakCount} días meditando, no paremos ahora",
+          "body": "Un momento de calma hoy mantiene viva tu racha."
+        },
+        "en": {
+          "title": "You've been meditating for {streakCount} days, let's not stop now",
+          "body": "A moment of calm today keeps your streak alive."
+        }
       }
     },
     {
       "key": "streak_activity_meditation_b",
       "family": "streak",
-      "context": ["streak_activity", "activity_meditation"],
-      "placeholders": ["streakCount"],
-      "enabled": true,
+      "context": [
+        "streak_activity",
+        "activity_meditation"
+      ],
+      "placeholders": [
+        "streakCount"
+      ],
+      "enabled": false,
       "order": 2,
       "locales": {
-        "es": { "title": "{streakCount} días seguidos de meditación", "body": "Siéntate unos minutos y sigue con tu racha." },
-        "en": { "title": "{streakCount} days of meditation in a row", "body": "Sit down for a few minutes and keep your streak going." }
+        "es": {
+          "title": "{streakCount} días seguidos de meditación",
+          "body": "Siéntate unos minutos y sigue con tu racha."
+        },
+        "en": {
+          "title": "{streakCount} days of meditation in a row",
+          "body": "Sit down for a few minutes and keep your streak going."
+        }
       }
     },
     {
       "key": "streak_activity_meditation_c",
       "family": "streak",
-      "context": ["streak_activity", "activity_meditation"],
-      "placeholders": ["streakCount"],
-      "enabled": true,
+      "context": [
+        "streak_activity",
+        "activity_meditation"
+      ],
+      "placeholders": [
+        "streakCount"
+      ],
+      "enabled": false,
       "order": 3,
       "locales": {
-        "es": { "title": "{streakCount} días meditando, qué buen ritmo", "body": "Un rato de calma hoy y sigues sumando." },
-        "en": { "title": "{streakCount} days of meditation, nice rhythm", "body": "A few quiet minutes today and you keep it going." }
+        "es": {
+          "title": "{streakCount} días meditando, qué buen ritmo",
+          "body": "Un rato de calma hoy y sigues sumando."
+        },
+        "en": {
+          "title": "{streakCount} days of meditation, nice rhythm",
+          "body": "A few quiet minutes today and you keep it going."
+        }
       }
     },
     {
       "key": "streak_activity_meditation_d",
       "family": "streak",
-      "context": ["streak_activity", "activity_meditation"],
-      "placeholders": ["streakCount"],
-      "enabled": true,
+      "context": [
+        "streak_activity",
+        "activity_meditation"
+      ],
+      "placeholders": [
+        "streakCount"
+      ],
+      "enabled": false,
       "order": 4,
       "locales": {
-        "es": { "title": "Llevas {streakCount} días meditando", "body": "Hoy también hay un momento para respirar." },
-        "en": { "title": "You've meditated {streakCount} days running", "body": "Take a little time to breathe today and keep going." }
+        "es": {
+          "title": "Llevas {streakCount} días meditando",
+          "body": "Hoy también hay un momento para respirar."
+        },
+        "en": {
+          "title": "You've meditated {streakCount} days running",
+          "body": "Take a little time to breathe today and keep going."
+        }
       }
     },
     {
       "key": "streak_activity_meditation_e",
       "family": "streak",
-      "context": ["streak_activity", "activity_meditation"],
-      "placeholders": ["streakCount"],
-      "enabled": true,
+      "context": [
+        "streak_activity",
+        "activity_meditation"
+      ],
+      "placeholders": [
+        "streakCount"
+      ],
+      "enabled": false,
       "order": 5,
       "locales": {
-        "es": { "title": "Tu meditación de {streakCount} días sigue en pie", "body": "Unos minutos de silencio hoy bastan para mantenerla." },
-        "en": { "title": "Your {streakCount}-day meditation habit is going strong", "body": "A few quiet minutes today is all it takes." }
+        "es": {
+          "title": "Tu meditación de {streakCount} días sigue en pie",
+          "body": "Unos minutos de silencio hoy bastan para mantenerla."
+        },
+        "en": {
+          "title": "Your {streakCount}-day meditation habit is going strong",
+          "body": "A few quiet minutes today is all it takes."
+        }
       }
     },
     {
       "key": "streak_activity_meditation_f",
       "family": "streak",
-      "context": ["streak_activity", "activity_meditation"],
-      "placeholders": ["streakCount"],
-      "enabled": true,
+      "context": [
+        "streak_activity",
+        "activity_meditation"
+      ],
+      "placeholders": [
+        "streakCount"
+      ],
+      "enabled": false,
       "order": 6,
       "locales": {
-        "es": { "title": "{streakCount} días de meditación seguidos", "body": "Siéntate un momento y continúa con tu práctica." },
-        "en": { "title": "{streakCount} meditation days in a row", "body": "Sit for a moment and keep your practice flowing." }
+        "es": {
+          "title": "{streakCount} días de meditación seguidos",
+          "body": "Siéntate un momento y continúa con tu práctica."
+        },
+        "en": {
+          "title": "{streakCount} meditation days in a row",
+          "body": "Sit for a moment and keep your practice flowing."
+        }
       }
     },
     {
       "key": "streak_activity_affirmations_a",
       "family": "streak",
-      "context": ["streak_activity", "activity_affirmations"],
-      "placeholders": ["streakCount"],
-      "enabled": true,
+      "context": [
+        "streak_activity",
+        "activity_affirmations"
+      ],
+      "placeholders": [
+        "streakCount"
+      ],
+      "enabled": false,
       "order": 1,
       "locales": {
-        "es": { "title": "Llevas {streakCount} días con tus afirmaciones, no paremos ahora", "body": "Lee una hoy y mantén viva tu racha." },
-        "en": { "title": "You've been doing your affirmations for {streakCount} days, let's not stop now", "body": "Read one today and keep your streak alive." }
+        "es": {
+          "title": "Llevas {streakCount} días con tus afirmaciones, no paremos ahora",
+          "body": "Lee una hoy y mantén viva tu racha."
+        },
+        "en": {
+          "title": "You've been doing your affirmations for {streakCount} days, let's not stop now",
+          "body": "Read one today and keep your streak alive."
+        }
       }
     },
     {
       "key": "streak_activity_affirmations_b",
       "family": "streak",
-      "context": ["streak_activity", "activity_affirmations"],
-      "placeholders": ["streakCount"],
-      "enabled": true,
+      "context": [
+        "streak_activity",
+        "activity_affirmations"
+      ],
+      "placeholders": [
+        "streakCount"
+      ],
+      "enabled": false,
       "order": 2,
       "locales": {
-        "es": { "title": "{streakCount} días seguidos de afirmaciones", "body": "Aún estás a tiempo de sumar la de hoy." },
-        "en": { "title": "{streakCount} days of affirmations in a row", "body": "You still have time to add today's." }
+        "es": {
+          "title": "{streakCount} días seguidos de afirmaciones",
+          "body": "Aún estás a tiempo de sumar la de hoy."
+        },
+        "en": {
+          "title": "{streakCount} days of affirmations in a row",
+          "body": "You still have time to add today's."
+        }
       }
     },
     {
       "key": "streak_activity_affirmations_c",
       "family": "streak",
-      "context": ["streak_activity", "activity_affirmations"],
-      "placeholders": ["streakCount"],
-      "enabled": true,
+      "context": [
+        "streak_activity",
+        "activity_affirmations"
+      ],
+      "placeholders": [
+        "streakCount"
+      ],
+      "enabled": false,
       "order": 3,
       "locales": {
-        "es": { "title": "{streakCount} días con tus afirmaciones, sigue así", "body": "Lee una hoy y llévate esa frase contigo." },
-        "en": { "title": "{streakCount} days of affirmations, keep it up", "body": "Read one today and carry it with you." }
+        "es": {
+          "title": "{streakCount} días con tus afirmaciones, sigue así",
+          "body": "Lee una hoy y llévate esa frase contigo."
+        },
+        "en": {
+          "title": "{streakCount} days of affirmations, keep it up",
+          "body": "Read one today and carry it with you."
+        }
       }
     },
     {
       "key": "streak_activity_affirmations_d",
       "family": "streak",
-      "context": ["streak_activity", "activity_affirmations"],
-      "placeholders": ["streakCount"],
-      "enabled": true,
+      "context": [
+        "streak_activity",
+        "activity_affirmations"
+      ],
+      "placeholders": [
+        "streakCount"
+      ],
+      "enabled": false,
       "order": 4,
       "locales": {
-        "es": { "title": "Llevas {streakCount} días practicando afirmaciones", "body": "Hoy también vale la pena decirte algo bonito." },
-        "en": { "title": "{streakCount} days of practicing affirmations", "body": "Today is another good day to say something kind to yourself." }
+        "es": {
+          "title": "Llevas {streakCount} días practicando afirmaciones",
+          "body": "Hoy también vale la pena decirte algo bonito."
+        },
+        "en": {
+          "title": "{streakCount} days of practicing affirmations",
+          "body": "Today is another good day to say something kind to yourself."
+        }
       }
     },
     {
       "key": "streak_activity_affirmations_e",
       "family": "streak",
-      "context": ["streak_activity", "activity_affirmations"],
-      "placeholders": ["streakCount"],
-      "enabled": true,
+      "context": [
+        "streak_activity",
+        "activity_affirmations"
+      ],
+      "placeholders": [
+        "streakCount"
+      ],
+      "enabled": false,
       "order": 5,
       "locales": {
-        "es": { "title": "Tu racha de afirmaciones llega a {streakCount} días", "body": "Un minuto para leer una y mantener el ritmo." },
-        "en": { "title": "Your affirmations streak is at {streakCount} days", "body": "Take a minute to read one and keep your rhythm." }
+        "es": {
+          "title": "Tu racha de afirmaciones llega a {streakCount} días",
+          "body": "Un minuto para leer una y mantener el ritmo."
+        },
+        "en": {
+          "title": "Your affirmations streak is at {streakCount} days",
+          "body": "Take a minute to read one and keep your rhythm."
+        }
       }
     },
     {
       "key": "streak_activity_affirmations_f",
       "family": "streak",
-      "context": ["streak_activity", "activity_affirmations"],
-      "placeholders": ["streakCount"],
-      "enabled": true,
+      "context": [
+        "streak_activity",
+        "activity_affirmations"
+      ],
+      "placeholders": [
+        "streakCount"
+      ],
+      "enabled": false,
       "order": 6,
       "locales": {
-        "es": { "title": "{streakCount} días de afirmaciones, sigamos juntos", "body": "Aún estás a tiempo de leer la de hoy." },
-        "en": { "title": "{streakCount} days of affirmations and counting", "body": "You still have time for today's." }
+        "es": {
+          "title": "{streakCount} días de afirmaciones, sigamos juntos",
+          "body": "Aún estás a tiempo de leer la de hoy."
+        },
+        "en": {
+          "title": "{streakCount} days of affirmations and counting",
+          "body": "You still have time for today's."
+        }
+      }
+    },
+    {
+      "key": "streak_overall_generic_a",
+      "family": "streak",
+      "context": ["streak_generic"],
+      "placeholders": ["streakCount"],
+      "enabled": true,
+      "order": 1,
+      "locales": {
+        "es": {
+          "title": "Tu racha general de {streakCount} días está en riesgo 🔥",
+          "body": "Cualquier actividad de hoy la mantiene viva."
+        },
+        "en": {
+          "title": "Your {streakCount}-day overall streak is at risk 🔥",
+          "body": "Any activity today keeps it alive."
+        }
+      }
+    },
+    {
+      "key": "streak_overall_generic_b",
+      "family": "streak",
+      "context": ["streak_generic"],
+      "placeholders": ["streakCount"],
+      "enabled": true,
+      "order": 2,
+      "locales": {
+        "es": {
+          "title": "Mantén tu racha general de {streakCount} días",
+          "body": "Una meditación o una afirmación hoy es suficiente."
+        },
+        "en": {
+          "title": "Keep your {streakCount}-day overall streak going",
+          "body": "One meditation or affirmation today is enough."
+        }
       }
     },
     {
       "key": "streak_risk_1_3_a",
       "family": "streak",
-      "context": ["streak_1_3"],
-      "placeholders": ["streakCount"],
-      "enabled": true,
+      "context": [
+        "streak_1_3"
+      ],
+      "placeholders": [
+        "streakCount"
+      ],
+      "enabled": false,
       "order": 1,
       "locales": {
-        "es": { "title": "Sigue construyendo tu racha: llevas {streakCount} días 🔥", "body": "Todavía llegas a completar tu práctica de hoy." },
-        "en": { "title": "Keep building it — you're at {streakCount} days 🔥", "body": "You still have time to complete today's practice." }
+        "es": {
+          "title": "Sigue construyendo tu racha: llevas {streakCount} días 🔥",
+          "body": "Todavía llegas a completar tu práctica de hoy."
+        },
+        "en": {
+          "title": "Keep building it — you're at {streakCount} days 🔥",
+          "body": "You still have time to complete today's practice."
+        }
       }
     },
     {
       "key": "streak_risk_4_13_a",
       "family": "streak",
-      "context": ["streak_4_13"],
-      "placeholders": ["streakCount"],
-      "enabled": true,
+      "context": [
+        "streak_4_13"
+      ],
+      "placeholders": [
+        "streakCount"
+      ],
+      "enabled": false,
       "order": 1,
       "locales": {
-        "es": { "title": "Tu racha de {streakCount} días está en riesgo 🔥", "body": "Todavía puedes mantenerla antes de que termine el día." },
-        "en": { "title": "Your {streakCount}-day streak is at risk 🔥", "body": "You can still keep it going before the day ends." }
+        "es": {
+          "title": "Tu racha de {streakCount} días está en riesgo 🔥",
+          "body": "Todavía puedes mantenerla antes de que termine el día."
+        },
+        "en": {
+          "title": "Your {streakCount}-day streak is at risk 🔥",
+          "body": "You can still keep it going before the day ends."
+        }
       }
     },
     {
       "key": "streak_risk_4_13_b",
       "family": "streak",
-      "context": ["streak_4_13"],
-      "placeholders": ["streakCount"],
-      "enabled": true,
+      "context": [
+        "streak_4_13"
+      ],
+      "placeholders": [
+        "streakCount"
+      ],
+      "enabled": false,
       "order": 2,
       "locales": {
-        "es": { "title": "{streakCount} días seguidos. Que hoy no sea el corte 🔥", "body": "Completa tu práctica y mantén la racha." },
-        "en": { "title": "{streakCount} days in a row. Don't let today break it 🔥", "body": "Complete today's practice and keep your streak alive." }
+        "es": {
+          "title": "{streakCount} días seguidos. Que hoy no sea el corte 🔥",
+          "body": "Completa tu práctica y mantén la racha."
+        },
+        "en": {
+          "title": "{streakCount} days in a row. Don't let today break it 🔥",
+          "body": "Complete today's practice and keep your streak alive."
+        }
       }
     },
     {
       "key": "streak_risk_14plus_a",
       "family": "streak",
-      "context": ["streak_14plus"],
-      "placeholders": ["streakCount"],
-      "enabled": true,
+      "context": [
+        "streak_14plus"
+      ],
+      "placeholders": [
+        "streakCount"
+      ],
+      "enabled": false,
       "order": 1,
       "locales": {
-        "es": { "title": "{streakCount} días. No la dejes caer ahora 🔥", "body": "Todavía estás a tiempo de mantener tu racha." },
-        "en": { "title": "{streakCount} days. Don't let it drop now 🔥", "body": "You still have time to keep your streak." }
+        "es": {
+          "title": "{streakCount} días. No la dejes caer ahora 🔥",
+          "body": "Todavía estás a tiempo de mantener tu racha."
+        },
+        "en": {
+          "title": "{streakCount} days. Don't let it drop now 🔥",
+          "body": "You still have time to keep your streak."
+        }
       }
     },
     {
       "key": "streak_risk_14plus_b",
       "family": "streak",
-      "context": ["streak_14plus"],
-      "placeholders": ["streakCount"],
-      "enabled": true,
+      "context": [
+        "streak_14plus"
+      ],
+      "placeholders": [
+        "streakCount"
+      ],
+      "enabled": false,
       "order": 2,
       "locales": {
-        "es": { "title": "Tu racha de {streakCount} días está en riesgo 🔥", "body": "Haz tu práctica de hoy antes de cerrar el día." },
-        "en": { "title": "Your {streakCount}-day streak is at risk 🔥", "body": "Complete today's practice before the day ends." }
+        "es": {
+          "title": "Tu racha de {streakCount} días está en riesgo 🔥",
+          "body": "Haz tu práctica de hoy antes de cerrar el día."
+        },
+        "en": {
+          "title": "Your {streakCount}-day streak is at risk 🔥",
+          "body": "Complete today's practice before the day ends."
+        }
       }
     },
     {
       "key": "streak_risk_14plus_c",
       "family": "streak",
-      "context": ["streak_14plus"],
-      "placeholders": ["streakCount"],
-      "enabled": true,
+      "context": [
+        "streak_14plus"
+      ],
+      "placeholders": [
+        "streakCount"
+      ],
+      "enabled": false,
       "order": 3,
       "locales": {
-        "es": { "title": "{streakCount} días construyendo esto. Hoy todavía cuenta.", "body": "Entra y mantén viva tu racha." },
-        "en": { "title": "{streakCount} days building this. Today still counts.", "body": "Open the app and keep your streak alive." }
+        "es": {
+          "title": "{streakCount} días construyendo esto. Hoy todavía cuenta.",
+          "body": "Entra y mantén viva tu racha."
+        },
+        "en": {
+          "title": "{streakCount} days building this. Today still counts.",
+          "body": "Open the app and keep your streak alive."
+        }
       }
     },
     {

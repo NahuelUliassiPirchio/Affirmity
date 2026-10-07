@@ -107,6 +107,12 @@ export function renderCopy(
   };
 }
 
+/** Localized day count with correct singular/plural, e.g. "1 day" / "4 días". */
+export function formatDays(count: number, locale: CopyLocale): string {
+  if (locale === 'en') return `${count} ${count === 1 ? 'day' : 'days'}`;
+  return `${count} ${count === 1 ? 'día' : 'días'}`;
+}
+
 function substitutePlaceholders(text: string, values: Record<string, string>): string {
   return text.replace(/\{(\w+)\}/g, (match, key: string) => (key in values ? values[key] : match));
 }

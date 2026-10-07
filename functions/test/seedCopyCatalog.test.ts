@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { selectVariant } from '../src/copyCatalog';
 import {
   buildCopyWritePlan,
   chunkCopyWrites,
@@ -173,58 +174,103 @@ describe('notification-copy.v1.json data quality', () => {
     }
   });
 
-  describe('activity-specific streak variants', () => {
-    const MIN_VARIANTS_PER_ACTIVITY = 4;
-    /** Rendered with a 2-digit count; a collapsed notification shows one title line and two body lines. */
+  describe('overall streak variants', () => {
+    const BREAKDOWNS = {
+      streak_both: ['streakCount', 'meditationDays', 'affirmationsDays'],
+      streak_meditation_only: ['streakCount', 'meditationDays'],
+      streak_affirmations_only: ['streakCount', 'affirmationsDays'],
+    } as const;
+    const BANDS = ['streak_1_3', 'streak_4_13', 'streak_14plus'];
     const MAX_TITLE_CHARS = 80;
-    const MAX_BODY_CHARS = 100;
-    const ORIGINAL_KEYS = new Set([
-      'streak_activity_meditation_a',
-      'streak_activity_meditation_b',
-      'streak_activity_affirmations_a',
-      'streak_activity_affirmations_b',
-    ]);
-    const NAMES_ACTIVITY: Record<string, Record<'es' | 'en', RegExp>> = {
-      meditation: { es: /medita/i, en: /meditat|meditation/i },
-      affirmations: { es: /afirma/i, en: /affirmation/i },
-    };
-    const render = (text: string) => text.replaceAll('{streakCount}', '14');
-    const EMOJI = /\p{Extended_Pictographic}/u;
-    for (const activity of ['meditation', 'affirmations']) {
-      const variantsOf = () =>
-        catalog.variants.filter(
-          (v) =>
-            v.family === 'streak' &&
-            v.context.includes('streak_activity') &&
-            v.context.includes(`activity_${activity}`),
-        );
+    const MAX_BODY_CHARS = 110;
+    const OVERALL: Record<'es' | 'en', RegExp> = { es: /general/i, en: /overall/i };
+    const FALLBACK_TAG = 'streak_generic';
+    const activeStreak = () => catalog.variants.filter((v) => v.family === 'streak' && v.enabled);
+    const isFallback = (v: { context: string[] }) => v.context.includes(FALLBACK_TAG);
+    // Breakdown variants: the primary attempt's pool (band + breakdown tags).
+    const active = () => activeStreak().filter((v) => !isFallback(v));
+    const fallback = () => activeStreak().filter(isFallback);
 
-      it(`has at least ${MIN_VARIANTS_PER_ACTIVITY} ${activity} variants so anti-repeat has room`, () => {
-        expect(variantsOf().length).toBeGreaterThanOrEqual(MIN_VARIANTS_PER_ACTIVITY);
-      });
+    it('has at least one enabled variant for every band x breakdown combination', () => {
+      for (const band of BANDS) {
+        for (const breakdown of Object.keys(BREAKDOWNS)) {
+          const matching = active().filter((v) => v.context.includes(band) && v.context.includes(breakdown));
+          expect(matching.length, `${band} ${breakdown}`).toBeGreaterThanOrEqual(1);
+        }
+      }
+    });
 
-      it(`every ${activity} variant has es+en, {streakCount}, exact tags, names the activity and fits`, () => {
-        for (const variant of variantsOf()) {
-          expect(variant.context.sort()).toEqual(['activity_' + activity, 'streak_activity'].sort());
-          expect(variant.placeholders).toEqual(['streakCount']);
-          for (const locale of ['es', 'en'] as const) {
-            const { title, body } = variant.locales[locale];
-            expect(`${title} ${body}`, `${variant.key} ${locale} has {streakCount}`).toContain('{streakCount}');
-            expect(render(title).length, `${variant.key} ${locale} title length`).toBeLessThanOrEqual(MAX_TITLE_CHARS);
-            expect(render(body).length, `${variant.key} ${locale} body length`).toBeLessThanOrEqual(MAX_BODY_CHARS);
-            expect(`${title} ${body}`, `${variant.key} ${locale} names the activity`).toMatch(
-              NAMES_ACTIVITY[activity][locale],
-            );
-            expect(EMOJI.test(`${title} ${body}`), `${variant.key} ${locale} has no emoji`).toBe(false);
-            expect(title, `${variant.key} ${locale} not all caps`).not.toBe(title.toUpperCase());
+    it('every enabled streak variant has exactly a band + breakdown tag and matching placeholders', () => {
+      for (const variant of active()) {
+        const [band, breakdown] = [
+          variant.context.find((t) => BANDS.includes(t)),
+          variant.context.find((t) => t in BREAKDOWNS),
+        ];
+        expect(band, `${variant.key} band`).toBeDefined();
+        expect(breakdown, `${variant.key} breakdown`).toBeDefined();
+        expect(variant.context).toHaveLength(2);
+        expect(variant.placeholders).toEqual(BREAKDOWNS[breakdown as keyof typeof BREAKDOWNS]);
+      }
+    });
+
+    it('every title says OVERALL, shows the general count, and the body explains the breakdown', () => {
+      for (const variant of active()) {
+        for (const locale of ['es', 'en'] as const) {
+          const { title, body } = variant.locales[locale];
+          expect(title, `${variant.key} ${locale} title has {streakCount}`).toContain('{streakCount}');
+          expect(title, `${variant.key} ${locale} title says overall`).toMatch(OVERALL[locale]);
+          for (const placeholder of variant.placeholders.filter((p) => p !== 'streakCount')) {
+            expect(body, `${variant.key} ${locale} body has {${placeholder}}`).toContain(`{${placeholder}}`);
+          }
+          const render = (text: string) =>
+            text.replaceAll('{streakCount}', '14').replaceAll(/\{\w+Days\}/g, '14 días');
+          expect(render(title).length, `${variant.key} ${locale} title length`).toBeLessThanOrEqual(MAX_TITLE_CHARS);
+          expect(render(body).length, `${variant.key} ${locale} body length`).toBeLessThanOrEqual(MAX_BODY_CHARS);
+        }
+      }
+    });
+
+    it('has an enabled fallback pool tagged only streak_generic, needing only {streakCount}', () => {
+      expect(fallback().length).toBeGreaterThanOrEqual(2);
+      for (const variant of fallback()) {
+        expect(variant.context, variant.key).toEqual([FALLBACK_TAG]);
+        expect(variant.placeholders, variant.key).toEqual(['streakCount']);
+        for (const locale of ['es', 'en'] as const) {
+          const { title, body } = variant.locales[locale];
+          expect(title, `${variant.key} ${locale} title has {streakCount}`).toContain('{streakCount}');
+          expect(title, `${variant.key} ${locale} title says overall`).toMatch(OVERALL[locale]);
+          expect(`${title} ${body}`, `${variant.key} ${locale} no breakdown placeholders`).not.toMatch(/\{\w*Days\}/);
+          expect(title.replaceAll('{streakCount}', '14').length, `${variant.key} ${locale} title length`).toBeLessThanOrEqual(MAX_TITLE_CHARS);
+          expect(body.length, `${variant.key} ${locale} body length`).toBeLessThanOrEqual(MAX_BODY_CHARS);
+        }
+      }
+    });
+
+    it('fallback and primary pools never cross-match, and only enabled streak_overall/generic keys are selectable', () => {
+      const pool = catalog.variants.filter((v) => v.enabled);
+      for (const band of BANDS) {
+        for (const breakdown of Object.keys(BREAKDOWNS)) {
+          const picked = selectVariant(pool, 'streak', [band, breakdown], [], () => 0);
+          expect(picked?.key, `${band} ${breakdown}`).toMatch(/^streak_overall_/);
+          for (let i = 0; i < 20; i++) {
+            const any = selectVariant(pool, 'streak', [band, breakdown], [], () => i / 20);
+            expect(any && isFallback(any), `${band} ${breakdown} primary must not match fallback`).toBe(false);
+            expect(any?.key.startsWith('streak_risk_') || any?.key.startsWith('streak_activity_')).toBe(false);
           }
         }
-      });
-    }
+      }
+      for (let i = 0; i < 20; i++) {
+        const any = selectVariant(pool, 'streak', [FALLBACK_TAG], [], () => i / 20);
+        expect(any && isFallback(any), 'fallback context only matches fallback variants').toBe(true);
+      }
+    });
 
-    it('keeps the four original variant keys', () => {
-      const keys = catalog.variants.map((v) => v.key);
-      for (const key of ORIGINAL_KEYS) expect(keys).toContain(key);
+    it('keeps the superseded streak_risk_* / streak_activity_* keys but disabled, so re-seeding retires them', () => {
+      const legacy = catalog.variants.filter(
+        (v) => v.key.startsWith('streak_risk_') || v.key.startsWith('streak_activity_'),
+      );
+      expect(legacy.length).toBeGreaterThan(0);
+      for (const variant of legacy) expect(variant.enabled, variant.key).toBe(false);
     });
   });
 

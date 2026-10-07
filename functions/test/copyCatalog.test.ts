@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CATALOG_CACHE_TTL_MILLIS,
+  formatDays,
   loadCopyCatalog,
   renderCopy,
   resetCopyCatalogCacheForTests,
@@ -173,5 +174,25 @@ describe('loadCopyCatalog', () => {
     expect(loadCount).toBe(2);
     expect(first[0].key).toBe('variant_1');
     expect(second[0].key).toBe('variant_2');
+  });
+});
+
+describe('formatDays', () => {
+  it('pluralizes per locale', () => {
+    expect(formatDays(1, 'en')).toBe('1 day');
+    expect(formatDays(4, 'en')).toBe('4 days');
+    expect(formatDays(1, 'es')).toBe('1 día');
+    expect(formatDays(14, 'es')).toBe('14 días');
+  });
+
+  it.each([
+    [0, 'en', '0 days'],
+    [1, 'en', '1 day'],
+    [2, 'en', '2 days'],
+    [0, 'es', '0 días'],
+    [1, 'es', '1 día'],
+    [2, 'es', '2 días'],
+  ] as const)('boundary %i in %s is "%s"', (count, locale, expected) => {
+    expect(formatDays(count, locale)).toBe(expected);
   });
 });
