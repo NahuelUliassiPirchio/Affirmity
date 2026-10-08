@@ -5,9 +5,11 @@ import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.Phase
 import com.pirxhio.affirmity.meditation.PhaseDuration
 import com.pirxhio.affirmity.meditation.ShowText
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
 import com.pirxhio.affirmity.meditation.authoring.RestKind
 import com.pirxhio.affirmity.meditation.authoring.breathingBlock
 import com.pirxhio.affirmity.meditation.authoring.restPhase
+import com.pirxhio.affirmity.meditation.authoring.withEntryCue
 
 /**
  * "Autocompasión 5min" / "Autocompasión 10min" — catalog entries `autocompasion_5` (Free) /
@@ -56,6 +58,7 @@ fun selfCompassionMeditationDefinition(length: SelfCompassionLength): Meditation
                 breathId = "sc_breath",
                 inhaleId = "sc_inhale",
                 exhaleId = "sc_exhale",
+                entryCue = MeditationCue.SectionTransition,
             ),
         )
         add(
@@ -64,7 +67,7 @@ fun selfCompassionMeditationDefinition(length: SelfCompassionLength): Meditation
                 kind = RestKind.OPEN_AWARENESS,
                 duration = PhaseDuration.Fixed(phraseMillis),
                 cueTextId = SelfCompassionText.PHRASE_1,
-            ),
+            ).withEntryCue(MeditationCue.SectionTransition),
         )
         add(
             restPhase(
@@ -72,7 +75,7 @@ fun selfCompassionMeditationDefinition(length: SelfCompassionLength): Meditation
                 kind = RestKind.OPEN_AWARENESS,
                 duration = PhaseDuration.Fixed(phraseMillis),
                 cueTextId = SelfCompassionText.PHRASE_2,
-            ),
+            ).withEntryCue(MeditationCue.SectionTransition),
         )
         if (length == SelfCompassionLength.LONG) {
             add(
@@ -81,7 +84,7 @@ fun selfCompassionMeditationDefinition(length: SelfCompassionLength): Meditation
                     kind = RestKind.OPEN_AWARENESS,
                     duration = PhaseDuration.Fixed(120_000L),
                     cueTextId = SelfCompassionText.PHRASE_3,
-                ),
+                ).withEntryCue(MeditationCue.SectionTransition),
             )
         }
         add(
@@ -89,7 +92,7 @@ fun selfCompassionMeditationDefinition(length: SelfCompassionLength): Meditation
                 id = "sc_close",
                 duration = PhaseDuration.Fixed(closeMillis),
                 onEnter = listOf(ShowText(SelfCompassionText.CLOSING)),
-            ),
+            ).withEntryCue(MeditationCue.SectionTransition),
         )
     }
 

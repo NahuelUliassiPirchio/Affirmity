@@ -3,9 +3,11 @@ package com.pirxhio.affirmity.meditation.selfcompassionbreak
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.PhaseDuration
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
 import com.pirxhio.affirmity.meditation.authoring.RestKind
 import com.pirxhio.affirmity.meditation.authoring.cuedPhase
 import com.pirxhio.affirmity.meditation.authoring.restPhase
+import com.pirxhio.affirmity.meditation.authoring.withEntryCue
 
 /**
  * Self-Compassion Break: Kristin Neff's three-step secular practice — recognizing a difficulty,
@@ -47,17 +49,17 @@ fun selfCompassionBreakMeditationDefinition(
             id = "shared_humanity",
             duration = PhaseDuration.Fixed(config.sharedHumanityMillis),
             cueTextId = SelfCompassionBreakText.SHARED_HUMANITY,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
         cuedPhase(
             id = "kindness",
             duration = PhaseDuration.Fixed(config.kindnessMillis),
             cueTextId = SelfCompassionBreakText.KINDNESS,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
         restPhase(
             id = "integration",
             kind = RestKind.SILENCE,
             duration = PhaseDuration.Fixed(config.integrationMillis),
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
     )
 
     return MeditationDefinition(

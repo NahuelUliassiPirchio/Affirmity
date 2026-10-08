@@ -3,11 +3,13 @@ package com.pirxhio.affirmity.meditation.breathingaffirmations
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.PhaseDuration
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
 import com.pirxhio.affirmity.meditation.authoring.RestKind
 import com.pirxhio.affirmity.meditation.authoring.breathingBlock
 import com.pirxhio.affirmity.meditation.authoring.cuedPhase
 import com.pirxhio.affirmity.meditation.authoring.literalCuedPhase
 import com.pirxhio.affirmity.meditation.authoring.restPhase
+import com.pirxhio.affirmity.meditation.authoring.withEntryCue
 import com.pirxhio.affirmity.meditation.boxbreathing.BoxBreathingText
 
 /**
@@ -80,7 +82,7 @@ fun breathingAffirmationsMeditationDefinition(
                     id = "affirmation_$index",
                     duration = PhaseDuration.Fixed(perAffirmationMillis),
                     literalText = text,
-                )
+                ).let { if (index == 0) it.withEntryCue(MeditationCue.SectionTransition) else it }
             },
         )
     } else {
@@ -88,7 +90,7 @@ fun breathingAffirmationsMeditationDefinition(
             id = "affirmations",
             duration = PhaseDuration.Fixed(config.affirmationMillis),
             cueTextId = BreathingAffirmationsText.AFFIRMATION_UNAVAILABLE,
-        )
+        ).withEntryCue(MeditationCue.SectionTransition)
     }
 
     val children = listOf(
@@ -98,13 +100,13 @@ fun breathingAffirmationsMeditationDefinition(
             kind = RestKind.BREATH_AWARENESS,
             duration = PhaseDuration.Fixed(config.meditationMillis),
             cueTextId = BreathingAffirmationsText.MEDITATION,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
         affirmationsNode,
         restPhase(
             id = "silence",
             kind = RestKind.SILENCE,
             duration = PhaseDuration.Fixed(60_000L),
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
     )
 
     return MeditationDefinition(

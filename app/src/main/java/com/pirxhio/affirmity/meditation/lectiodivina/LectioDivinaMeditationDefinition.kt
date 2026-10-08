@@ -3,9 +3,11 @@ package com.pirxhio.affirmity.meditation.lectiodivina
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.PhaseDuration
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
 import com.pirxhio.affirmity.meditation.authoring.RestKind
 import com.pirxhio.affirmity.meditation.authoring.cuedPhase
 import com.pirxhio.affirmity.meditation.authoring.restPhase
+import com.pirxhio.affirmity.meditation.authoring.withEntryCue
 
 /**
  * Lectio Divina: the traditional four stages — lectio (reading), meditatio (reflection), oratio
@@ -45,17 +47,17 @@ fun lectioDivinaMeditationDefinition(
             id = "meditatio",
             duration = PhaseDuration.Fixed(config.meditatioMillis),
             cueTextId = LectioDivinaText.MEDITATIO,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
         cuedPhase(
             id = "oratio",
             duration = PhaseDuration.Fixed(config.oratioMillis),
             cueTextId = LectioDivinaText.ORATIO,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
         restPhase(
             id = "contemplatio",
             kind = RestKind.SILENCE,
             duration = PhaseDuration.Fixed(config.contemplatioMillis),
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
     )
 
     return MeditationDefinition(

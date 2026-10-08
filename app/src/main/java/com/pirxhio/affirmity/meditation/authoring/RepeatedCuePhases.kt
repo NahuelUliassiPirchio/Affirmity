@@ -4,9 +4,11 @@ import com.pirxhio.affirmity.meditation.FixedCountRepetition
 import com.pirxhio.affirmity.meditation.Phase
 import com.pirxhio.affirmity.meditation.PhaseDuration
 import com.pirxhio.affirmity.meditation.PlayAudio
+import com.pirxhio.affirmity.meditation.PlayCue
 import com.pirxhio.affirmity.meditation.PlayVoice
 import com.pirxhio.affirmity.meditation.Repeat
 import com.pirxhio.affirmity.meditation.ShowText
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
 
 const val DEFAULT_BELL_STRIKE_MILLIS = 2_000L
 
@@ -41,6 +43,8 @@ fun countedRepetitionPhase(
     cueTextId: String? = null,
     cueVoiceId: String? = null,
     repetitionId: String = "repetition",
+    /** Rung once, on the first repetition only (via `onlyAtFirstIterationOf`) -- never per repetition. */
+    entryCue: MeditationCue? = null,
 ): Repeat {
     require(count > 0) { "count must be > 0, got $count" }
     return Repeat(
@@ -48,7 +52,11 @@ fun countedRepetitionPhase(
         child = Phase(
             id = repetitionId,
             duration = PhaseDuration.Fixed(repetitionDurationMillis),
-            onEnter = listOfNotNull(cueTextId?.let { ShowText(it) }, cueVoiceId?.let { PlayVoice(it) }),
+            onEnter = listOfNotNull(
+                entryCue?.let { PlayCue(it, onlyAtFirstIterationOf = id) },
+                cueTextId?.let { ShowText(it) },
+                cueVoiceId?.let { PlayVoice(it) },
+            ),
         ),
         strategy = FixedCountRepetition(count),
     )

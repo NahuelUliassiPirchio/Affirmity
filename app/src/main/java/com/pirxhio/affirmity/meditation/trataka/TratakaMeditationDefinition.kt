@@ -5,9 +5,11 @@ import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.PhaseDuration
 import com.pirxhio.affirmity.meditation.Repeat
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
 import com.pirxhio.affirmity.meditation.authoring.RestKind
 import com.pirxhio.affirmity.meditation.authoring.cuedPhase
 import com.pirxhio.affirmity.meditation.authoring.restPhase
+import com.pirxhio.affirmity.meditation.authoring.withEntryCue
 
 /**
  * Trataka: yogic sustained visual concentration on a single point (traditionally a candle flame),
@@ -49,12 +51,12 @@ fun tratakaMeditationDefinition(
                         id = "external_focus",
                         duration = PhaseDuration.Fixed(config.focusMillis),
                         cueTextId = TratakaText.EXTERNAL_FOCUS,
-                    ),
+                    ).withEntryCue(MeditationCue.SectionTransition),
                     cuedPhase(
                         id = "eyes_closed",
                         duration = PhaseDuration.Fixed(config.afterimageMillis),
                         cueTextId = TratakaText.EYES_CLOSED,
-                    ),
+                    ).withEntryCue(MeditationCue.SectionTransition),
                 ),
             ),
             strategy = FixedCountRepetition(config.rounds),
@@ -63,7 +65,7 @@ fun tratakaMeditationDefinition(
             id = "rest",
             kind = RestKind.SILENCE,
             duration = PhaseDuration.Fixed(config.restMillis),
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
     )
 
     return MeditationDefinition(

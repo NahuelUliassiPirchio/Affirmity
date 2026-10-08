@@ -3,7 +3,9 @@ package com.pirxhio.affirmity.meditation.visualization
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.PhaseDuration
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
 import com.pirxhio.affirmity.meditation.authoring.cuedPhase
+import com.pirxhio.affirmity.meditation.authoring.withEntryCue
 
 /**
  * Guided Visualization: relaxation, then a mental-imagery span, an integration reflection, and a
@@ -58,17 +60,17 @@ fun visualizationMeditationDefinition(
             id = "visualization",
             duration = PhaseDuration.Fixed(config.visualizationMillis),
             cueTextId = VisualizationText.visualizationCueFor(config.scenario),
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
         cuedPhase(
             id = "integration",
             duration = PhaseDuration.Fixed(config.integrationMillis),
             cueTextId = VisualizationText.INTEGRATION,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
         cuedPhase(
             id = "return",
             duration = PhaseDuration.Fixed(config.returnMillis),
             cueTextId = VisualizationText.RETURN,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
     )
 
     return MeditationDefinition(

@@ -3,9 +3,11 @@ package com.pirxhio.affirmity.meditation.vipassana
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.PhaseDuration
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
 import com.pirxhio.affirmity.meditation.authoring.RestKind
 import com.pirxhio.affirmity.meditation.authoring.cuedPhase
 import com.pirxhio.affirmity.meditation.authoring.restPhase
+import com.pirxhio.affirmity.meditation.authoring.withEntryCue
 
 /**
  * Vipassana: breath anchor, body-sensation awareness, open observation, closing. The three
@@ -44,18 +46,18 @@ fun vipassanaMeditationDefinition(
             kind = RestKind.OPEN_AWARENESS,
             duration = PhaseDuration.Fixed(config.bodyAwarenessMillis),
             cueTextId = VipassanaText.BODY_AWARENESS,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
         restPhase(
             id = "open_observation",
             kind = RestKind.OPEN_AWARENESS,
             duration = PhaseDuration.Fixed(config.openObservationMillis),
             cueTextId = VipassanaText.OPEN_OBSERVATION,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
         cuedPhase(
             id = "closing",
             duration = PhaseDuration.Fixed(config.closingMillis),
             cueTextId = VipassanaText.CLOSING,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
     )
 
     return MeditationDefinition(

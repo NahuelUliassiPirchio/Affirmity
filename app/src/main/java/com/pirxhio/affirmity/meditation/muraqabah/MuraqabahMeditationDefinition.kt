@@ -3,9 +3,11 @@ package com.pirxhio.affirmity.meditation.muraqabah
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.PhaseDuration
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
 import com.pirxhio.affirmity.meditation.authoring.RestKind
 import com.pirxhio.affirmity.meditation.authoring.cuedPhase
 import com.pirxhio.affirmity.meditation.authoring.restPhase
+import com.pirxhio.affirmity.meditation.authoring.withEntryCue
 
 /**
  * Muraqabah: an Islamic Sufi contemplative practice — a spoken intention, settling into
@@ -39,12 +41,12 @@ fun muraqabahMeditationDefinition(
             kind = RestKind.BREATH_AWARENESS,
             duration = PhaseDuration.Fixed(config.breathSettlingMillis),
             cueTextId = MuraqabahText.BREATH_SETTLING,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
         restPhase(
             id = "contemplation",
             kind = RestKind.SILENCE,
             duration = PhaseDuration.Fixed(config.contemplationMillis),
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
     )
 
     return MeditationDefinition(

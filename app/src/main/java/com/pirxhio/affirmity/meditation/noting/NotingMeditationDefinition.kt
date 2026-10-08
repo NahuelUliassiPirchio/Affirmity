@@ -3,8 +3,10 @@ package com.pirxhio.affirmity.meditation.noting
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.PhaseDuration
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
 import com.pirxhio.affirmity.meditation.authoring.RestKind
 import com.pirxhio.affirmity.meditation.authoring.restPhase
+import com.pirxhio.affirmity.meditation.authoring.withEntryCue
 
 /**
  * Noting: a Vipassana-derived mindfulness technique — briefly labeling experiences (thinking,
@@ -42,13 +44,13 @@ fun notingMeditationDefinition(
             kind = RestKind.OPEN_AWARENESS,
             duration = PhaseDuration.Fixed(config.notingMillis),
             cueTextId = NotingText.NOTING,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
         restPhase(
             id = "open_awareness",
             kind = RestKind.OPEN_AWARENESS,
             duration = PhaseDuration.Fixed(config.openAwarenessMillis),
             cueTextId = NotingText.OPEN,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
     )
 
     return MeditationDefinition(

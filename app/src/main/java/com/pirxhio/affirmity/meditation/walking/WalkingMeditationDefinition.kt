@@ -3,9 +3,11 @@ package com.pirxhio.affirmity.meditation.walking
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.PhaseDuration
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
 import com.pirxhio.affirmity.meditation.authoring.RestKind
 import com.pirxhio.affirmity.meditation.authoring.cuedPhase
 import com.pirxhio.affirmity.meditation.authoring.restPhase
+import com.pirxhio.affirmity.meditation.authoring.withEntryCue
 
 /**
  * Walking meditation: arrival, standing awareness, mindful walking, closing. [pace] and
@@ -42,17 +44,17 @@ fun walkingMeditationDefinition(
             kind = RestKind.OPEN_AWARENESS,
             duration = PhaseDuration.Fixed(config.standingAwarenessMillis),
             cueTextId = WalkingMeditationText.STANDING,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
         cuedPhase(
             id = "walking",
             duration = PhaseDuration.Fixed(config.walkingMillis),
             cueTextId = WalkingMeditationText.WALKING,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
         cuedPhase(
             id = "closing",
             duration = PhaseDuration.Fixed(config.closingMillis),
             cueTextId = WalkingMeditationText.CLOSING,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
     )
 
     return MeditationDefinition(

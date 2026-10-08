@@ -3,7 +3,9 @@ package com.pirxhio.affirmity.meditation.gratitudemeditation
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.PhaseDuration
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
 import com.pirxhio.affirmity.meditation.authoring.cuedPhase
+import com.pirxhio.affirmity.meditation.authoring.withEntryCue
 
 /**
  * Gratitude Meditation: an arrival cue, then three reflection prompts (person, experience,
@@ -51,7 +53,7 @@ fun gratitudeMeditationDefinition(
                     id = "person",
                     duration = PhaseDuration.Fixed(config.personMillis),
                     cueTextId = GratitudeMeditationText.PERSON,
-                ),
+                ).withEntryCue(MeditationCue.SectionTransition),
             )
         }
         if (config.promptCount >= 2) {
@@ -60,7 +62,7 @@ fun gratitudeMeditationDefinition(
                     id = "experience",
                     duration = PhaseDuration.Fixed(config.experienceMillis),
                     cueTextId = GratitudeMeditationText.EXPERIENCE,
-                ),
+                ).withEntryCue(MeditationCue.SectionTransition),
             )
         }
         if (config.promptCount >= 3) {
@@ -69,7 +71,7 @@ fun gratitudeMeditationDefinition(
                     id = "present",
                     duration = PhaseDuration.Fixed(config.presentMillis),
                     cueTextId = GratitudeMeditationText.PRESENT,
-                ),
+                ).withEntryCue(MeditationCue.SectionTransition),
             )
         }
     }

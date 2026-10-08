@@ -3,9 +3,11 @@ package com.pirxhio.affirmity.meditation.anapanasati
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.PhaseDuration
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
 import com.pirxhio.affirmity.meditation.authoring.RestKind
 import com.pirxhio.affirmity.meditation.authoring.cuedPhase
 import com.pirxhio.affirmity.meditation.authoring.restPhase
+import com.pirxhio.affirmity.meditation.authoring.withEntryCue
 
 /**
  * Mindful breathing (anapanasati): arrival, a long breath-awareness span, closing. `durationMinutes`
@@ -42,12 +44,12 @@ fun anapanasatiMeditationDefinition(
             kind = RestKind.BREATH_AWARENESS,
             duration = PhaseDuration.Fixed(config.awarenessMillis),
             cueTextId = AnapanasatiText.AWARENESS,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
         cuedPhase(
             id = "closing",
             duration = PhaseDuration.Fixed(config.closingMillis),
             cueTextId = AnapanasatiText.CLOSING,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
     )
 
     return MeditationDefinition(

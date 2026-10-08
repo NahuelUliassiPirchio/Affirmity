@@ -59,7 +59,7 @@ class VisualizationChristianPrayerCustomizationTest {
         val visualizationPhase = (custom.root as MeditationSequence).children[1] as Phase
         assertEquals(
             com.pirxhio.affirmity.meditation.visualization.VisualizationText.VISUALIZATION_GOAL,
-            (visualizationPhase.onEnter.first() as ShowText).textId,
+            visualizationPhase.onEnter.filterIsInstance<ShowText>().single().textId,
         )
     }
 

@@ -3,9 +3,11 @@ package com.pirxhio.affirmity.meditation.mantra
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.PhaseDuration
+import com.pirxhio.affirmity.meditation.audio.MeditationCue
 import com.pirxhio.affirmity.meditation.authoring.RestKind
 import com.pirxhio.affirmity.meditation.authoring.cuedPhase
 import com.pirxhio.affirmity.meditation.authoring.restPhase
+import com.pirxhio.affirmity.meditation.authoring.withEntryCue
 
 /**
  * Generic mantra meditation: preparation, a duration-bound mantra repetition span, closing
@@ -43,12 +45,12 @@ fun mantraMeditationDefinition(
             id = "mantra",
             duration = PhaseDuration.Fixed(config.mantraMillis),
             cueTextId = MantraMeditationText.MANTRA,
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
         restPhase(
             id = "silence",
             kind = RestKind.SILENCE,
             duration = PhaseDuration.Fixed(config.silenceMillis),
-        ),
+        ).withEntryCue(MeditationCue.SectionTransition),
     )
 
     return MeditationDefinition(
