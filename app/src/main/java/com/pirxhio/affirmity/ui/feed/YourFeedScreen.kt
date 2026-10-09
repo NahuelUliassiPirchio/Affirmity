@@ -36,9 +36,11 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -80,7 +82,12 @@ fun YourFeedScreen(
     yourGroups: @Composable () -> Unit = {},
 ) {
     val resources = LocalContext.current.resources
-    val selectedThemes = draftThemeIds.mapNotNull { catalogThemesById[it] }.sortedBy { it.displayLabel(resources) }
+    // The labels are locale-dependent; LocalConfiguration is a new object on a configuration
+    // change, so it re-sorts then (the Resources instance itself is stable and not a usable key).
+    val configuration = LocalConfiguration.current
+    val selectedThemes = remember(draftThemeIds, catalogThemesById, configuration) {
+        draftThemeIds.mapNotNull { catalogThemesById[it] }.sortedBy { it.displayLabel(resources) }
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -381,6 +388,8 @@ private fun FavoritesEntryCard(onClick: () -> Unit, modifier: Modifier = Modifie
 @Composable
 fun YourFeedSheetContent(
     isExpanded: Boolean,
+    showContent: Boolean = isExpanded,
+    isExpanding: Boolean = false,
     draftThemeIds: Set<String>,
     isDirty: Boolean,
     catalogThemesById: Map<String, CatalogTheme>,
@@ -407,9 +416,17 @@ fun YourFeedSheetContent(
             isExpanded = isExpanded,
             // Tapping the peek strip while expanded commits the draft, same as "Update my feed"
             // -- mirrors the old selector sheet's GroupSelectorPeekRow, which called onApply here.
-            onClick = if (isExpanded) onUpdateFeed else onPeekClick,
+            onClick = when (peekRowAction(isExpanded, isExpanding)) {
+                PeekRowAction.UpdateFeed -> onUpdateFeed
+                PeekRowAction.Expand -> onPeekClick
+                PeekRowAction.None -> ({})
+            },
         )
-        if (isExpanded) {
+        // Composed as soon as the expand starts (and kept through the collapse animation) so the
+        // heavy screen is not built in one frame after the animation settles. Fully collapsed it
+        // is dropped again. The peek row above still follows the settled [isExpanded], so a tap
+        // mid-expand cannot trigger "Update my feed".
+        if (showContent) {
             YourFeedScreen(
                 draftThemeIds = draftThemeIds,
                 isDirty = isDirty,
@@ -433,6 +450,17 @@ fun YourFeedSheetContent(
             )
         }
     }
+}
+
+/** What a tap on the peek row does. */
+internal enum class PeekRowAction { UpdateFeed, Expand, None }
+
+/** Settled expanded commits the draft; mid-expand taps are ignored so [PeekRowAction.Expand]'s
+ *  draft reset can't wipe edits made while the content is already visible. */
+internal fun peekRowAction(isExpanded: Boolean, isExpanding: Boolean): PeekRowAction = when {
+    isExpanded -> PeekRowAction.UpdateFeed
+    isExpanding -> PeekRowAction.None
+    else -> PeekRowAction.Expand
 }
 
 @Composable

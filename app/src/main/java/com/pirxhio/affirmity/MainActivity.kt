@@ -1685,6 +1685,11 @@ fun AffirmityApp(
                         sheetContent = {
                             YourFeedSheetContent(
                                 isExpanded = yourFeedSheetState.currentValue == SheetValue.Expanded,
+                                // Target-or-settled: compose on expand start, keep through collapse.
+                                showContent = yourFeedSheetState.currentValue == SheetValue.Expanded ||
+                                    yourFeedSheetState.targetValue == SheetValue.Expanded,
+                                isExpanding = yourFeedSheetState.targetValue == SheetValue.Expanded &&
+                                    yourFeedSheetState.currentValue != SheetValue.Expanded,
                                 draftThemeIds = appState.draftThemeIds.value,
                                 isDirty = appState.isFeedDraftDirty,
                                 catalogThemesById = catalogThemesById(),
