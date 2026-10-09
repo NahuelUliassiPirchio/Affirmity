@@ -1734,6 +1734,7 @@ fun AffirmityApp(
                                         onDelete = appState::deleteCollection,
                                         onRemoveItem = appState::removeFromCollection,
                                         onRestoreItem = appState::addToCollection,
+                                        onGroupRoundCompleted = { appState.onRoundCompleted(it, RoundSource.GROUP) },
                                         onCreate = { name, highlightId ->
                                             appState.createCollection(name, highlightId = highlightId)
                                         },

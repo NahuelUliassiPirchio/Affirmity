@@ -56,8 +56,8 @@ private val ToggleRingWidth = 1.5.dp
 private const val InFeedBorderAlpha = 0.5f
 
 /**
- * "Your groups" shelf of "Your feed" (design 7a): a "New group" tile followed by one square cover
- * per user collection. Also owns the sheets it opens (group detail, new group) and the existing
+ * "Your groups" shelf of "Your feed" (design 7a): one square cover per user collection followed by
+ * the "New group" tile as the last entry of the scrolling row. Also owns the sheets it opens (group detail, new group) and the existing
  * rename/delete flow, so the host screen only passes data and callbacks in. Tapping a cover opens
  * its detail; the on/off switch lives there and goes through the same [onToggle] as the card toggle.
  */
@@ -71,6 +71,7 @@ internal fun YourGroupsSection(
     onDelete: (userCollectionId: String) -> Unit,
     onRemoveItem: (userCollectionId: String, affirmationId: String) -> Unit,
     onRestoreItem: (userCollectionId: String, affirmationId: String) -> Unit,
+    onGroupRoundCompleted: (groupSize: Int) -> Unit,
     onCreate: suspend (name: String, highlightId: String) -> CollectionNameResult,
     onUpgrade: () -> Unit,
     modifier: Modifier = Modifier,
@@ -97,13 +98,23 @@ internal fun YourGroupsSection(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item(key = "new") { NewGroupTile(onClick = { showNewGroup = true }) }
-            items(cards, key = { it.id }) { card ->
-                GroupCardTile(
-                    card = card,
-                    onClick = { openGroupId = card.id },
-                    onToggle = { onToggle(card.id) },
-                )
+            items(
+                groupsRowEntries(cards),
+                key = { entry ->
+                    when (entry) {
+                        is GroupsRowEntry.Group -> entry.card.id
+                        GroupsRowEntry.NewGroup -> "new"
+                    }
+                },
+            ) { entry ->
+                when (entry) {
+                    is GroupsRowEntry.Group -> GroupCardTile(
+                        card = entry.card,
+                        onClick = { openGroupId = entry.card.id },
+                        onToggle = { onToggle(entry.card.id) },
+                    )
+                    GroupsRowEntry.NewGroup -> NewGroupTile(onClick = { showNewGroup = true })
+                }
             }
         }
     }
@@ -116,6 +127,7 @@ internal fun YourGroupsSection(
             onMore = { manageState = manageState.reduce(CollectionManageEvent.LongPress(openCollection)) },
             onRemoveItem = { affirmationId -> onRemoveItem(openCollection.id, affirmationId) },
             onRestoreItem = { affirmationId -> onRestoreItem(openCollection.id, affirmationId) },
+            onRoundCompleted = onGroupRoundCompleted,
             onDismiss = { openGroupId = null },
         )
     }
