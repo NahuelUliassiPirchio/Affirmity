@@ -58,7 +58,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -94,7 +93,6 @@ import com.pirxhio.affirmity.ui.collections.messageRes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -181,22 +179,7 @@ fun AffirmationsScreen(
             .collect { onAffirmationViewed() }
     }
 
-    // Round detection: every settle (the initial page included, hence no drop(1)) is reported with
-    // the CURRENT feed ids. snapshotFlow also re-emits when the feed itself changes under a
-    // stationary pager; the tracker then resets (it never completes on a feed change) and counts the
-    // card the user is sitting on. Nothing is reported while a scroll is still in progress.
-    val currentAffirmations by rememberUpdatedState(affirmations)
-    val currentOnRoundCompleted by rememberUpdatedState(onRoundCompleted)
-    val roundTracker = remember { RoundTracker() }
-    LaunchedEffect(pagerState) {
-        snapshotFlow {
-            Triple(pagerState.settledPage, currentAffirmations.map { it.id }, pagerState.isScrollInProgress)
-        }
-            .filter { (_, _, scrolling) -> !scrolling }
-            .collect { (page, ids, _) ->
-                if (roundTracker.onSettled(ids, page)) currentOnRoundCompleted(ids.size)
-            }
-    }
+    RoundCompletionEffect(pagerState, affirmations, onRoundCompleted)
 
     val pagerScope = rememberCoroutineScope()
 
