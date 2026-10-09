@@ -15,7 +15,9 @@
  * non-positive `rewardedUnlockHours` (the latter two enforced inside `buildCatalog.mjs`).
  *
  * Usage: node tools/catalog/generate-catalog.mjs [path/to/source.json]
- * Defaults to /Users/pirxhion/Downloads/affirmations-catalog.v2.json (the measured source, design.md).
+ * With no args, builds from the in-repo sources: `tools/catalog/source/affirmations.v5.csv`
+ * (content) + `tools/catalog/source/taxonomy.json` (universes/themes/collections), joined by
+ * `csvSource.mjs`. An explicit JSON path (full source shape) is still accepted for back-compat.
  */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -23,11 +25,14 @@ import { fileURLToPath } from "node:url";
 
 import { findIllegalBrackets } from "./bracketGate.mjs";
 import { buildCatalog } from "./buildCatalog.mjs";
+import { csvToSource } from "./csvSource.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, "..", "..");
 
-const sourcePath = process.argv[2] ?? "/Users/pirxhion/Downloads/affirmations-catalog.v2.json";
+const sourcePath = process.argv[2];
+const CSV_SOURCE = join(__dirname, "source/affirmations.v5.csv");
+const TAXONOMY_SOURCE = join(__dirname, "source/taxonomy.json");
 const ASSET_OUT = join(REPO_ROOT, "app/src/main/assets/catalog.v1.json");
 const TAXONOMY_OUT = join(
   REPO_ROOT,
@@ -93,8 +98,9 @@ export function runBracketGate({ universes, themes, collections, affirmations })
 }
 
 function main() {
-  const raw = readFileSync(sourcePath, "utf8");
-  const source = JSON.parse(raw);
+  const source = sourcePath
+    ? JSON.parse(readFileSync(sourcePath, "utf8"))
+    : csvToSource(readFileSync(CSV_SOURCE, "utf8"), JSON.parse(readFileSync(TAXONOMY_SOURCE, "utf8")));
 
   let result;
   try {
