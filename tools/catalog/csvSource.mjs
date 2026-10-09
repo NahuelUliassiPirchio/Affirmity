@@ -62,8 +62,13 @@ export function csvToSource(csvText, taxonomy) {
     const get = (name) => fields[col.get(name)];
     const rawId = get('id').trim();
     if (rawId === '') fail(`line ${line}: empty id`);
+    if (!rawId.startsWith(CSV_ID_PREFIX)) {
+      fail(`line ${line}: id "${rawId}" must start with "${CSV_ID_PREFIX}"`);
+    }
+    const id = rawId.slice(CSV_ID_PREFIX.length);
+    if (id === '') fail(`line ${line}: id "${rawId}" has nothing after "${CSV_ID_PREFIX}"`);
     return {
-      id: rawId.startsWith(CSV_ID_PREFIX) ? rawId.slice(CSV_ID_PREFIX.length) : rawId,
+      id,
       collectionId: get('collection'),
       themeId: get('theme'),
       universeId: get('group'),

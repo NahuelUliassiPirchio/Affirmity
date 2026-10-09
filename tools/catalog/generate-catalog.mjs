@@ -97,6 +97,13 @@ export function runBracketGate({ universes, themes, collections, affirmations })
   }
 }
 
+/** Pure source -> exact file contents the generator writes (no I/O). Runs the bracket gate first. */
+export function generateCatalogFiles(source) {
+  runBracketGate(source);
+  const { asset, taxonomyKt } = buildCatalog(source);
+  return { asset, assetJson: JSON.stringify(asset), taxonomyKt };
+}
+
 function main() {
   const source = sourcePath
     ? JSON.parse(readFileSync(sourcePath, "utf8"))
@@ -104,18 +111,17 @@ function main() {
 
   let result;
   try {
-    runBracketGate(source);
-    result = buildCatalog(source);
+    result = generateCatalogFiles(source);
   } catch (error) {
     console.error(error.message.startsWith("[generate-catalog] FAILED:") ? error.message : `[generate-catalog] FAILED: ${error.message}`);
     process.exit(1);
     return;
   }
 
-  const { asset, taxonomyKt } = result;
+  const { asset, assetJson, taxonomyKt } = result;
 
   mkdirSync(dirname(ASSET_OUT), { recursive: true });
-  writeFileSync(ASSET_OUT, JSON.stringify(asset), "utf8");
+  writeFileSync(ASSET_OUT, assetJson, "utf8");
 
   mkdirSync(dirname(TAXONOMY_OUT), { recursive: true });
   writeFileSync(TAXONOMY_OUT, taxonomyKt, "utf8");

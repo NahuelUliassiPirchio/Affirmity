@@ -48,4 +48,10 @@ describe('csvToSource', () => {
   it('fails on a row with the wrong field count', () => {
     expect(() => csvToSource(`${HEADER}\nu,u.t`, taxonomy)).toThrow(/fields/i);
   });
+  it('rejects an id that lacks the cat_ prefix, naming the line and id', () => {
+    expect(() => csvToSource(`${HEADER}\n${row('x')}`, taxonomy)).toThrow(/line 2.*"x".*cat_/i);
+  });
+  it('rejects an id that is only the cat_ prefix', () => {
+    expect(() => csvToSource(`${HEADER}\n${row('cat_')}`, taxonomy)).toThrow(/line 2.*"cat_".*after/i);
+  });
 });
