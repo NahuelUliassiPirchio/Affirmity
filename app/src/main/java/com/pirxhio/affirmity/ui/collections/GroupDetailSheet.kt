@@ -62,6 +62,7 @@ internal fun GroupDetailSheet(
     onMore: () -> Unit,
     onRemoveItem: (affirmationId: String) -> Unit,
     onRestoreItem: (affirmationId: String) -> Unit,
+    onRoundCompleted: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val card = collection.toGroupCardUi()
@@ -197,7 +198,11 @@ internal fun GroupDetailSheet(
             SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
         }
         if (shouldShowGroupPlayer(requested = playing, itemCount = affirmations.size)) {
-            GroupPlayerDialog(affirmations = affirmations, onDismiss = { playing = false })
+            GroupPlayerDialog(
+                affirmations = affirmations,
+                onRoundCompleted = onRoundCompleted,
+                onDismiss = { playing = false },
+            )
         }
     }
 }

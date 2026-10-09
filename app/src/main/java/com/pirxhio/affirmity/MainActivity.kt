@@ -83,6 +83,7 @@ import com.pirxhio.affirmity.analytics.NotificationFamilyValue
 import com.pirxhio.affirmity.analytics.NotificationLocaleValue
 import com.pirxhio.affirmity.analytics.PaywallPlan
 import com.pirxhio.affirmity.analytics.PaywallSource
+import com.pirxhio.affirmity.analytics.RoundSource
 import com.pirxhio.affirmity.analytics.provenance
 import com.pirxhio.affirmity.data.AdRequestNotice
 import com.pirxhio.affirmity.data.Affirmation
@@ -1733,6 +1734,7 @@ fun AffirmityApp(
                                         onDelete = appState::deleteCollection,
                                         onRemoveItem = appState::removeFromCollection,
                                         onRestoreItem = appState::addToCollection,
+                                        onGroupRoundCompleted = { appState.onRoundCompleted(it, RoundSource.GROUP) },
                                         onCreate = { name, highlightId ->
                                             appState.createCollection(name, highlightId = highlightId)
                                         },
@@ -1773,7 +1775,7 @@ fun AffirmityApp(
                             AffirmationsScreen(
                                 affirmations = appState.filteredAffirmations,
                                 onAffirmationViewed = { appState.recordAffirmationViewed() },
-                                onRoundCompleted = appState::onFeedRoundCompleted,
+                                onRoundCompleted = { appState.onRoundCompleted(it, RoundSource.FEED) },
                                 onOverrideCommitted = appState::setTokenOverride,
                                 favoriteIds = appState.favoriteAffirmationIds.value,
                                 onToggleFavorite = toggleFavoriteWithUndo,

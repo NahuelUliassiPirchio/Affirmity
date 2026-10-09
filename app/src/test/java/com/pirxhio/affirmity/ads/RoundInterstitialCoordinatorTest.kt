@@ -6,6 +6,7 @@ import com.pirxhio.affirmity.analytics.AnalyticsEvent
 import com.pirxhio.affirmity.analytics.FakeAnalyticsLogger
 import com.pirxhio.affirmity.analytics.FeedSizeBucket
 import com.pirxhio.affirmity.analytics.RoundSkipReason
+import com.pirxhio.affirmity.analytics.RoundSource
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -36,16 +37,32 @@ class RoundInterstitialCoordinatorTest {
 
     @Test
     fun `free user at round end sees the interstitial`() = runBlocking {
-        coordinator.onRoundCompleted(AccessTier.FREE, feedSize = 12)
+        coordinator.onRoundCompleted(AccessTier.FREE, feedSize = 12, source = RoundSource.FEED)
 
         assertEquals(1, gateway.showCalls)
-        assertTrue(analytics.recorded.contains(AnalyticsEvent.RoundCompleted(FeedSizeBucket.SIZE_10_24)))
+        assertTrue(analytics.recorded.contains(AnalyticsEvent.RoundCompleted(FeedSizeBucket.SIZE_10_24, RoundSource.FEED)))
         assertTrue(analytics.recorded.contains(AnalyticsEvent.RoundInterstitialShown))
     }
 
     @Test
+    fun `a group round is logged with the group source and shows the interstitial`() = runBlocking {
+        coordinator.onRoundCompleted(AccessTier.FREE, feedSize = 12, source = RoundSource.GROUP)
+
+        assertEquals(1, gateway.showCalls)
+        assertTrue(analytics.recorded.contains(AnalyticsEvent.RoundCompleted(FeedSizeBucket.SIZE_10_24, RoundSource.GROUP)))
+    }
+
+    @Test
+    fun `pro skips a group round too`() = runBlocking {
+        coordinator.onRoundCompleted(AccessTier.PRO, feedSize = 12, source = RoundSource.GROUP)
+
+        assertEquals(0, gateway.showCalls)
+        assertTrue(analytics.recorded.contains(AnalyticsEvent.RoundInterstitialSkipped(RoundSkipReason.PREMIUM)))
+    }
+
+    @Test
     fun `pro never reaches the gateway`() = runBlocking {
-        coordinator.onRoundCompleted(AccessTier.PRO, feedSize = 12)
+        coordinator.onRoundCompleted(AccessTier.PRO, feedSize = 12, source = RoundSource.FEED)
 
         assertEquals(0, gateway.showCalls)
         assertTrue(analytics.recorded.contains(AnalyticsEvent.RoundInterstitialSkipped(RoundSkipReason.PREMIUM)))
@@ -53,9 +70,9 @@ class RoundInterstitialCoordinatorTest {
 
     @Test
     fun `free rounds back to back each show an interstitial`() = runBlocking {
-        coordinator.onRoundCompleted(AccessTier.FREE, 12)
-        coordinator.onRoundCompleted(AccessTier.FREE, 12)
-        coordinator.onRoundCompleted(AccessTier.FREE, 12)
+        coordinator.onRoundCompleted(AccessTier.FREE, 12, RoundSource.FEED)
+        coordinator.onRoundCompleted(AccessTier.FREE, 12, RoundSource.FEED)
+        coordinator.onRoundCompleted(AccessTier.FREE, 12, RoundSource.FEED)
 
         assertEquals(3, gateway.showCalls)
     }
@@ -63,7 +80,7 @@ class RoundInterstitialCoordinatorTest {
     @Test
     fun `no consent is silent`() = runBlocking {
         gateway.result = RoundInterstitialResult.NoConsent
-        coordinator.onRoundCompleted(AccessTier.FREE, 12)
+        coordinator.onRoundCompleted(AccessTier.FREE, 12, RoundSource.FEED)
 
         assertTrue(analytics.recorded.contains(AnalyticsEvent.RoundInterstitialSkipped(RoundSkipReason.NO_CONSENT)))
     }
@@ -71,7 +88,7 @@ class RoundInterstitialCoordinatorTest {
     @Test
     fun `an ad that is not loaded is silent`() = runBlocking {
         gateway.result = RoundInterstitialResult.NotReady
-        coordinator.onRoundCompleted(AccessTier.FREE, 12)
+        coordinator.onRoundCompleted(AccessTier.FREE, 12, RoundSource.FEED)
 
         assertTrue(analytics.recorded.contains(AnalyticsEvent.RoundInterstitialSkipped(RoundSkipReason.NOT_LOADED)))
     }
@@ -79,7 +96,7 @@ class RoundInterstitialCoordinatorTest {
     @Test
     fun `a show failure is reported with a bounded reason`() = runBlocking {
         gateway.result = RoundInterstitialResult.ShowFailed("Ad failed to show")
-        coordinator.onRoundCompleted(AccessTier.FREE, 12)
+        coordinator.onRoundCompleted(AccessTier.FREE, 12, RoundSource.FEED)
 
         assertTrue(analytics.recorded.contains(AnalyticsEvent.RoundInterstitialFailed(AdFailureReason.SHOW_FAILED)))
     }
@@ -87,13 +104,13 @@ class RoundInterstitialCoordinatorTest {
     @Test
     fun `an exception inside the gateway never escapes`() = runBlocking {
         gateway.throwOnShow = true
-        coordinator.onRoundCompleted(AccessTier.FREE, 12)
+        coordinator.onRoundCompleted(AccessTier.FREE, 12, RoundSource.FEED)
 
         assertFalse(analytics.recorded.contains(AnalyticsEvent.RoundInterstitialShown))
 
         // The failure must not poison the next round.
         gateway.throwOnShow = false
-        coordinator.onRoundCompleted(AccessTier.FREE, 12)
+        coordinator.onRoundCompleted(AccessTier.FREE, 12, RoundSource.FEED)
 
         assertEquals(2, gateway.showCalls)
         assertTrue(analytics.recorded.contains(AnalyticsEvent.RoundInterstitialShown))
@@ -117,7 +134,7 @@ class RoundInterstitialCoordinatorTest {
     @Test
     fun `unresolved entitlement drops the round and never touches the gateway`() = runBlocking {
         coordinator.preload(null)
-        coordinator.onRoundCompleted(null, 12)
+        coordinator.onRoundCompleted(null, 12, RoundSource.FEED)
 
         assertEquals(0, gateway.preloadCalls)
         assertEquals(0, gateway.showCalls)
@@ -128,7 +145,7 @@ class RoundInterstitialCoordinatorTest {
     fun `kill switch off means no preload no show and no analytics`() = runBlocking {
         val off = RoundInterstitialCoordinator(gateway, analytics, enabled = false)
         off.preload(AccessTier.FREE)
-        off.onRoundCompleted(AccessTier.FREE, 12)
+        off.onRoundCompleted(AccessTier.FREE, 12, RoundSource.FEED)
         off.triggerForDebug()
 
         assertEquals(0, gateway.preloadCalls)
@@ -147,8 +164,8 @@ class RoundInterstitialCoordinatorTest {
             }
         }
         val c = RoundInterstitialCoordinator(hanging, analytics, showTimeoutMs = 100L)
-        c.onRoundCompleted(AccessTier.FREE, 12)
-        c.onRoundCompleted(AccessTier.FREE, 12)
+        c.onRoundCompleted(AccessTier.FREE, 12, RoundSource.FEED)
+        c.onRoundCompleted(AccessTier.FREE, 12, RoundSource.FEED)
 
         assertEquals(2, hanging.shows)
         assertTrue(analytics.recorded.contains(AnalyticsEvent.RoundInterstitialSkipped(RoundSkipReason.NOT_LOADED)))

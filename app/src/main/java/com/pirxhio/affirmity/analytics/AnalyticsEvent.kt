@@ -72,6 +72,9 @@ enum class AnalyticsParam(val wireName: String) {
 /** Bounded feed size at round completion (rounds only count from 10 affirmations up). */
 enum class FeedSizeBucket { SIZE_10_24, SIZE_25_49, SIZE_50_99, SIZE_100_PLUS }
 
+/** Which player completed the round: the affirmations feed or a group's player. */
+enum class RoundSource { FEED, GROUP }
+
 /** Why a completed round did not produce an interstitial. */
 enum class RoundSkipReason { PREMIUM, NO_CONSENT, NOT_LOADED }
 
@@ -337,6 +340,7 @@ sealed interface AnalyticsEvent {
 
     data class RoundCompleted(
         val feedSize: FeedSizeBucket,
+        val source: RoundSource,
     ) : AnalyticsEvent {
         override val name = AnalyticsEventName.ROUND_COMPLETED
     }

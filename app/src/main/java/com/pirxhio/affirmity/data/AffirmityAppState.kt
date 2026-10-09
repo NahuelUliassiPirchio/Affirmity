@@ -48,6 +48,7 @@ import com.pirxhio.affirmity.analytics.NoOpAnalyticsLogger
 import com.pirxhio.affirmity.analytics.NotificationDestinationValue
 import com.pirxhio.affirmity.analytics.NotificationFamilyValue
 import com.pirxhio.affirmity.analytics.NotificationLocaleValue
+import com.pirxhio.affirmity.analytics.RoundSource
 import com.pirxhio.affirmity.analytics.firebase.AndroidFirebaseAnalyticsSink
 import com.pirxhio.affirmity.analytics.toAdFailureReason
 import com.pirxhio.affirmity.ads.GoogleRewardedAdGateway
@@ -2030,11 +2031,11 @@ class AffirmityAppState(
         }
     }
 
-    /** The user has seen every affirmation of a feed of [feedSize] (>= MIN_ROUND_SIZE). Fire and forget:
-     *  the interstitial decision/IO never runs on, or blocks, the feed. */
-    fun onFeedRoundCompleted(feedSize: Int) {
+    /** The user has seen every affirmation of a [source] list of [feedSize] (>= MIN_ROUND_SIZE). Fire and
+     *  forget: the interstitial decision/IO never runs on, or blocks, the player. */
+    fun onRoundCompleted(feedSize: Int, source: RoundSource) {
         val coordinator = roundInterstitial ?: return
-        scope.launch { coordinator.onRoundCompleted(resolvedTierOrNull(), feedSize) }
+        scope.launch { coordinator.onRoundCompleted(resolvedTierOrNull(), feedSize, source) }
     }
 
     /** Warms the next round-end interstitial. Cheap and throttled; a no-op for Pro. */
