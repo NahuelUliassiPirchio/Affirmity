@@ -30,7 +30,7 @@ describe('csvToSource', () => {
     const csv = `﻿${HEADER}\r\n${row('cat_u.t.c.v4.02', '"A, b"')}\r\n${row('cat_u.t.c.v4.01')}\r\n`;
     const src = csvToSource(csv, taxonomy);
     expect(src.catalogVersion).toBe(CATALOG_SOURCE_VERSION);
-    expect(CATALOG_SOURCE_VERSION).toBe('5.0.0');
+    expect(CATALOG_SOURCE_VERSION).toBe('5.1.0');
     expect(src.universes).toBe(taxonomy.universes);
     expect(src.affirmations.map((a: { id: string }) => a.id)).toEqual(['u.t.c.v4.02', 'u.t.c.v4.01']);
     expect(src.affirmations[0]).toMatchObject({

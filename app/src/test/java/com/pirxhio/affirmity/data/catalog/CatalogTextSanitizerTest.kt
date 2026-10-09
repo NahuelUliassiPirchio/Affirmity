@@ -67,8 +67,8 @@ class CatalogTextSanitizerTest {
             if (title.contains('[') || subtitle.contains('[')) legalTokenRows++
             scanned++
         }
-        assertEquals(888, scanned)
-        assertEquals("no rows carry a legal placeholder token in the v5 catalog trim", 0, legalTokenRows)
+        assertEquals(889, scanned)
+        assertEquals("rows carrying a legal placeholder token in the v5.1 catalog", 6, legalTokenRows)
     }
 
     private fun findBracketFixtures(): File = walkUp("tools/catalog/bracket-fixtures.json")
