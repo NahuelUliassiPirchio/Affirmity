@@ -71,6 +71,7 @@ import {
 import {
   AppStoreVerificationError,
   isSandboxEntitlementsAllowed,
+  isStaleIosEntitlement,
   parseAppleAppId,
   resolveIosEntitlement,
   type AppStoreEntitlementDoc,
@@ -720,8 +721,7 @@ function iosEntitlementStore(): IosEntitlementStore {
         }
 
         const entitlementSnapshot = await tx.get(entitlementRef);
-        const lastVerifiedAt = entitlementSnapshot.data()?.lastVerifiedAt;
-        const isStale = typeof lastVerifiedAt === 'number' && doc.lastVerifiedAt <= lastVerifiedAt;
+        const isStale = isStaleIosEntitlement(entitlementSnapshot.data(), doc);
 
         if (!claimantUid) {
           tx.set(claimRef, { uid, transactionId, claimedAt: FieldValue.serverTimestamp() });

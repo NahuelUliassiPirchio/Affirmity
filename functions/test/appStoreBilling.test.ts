@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   AppStoreVerificationError,
   isSandboxEntitlementsAllowed,
+  isStaleIosEntitlement,
   parseAppleAppId,
   resolveIosEntitlement,
   toAppStoreEntitlement,
@@ -305,5 +306,84 @@ describe('parseAppleAppId', () => {
     expect(String(spy.mock.calls[0][0])).toContain('malformed');
     expect(String(spy.mock.calls[0][0])).not.toContain('abc');
     spy.mockRestore();
+  });
+});
+
+// Ordering rule on the transaction's own time: an older App Store transaction redelivered after a
+// newer one must not overwrite it, even though its server-side `lastVerifiedAt` is later.
+describe('isStaleIosEntitlement', () => {
+  const stored = { source: 'sync-ios', expiryTimeMillis: 2000, lastVerifiedAt: 100 };
+  const incoming = (overrides: Partial<AppStoreEntitlementDoc> = {}): AppStoreEntitlementDoc => ({
+    ...toAppStoreEntitlement(
+      {
+        transactionId: 'txn-x',
+        productId: 'pro_monthly',
+        expiresDate: 2000,
+        type: 'Auto-Renewable Subscription',
+      },
+      200,
+    ),
+    ...overrides,
+  });
+
+  it('is stale when the incoming expiry is older than the stored sync-ios expiry, even if verified later', () => {
+    expect(isStaleIosEntitlement(stored, incoming({ expiryTimeMillis: 1000, lastVerifiedAt: 999 }))).toBe(true);
+  });
+
+  it('falls back to lastVerifiedAt on equal expiry: older verification is stale', () => {
+    expect(isStaleIosEntitlement(stored, incoming({ expiryTimeMillis: 2000, lastVerifiedAt: 50 }))).toBe(true);
+  });
+
+  it('falls back to lastVerifiedAt on equal expiry: equal verification is stale', () => {
+    expect(isStaleIosEntitlement(stored, incoming({ expiryTimeMillis: 2000, lastVerifiedAt: 100 }))).toBe(true);
+  });
+
+  it('falls back to lastVerifiedAt on equal expiry: newer verification is not stale', () => {
+    expect(isStaleIosEntitlement(stored, incoming({ expiryTimeMillis: 2000, lastVerifiedAt: 101 }))).toBe(false);
+  });
+
+  it('is not stale when the incoming expiry is newer, even if verified earlier', () => {
+    expect(isStaleIosEntitlement(stored, incoming({ expiryTimeMillis: 3000, lastVerifiedAt: 1 }))).toBe(false);
+  });
+
+  it('does not apply the expiry rule when the stored doc comes from play', () => {
+    const playStored = { source: 'play', expiryTimeMillis: 5000, lastVerifiedAt: 100 };
+    expect(isStaleIosEntitlement(playStored, incoming({ expiryTimeMillis: 1000, lastVerifiedAt: 200 }))).toBe(false);
+  });
+
+  it('does not apply the expiry rule when the stored source is missing', () => {
+    const unknownStored = { expiryTimeMillis: 5000, lastVerifiedAt: 100 };
+    expect(isStaleIosEntitlement(unknownStored, incoming({ expiryTimeMillis: 1000, lastVerifiedAt: 200 }))).toBe(false);
+  });
+
+  it('does not apply the expiry rule when the stored expiry is missing or null', () => {
+    expect(
+      isStaleIosEntitlement({ source: 'sync-ios', expiryTimeMillis: null, lastVerifiedAt: 100 }, incoming({ lastVerifiedAt: 200 })),
+    ).toBe(false);
+    expect(isStaleIosEntitlement({ source: 'sync-ios', lastVerifiedAt: 100 }, incoming({ lastVerifiedAt: 200 }))).toBe(false);
+  });
+
+  it('does not apply the expiry rule when the incoming expiry is null', () => {
+    expect(isStaleIosEntitlement(stored, incoming({ expiryTimeMillis: null, lastVerifiedAt: 200 }))).toBe(false);
+  });
+
+  it('is not stale for a revocation of the latest transaction (same expiry, verified later)', () => {
+    const revoked = toAppStoreEntitlement(
+      {
+        transactionId: 'txn-x',
+        productId: 'pro_monthly',
+        expiresDate: 2000,
+        type: 'Auto-Renewable Subscription',
+        revocationDate: 1500,
+      },
+      300,
+    );
+    expect(revoked.tier).toBe('free');
+    expect(revoked.status).toBe('REVOKED');
+    expect(isStaleIosEntitlement(stored, revoked)).toBe(false);
+  });
+
+  it('is not stale when nothing is stored yet', () => {
+    expect(isStaleIosEntitlement(undefined, incoming())).toBe(false);
   });
 });

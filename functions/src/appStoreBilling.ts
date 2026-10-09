@@ -131,13 +131,40 @@ export class AppStoreVerificationError extends Error {}
 /** Outcome of the atomic claim-and-write decision (Fix 1 + Fix 5's partial fix -- see
  * `IosEntitlementStore.claimAndWriteEntitlement` below):
  *  - `written`: the transactionId was unclaimed or already claimed by this same uid, and this
- *    verification is newer than (or there was no) previously stored entitlement for this uid.
- *  - `dropped-stale`: same claim outcome, but this verification is not newer -- idempotent
- *    redelivery, identical policy to `resolveEntitlement`'s for Play.
+ *    transaction is not stale versus the previously stored entitlement for this uid (see
+ *    `isStaleIosEntitlement`), or there was none.
+ *  - `dropped-stale`: same claim outcome, but the entitlement is not written because either the
+ *    incoming transaction expires earlier than the stored `sync-ios` one (an older transaction
+ *    redelivered late), or -- on equal/unknown expiry -- this verification is not newer than the
+ *    stored one (idempotent redelivery, same policy as `resolveEntitlement`'s for Play).
  *  - `claimed-by-other-uid`: the transactionId is already claimed by a DIFFERENT uid -- a replayed
  *    (e.g. leaked/intercepted) JWS being presented by an account that never made this purchase.
  *    Nothing is written; that other uid's entitlement is left untouched. */
 export type ClaimAndWriteOutcome = 'written' | 'dropped-stale' | 'claimed-by-other-uid';
+
+/** Pure staleness decision for an incoming iOS entitlement doc versus the stored one.
+ *  1. Expiry ordering (transaction's own time): when the stored doc is `source === 'sync-ios'` and
+ *     both stored and incoming `expiryTimeMillis` are numbers, an incoming expiry strictly earlier
+ *     than the stored one is stale (an older transaction redelivered after a newer one), regardless
+ *     of `lastVerifiedAt`. A strictly later expiry is never stale.
+ *  2. Otherwise (equal expiry, non-`sync-ios` source, or a missing/null expiry on either side) the
+ *     existing tie-breaker applies: stale when `incoming.lastVerifiedAt <= stored.lastVerifiedAt`.
+ *     Equal expiry therefore lets a later revocation of the latest transaction win. */
+export function isStaleIosEntitlement(
+  stored: { source?: unknown; expiryTimeMillis?: unknown; lastVerifiedAt?: unknown } | undefined,
+  incoming: AppStoreEntitlementDoc,
+): boolean {
+  if (!stored) return false;
+  if (
+    stored.source === 'sync-ios' &&
+    typeof stored.expiryTimeMillis === 'number' &&
+    typeof incoming.expiryTimeMillis === 'number'
+  ) {
+    if (incoming.expiryTimeMillis < stored.expiryTimeMillis) return true;
+    if (incoming.expiryTimeMillis > stored.expiryTimeMillis) return false;
+  }
+  return typeof stored.lastVerifiedAt === 'number' && incoming.lastVerifiedAt <= stored.lastVerifiedAt;
+}
 
 /** Port-agnostic App Store entitlement store. Unlike Play's `EntitlementStore` (separate
  * `getLastVerifiedAt` read + `writeEntitlement` write, safe there because a purchase token/
