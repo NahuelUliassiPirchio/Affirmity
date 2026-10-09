@@ -6,6 +6,8 @@ import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.CollectionNameResult
 import com.pirxhio.affirmity.data.COLLECTION_NAME_MAX
 import com.pirxhio.affirmity.data.UserCollectionUi
+import com.pirxhio.affirmity.ui.affirmations.LOOP_MULTIPLIER
+import com.pirxhio.affirmity.ui.affirmations.centeredStartPage
 import com.pirxhio.affirmity.ui.theme.GroupHighlight
 
 /*
@@ -227,3 +229,36 @@ internal fun canPlayGroup(itemCount: Int): Boolean = itemCount > 0
 
 /** The player is driven by a saveable request flag, but never shows over a group that has emptied (e.g. removed items). */
 internal fun shouldShowGroupPlayer(requested: Boolean, itemCount: Int): Boolean = requested && canPlayGroup(itemCount)
+
+/** Only a group with several items loops; a single item is shown as-is and an empty group is never played. */
+internal fun groupPlayerLoops(itemCount: Int): Boolean = itemCount > 1
+
+/** Pager length: `itemCount * LOOP_MULTIPLIER` virtual pages when looping, else the plain count (0 or 1). */
+internal fun groupPlayerPageCount(itemCount: Int): Int =
+    if (groupPlayerLoops(itemCount)) itemCount * LOOP_MULTIPLIER else itemCount.coerceAtLeast(0)
+
+/** Opens on the group's first item: the centered virtual page aligned to index 0 when looping, else page 0. */
+internal fun groupPlayerStartPage(itemCount: Int): Int =
+    if (groupPlayerLoops(itemCount)) centeredStartPage(itemCount) else 0
+
+/**
+ * Page to jump to when the player has drifted into the first or last cycle of the virtual range (so
+ * it can never run out of room in either direction), else null. The target keeps the same item
+ * (`% itemCount`), so the card on screen does not change. Always null when the group does not loop.
+ */
+internal fun groupPlayerRecenterPageOrNull(currentPage: Int, itemCount: Int): Int? {
+    if (!groupPlayerLoops(itemCount)) return null
+    val pageCount = groupPlayerPageCount(itemCount)
+    if (currentPage >= itemCount && currentPage < pageCount - itemCount) return null
+    return centeredStartPage(itemCount) + currentPage % itemCount
+}
+
+/** One entry of the "Your groups" row. */
+internal sealed interface GroupsRowEntry {
+    data class Group(val card: GroupCardUi) : GroupsRowEntry
+    data object NewGroup : GroupsRowEntry
+}
+
+/** The user's groups in their given order, then the "New group" tile as the LAST entry of the row. */
+internal fun groupsRowEntries(cards: List<GroupCardUi>): List<GroupsRowEntry> =
+    cards.map { GroupsRowEntry.Group(it) } + GroupsRowEntry.NewGroup

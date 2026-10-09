@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.ui.collections
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.CollectionNameResult
 import com.pirxhio.affirmity.data.UserCollectionUi
+import com.pirxhio.affirmity.ui.theme.GroupHighlight
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -187,5 +188,22 @@ class CollectionUiLogicTest {
         assertEquals(false, isSaved(isFavorite = false, isInAnyGroup = false))
         assertEquals(true, isSaved(isFavorite = true, isInAnyGroup = false))
         assertEquals(true, isSaved(isFavorite = false, isInAnyGroup = true))
+    }
+
+    private fun card(id: String) = GroupCardUi(id, id, GroupHighlight.Teal, GroupFeedStatus.InFeed, itemCount = 3)
+
+    @Test
+    fun `groups row lists the groups in order then the new group tile last`() {
+        val a = card("a")
+        val b = card("b")
+        assertEquals(
+            listOf(GroupsRowEntry.Group(a), GroupsRowEntry.Group(b), GroupsRowEntry.NewGroup),
+            groupsRowEntries(listOf(a, b)),
+        )
+    }
+
+    @Test
+    fun `groups row with no groups only has the new group tile`() {
+        assertEquals(listOf(GroupsRowEntry.NewGroup), groupsRowEntries(emptyList()))
     }
 }
