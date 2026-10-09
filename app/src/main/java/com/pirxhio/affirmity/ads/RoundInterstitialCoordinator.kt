@@ -5,6 +5,7 @@ import com.pirxhio.affirmity.analytics.AnalyticsEvent
 import com.pirxhio.affirmity.analytics.AnalyticsLogger
 import com.pirxhio.affirmity.analytics.FeedSizeBucket
 import com.pirxhio.affirmity.analytics.RoundSkipReason
+import com.pirxhio.affirmity.analytics.RoundSource
 import com.pirxhio.affirmity.analytics.toAdFailureReason
 import com.pirxhio.affirmity.ui.affirmations.RoundInterstitialDecision
 import com.pirxhio.affirmity.ui.affirmations.decideRoundInterstitial
@@ -43,10 +44,10 @@ class RoundInterstitialCoordinator(
 ) {
     private val mutex = Mutex()
 
-    suspend fun onRoundCompleted(tier: AccessTier?, feedSize: Int) = guarded {
+    suspend fun onRoundCompleted(tier: AccessTier?, feedSize: Int, source: RoundSource) = guarded {
         if (!enabled || tier == null) return@guarded
         mutex.withLock {
-            analytics.log(AnalyticsEvent.RoundCompleted(feedSizeBucket(feedSize)))
+            analytics.log(AnalyticsEvent.RoundCompleted(feedSizeBucket(feedSize), source))
             when (decideRoundInterstitial(tier)) {
                 RoundInterstitialDecision.SKIP_PREMIUM -> skipped(RoundSkipReason.PREMIUM)
                 RoundInterstitialDecision.SHOW -> showAndRecord()

@@ -95,6 +95,7 @@ class FirebaseAnalyticsLogger(private val sink: FirebaseAnalyticsSink) : Analyti
         )
         is AnalyticsEvent.RoundCompleted -> listOf(
             text(AnalyticsParam.FEED_SIZE_BUCKET, event.feedSize.name),
+            text(AnalyticsParam.SOURCE, event.source.name),
         )
         AnalyticsEvent.RoundInterstitialShown -> emptyList()
         is AnalyticsEvent.RoundInterstitialFailed -> listOf(

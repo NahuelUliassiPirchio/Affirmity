@@ -193,6 +193,19 @@ class FirebaseAnalyticsLoggerTest {
     }
 
     @Test
+    fun `round_completed maps feed_size_bucket and source`() {
+        val logged = log(AnalyticsEvent.RoundCompleted(FeedSizeBucket.SIZE_10_24, RoundSource.GROUP))
+        assertEquals("round_completed", logged.name)
+        assertEquals(
+            listOf(
+                AnalyticsParamValue.Text("feed_size_bucket", "size_10_24"),
+                AnalyticsParamValue.Text("source", "group"),
+            ),
+            logged.params,
+        )
+    }
+
+    @Test
     fun `content_locked_tapped maps content_key, content_type, access_decision`() {
         val logged = log(
             AnalyticsEvent.ContentLockedTapped(
