@@ -242,8 +242,9 @@ internal fun groupPlayerStartPage(itemCount: Int): Int =
     if (groupPlayerLoops(itemCount)) centeredStartPage(itemCount) else 0
 
 /**
- * Page to jump to when the player has drifted into the first or last cycle of the virtual range (so
- * it can never run out of room in either direction), else null. The target keeps the same item
+ * Page to jump to when the player sits in the first or last cycle of the virtual range, else null.
+ * Used only when the page count changes (on open and when the group changes size, e.g. 1 -> N leaves
+ * the pager on page 0); it is not re-evaluated while scrolling. The target keeps the same item
  * (`% itemCount`), so the card on screen does not change. Always null when the group does not loop.
  */
 internal fun groupPlayerRecenterPageOrNull(currentPage: Int, itemCount: Int): Int? {

@@ -51,8 +51,9 @@ internal fun GroupPlayerDialog(
         initialPage = groupPlayerStartPage(itemCount),
         pageCount = { pageCount },
     )
-    // The group can change size while the player is open (e.g. 1 -> N leaves the pager on page 0,
-    // where a backward swipe would be dead). Re-center onto the same item so the card does not change.
+    // Runs on open and whenever the page count changes (the group can change size while the player is
+    // open, e.g. 1 -> N leaves the pager on page 0, where a backward swipe would be dead). Re-centers
+    // onto the same item so the card does not change. It does not run while scrolling.
     LaunchedEffect(pageCount) {
         groupPlayerRecenterPageOrNull(pagerState.currentPage, itemCount)
             ?.let { pagerState.scrollToPage(it) }
