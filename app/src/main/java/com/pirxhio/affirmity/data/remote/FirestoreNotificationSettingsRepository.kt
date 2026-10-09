@@ -84,4 +84,8 @@ class FirestoreNotificationSettingsRepository(
             SetOptions.merge(),
         ).await()
     }
+
+    override suspend fun setLocale(locale: String) {
+        document().set(mapOf("locale" to locale), SetOptions.merge()).await()
+    }
 }

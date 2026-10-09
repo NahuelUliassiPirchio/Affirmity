@@ -150,6 +150,12 @@ interface NotificationSettingsRepository {
      * signed-out users have no server-driven scheduling to feed.
      */
     suspend fun setTimeZone(zoneId: String)
+
+    /**
+     * Persists the app's selected language (`"en"`/`"es"`) so server-rendered push notifications
+     * follow it. Defaults to a no-op: only the Firestore-backed implementation feeds the server.
+     */
+    suspend fun setLocale(locale: String) = Unit
 }
 
 /** Client-facing entitlement snapshot. [expiryTimeMillis] is `null` for a Free tier or a

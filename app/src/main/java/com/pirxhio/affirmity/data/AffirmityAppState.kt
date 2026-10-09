@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.data
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
@@ -496,6 +497,14 @@ class AffirmityAppState(
     private val widgetUpdater: WidgetUpdater,
     private val authRepository: AuthRepository,
     private val fcmTokenRepository: FcmTokenRepository,
+    /** Wire locale token (`"en"`/`"es"`) of the app's current language, synced to the server so
+     * push notifications are rendered in the language the user selected in-app. */
+    private val deviceLocaleToken: () -> String = {
+        val appLocales = AppCompatDelegate.getApplicationLocales()
+        notificationLocaleToken(
+            if (appLocales.isEmpty) java.util.Locale.getDefault().language else appLocales[0]?.language,
+        )
+    },
     private val fcmTokenProvider: suspend () -> String = {
         FirebaseMessaging.getInstance().token.await()
     },
@@ -1296,6 +1305,17 @@ class AffirmityAppState(
                             remoteSession.notifications.setTimeZone(zoneId)
                             Log.d(TAG, "fcm/timezone sync: timeZone write succeeded")
                             val token = fcmTokenProvider()
+                    // Best-effort and deliberately AFTER (and isolated from) the timezone/FCM
+                    // handshake above: a failed or stalled locale write must never block push
+                    // registration. Last step of this collectLatest body, so a session swap still
+                    // cancels it.
+                    try {
+                        remoteSession.notifications.setLocale(deviceLocaleToken())
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (error: Exception) {
+                        Log.e(TAG, "locale sync: FAILED", error)
+                    }
                             if (BuildConfig.DEBUG) Log.d(TAG, "fcm/timezone sync: got FCM token, registering for uid=$uid")
                             fcmTokenOwnershipCoordinator.registerIfActive(
                                 uid = uid,

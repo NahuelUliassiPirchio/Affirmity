@@ -152,7 +152,13 @@ private class FakeMeditationPreferencesRepository(
 private class FakeNotificationSettingsRepository(
     private val flow: Flow<ChannelSettings>,
     private val settingsByChannel: Map<NotificationChannelSpec, ChannelSettings> = emptyMap(),
+    private val failSetLocale: Boolean = false,
 ) : NotificationSettingsRepository {
+    val locales = CopyOnWriteArrayList<String>()
+    override suspend fun setLocale(locale: String) {
+        locales += locale
+        if (failSetLocale) throw IllegalStateException("locale write failed")
+    }
     override fun observe(channel: NotificationChannelSpec): Flow<ChannelSettings> =
         settingsByChannel[channel]?.let(::flowOf) ?: flow
     override suspend fun setEnabled(channel: NotificationChannelSpec, enabled: Boolean) = Unit
@@ -300,6 +306,9 @@ private fun fakeRemote(
     entitlements: EntitlementRepository = FakeEntitlementRepository(),
     completions: DailyCompletionRepository = FakeDailyCompletionRepository(EventedFlow("remote-completions", events, listOf(emptyList()))),
     healerUses: StreakHealerRepository = FakeStreakHealerRepository(EventedFlow("remote-healerUses", events, listOf(emptyList()))),
+    notifications: NotificationSettingsRepository = FakeNotificationSettingsRepository(
+        EventedFlow("remote-notifications", events, listOf(ChannelSettings(enabled = false, segments = setOf(DaySegment.MANANA, DaySegment.TARDE)))),
+    ),
 ): DataSession.Remote = DataSession.Remote(
     uid = uid,
     affirmations = FakeAffirmationRepository(
@@ -309,9 +318,7 @@ private fun fakeRemote(
     moods = FakeDailyMoodRepository(EventedFlow("remote-moods", events, listOf(emptyList()))),
     healerUses = healerUses,
     meditation = FakeMeditationPreferencesRepository(EventedFlow("remote-meditation", events, listOf(600))),
-    notifications = FakeNotificationSettingsRepository(
-        EventedFlow("remote-notifications", events, listOf(ChannelSettings(enabled = false, segments = setOf(DaySegment.MANANA, DaySegment.TARDE)))),
-    ),
+    notifications = notifications,
     entitlements = entitlements,
     adUnlocks = adUnlocks,
 )
@@ -342,6 +349,7 @@ private fun buildState(
     fcmTokenProvider: suspend () -> String = { "test-token" },
     fcmTokenOwnershipCoordinator: FcmTokenOwnershipCoordinator = FcmTokenOwnershipCoordinator(),
     healerTodayEpochDay: () -> Long = { DayClock.epochDay() },
+    deviceLocaleToken: () -> String = { "es" },
     legacyGroupIdsProvider: suspend () -> Set<String>? = { null },
     goalIdsProvider: suspend () -> Set<String>? = { null },
 ): AffirmityAppState {
@@ -388,6 +396,7 @@ private fun buildState(
         onboardingPreferences = onboardingPreferences,
         onboardingGuidePreferences = onboardingGuidePreferences,
         deviceTimeZoneId = { "UTC" },
+        deviceLocaleToken = deviceLocaleToken,
         themePreferences = themePreferences,
         knownThemeIds = knownThemeIds,
         defaultThematicThemeIds = defaultThematicThemeIds,
@@ -566,6 +575,52 @@ class AffirmityAppStateSwapTest {
         runCurrent()
 
         assertEquals(1, authRepository.signOutCalls)
+    }
+
+    @Test
+    fun `signed-in sync writes the injected locale token`() = runTest {
+        val events = mutableListOf<String>()
+        val notifications = FakeNotificationSettingsRepository(flowOf(ChannelSettings(enabled = false, segments = emptySet())))
+        val registered = CompletableDeferred<Unit>()
+        val tokens = mock(FcmTokenRepository::class.java)
+        buildState(
+            local = fakeLocal(events),
+            remote = { fakeRemote("uid-locale", events, notifications = notifications) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = FakeAuthRepository(AuthState.SignedIn(uid = "uid-locale", displayName = null, email = null)),
+            scope = backgroundScope,
+            fcmTokenRepositoryOverride = tokens,
+            fcmTokenProvider = { registered.complete(Unit); "test-token" },
+            deviceLocaleToken = { "en" },
+        )
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(listOf("en"), notifications.locales.toList())
+    }
+
+    @Test
+    fun `a failing locale write never blocks FCM token registration`() = runTest {
+        val events = mutableListOf<String>()
+        val notifications = FakeNotificationSettingsRepository(
+            flowOf(ChannelSettings(enabled = false, segments = emptySet())),
+            failSetLocale = true,
+        )
+        val tokenRequested = CompletableDeferred<Unit>()
+        buildState(
+            local = fakeLocal(events),
+            remote = { fakeRemote("uid-locale-fail", events, notifications = notifications) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = FakeAuthRepository(AuthState.SignedIn(uid = "uid-locale-fail", displayName = null, email = null)),
+            scope = backgroundScope,
+            fcmTokenProvider = { tokenRequested.complete(Unit); "test-token" },
+            deviceLocaleToken = { "en" },
+        )
+        runCurrent()
+        advanceUntilIdle()
+
+        assertTrue(tokenRequested.isCompleted)
+        assertEquals(listOf("en"), notifications.locales.toList())
     }
 
     @Test
