@@ -1,0 +1,5837 @@
+{
+  "universes": [
+    {
+      "id": "self_worth",
+      "title": "Amor propio y autoestima",
+      "description": "Biblioteca de afirmaciones sobre amor propio y autoestima.",
+      "coreNeed": "Tengo valor independientemente de rendimiento, aprobación o perfección, y puedo construir una relación conmigo basada en respeto.",
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage",
+      "title": "Confianza y valentía",
+      "description": "Biblioteca de afirmaciones sobre confianza y valentía.",
+      "coreNeed": "Puedo confiar en mis capacidades y avanzar incluso cuando aparece miedo o duda.",
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "calm_peace",
+      "title": "Calma y paz",
+      "description": "Biblioteca de afirmaciones sobre calma y paz.",
+      "coreNeed": "Puedo bajar el ritmo, sentir estabilidad interna y permitirme momentos de paz.",
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "mind_anxiety",
+      "title": "Mente y ansiedad",
+      "description": "Biblioteca de afirmaciones sobre mente y ansiedad.",
+      "coreNeed": "Puedo tener pensamientos y preocupaciones sin tener que creer, resolver o seguir todo lo que mi mente produce.",
+      "order": 4,
+      "status": "active"
+    },
+    {
+      "id": "presence_acceptance_control",
+      "title": "Presente, aceptación y control",
+      "description": "Biblioteca de afirmaciones sobre presente, aceptación y control.",
+      "coreNeed": "Puedo volver al presente, aceptar lo que ya es y actuar sobre lo que sí depende de mí.",
+      "order": 5,
+      "status": "active"
+    },
+    {
+      "id": "gratitude_hope_possibility",
+      "title": "Gratitud, esperanza y posibilidades",
+      "description": "Biblioteca de afirmaciones sobre gratitud, esperanza y posibilidades.",
+      "coreNeed": "Puedo reconocer lo bueno que existe, recuperar esperanza y mantenerme abierto a posibilidades nuevas.",
+      "order": 6,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility",
+      "title": "Motivación, disciplina y responsabilidad",
+      "description": "Biblioteca de afirmaciones sobre motivación, disciplina y responsabilidad.",
+      "coreNeed": "Puedo avanzar aunque no tenga ganas, construir consistencia y cumplir conmigo.",
+      "order": 7,
+      "status": "active"
+    },
+    {
+      "id": "work_money_growth",
+      "title": "Trabajo, dinero y crecimiento",
+      "description": "Biblioteca de afirmaciones sobre trabajo, dinero y crecimiento.",
+      "coreNeed": "Puedo crecer profesionalmente, aportar valor y construir una relación sana con el dinero.",
+      "order": 8,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing",
+      "title": "Cuerpo, energía y bienestar",
+      "description": "Biblioteca de afirmaciones sobre cuerpo, energía y bienestar.",
+      "coreNeed": "Puedo habitar mi cuerpo con respeto, disfrutar de lo que puede hacer y cuidarlo sin convertirlo en un enemigo.",
+      "order": 9,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships",
+      "title": "Amor, deseo y vínculos románticos",
+      "description": "Biblioteca de afirmaciones sobre amor, deseo y vínculos románticos.",
+      "coreNeed": "Puedo amar, recibir amor, sentir deseo y construir intimidad sin perder mi centro.",
+      "order": 10,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging",
+      "title": "Conexión y pertenencia",
+      "description": "Biblioteca de afirmaciones sobre conexión y pertenencia.",
+      "coreNeed": "Puedo construir conexión, pertenencia y comunidad sin dejar de ser yo.",
+      "order": 11,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings",
+      "title": "Cambio, pérdida y nuevos comienzos",
+      "description": "Biblioteca de afirmaciones sobre cambio, pérdida y nuevos comienzos.",
+      "coreNeed": "Puedo atravesar cambios y pérdidas, integrar lo vivido y abrir nuevos capítulos.",
+      "order": 12,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom",
+      "title": "Expectativas, límites y libertad personal",
+      "description": "Biblioteca de afirmaciones sobre expectativas, límites y libertad personal.",
+      "coreNeed": "Puedo vivir con más libertad respecto de expectativas ajenas, autoexigencia y necesidad de aprobación.",
+      "order": 13,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction",
+      "title": "Propósito, identidad y dirección",
+      "description": "Biblioteca de afirmaciones sobre propósito, identidad y dirección.",
+      "coreNeed": "Puedo conocerme, elegir una dirección y construir una vida que se parezca a mí.",
+      "order": 14,
+      "status": "active"
+    }
+  ],
+  "themes": [
+    {
+      "id": "self_worth.feeling_enough",
+      "universeId": "self_worth",
+      "title": "Sentirme suficiente",
+      "description": "Afirmaciones para trabajar sentirme suficiente.",
+      "conceptTagIds": [
+        "intrinsic_worth",
+        "productivity_worth"
+      ],
+      "desiredStateIds": [
+        "self_worth",
+        "self_compassion"
+      ],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.recognize_my_value",
+      "universeId": "self_worth",
+      "title": "Reconocer mi propio valor",
+      "description": "Afirmaciones para trabajar reconocer mi propio valor.",
+      "conceptTagIds": [
+        "strengths",
+        "contribution",
+        "external_validation"
+      ],
+      "desiredStateIds": [
+        "self_worth",
+        "confidence"
+      ],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.inner_dialogue",
+      "universeId": "self_worth",
+      "title": "Hablarme mejor",
+      "description": "Afirmaciones para trabajar hablarme mejor.",
+      "conceptTagIds": [
+        "self_criticism",
+        "self_compassion",
+        "mistakes"
+      ],
+      "desiredStateIds": [
+        "self_compassion",
+        "inner_safety"
+      ],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.comparison",
+      "universeId": "self_worth",
+      "title": "Dejar de compararme",
+      "description": "Afirmaciones para trabajar dejar de compararme.",
+      "conceptTagIds": [
+        "comparison",
+        "external_validation"
+      ],
+      "desiredStateIds": [
+        "self_worth",
+        "freedom"
+      ],
+      "order": 4,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.self_forgiveness",
+      "universeId": "self_worth",
+      "title": "Perdonarme",
+      "description": "Afirmaciones para trabajar perdonarme.",
+      "conceptTagIds": [
+        "self_forgiveness",
+        "guilt",
+        "shame",
+        "mistakes"
+      ],
+      "desiredStateIds": [
+        "self_compassion",
+        "acceptance",
+        "hope"
+      ],
+      "order": 5,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.achievement_recognition",
+      "universeId": "self_worth",
+      "title": "Reconocer mis logros",
+      "description": "Afirmaciones para trabajar reconocer mis logros.",
+      "conceptTagIds": [
+        "achievement",
+        "pride",
+        "contribution"
+      ],
+      "desiredStateIds": [
+        "self_worth",
+        "confidence"
+      ],
+      "order": 6,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.believe_in_my_abilities",
+      "universeId": "confidence_courage",
+      "title": "Creer en mis capacidades",
+      "description": "Afirmaciones para trabajar creer en mis capacidades.",
+      "conceptTagIds": [
+        "capability",
+        "learning"
+      ],
+      "desiredStateIds": [
+        "confidence",
+        "capability"
+      ],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.move_with_fear",
+      "universeId": "confidence_courage",
+      "title": "Avanzar aunque tenga miedo",
+      "description": "Afirmaciones para trabajar avanzar aunque tenga miedo.",
+      "conceptTagIds": [
+        "fear",
+        "courage"
+      ],
+      "desiredStateIds": [
+        "courage",
+        "confidence"
+      ],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.failure",
+      "universeId": "confidence_courage",
+      "title": "Miedo al fracaso",
+      "description": "Afirmaciones para trabajar miedo al fracaso.",
+      "conceptTagIds": [
+        "fear_of_failure",
+        "mistakes"
+      ],
+      "desiredStateIds": [
+        "courage",
+        "resilience"
+      ],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.impostor",
+      "universeId": "confidence_courage",
+      "title": "Síndrome del impostor",
+      "description": "Afirmaciones para trabajar síndrome del impostor.",
+      "conceptTagIds": [
+        "impostor_syndrome",
+        "professional_identity"
+      ],
+      "desiredStateIds": [
+        "confidence",
+        "belonging"
+      ],
+      "order": 4,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.decisions",
+      "universeId": "confidence_courage",
+      "title": "Confiar en mis decisiones",
+      "description": "Afirmaciones para trabajar confiar en mis decisiones.",
+      "conceptTagIds": [
+        "decision_confidence",
+        "personal_agency"
+      ],
+      "desiredStateIds": [
+        "confidence",
+        "clarity"
+      ],
+      "order": 5,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.take_space",
+      "universeId": "confidence_courage",
+      "title": "Ocupar mi espacio y expresarme",
+      "description": "Afirmaciones para trabajar ocupar mi espacio y expresarme.",
+      "conceptTagIds": [
+        "self_expression",
+        "visibility"
+      ],
+      "desiredStateIds": [
+        "confidence",
+        "courage"
+      ],
+      "order": 6,
+      "status": "active"
+    },
+    {
+      "id": "calm_peace.find_calm",
+      "universeId": "calm_peace",
+      "title": "Encontrar calma",
+      "description": "Afirmaciones para trabajar encontrar calma.",
+      "conceptTagIds": [
+        "calm",
+        "inner_safety"
+      ],
+      "desiredStateIds": [
+        "calm",
+        "inner_safety"
+      ],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "calm_peace.release_tension",
+      "universeId": "calm_peace",
+      "title": "Soltar tensión",
+      "description": "Afirmaciones para trabajar soltar tensión.",
+      "conceptTagIds": [
+        "tension",
+        "calm"
+      ],
+      "desiredStateIds": [
+        "calm",
+        "freedom"
+      ],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "calm_peace.overwhelmed",
+      "universeId": "calm_peace",
+      "title": "Cuando todo me supera",
+      "description": "Afirmaciones para trabajar cuando todo me supera.",
+      "conceptTagIds": [
+        "overwhelm",
+        "calm"
+      ],
+      "desiredStateIds": [
+        "calm",
+        "clarity",
+        "resilience"
+      ],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "calm_peace.rest_without_guilt",
+      "universeId": "calm_peace",
+      "title": "Descansar y desconectar sin culpa",
+      "description": "Afirmaciones para trabajar descansar y desconectar sin culpa.",
+      "conceptTagIds": [
+        "rest",
+        "availability"
+      ],
+      "desiredStateIds": [
+        "calm",
+        "self_compassion"
+      ],
+      "order": 4,
+      "status": "active"
+    },
+    {
+      "id": "mind_anxiety.overthinking",
+      "universeId": "mind_anxiety",
+      "title": "Sobrepensar y rumiar",
+      "description": "Afirmaciones para trabajar sobrepensar y rumiar.",
+      "conceptTagIds": [
+        "overthinking",
+        "rumination",
+        "certainty_seeking"
+      ],
+      "desiredStateIds": [
+        "clarity",
+        "calm",
+        "freedom"
+      ],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "mind_anxiety.catastrophizing",
+      "universeId": "mind_anxiety",
+      "title": "Anticipar lo peor",
+      "description": "Afirmaciones para trabajar anticipar lo peor.",
+      "conceptTagIds": [
+        "catastrophizing",
+        "worry",
+        "uncertainty"
+      ],
+      "desiredStateIds": [
+        "calm",
+        "hope",
+        "clarity"
+      ],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "mind_anxiety.negative_thoughts",
+      "universeId": "mind_anxiety",
+      "title": "Tomar distancia de pensamientos negativos",
+      "description": "Afirmaciones para trabajar tomar distancia de pensamientos negativos.",
+      "conceptTagIds": [
+        "negative_thoughts"
+      ],
+      "desiredStateIds": [
+        "clarity",
+        "freedom"
+      ],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "mind_anxiety.intrusive_thoughts",
+      "universeId": "mind_anxiety",
+      "title": "Tomar distancia de pensamientos intrusivos",
+      "description": "Afirmaciones para trabajar tomar distancia de pensamientos intrusivos.",
+      "conceptTagIds": [
+        "intrusive_thoughts"
+      ],
+      "desiredStateIds": [
+        "clarity",
+        "inner_safety",
+        "freedom"
+      ],
+      "order": 4,
+      "status": "active"
+    },
+    {
+      "id": "mind_anxiety.social_judgment",
+      "universeId": "mind_anxiety",
+      "title": "Miedo al juicio y ansiedad social",
+      "description": "Afirmaciones para trabajar miedo al juicio y ansiedad social.",
+      "conceptTagIds": [
+        "social_judgment",
+        "social_anxiety"
+      ],
+      "desiredStateIds": [
+        "confidence",
+        "freedom",
+        "connection"
+      ],
+      "order": 5,
+      "status": "active"
+    },
+    {
+      "id": "presence_acceptance_control.present_moment",
+      "universeId": "presence_acceptance_control",
+      "title": "Vivir más en el presente",
+      "description": "Afirmaciones para trabajar vivir más en el presente.",
+      "conceptTagIds": [
+        "present_moment"
+      ],
+      "desiredStateIds": [
+        "presence",
+        "calm"
+      ],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "presence_acceptance_control.release_uncontrollable",
+      "universeId": "presence_acceptance_control",
+      "title": "Soltar lo que no puedo controlar",
+      "description": "Afirmaciones para trabajar soltar lo que no puedo controlar.",
+      "conceptTagIds": [
+        "control",
+        "letting_go"
+      ],
+      "desiredStateIds": [
+        "freedom",
+        "acceptance",
+        "calm"
+      ],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "presence_acceptance_control.personal_agency",
+      "universeId": "presence_acceptance_control",
+      "title": "Actuar sobre lo que sí depende de mí",
+      "description": "Afirmaciones para trabajar actuar sobre lo que sí depende de mí.",
+      "conceptTagIds": [
+        "personal_agency"
+      ],
+      "desiredStateIds": [
+        "confidence",
+        "clarity"
+      ],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "presence_acceptance_control.uncertainty",
+      "universeId": "presence_acceptance_control",
+      "title": "Aceptar la incertidumbre",
+      "description": "Afirmaciones para trabajar aceptar la incertidumbre.",
+      "conceptTagIds": [
+        "uncertainty",
+        "adaptability"
+      ],
+      "desiredStateIds": [
+        "acceptance",
+        "confidence",
+        "resilience"
+      ],
+      "order": 4,
+      "status": "active"
+    },
+    {
+      "id": "presence_acceptance_control.reality_acceptance",
+      "universeId": "presence_acceptance_control",
+      "title": "Aceptar lo que ya es",
+      "description": "Afirmaciones para trabajar aceptar lo que ya es.",
+      "conceptTagIds": [
+        "reality_acceptance",
+        "past_acceptance"
+      ],
+      "desiredStateIds": [
+        "acceptance",
+        "freedom"
+      ],
+      "order": 5,
+      "status": "active"
+    },
+    {
+      "id": "gratitude_hope_possibility.gratitude",
+      "universeId": "gratitude_hope_possibility",
+      "title": "Sentir gratitud",
+      "description": "Afirmaciones para trabajar sentir gratitud.",
+      "conceptTagIds": [
+        "gratitude",
+        "everyday_appreciation"
+      ],
+      "desiredStateIds": [
+        "gratitude",
+        "presence"
+      ],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "gratitude_hope_possibility.hope",
+      "universeId": "gratitude_hope_possibility",
+      "title": "Recuperar esperanza",
+      "description": "Afirmaciones para trabajar recuperar esperanza.",
+      "conceptTagIds": [
+        "hope"
+      ],
+      "desiredStateIds": [
+        "hope",
+        "resilience"
+      ],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "gratitude_hope_possibility.possibilities",
+      "universeId": "gratitude_hope_possibility",
+      "title": "Abrirme a nuevas posibilidades",
+      "description": "Afirmaciones para trabajar abrirme a nuevas posibilidades.",
+      "conceptTagIds": [
+        "possibility",
+        "opportunity"
+      ],
+      "desiredStateIds": [
+        "hope",
+        "purpose"
+      ],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.procrastination",
+      "universeId": "motivation_discipline_responsibility",
+      "title": "Empezar y dejar de procrastinar",
+      "description": "Afirmaciones para trabajar empezar y dejar de procrastinar.",
+      "conceptTagIds": [
+        "procrastination",
+        "starting",
+        "small_steps"
+      ],
+      "desiredStateIds": [
+        "motivation",
+        "focus"
+      ],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.discipline_consistency",
+      "universeId": "motivation_discipline_responsibility",
+      "title": "Construir disciplina y constancia",
+      "description": "Afirmaciones para trabajar construir disciplina y constancia.",
+      "conceptTagIds": [
+        "discipline",
+        "consistency",
+        "habit_building"
+      ],
+      "desiredStateIds": [
+        "consistency",
+        "motivation"
+      ],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.act_without_motivation",
+      "universeId": "motivation_discipline_responsibility",
+      "title": "Actuar aunque no tenga motivación",
+      "description": "Afirmaciones para trabajar actuar aunque no tenga motivación.",
+      "conceptTagIds": [
+        "low_motivation",
+        "discipline"
+      ],
+      "desiredStateIds": [
+        "motivation",
+        "consistency"
+      ],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.finish_what_i_start",
+      "universeId": "motivation_discipline_responsibility",
+      "title": "Terminar lo que empiezo",
+      "description": "Afirmaciones para trabajar terminar lo que empiezo.",
+      "conceptTagIds": [
+        "finishing",
+        "persistence"
+      ],
+      "desiredStateIds": [
+        "consistency",
+        "confidence"
+      ],
+      "order": 4,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.return_after_quitting",
+      "universeId": "motivation_discipline_responsibility",
+      "title": "Volver después de haber abandonado",
+      "description": "Afirmaciones para trabajar volver después de haber abandonado.",
+      "conceptTagIds": [
+        "restarting",
+        "consistency"
+      ],
+      "desiredStateIds": [
+        "resilience",
+        "consistency"
+      ],
+      "order": 5,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.personal_accountability",
+      "universeId": "motivation_discipline_responsibility",
+      "title": "Cumplir conmigo",
+      "description": "Afirmaciones para trabajar cumplir conmigo.",
+      "conceptTagIds": [
+        "accountability",
+        "excuses"
+      ],
+      "desiredStateIds": [
+        "confidence",
+        "consistency"
+      ],
+      "order": 6,
+      "status": "active"
+    },
+    {
+      "id": "work_money_growth.career_growth",
+      "universeId": "work_money_growth",
+      "title": "Crecer en mi carrera",
+      "description": "Afirmaciones para trabajar crecer en mi carrera.",
+      "conceptTagIds": [
+        "career_growth",
+        "professional_identity"
+      ],
+      "desiredStateIds": [
+        "confidence",
+        "purpose"
+      ],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "work_money_growth.money_relationship",
+      "universeId": "work_money_growth",
+      "title": "Construir una relación sana con el dinero",
+      "description": "Afirmaciones para trabajar construir una relación sana con el dinero.",
+      "conceptTagIds": [
+        "money_beliefs",
+        "financial_security"
+      ],
+      "desiredStateIds": [
+        "freedom",
+        "clarity"
+      ],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "work_money_growth.work_value_compensation",
+      "universeId": "work_money_growth",
+      "title": "Valorar y cobrar mi trabajo",
+      "description": "Afirmaciones para trabajar valorar y cobrar mi trabajo.",
+      "conceptTagIds": [
+        "compensation",
+        "negotiation",
+        "value_creation"
+      ],
+      "desiredStateIds": [
+        "confidence",
+        "freedom"
+      ],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "work_money_growth.entrepreneurship",
+      "universeId": "work_money_growth",
+      "title": "Emprender y crear valor",
+      "description": "Afirmaciones para trabajar emprender y crear valor.",
+      "conceptTagIds": [
+        "entrepreneurship",
+        "selling",
+        "value_creation"
+      ],
+      "desiredStateIds": [
+        "courage",
+        "confidence",
+        "purpose"
+      ],
+      "order": 4,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.body_acceptance",
+      "universeId": "body_energy_wellbeing",
+      "title": "Aceptar y querer mi cuerpo",
+      "description": "Afirmaciones para trabajar aceptar y querer mi cuerpo.",
+      "conceptTagIds": [
+        "body_acceptance",
+        "body_image"
+      ],
+      "desiredStateIds": [
+        "self_compassion",
+        "acceptance"
+      ],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.body_confidence",
+      "universeId": "body_energy_wellbeing",
+      "title": "Sentirme seguro en mi cuerpo",
+      "description": "Afirmaciones para trabajar sentirme seguro en mi cuerpo.",
+      "conceptTagIds": [
+        "body_confidence",
+        "body_image"
+      ],
+      "desiredStateIds": [
+        "confidence",
+        "inner_safety"
+      ],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.energy",
+      "universeId": "body_energy_wellbeing",
+      "title": "Sentirme con más energía",
+      "description": "Afirmaciones para trabajar sentirme con más energía.",
+      "conceptTagIds": [
+        "energy",
+        "pacing"
+      ],
+      "desiredStateIds": [
+        "energy",
+        "clarity"
+      ],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.physical_capability",
+      "universeId": "body_energy_wellbeing",
+      "title": "Sentirme fuerte y capaz físicamente",
+      "description": "Afirmaciones para trabajar sentirme fuerte y capaz físicamente.",
+      "conceptTagIds": [
+        "physical_strength",
+        "capability"
+      ],
+      "desiredStateIds": [
+        "strength",
+        "capability"
+      ],
+      "order": 4,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.enjoy_movement",
+      "universeId": "body_energy_wellbeing",
+      "title": "Disfrutar del movimiento",
+      "description": "Afirmaciones para trabajar disfrutar del movimiento.",
+      "conceptTagIds": [
+        "movement",
+        "exercise_relationship"
+      ],
+      "desiredStateIds": [
+        "energy",
+        "freedom"
+      ],
+      "order": 5,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.body_care",
+      "universeId": "body_energy_wellbeing",
+      "title": "Escuchar y cuidar mi cuerpo",
+      "description": "Afirmaciones para trabajar escuchar y cuidar mi cuerpo.",
+      "conceptTagIds": [
+        "body_awareness",
+        "recovery",
+        "rest"
+      ],
+      "desiredStateIds": [
+        "self_compassion",
+        "energy"
+      ],
+      "order": 6,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.receive_love",
+      "universeId": "love_desire_romantic_relationships",
+      "title": "Abrirme a recibir amor",
+      "description": "Afirmaciones para trabajar abrirme a recibir amor.",
+      "conceptTagIds": [
+        "receiving_love",
+        "affection"
+      ],
+      "desiredStateIds": [
+        "love",
+        "inner_safety"
+      ],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.desire_attraction",
+      "universeId": "love_desire_romantic_relationships",
+      "title": "Sentirme deseado y atractivo",
+      "description": "Afirmaciones para trabajar sentirme deseado y atractivo.",
+      "conceptTagIds": [
+        "desirability",
+        "attraction",
+        "desire"
+      ],
+      "desiredStateIds": [
+        "desirability",
+        "confidence"
+      ],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.secure_relationship",
+      "universeId": "love_desire_romantic_relationships",
+      "title": "Construir una relación amorosa segura",
+      "description": "Afirmaciones para trabajar construir una relación amorosa segura.",
+      "conceptTagIds": [
+        "romantic_security",
+        "relationship_needs"
+      ],
+      "desiredStateIds": [
+        "love",
+        "inner_safety",
+        "connection"
+      ],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.intimacy",
+      "universeId": "love_desire_romantic_relationships",
+      "title": "Abrirme a la intimidad",
+      "description": "Afirmaciones para trabajar abrirme a la intimidad.",
+      "conceptTagIds": [
+        "intimacy",
+        "vulnerability",
+        "consent"
+      ],
+      "desiredStateIds": [
+        "love",
+        "connection",
+        "inner_safety"
+      ],
+      "order": 4,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.rejection",
+      "universeId": "love_desire_romantic_relationships",
+      "title": "Superar un rechazo",
+      "description": "Afirmaciones para trabajar superar un rechazo.",
+      "conceptTagIds": [
+        "rejection"
+      ],
+      "desiredStateIds": [
+        "self_worth",
+        "resilience",
+        "hope"
+      ],
+      "order": 5,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.breakup_recovery",
+      "universeId": "love_desire_romantic_relationships",
+      "title": "Atravesar una ruptura y volver a confiar",
+      "description": "Afirmaciones para trabajar atravesar una ruptura y volver a confiar.",
+      "conceptTagIds": [
+        "breakup",
+        "romantic_trust"
+      ],
+      "desiredStateIds": [
+        "resilience",
+        "hope",
+        "love"
+      ],
+      "order": 6,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.loneliness",
+      "universeId": "connection_belonging",
+      "title": "Atravesar la soledad",
+      "description": "Afirmaciones para trabajar atravesar la soledad.",
+      "conceptTagIds": [
+        "loneliness",
+        "support"
+      ],
+      "desiredStateIds": [
+        "connection",
+        "hope"
+      ],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.belonging",
+      "universeId": "connection_belonging",
+      "title": "Sentir que pertenezco",
+      "description": "Afirmaciones para trabajar sentir que pertenezco.",
+      "conceptTagIds": [
+        "belonging",
+        "community"
+      ],
+      "desiredStateIds": [
+        "belonging",
+        "connection"
+      ],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.find_my_people",
+      "universeId": "connection_belonging",
+      "title": "Encontrar mi gente",
+      "description": "Afirmaciones para trabajar encontrar mi gente.",
+      "conceptTagIds": [
+        "community",
+        "social_initiative"
+      ],
+      "desiredStateIds": [
+        "connection",
+        "belonging"
+      ],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.friendships",
+      "universeId": "connection_belonging",
+      "title": "Construir amistades",
+      "description": "Afirmaciones para trabajar construir amistades.",
+      "conceptTagIds": [
+        "friendship",
+        "social_initiative"
+      ],
+      "desiredStateIds": [
+        "connection",
+        "belonging"
+      ],
+      "order": 4,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.authentic_connection",
+      "universeId": "connection_belonging",
+      "title": "Conectar siendo yo mismo",
+      "description": "Afirmaciones para trabajar conectar siendo yo mismo.",
+      "conceptTagIds": [
+        "authenticity",
+        "vulnerability"
+      ],
+      "desiredStateIds": [
+        "connection",
+        "confidence"
+      ],
+      "order": 5,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.own_company",
+      "universeId": "connection_belonging",
+      "title": "Disfrutar de mi propia compañía",
+      "description": "Afirmaciones para trabajar disfrutar de mi propia compañía.",
+      "conceptTagIds": [
+        "solitude",
+        "self_acceptance"
+      ],
+      "desiredStateIds": [
+        "inner_safety",
+        "self_compassion"
+      ],
+      "order": 6,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.difficult_period",
+      "universeId": "change_loss_new_beginnings",
+      "title": "Atravesar una etapa difícil",
+      "description": "Afirmaciones para trabajar atravesar una etapa difícil.",
+      "conceptTagIds": [
+        "difficult_period",
+        "support"
+      ],
+      "desiredStateIds": [
+        "resilience",
+        "hope"
+      ],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.adapt_to_change",
+      "universeId": "change_loss_new_beginnings",
+      "title": "Adaptarme a un cambio",
+      "description": "Afirmaciones para trabajar adaptarme a un cambio.",
+      "conceptTagIds": [
+        "change",
+        "adaptation"
+      ],
+      "desiredStateIds": [
+        "resilience",
+        "acceptance"
+      ],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.grief",
+      "universeId": "change_loss_new_beginnings",
+      "title": "Atravesar una pérdida o duelo",
+      "description": "Afirmaciones para trabajar atravesar una pérdida o duelo.",
+      "conceptTagIds": [
+        "loss",
+        "grief"
+      ],
+      "desiredStateIds": [
+        "self_compassion",
+        "acceptance",
+        "hope"
+      ],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.closure",
+      "universeId": "change_loss_new_beginnings",
+      "title": "Cerrar un ciclo",
+      "description": "Afirmaciones para trabajar cerrar un ciclo.",
+      "conceptTagIds": [
+        "closure",
+        "letting_go"
+      ],
+      "desiredStateIds": [
+        "acceptance",
+        "freedom"
+      ],
+      "order": 4,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.rebuild",
+      "universeId": "change_loss_new_beginnings",
+      "title": "Reconstruirme",
+      "description": "Afirmaciones para trabajar reconstruirme.",
+      "conceptTagIds": [
+        "rebuilding",
+        "identity_growth"
+      ],
+      "desiredStateIds": [
+        "resilience",
+        "hope",
+        "confidence"
+      ],
+      "order": 5,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.new_beginning",
+      "universeId": "change_loss_new_beginnings",
+      "title": "Empezar de nuevo",
+      "description": "Afirmaciones para trabajar empezar de nuevo.",
+      "conceptTagIds": [
+        "new_beginning",
+        "second_chance"
+      ],
+      "desiredStateIds": [
+        "hope",
+        "courage"
+      ],
+      "order": 6,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom.external_expectations",
+      "universeId": "expectations_boundaries_freedom",
+      "title": "Liberarme de expectativas y aprobación ajena",
+      "description": "Afirmaciones para trabajar liberarme de expectativas y aprobación ajena.",
+      "conceptTagIds": [
+        "external_expectations",
+        "approval_seeking",
+        "people_pleasing"
+      ],
+      "desiredStateIds": [
+        "freedom",
+        "confidence"
+      ],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom.self_pressure",
+      "universeId": "expectations_boundaries_freedom",
+      "title": "Bajar la autoexigencia",
+      "description": "Afirmaciones para trabajar bajar la autoexigencia.",
+      "conceptTagIds": [
+        "self_pressure",
+        "productivity_worth"
+      ],
+      "desiredStateIds": [
+        "self_compassion",
+        "calm"
+      ],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom.perfectionism",
+      "universeId": "expectations_boundaries_freedom",
+      "title": "Soltar el perfeccionismo",
+      "description": "Afirmaciones para trabajar soltar el perfeccionismo.",
+      "conceptTagIds": [
+        "perfectionism"
+      ],
+      "desiredStateIds": [
+        "freedom",
+        "confidence"
+      ],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom.boundaries",
+      "universeId": "expectations_boundaries_freedom",
+      "title": "Poner límites y decir que no",
+      "description": "Afirmaciones para trabajar poner límites y decir que no.",
+      "conceptTagIds": [
+        "boundaries",
+        "saying_no"
+      ],
+      "desiredStateIds": [
+        "freedom",
+        "confidence"
+      ],
+      "order": 4,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom.life_timeline",
+      "universeId": "expectations_boundaries_freedom",
+      "title": "Dejar de sentir que voy tarde",
+      "description": "Afirmaciones para trabajar dejar de sentir que voy tarde.",
+      "conceptTagIds": [
+        "life_timeline",
+        "comparison"
+      ],
+      "desiredStateIds": [
+        "freedom",
+        "hope"
+      ],
+      "order": 5,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.self_discovery",
+      "universeId": "purpose_identity_direction",
+      "title": "Conocerme mejor",
+      "description": "Afirmaciones para trabajar conocerme mejor.",
+      "conceptTagIds": [
+        "self_discovery"
+      ],
+      "desiredStateIds": [
+        "clarity",
+        "purpose"
+      ],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.values",
+      "universeId": "purpose_identity_direction",
+      "title": "Clarificar mis valores",
+      "description": "Afirmaciones para trabajar clarificar mis valores.",
+      "conceptTagIds": [
+        "personal_values"
+      ],
+      "desiredStateIds": [
+        "clarity",
+        "purpose"
+      ],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.direction",
+      "universeId": "purpose_identity_direction",
+      "title": "Encontrar dirección",
+      "description": "Afirmaciones para trabajar encontrar dirección.",
+      "conceptTagIds": [
+        "direction"
+      ],
+      "desiredStateIds": [
+        "clarity",
+        "purpose"
+      ],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.purpose",
+      "universeId": "purpose_identity_direction",
+      "title": "Vivir con propósito",
+      "description": "Afirmaciones para trabajar vivir con propósito.",
+      "conceptTagIds": [
+        "purpose",
+        "meaning"
+      ],
+      "desiredStateIds": [
+        "purpose",
+        "motivation"
+      ],
+      "order": 4,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.identity_growth",
+      "universeId": "purpose_identity_direction",
+      "title": "Construir quién quiero ser",
+      "description": "Afirmaciones para trabajar construir quién quiero ser.",
+      "conceptTagIds": [
+        "identity_growth",
+        "personal_values"
+      ],
+      "desiredStateIds": [
+        "purpose",
+        "confidence"
+      ],
+      "order": 5,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.trust_process",
+      "universeId": "purpose_identity_direction",
+      "title": "Confiar en mi proceso",
+      "description": "Afirmaciones para trabajar confiar en mi proceso.",
+      "conceptTagIds": [
+        "trust_process",
+        "meaning"
+      ],
+      "desiredStateIds": [
+        "hope",
+        "acceptance",
+        "purpose"
+      ],
+      "order": 6,
+      "status": "active"
+    }
+  ],
+  "collections": [
+    {
+      "id": "self_worth.feeling_enough.intrinsic_worth",
+      "universeId": "self_worth",
+      "themeId": "self_worth.feeling_enough",
+      "title": "No tengo que ganarme mi valor",
+      "description": "Ángulo editorial: No tengo que ganarme mi valor.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "intrinsic_worth"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.feeling_enough.enough_without_perfection",
+      "universeId": "self_worth",
+      "themeId": "self_worth.feeling_enough",
+      "title": "Ser suficiente sin ser perfecto",
+      "description": "Ángulo editorial: Ser suficiente sin ser perfecto.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "self_acceptance"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.feeling_enough.worth_beyond_productivity",
+      "universeId": "self_worth",
+      "themeId": "self_worth.feeling_enough",
+      "title": "Mi valor no depende de cuánto produzco",
+      "description": "Ángulo editorial: Mi valor no depende de cuánto produzco.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "productivity_worth"
+      ],
+      "contextIds": [
+        "work",
+        "study"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.recognize_my_value.see_my_strengths",
+      "universeId": "self_worth",
+      "themeId": "self_worth.recognize_my_value",
+      "title": "Ver lo bueno que hay en mí",
+      "description": "Ángulo editorial: Ver lo bueno que hay en mí.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "strengths"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.recognize_my_value.recognize_my_contribution",
+      "universeId": "self_worth",
+      "themeId": "self_worth.recognize_my_value",
+      "title": "Reconocer lo que aporto",
+      "description": "Ángulo editorial: Reconocer lo que aporto.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "contribution"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.recognize_my_value.inner_validation",
+      "universeId": "self_worth",
+      "themeId": "self_worth.recognize_my_value",
+      "title": "Validarme desde adentro",
+      "description": "Ángulo editorial: Validarme desde adentro.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "external_validation"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.inner_dialogue.reduce_self_criticism",
+      "universeId": "self_worth",
+      "themeId": "self_worth.inner_dialogue",
+      "title": "Bajar la autocrítica",
+      "description": "Ángulo editorial: Bajar la autocrítica.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "self_criticism"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.inner_dialogue.after_mistakes",
+      "universeId": "self_worth",
+      "themeId": "self_worth.inner_dialogue",
+      "title": "Cuando me equivoco",
+      "description": "Ángulo editorial: Cuando me equivoco.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "mistakes"
+      ],
+      "contextIds": [],
+      "momentIds": [
+        "after_setback"
+      ],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.inner_dialogue.on_my_own_side",
+      "universeId": "self_worth",
+      "themeId": "self_worth.inner_dialogue",
+      "title": "Estar de mi propio lado",
+      "description": "Ángulo editorial: Estar de mi propio lado.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "self_compassion",
+        "inner_safety"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.comparison.return_to_my_path",
+      "universeId": "self_worth",
+      "themeId": "self_worth.comparison",
+      "title": "Volver a mi propio camino",
+      "description": "Ángulo editorial: Volver a mi propio camino.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "comparison"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.comparison.admire_without_shrinking",
+      "universeId": "self_worth",
+      "themeId": "self_worth.comparison",
+      "title": "Admirar sin sentirme menos",
+      "description": "Ángulo editorial: Admirar sin sentirme menos.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "comparison"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.comparison.stop_ranking_my_worth",
+      "universeId": "self_worth",
+      "themeId": "self_worth.comparison",
+      "title": "Dejar de medir mi valor con otros",
+      "description": "Ángulo editorial: Dejar de medir mi valor con otros.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "comparison",
+        "external_validation"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.self_forgiveness.not_my_worst_mistake",
+      "universeId": "self_worth",
+      "themeId": "self_worth.self_forgiveness",
+      "title": "No soy mi peor error",
+      "description": "Ángulo editorial: No soy mi peor error.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "mistakes",
+        "self_forgiveness"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.self_forgiveness.learn_without_punishment",
+      "universeId": "self_worth",
+      "themeId": "self_worth.self_forgiveness",
+      "title": "Aprender sin castigarme",
+      "description": "Ángulo editorial: Aprender sin castigarme.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "mistakes",
+        "self_forgiveness"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.self_forgiveness.release_guilt_shame",
+      "universeId": "self_worth",
+      "themeId": "self_worth.self_forgiveness",
+      "title": "Soltar culpa y vergüenza",
+      "description": "Ángulo editorial: Soltar culpa y vergüenza.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "guilt",
+        "shame"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.self_forgiveness.second_chance",
+      "universeId": "self_worth",
+      "themeId": "self_worth.self_forgiveness",
+      "title": "Darme otra oportunidad",
+      "description": "Ángulo editorial: Darme otra oportunidad.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "second_chance"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 4,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.achievement_recognition.stop_minimizing",
+      "universeId": "self_worth",
+      "themeId": "self_worth.achievement_recognition",
+      "title": "No minimizar lo que consigo",
+      "description": "Ángulo editorial: No minimizar lo que consigo.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "achievement"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.achievement_recognition.give_myself_credit",
+      "universeId": "self_worth",
+      "themeId": "self_worth.achievement_recognition",
+      "title": "Darme crédito por lo que construí",
+      "description": "Ángulo editorial: Darme crédito por lo que construí.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "achievement",
+        "contribution"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "self_worth.achievement_recognition.proud_of_who_im_becoming",
+      "universeId": "self_worth",
+      "themeId": "self_worth.achievement_recognition",
+      "title": "Sentir orgullo de quien estoy siendo",
+      "description": "Ángulo editorial: Sentir orgullo de quien estoy siendo.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "pride",
+        "identity_growth"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.believe_in_my_abilities.remember_my_capability",
+      "universeId": "confidence_courage",
+      "themeId": "confidence_courage.believe_in_my_abilities",
+      "title": "Recordar de lo que soy capaz",
+      "description": "Ángulo editorial: Recordar de lo que soy capaz.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "capability"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.believe_in_my_abilities.trust_while_learning",
+      "universeId": "confidence_courage",
+      "themeId": "confidence_courage.believe_in_my_abilities",
+      "title": "Confiar mientras sigo aprendiendo",
+      "description": "Ángulo editorial: Confiar mientras sigo aprendiendo.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "learning"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.believe_in_my_abilities.see_myself_as_capable",
+      "universeId": "confidence_courage",
+      "themeId": "confidence_courage.believe_in_my_abilities",
+      "title": "Verme como alguien capaz",
+      "description": "Ángulo editorial: Verme como alguien capaz.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "capability",
+        "identity_growth"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.move_with_fear.next_step",
+      "universeId": "confidence_courage",
+      "themeId": "confidence_courage.move_with_fear",
+      "title": "Dar el siguiente paso",
+      "description": "Ángulo editorial: Dar el siguiente paso.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "courage"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.move_with_fear.fear_without_obedience",
+      "universeId": "confidence_courage",
+      "themeId": "confidence_courage.move_with_fear",
+      "title": "Hacer espacio al miedo sin obedecerlo",
+      "description": "Ángulo editorial: Hacer espacio al miedo sin obedecerlo.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "fear"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.move_with_fear.courageous_identity",
+      "universeId": "confidence_courage",
+      "themeId": "confidence_courage.move_with_fear",
+      "title": "Convertirme en alguien valiente",
+      "description": "Ángulo editorial: Convertirme en alguien valiente.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "courage"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.failure.failure_is_not_the_end",
+      "universeId": "confidence_courage",
+      "themeId": "confidence_courage.failure",
+      "title": "Fallar no termina mi camino",
+      "description": "Ángulo editorial: Fallar no termina mi camino.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "fear_of_failure"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.failure.learn_from_failure",
+      "universeId": "confidence_courage",
+      "themeId": "confidence_courage.failure",
+      "title": "Aprender de la caída",
+      "description": "Ángulo editorial: Aprender de la caída.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "fear_of_failure",
+        "mistakes"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.failure.risk_without_self_worth",
+      "universeId": "confidence_courage",
+      "themeId": "confidence_courage.failure",
+      "title": "Atreverme sin poner mi valor en juego",
+      "description": "Ángulo editorial: Atreverme sin poner mi valor en juego.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "fear_of_failure",
+        "intrinsic_worth"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.impostor.i_belong_here",
+      "universeId": "confidence_courage",
+      "themeId": "confidence_courage.impostor",
+      "title": "Tengo derecho a estar acá",
+      "description": "Ángulo editorial: Tengo derecho a estar acá.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "impostor_syndrome"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.impostor.recognize_my_path",
+      "universeId": "confidence_courage",
+      "themeId": "confidence_courage.impostor",
+      "title": "Reconocer cómo llegué hasta acá",
+      "description": "Ángulo editorial: Reconocer cómo llegué hasta acá.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "impostor_syndrome",
+        "achievement"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.impostor.belong_without_mastery",
+      "universeId": "confidence_courage",
+      "themeId": "confidence_courage.impostor",
+      "title": "No necesitar sentirme experto para pertenecer",
+      "description": "Ángulo editorial: No necesitar sentirme experto para pertenecer.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "impostor_syndrome",
+        "learning"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.decisions.choose_with_what_i_know",
+      "universeId": "confidence_courage",
+      "themeId": "confidence_courage.decisions",
+      "title": "Elegir con lo que sé hoy",
+      "description": "Ángulo editorial: Elegir con lo que sé hoy.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "decision_confidence"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.decisions.stop_rechecking",
+      "universeId": "confidence_courage",
+      "themeId": "confidence_courage.decisions",
+      "title": "Dejar de revisar cada decisión",
+      "description": "Ángulo editorial: Dejar de revisar cada decisión.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "decision_confidence",
+        "certainty_seeking"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.decisions.own_my_choices",
+      "universeId": "confidence_courage",
+      "themeId": "confidence_courage.decisions",
+      "title": "Hacerme dueño de mis elecciones",
+      "description": "Ángulo editorial: Hacerme dueño de mis elecciones.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "decision_confidence",
+        "personal_agency"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.take_space.my_voice_matters",
+      "universeId": "confidence_courage",
+      "themeId": "confidence_courage.take_space",
+      "title": "Mi voz merece lugar",
+      "description": "Ángulo editorial: Mi voz merece lugar.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "self_expression",
+        "visibility"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.take_space.speak_clearly",
+      "universeId": "confidence_courage",
+      "themeId": "confidence_courage.take_space",
+      "title": "Hablar con claridad y seguridad",
+      "description": "Ángulo editorial: Hablar con claridad y seguridad.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "self_expression"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "confidence_courage.take_space.stop_shrinking",
+      "universeId": "confidence_courage",
+      "themeId": "confidence_courage.take_space",
+      "title": "Dejar de achicarme para encajar",
+      "description": "Ángulo editorial: Dejar de achicarme para encajar.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "visibility",
+        "approval_seeking"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "calm_peace.find_calm.return_to_myself",
+      "universeId": "calm_peace",
+      "themeId": "calm_peace.find_calm",
+      "title": "Volver a mí",
+      "description": "Ángulo editorial: Volver a mí.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "calm"
+      ],
+      "contextIds": [],
+      "momentIds": [
+        "difficult_moment"
+      ],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "calm_peace.find_calm.calm_during_busy_days",
+      "universeId": "calm_peace",
+      "themeId": "calm_peace.find_calm",
+      "title": "Calma en medio de un día intenso",
+      "description": "Ángulo editorial: Calma en medio de un día intenso.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "calm",
+        "overwhelm"
+      ],
+      "contextIds": [
+        "work",
+        "study"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "calm_peace.find_calm.inner_safety",
+      "universeId": "calm_peace",
+      "themeId": "calm_peace.find_calm",
+      "title": "Sentirme seguro dentro de mí",
+      "description": "Ángulo editorial: Sentirme seguro dentro de mí.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "inner_safety"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "calm_peace.release_tension.allow_myself_to_relax",
+      "universeId": "calm_peace",
+      "themeId": "calm_peace.release_tension",
+      "title": "Permitirme aflojar",
+      "description": "Ángulo editorial: Permitirme aflojar.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "tension"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "calm_peace.release_tension.stop_carrying_everything",
+      "universeId": "calm_peace",
+      "themeId": "calm_peace.release_tension",
+      "title": "Dejar de cargar todo al mismo tiempo",
+      "description": "Ángulo editorial: Dejar de cargar todo al mismo tiempo.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "overwhelm"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "calm_peace.release_tension.calm_way_of_being",
+      "universeId": "calm_peace",
+      "themeId": "calm_peace.release_tension",
+      "title": "Hacer de la calma una forma de estar",
+      "description": "Ángulo editorial: Hacer de la calma una forma de estar.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "calm"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "calm_peace.overwhelmed.only_now",
+      "universeId": "calm_peace",
+      "themeId": "calm_peace.overwhelmed",
+      "title": "Solo necesito ocuparme de ahora",
+      "description": "Ángulo editorial: Solo necesito ocuparme de ahora.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "overwhelm"
+      ],
+      "contextIds": [],
+      "momentIds": [
+        "difficult_moment"
+      ],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "calm_peace.overwhelmed.one_thing_at_a_time",
+      "universeId": "calm_peace",
+      "themeId": "calm_peace.overwhelmed",
+      "title": "Una cosa a la vez",
+      "description": "Ángulo editorial: Una cosa a la vez.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "overwhelm"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "calm_peace.overwhelmed.stay_grounded_in_chaos",
+      "universeId": "calm_peace",
+      "themeId": "calm_peace.overwhelmed",
+      "title": "Atravesar el caos sin perderme",
+      "description": "Ángulo editorial: Atravesar el caos sin perderme.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "overwhelm",
+        "inner_safety"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "calm_peace.rest_without_guilt.permission_to_stop",
+      "universeId": "calm_peace",
+      "themeId": "calm_peace.rest_without_guilt",
+      "title": "Darme permiso para parar",
+      "description": "Ángulo editorial: Darme permiso para parar.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "rest"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "calm_peace.rest_without_guilt.not_always_available",
+      "universeId": "calm_peace",
+      "themeId": "calm_peace.rest_without_guilt",
+      "title": "No tener que estar disponible siempre",
+      "description": "Ángulo editorial: No tener que estar disponible siempre.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "availability",
+        "boundaries"
+      ],
+      "contextIds": [
+        "work",
+        "family",
+        "romantic_relationship",
+        "digital_life"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "calm_peace.rest_without_guilt.healthy_relationship_with_rest",
+      "universeId": "calm_peace",
+      "themeId": "calm_peace.rest_without_guilt",
+      "title": "Construir una relación sana con el descanso",
+      "description": "Ángulo editorial: Construir una relación sana con el descanso.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "rest"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "mind_anxiety.overthinking.stop_another_loop",
+      "universeId": "mind_anxiety",
+      "themeId": "mind_anxiety.overthinking",
+      "title": "Dejar de darle otra vuelta",
+      "description": "Ángulo editorial: Dejar de darle otra vuelta.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "overthinking",
+        "rumination"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "mind_anxiety.overthinking.no_perfect_certainty",
+      "universeId": "mind_anxiety",
+      "themeId": "mind_anxiety.overthinking",
+      "title": "No necesitar encontrar certeza perfecta",
+      "description": "Ángulo editorial: No necesitar encontrar certeza perfecta.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "certainty_seeking",
+        "uncertainty"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "mind_anxiety.overthinking.return_to_life",
+      "universeId": "mind_anxiety",
+      "themeId": "mind_anxiety.overthinking",
+      "title": "Salir de mi cabeza y volver a vivir",
+      "description": "Ángulo editorial: Salir de mi cabeza y volver a vivir.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "overthinking",
+        "present_moment"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "mind_anxiety.catastrophizing.possibility_not_prediction",
+      "universeId": "mind_anxiety",
+      "themeId": "mind_anxiety.catastrophizing",
+      "title": "Una posibilidad no es una predicción",
+      "description": "Ángulo editorial: Una posibilidad no es una predicción.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "catastrophizing"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "mind_anxiety.catastrophizing.not_prepare_for_every_disaster",
+      "universeId": "mind_anxiety",
+      "themeId": "mind_anxiety.catastrophizing",
+      "title": "No tener que prepararme para todas las catástrofes",
+      "description": "Ángulo editorial: No tener que prepararme para todas las catástrofes.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "catastrophizing",
+        "worry"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "mind_anxiety.catastrophizing.multiple_possible_futures",
+      "universeId": "mind_anxiety",
+      "themeId": "mind_anxiety.catastrophizing",
+      "title": "Hacer espacio a futuros diferentes",
+      "description": "Ángulo editorial: Hacer espacio a futuros diferentes.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "catastrophizing",
+        "possibility"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "mind_anxiety.negative_thoughts.thought_not_fact",
+      "universeId": "mind_anxiety",
+      "themeId": "mind_anxiety.negative_thoughts",
+      "title": "Un pensamiento no es un hecho",
+      "description": "Ángulo editorial: Un pensamiento no es un hecho.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "negative_thoughts"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "mind_anxiety.negative_thoughts.choose_what_i_feed",
+      "universeId": "mind_anxiety",
+      "themeId": "mind_anxiety.negative_thoughts",
+      "title": "Elegir qué ideas alimento",
+      "description": "Ángulo editorial: Elegir qué ideas alimento.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "negative_thoughts"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "mind_anxiety.negative_thoughts.relationship_with_inner_voice",
+      "universeId": "mind_anxiety",
+      "themeId": "mind_anxiety.negative_thoughts",
+      "title": "Cambiar mi relación con mi voz mental",
+      "description": "Ángulo editorial: Cambiar mi relación con mi voz mental.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "negative_thoughts",
+        "self_criticism"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "mind_anxiety.intrusive_thoughts.notice_and_release",
+      "universeId": "mind_anxiety",
+      "themeId": "mind_anxiety.intrusive_thoughts",
+      "title": "Puedo notar un pensamiento y dejarlo pasar",
+      "description": "Ángulo editorial: Puedo notar un pensamiento y dejarlo pasar.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "intrusive_thoughts"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "mind_anxiety.intrusive_thoughts.not_everything_has_meaning",
+      "universeId": "mind_anxiety",
+      "themeId": "mind_anxiety.intrusive_thoughts",
+      "title": "No darle significado a todo lo que aparece",
+      "description": "Ángulo editorial: No darle significado a todo lo que aparece.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "intrusive_thoughts"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "mind_anxiety.intrusive_thoughts.self_beyond_mental_content",
+      "universeId": "mind_anxiety",
+      "themeId": "mind_anxiety.intrusive_thoughts",
+      "title": "Separar quién soy de lo que mi mente produce",
+      "description": "Ángulo editorial: Separar quién soy de lo que mi mente produce.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "intrusive_thoughts",
+        "identity_growth"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "mind_anxiety.social_judgment.cannot_read_minds",
+      "universeId": "mind_anxiety",
+      "themeId": "mind_anxiety.social_judgment",
+      "title": "No puedo leer la mente de los demás",
+      "description": "Ángulo editorial: No puedo leer la mente de los demás.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "social_judgment"
+      ],
+      "contextIds": [
+        "social"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "mind_anxiety.social_judgment.allow_being_seen",
+      "universeId": "mind_anxiety",
+      "themeId": "mind_anxiety.social_judgment",
+      "title": "Permitirme ser visto",
+      "description": "Ángulo editorial: Permitirme ser visto.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "social_anxiety",
+        "visibility"
+      ],
+      "contextIds": [
+        "social"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "mind_anxiety.social_judgment.self_without_controlling_opinions",
+      "universeId": "mind_anxiety",
+      "themeId": "mind_anxiety.social_judgment",
+      "title": "Ser yo sin controlar qué piensan",
+      "description": "Ángulo editorial: Ser yo sin controlar qué piensan.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "social_judgment",
+        "authenticity"
+      ],
+      "contextIds": [
+        "social"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "presence_acceptance_control.present_moment.return_to_now",
+      "universeId": "presence_acceptance_control",
+      "themeId": "presence_acceptance_control.present_moment",
+      "title": "Volver a este momento",
+      "description": "Ángulo editorial: Volver a este momento.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "present_moment"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "presence_acceptance_control.present_moment.be_where_i_am",
+      "universeId": "presence_acceptance_control",
+      "themeId": "presence_acceptance_control.present_moment",
+      "title": "Estar donde realmente estoy",
+      "description": "Ángulo editorial: Estar donde realmente estoy.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "present_moment"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "presence_acceptance_control.present_moment.stop_living_in_next_moment",
+      "universeId": "presence_acceptance_control",
+      "themeId": "presence_acceptance_control.present_moment",
+      "title": "Dejar de vivir siempre en el próximo momento",
+      "description": "Ángulo editorial: Dejar de vivir siempre en el próximo momento.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "present_moment",
+        "life_timeline"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "presence_acceptance_control.release_uncontrollable.what_is_mine",
+      "universeId": "presence_acceptance_control",
+      "themeId": "presence_acceptance_control.release_uncontrollable",
+      "title": "Distinguir lo mío de lo que no lo es",
+      "description": "Ángulo editorial: Distinguir lo mío de lo que no lo es.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "control"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "presence_acceptance_control.release_uncontrollable.stop_controlling_outcomes",
+      "universeId": "presence_acceptance_control",
+      "themeId": "presence_acceptance_control.release_uncontrollable",
+      "title": "Dejar de intentar controlar resultados",
+      "description": "Ángulo editorial: Dejar de intentar controlar resultados.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "control",
+        "letting_go"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "presence_acceptance_control.release_uncontrollable.unwinnable_battles",
+      "universeId": "presence_acceptance_control",
+      "themeId": "presence_acceptance_control.release_uncontrollable",
+      "title": "Liberarme de luchas que no puedo ganar",
+      "description": "Ángulo editorial: Liberarme de luchas que no puedo ganar.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "letting_go"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "presence_acceptance_control.personal_agency.next_action",
+      "universeId": "presence_acceptance_control",
+      "themeId": "presence_acceptance_control.personal_agency",
+      "title": "Elegir mi siguiente acción",
+      "description": "Ángulo editorial: Elegir mi siguiente acción.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "personal_agency"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "presence_acceptance_control.personal_agency.choose_my_response",
+      "universeId": "presence_acceptance_control",
+      "themeId": "presence_acceptance_control.personal_agency",
+      "title": "Cambiar mi respuesta",
+      "description": "Ángulo editorial: Cambiar mi respuesta.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "personal_agency"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "presence_acceptance_control.personal_agency.reclaim_agency",
+      "universeId": "presence_acceptance_control",
+      "themeId": "presence_acceptance_control.personal_agency",
+      "title": "Recuperar mi sentido de agencia",
+      "description": "Ángulo editorial: Recuperar mi sentido de agencia.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "personal_agency"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "presence_acceptance_control.uncertainty.not_know_everything_today",
+      "universeId": "presence_acceptance_control",
+      "themeId": "presence_acceptance_control.uncertainty",
+      "title": "No necesito saberlo todo hoy",
+      "description": "Ángulo editorial: No necesito saberlo todo hoy.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "uncertainty"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "presence_acceptance_control.uncertainty.move_without_guarantees",
+      "universeId": "presence_acceptance_control",
+      "themeId": "presence_acceptance_control.uncertainty",
+      "title": "Avanzar sin garantías",
+      "description": "Ángulo editorial: Avanzar sin garantías.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "uncertainty",
+        "courage"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "presence_acceptance_control.uncertainty.trust_adaptability",
+      "universeId": "presence_acceptance_control",
+      "themeId": "presence_acceptance_control.uncertainty",
+      "title": "Confiar en mi capacidad de adaptarme",
+      "description": "Ángulo editorial: Confiar en mi capacidad de adaptarme.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "adaptability"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "presence_acceptance_control.reality_acceptance.stop_arguing_with_reality",
+      "universeId": "presence_acceptance_control",
+      "themeId": "presence_acceptance_control.reality_acceptance",
+      "title": "Dejar de discutir con la realidad",
+      "description": "Ángulo editorial: Dejar de discutir con la realidad.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "reality_acceptance"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "presence_acceptance_control.reality_acceptance.make_peace_with_past",
+      "universeId": "presence_acceptance_control",
+      "themeId": "presence_acceptance_control.reality_acceptance",
+      "title": "Hacer las paces con lo ocurrido",
+      "description": "Ángulo editorial: Hacer las paces con lo ocurrido.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "past_acceptance"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "presence_acceptance_control.reality_acceptance.integrate_past",
+      "universeId": "presence_acceptance_control",
+      "themeId": "presence_acceptance_control.reality_acceptance",
+      "title": "Integrar el pasado sin seguir viviendo dentro de él",
+      "description": "Ángulo editorial: Integrar el pasado sin seguir viviendo dentro de él.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "past_acceptance",
+        "letting_go"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "gratitude_hope_possibility.gratitude.notice_what_is_here",
+      "universeId": "gratitude_hope_possibility",
+      "themeId": "gratitude_hope_possibility.gratitude",
+      "title": "Reconocer lo que sí está",
+      "description": "Ángulo editorial: Reconocer lo que sí está.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "gratitude"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "gratitude_hope_possibility.gratitude.value_in_simple_things",
+      "universeId": "gratitude_hope_possibility",
+      "themeId": "gratitude_hope_possibility.gratitude",
+      "title": "Encontrar valor en lo simple",
+      "description": "Ángulo editorial: Encontrar valor en lo simple.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "everyday_appreciation"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "gratitude_hope_possibility.gratitude.receive_the_good",
+      "universeId": "gratitude_hope_possibility",
+      "themeId": "gratitude_hope_possibility.gratitude",
+      "title": "Recibir lo bueno sin pasarlo por alto",
+      "description": "Ángulo editorial: Recibir lo bueno sin pasarlo por alto.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "gratitude"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "gratitude_hope_possibility.gratitude.grateful_way_of_seeing",
+      "universeId": "gratitude_hope_possibility",
+      "themeId": "gratitude_hope_possibility.gratitude",
+      "title": "Hacer de la gratitud una manera de mirar",
+      "description": "Ángulo editorial: Hacer de la gratitud una manera de mirar.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "gratitude"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 4,
+      "status": "active"
+    },
+    {
+      "id": "gratitude_hope_possibility.hope.this_is_a_chapter",
+      "universeId": "gratitude_hope_possibility",
+      "themeId": "gratitude_hope_possibility.hope",
+      "title": "Esta etapa no tiene que durar para siempre",
+      "description": "Ángulo editorial: Esta etapa no tiene que durar para siempre.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "hope"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "gratitude_hope_possibility.hope.remember_change",
+      "universeId": "gratitude_hope_possibility",
+      "themeId": "gratitude_hope_possibility.hope",
+      "title": "Recordar cuánto puede cambiar",
+      "description": "Ángulo editorial: Recordar cuánto puede cambiar.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "hope",
+        "change"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "gratitude_hope_possibility.hope.realistic_hope",
+      "universeId": "gratitude_hope_possibility",
+      "themeId": "gratitude_hope_possibility.hope",
+      "title": "Elegir esperanza sin negar la realidad",
+      "description": "Ángulo editorial: Elegir esperanza sin negar la realidad.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "hope",
+        "reality_acceptance"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "gratitude_hope_possibility.possibilities.unknown_good",
+      "universeId": "gratitude_hope_possibility",
+      "themeId": "gratitude_hope_possibility.possibilities",
+      "title": "No sé todo lo bueno que todavía puede pasar",
+      "description": "Ángulo editorial: No sé todo lo bueno que todavía puede pasar.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "possibility"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "gratitude_hope_possibility.possibilities.recognize_opportunities",
+      "universeId": "gratitude_hope_possibility",
+      "themeId": "gratitude_hope_possibility.possibilities",
+      "title": "Reconocer oportunidades",
+      "description": "Ángulo editorial: Reconocer oportunidades.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "opportunity"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "gratitude_hope_possibility.possibilities.expand_what_feels_possible",
+      "universeId": "gratitude_hope_possibility",
+      "themeId": "gratitude_hope_possibility.possibilities",
+      "title": "Abrirme a una vida más grande de la que imagino",
+      "description": "Ángulo editorial: Abrirme a una vida más grande de la que imagino.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "possibility"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.procrastination.just_start",
+      "universeId": "motivation_discipline_responsibility",
+      "themeId": "motivation_discipline_responsibility.procrastination",
+      "title": "Solo empezar",
+      "description": "Ángulo editorial: Solo empezar.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "starting"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.procrastination.make_it_small",
+      "universeId": "motivation_discipline_responsibility",
+      "themeId": "motivation_discipline_responsibility.procrastination",
+      "title": "Hacerlo pequeño",
+      "description": "Ángulo editorial: Hacerlo pequeño.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "small_steps"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.procrastination.stop_waiting_for_perfect_moment",
+      "universeId": "motivation_discipline_responsibility",
+      "themeId": "motivation_discipline_responsibility.procrastination",
+      "title": "Dejar de esperar el momento perfecto",
+      "description": "Ángulo editorial: Dejar de esperar el momento perfecto.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "procrastination",
+        "perfectionism"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.discipline_consistency.show_up_today",
+      "universeId": "motivation_discipline_responsibility",
+      "themeId": "motivation_discipline_responsibility.discipline_consistency",
+      "title": "Cumplir conmigo hoy",
+      "description": "Ángulo editorial: Cumplir conmigo hoy.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "consistency"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.discipline_consistency.build_sustainable_habits",
+      "universeId": "motivation_discipline_responsibility",
+      "themeId": "motivation_discipline_responsibility.discipline_consistency",
+      "title": "Construir hábitos sostenibles",
+      "description": "Ángulo editorial: Construir hábitos sostenibles.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "habit_building"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.discipline_consistency.repeat_when_boring",
+      "universeId": "motivation_discipline_responsibility",
+      "themeId": "motivation_discipline_responsibility.discipline_consistency",
+      "title": "Repetir aunque sea aburrido",
+      "description": "Ángulo editorial: Repetir aunque sea aburrido.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "consistency",
+        "persistence"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.discipline_consistency.consistent_identity",
+      "universeId": "motivation_discipline_responsibility",
+      "themeId": "motivation_discipline_responsibility.discipline_consistency",
+      "title": "Convertirme en alguien constante",
+      "description": "Ángulo editorial: Convertirme en alguien constante.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "consistency",
+        "identity_growth"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 4,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.act_without_motivation.no_need_to_feel_like_it",
+      "universeId": "motivation_discipline_responsibility",
+      "themeId": "motivation_discipline_responsibility.act_without_motivation",
+      "title": "No necesito tener ganas",
+      "description": "Ángulo editorial: No necesito tener ganas.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "low_motivation"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.act_without_motivation.minimum_viable_effort",
+      "universeId": "motivation_discipline_responsibility",
+      "themeId": "motivation_discipline_responsibility.act_without_motivation",
+      "title": "Hacer el mínimo que mantiene el movimiento",
+      "description": "Ángulo editorial: Hacer el mínimo que mantiene el movimiento.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "small_steps",
+        "consistency"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.act_without_motivation.values_over_mood",
+      "universeId": "motivation_discipline_responsibility",
+      "themeId": "motivation_discipline_responsibility.act_without_motivation",
+      "title": "Elegir mis valores por encima del estado del momento",
+      "description": "Ángulo editorial: Elegir mis valores por encima del estado del momento.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "personal_values",
+        "low_motivation"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.finish_what_i_start.keep_going",
+      "universeId": "motivation_discipline_responsibility",
+      "themeId": "motivation_discipline_responsibility.finish_what_i_start",
+      "title": "Seguir con el siguiente paso",
+      "description": "Ángulo editorial: Seguir con el siguiente paso.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "finishing"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.finish_what_i_start.middle_phase",
+      "universeId": "motivation_discipline_responsibility",
+      "themeId": "motivation_discipline_responsibility.finish_what_i_start",
+      "title": "Atravesar la parte aburrida",
+      "description": "Ángulo editorial: Atravesar la parte aburrida.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "persistence"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.finish_what_i_start.finisher_identity",
+      "universeId": "motivation_discipline_responsibility",
+      "themeId": "motivation_discipline_responsibility.finish_what_i_start",
+      "title": "Convertirme en alguien que cierra ciclos",
+      "description": "Ángulo editorial: Convertirme en alguien que cierra ciclos.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "finishing",
+        "identity_growth"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.return_after_quitting.return_today",
+      "universeId": "motivation_discipline_responsibility",
+      "themeId": "motivation_discipline_responsibility.return_after_quitting",
+      "title": "Hoy también puedo volver",
+      "description": "Ángulo editorial: Hoy también puedo volver.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "restarting"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.return_after_quitting.not_back_to_zero",
+      "universeId": "motivation_discipline_responsibility",
+      "themeId": "motivation_discipline_responsibility.return_after_quitting",
+      "title": "No empezar nuevamente desde cero",
+      "description": "Ángulo editorial: No empezar nuevamente desde cero.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "restarting"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.return_after_quitting.returning_skill",
+      "universeId": "motivation_discipline_responsibility",
+      "themeId": "motivation_discipline_responsibility.return_after_quitting",
+      "title": "Hacer de volver una habilidad",
+      "description": "Ángulo editorial: Hacer de volver una habilidad.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "restarting",
+        "consistency"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.personal_accountability.keep_my_word",
+      "universeId": "motivation_discipline_responsibility",
+      "themeId": "motivation_discipline_responsibility.personal_accountability",
+      "title": "Hacer lo que dije que haría",
+      "description": "Ángulo editorial: Hacer lo que dije que haría.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "accountability"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.personal_accountability.stop_giving_power_to_excuses",
+      "universeId": "motivation_discipline_responsibility",
+      "themeId": "motivation_discipline_responsibility.personal_accountability",
+      "title": "Dejar de regalar mi poder a las excusas",
+      "description": "Ángulo editorial: Dejar de regalar mi poder a las excusas.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "excuses",
+        "accountability"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "motivation_discipline_responsibility.personal_accountability.trust_my_word",
+      "universeId": "motivation_discipline_responsibility",
+      "themeId": "motivation_discipline_responsibility.personal_accountability",
+      "title": "Poder confiar en mi propia palabra",
+      "description": "Ángulo editorial: Poder confiar en mi propia palabra.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "accountability",
+        "consistency"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "work_money_growth.career_growth.building_experience",
+      "universeId": "work_money_growth",
+      "themeId": "work_money_growth.career_growth",
+      "title": "Estoy construyendo experiencia",
+      "description": "Ángulo editorial: Estoy construyendo experiencia.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "career_growth"
+      ],
+      "contextIds": [
+        "work"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "work_money_growth.career_growth.allow_bigger_ambition",
+      "universeId": "work_money_growth",
+      "themeId": "work_money_growth.career_growth",
+      "title": "Permitirme aspirar a más",
+      "description": "Ángulo editorial: Permitirme aspirar a más.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "career_growth"
+      ],
+      "contextIds": [
+        "work"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "work_money_growth.career_growth.design_my_career",
+      "universeId": "work_money_growth",
+      "themeId": "work_money_growth.career_growth",
+      "title": "Diseñar una carrera propia",
+      "description": "Ángulo editorial: Diseñar una carrera propia.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "career_growth",
+        "professional_identity"
+      ],
+      "contextIds": [
+        "work"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "work_money_growth.money_relationship.money_as_tool",
+      "universeId": "work_money_growth",
+      "themeId": "work_money_growth.money_relationship",
+      "title": "El dinero es una herramienta",
+      "description": "Ángulo editorial: El dinero es una herramienta.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "money_beliefs"
+      ],
+      "contextIds": [
+        "financial_decision"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "work_money_growth.money_relationship.receive_without_guilt",
+      "universeId": "work_money_growth",
+      "themeId": "work_money_growth.money_relationship",
+      "title": "Recibir y usar dinero sin culpa",
+      "description": "Ángulo editorial: Recibir y usar dinero sin culpa.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "money_beliefs"
+      ],
+      "contextIds": [
+        "financial_decision"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "work_money_growth.money_relationship.rewrite_money_beliefs",
+      "universeId": "work_money_growth",
+      "themeId": "work_money_growth.money_relationship",
+      "title": "Cambiar viejas ideas sobre el dinero",
+      "description": "Ángulo editorial: Cambiar viejas ideas sobre el dinero.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "money_beliefs"
+      ],
+      "contextIds": [
+        "financial_decision"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "work_money_growth.work_value_compensation.work_has_economic_value",
+      "universeId": "work_money_growth",
+      "themeId": "work_money_growth.work_value_compensation",
+      "title": "Mi trabajo puede tener valor económico",
+      "description": "Ángulo editorial: Mi trabajo puede tener valor económico.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "compensation",
+        "value_creation"
+      ],
+      "contextIds": [
+        "work"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "work_money_growth.work_value_compensation.ask_for_fair_compensation",
+      "universeId": "work_money_growth",
+      "themeId": "work_money_growth.work_value_compensation",
+      "title": "Pedir lo que corresponde",
+      "description": "Ángulo editorial: Pedir lo que corresponde.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "compensation",
+        "negotiation"
+      ],
+      "contextIds": [
+        "work",
+        "job_search"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "work_money_growth.work_value_compensation.receive_well_without_guilt",
+      "universeId": "work_money_growth",
+      "themeId": "work_money_growth.work_value_compensation",
+      "title": "Recibir bien sin sentir que tengo que justificarme",
+      "description": "Ángulo editorial: Recibir bien sin sentir que tengo que justificarme.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "compensation"
+      ],
+      "contextIds": [
+        "work"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "work_money_growth.entrepreneurship.start_before_ready",
+      "universeId": "work_money_growth",
+      "themeId": "work_money_growth.entrepreneurship",
+      "title": "Puedo empezar antes de tener todo resuelto",
+      "description": "Ángulo editorial: Puedo empezar antes de tener todo resuelto.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "entrepreneurship"
+      ],
+      "contextIds": [
+        "entrepreneurship"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "work_money_growth.entrepreneurship.show_and_sell",
+      "universeId": "work_money_growth",
+      "themeId": "work_money_growth.entrepreneurship",
+      "title": "Mostrar y ofrecer lo que hago",
+      "description": "Ángulo editorial: Mostrar y ofrecer lo que hago.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "selling",
+        "professional_visibility"
+      ],
+      "contextIds": [
+        "entrepreneurship"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "work_money_growth.entrepreneurship.trust_in_uncertainty",
+      "universeId": "work_money_growth",
+      "themeId": "work_money_growth.entrepreneurship",
+      "title": "Confiar en mí dentro de la incertidumbre",
+      "description": "Ángulo editorial: Confiar en mí dentro de la incertidumbre.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "entrepreneurship",
+        "uncertainty"
+      ],
+      "contextIds": [
+        "entrepreneurship"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.body_acceptance.respect_my_body_today",
+      "universeId": "body_energy_wellbeing",
+      "themeId": "body_energy_wellbeing.body_acceptance",
+      "title": "Tratar mi cuerpo con respeto hoy",
+      "description": "Ángulo editorial: Tratar mi cuerpo con respeto hoy.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "body_acceptance"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.body_acceptance.stop_waiting_for_different_body",
+      "universeId": "body_energy_wellbeing",
+      "themeId": "body_energy_wellbeing.body_acceptance",
+      "title": "Dejar de esperar otro cuerpo para quererme",
+      "description": "Ángulo editorial: Dejar de esperar otro cuerpo para quererme.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "body_image"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.body_acceptance.kind_body_relationship",
+      "universeId": "body_energy_wellbeing",
+      "themeId": "body_energy_wellbeing.body_acceptance",
+      "title": "Construir una relación amable con mi cuerpo",
+      "description": "Ángulo editorial: Construir una relación amable con mi cuerpo.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "body_acceptance"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.body_confidence.take_physical_space",
+      "universeId": "body_energy_wellbeing",
+      "themeId": "body_energy_wellbeing.body_confidence",
+      "title": "Tengo derecho a ocupar espacio",
+      "description": "Ángulo editorial: Tengo derecho a ocupar espacio.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "body_confidence",
+        "visibility"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.body_confidence.comfortable_being_seen",
+      "universeId": "body_energy_wellbeing",
+      "themeId": "body_energy_wellbeing.body_confidence",
+      "title": "Sentirme cómodo siendo visto",
+      "description": "Ángulo editorial: Sentirme cómodo siendo visto.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "body_confidence",
+        "body_image"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.body_confidence.embodied_confidence",
+      "universeId": "body_energy_wellbeing",
+      "themeId": "body_energy_wellbeing.body_confidence",
+      "title": "Habitar mi cuerpo con confianza",
+      "description": "Ángulo editorial: Habitar mi cuerpo con confianza.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "body_confidence"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.energy.protect_my_energy",
+      "universeId": "body_energy_wellbeing",
+      "themeId": "body_energy_wellbeing.energy",
+      "title": "Cuidar la energía que tengo",
+      "description": "Ángulo editorial: Cuidar la energía que tengo.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "energy"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.energy.sustainable_pace",
+      "universeId": "body_energy_wellbeing",
+      "themeId": "body_energy_wellbeing.energy",
+      "title": "Elegir un ritmo sostenible",
+      "description": "Ángulo editorial: Elegir un ritmo sostenible.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "pacing"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.energy.life_that_recharges_me",
+      "universeId": "body_energy_wellbeing",
+      "themeId": "body_energy_wellbeing.energy",
+      "title": "Construir una vida que también me recargue",
+      "description": "Ángulo editorial: Construir una vida que también me recargue.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "energy",
+        "recovery"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.physical_capability.recognize_what_my_body_can_do",
+      "universeId": "body_energy_wellbeing",
+      "themeId": "body_energy_wellbeing.physical_capability",
+      "title": "Reconocer lo que mi cuerpo puede hacer",
+      "description": "Ángulo editorial: Reconocer lo que mi cuerpo puede hacer.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "physical_strength",
+        "capability"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.physical_capability.enjoy_getting_stronger",
+      "universeId": "body_energy_wellbeing",
+      "themeId": "body_energy_wellbeing.physical_capability",
+      "title": "Disfrutar de hacerme más fuerte",
+      "description": "Ángulo editorial: Disfrutar de hacerme más fuerte.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "physical_strength"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.physical_capability.trust_physical_capability",
+      "universeId": "body_energy_wellbeing",
+      "themeId": "body_energy_wellbeing.physical_capability",
+      "title": "Confiar en mi capacidad física",
+      "description": "Ángulo editorial: Confiar en mi capacidad física.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "capability",
+        "physical_strength"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.enjoy_movement.move_because_it_feels_good",
+      "universeId": "body_energy_wellbeing",
+      "themeId": "body_energy_wellbeing.enjoy_movement",
+      "title": "Moverme porque me hace bien",
+      "description": "Ángulo editorial: Moverme porque me hace bien.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "movement",
+        "exercise_relationship"
+      ],
+      "contextIds": [
+        "exercise"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.enjoy_movement.reconnect_with_movement_pleasure",
+      "universeId": "body_energy_wellbeing",
+      "themeId": "body_energy_wellbeing.enjoy_movement",
+      "title": "Reconectar con el placer de moverme",
+      "description": "Ángulo editorial: Reconectar con el placer de moverme.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "movement"
+      ],
+      "contextIds": [
+        "exercise"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.enjoy_movement.stop_using_exercise_as_punishment",
+      "universeId": "body_energy_wellbeing",
+      "themeId": "body_energy_wellbeing.enjoy_movement",
+      "title": "Dejar de usar el ejercicio como castigo",
+      "description": "Ángulo editorial: Dejar de usar el ejercicio como castigo.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "exercise_relationship"
+      ],
+      "contextIds": [
+        "exercise"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.body_care.listen_to_what_i_need",
+      "universeId": "body_energy_wellbeing",
+      "themeId": "body_energy_wellbeing.body_care",
+      "title": "Escuchar lo que necesito",
+      "description": "Ángulo editorial: Escuchar lo que necesito.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "body_awareness"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.body_care.rest_is_part_of_it",
+      "universeId": "body_energy_wellbeing",
+      "themeId": "body_energy_wellbeing.body_care",
+      "title": "Descansar también forma parte",
+      "description": "Ángulo editorial: Descansar también forma parte.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "rest",
+        "recovery"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "body_energy_wellbeing.body_care.wellbeing_without_fighting_body",
+      "universeId": "body_energy_wellbeing",
+      "themeId": "body_energy_wellbeing.body_care",
+      "title": "Construir bienestar sin pelearme con mi cuerpo",
+      "description": "Ángulo editorial: Construir bienestar sin pelearme con mi cuerpo.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "body_acceptance",
+        "recovery"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.receive_love.allow_affection",
+      "universeId": "love_desire_romantic_relationships",
+      "themeId": "love_desire_romantic_relationships.receive_love",
+      "title": "Permitirme recibir cariño",
+      "description": "Ángulo editorial: Permitirme recibir cariño.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "receiving_love",
+        "affection"
+      ],
+      "contextIds": [
+        "romantic_relationship"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.receive_love.not_earn_love",
+      "universeId": "love_desire_romantic_relationships",
+      "themeId": "love_desire_romantic_relationships.receive_love",
+      "title": "No tener que ganarme el amor",
+      "description": "Ángulo editorial: No tener que ganarme el amor.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "receiving_love",
+        "approval_seeking"
+      ],
+      "contextIds": [
+        "romantic_relationship"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.receive_love.safe_love",
+      "universeId": "love_desire_romantic_relationships",
+      "themeId": "love_desire_romantic_relationships.receive_love",
+      "title": "Abrirme a un amor que se sienta seguro",
+      "description": "Ángulo editorial: Abrirme a un amor que se sienta seguro.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "romantic_security"
+      ],
+      "contextIds": [
+        "romantic_relationship"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.desire_attraction.feel_attractive_today",
+      "universeId": "love_desire_romantic_relationships",
+      "themeId": "love_desire_romantic_relationships.desire_attraction",
+      "title": "Puedo sentirme atractivo hoy",
+      "description": "Ángulo editorial: Puedo sentirme atractivo hoy.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "desirability",
+        "attraction"
+      ],
+      "contextIds": [
+        "dating"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.desire_attraction.desirable_without_everyone",
+      "universeId": "love_desire_romantic_relationships",
+      "themeId": "love_desire_romantic_relationships.desire_attraction",
+      "title": "Ser deseable sin gustarle a todos",
+      "description": "Ángulo editorial: Ser deseable sin gustarle a todos.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "desirability",
+        "rejection"
+      ],
+      "contextIds": [
+        "dating"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.desire_attraction.inhabit_desire_safely",
+      "universeId": "love_desire_romantic_relationships",
+      "themeId": "love_desire_romantic_relationships.desire_attraction",
+      "title": "Habitar mi deseo y atractivo con seguridad",
+      "description": "Ángulo editorial: Habitar mi deseo y atractivo con seguridad.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "desire",
+        "consent"
+      ],
+      "contextIds": [
+        "dating",
+        "romantic_relationship"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.secure_relationship.love_and_calm_can_coexist",
+      "universeId": "love_desire_romantic_relationships",
+      "themeId": "love_desire_romantic_relationships.secure_relationship",
+      "title": "Amor y tranquilidad pueden coexistir",
+      "description": "Ángulo editorial: Amor y tranquilidad pueden coexistir.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "romantic_security"
+      ],
+      "contextIds": [
+        "romantic_relationship"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.secure_relationship.express_what_i_need",
+      "universeId": "love_desire_romantic_relationships",
+      "themeId": "love_desire_romantic_relationships.secure_relationship",
+      "title": "Expresar lo que necesito",
+      "description": "Ángulo editorial: Expresar lo que necesito.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "relationship_needs"
+      ],
+      "contextIds": [
+        "romantic_relationship"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.secure_relationship.choose_relationships_where_i_can_be_me",
+      "universeId": "love_desire_romantic_relationships",
+      "themeId": "love_desire_romantic_relationships.secure_relationship",
+      "title": "Elegir vínculos donde puedo ser yo",
+      "description": "Ángulo editorial: Elegir vínculos donde puedo ser yo.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "romantic_security",
+        "authenticity"
+      ],
+      "contextIds": [
+        "romantic_relationship"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.intimacy.approach_at_my_pace",
+      "universeId": "love_desire_romantic_relationships",
+      "themeId": "love_desire_romantic_relationships.intimacy",
+      "title": "Puedo acercarme a mi ritmo",
+      "description": "Ángulo editorial: Puedo acercarme a mi ritmo.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "intimacy",
+        "consent"
+      ],
+      "contextIds": [
+        "romantic_relationship"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.intimacy.vulnerable_without_disappearing",
+      "universeId": "love_desire_romantic_relationships",
+      "themeId": "love_desire_romantic_relationships.intimacy",
+      "title": "Ser vulnerable sin desaparecer",
+      "description": "Ángulo editorial: Ser vulnerable sin desaparecer.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "vulnerability",
+        "intimacy"
+      ],
+      "contextIds": [
+        "romantic_relationship"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.intimacy.allow_deeply_known",
+      "universeId": "love_desire_romantic_relationships",
+      "themeId": "love_desire_romantic_relationships.intimacy",
+      "title": "Permitirme ser profundamente conocido",
+      "description": "Ángulo editorial: Permitirme ser profundamente conocido.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "intimacy",
+        "vulnerability"
+      ],
+      "contextIds": [
+        "romantic_relationship"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.rejection.rejection_not_worth",
+      "universeId": "love_desire_romantic_relationships",
+      "themeId": "love_desire_romantic_relationships.rejection",
+      "title": "Un rechazo no decide mi valor",
+      "description": "Ángulo editorial: Un rechazo no decide mi valor.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "rejection"
+      ],
+      "contextIds": [
+        "dating"
+      ],
+      "momentIds": [
+        "after_setback"
+      ],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.rejection.stop_looking_for_whats_wrong",
+      "universeId": "love_desire_romantic_relationships",
+      "themeId": "love_desire_romantic_relationships.rejection",
+      "title": "Dejar de buscar qué había de malo en mí",
+      "description": "Ángulo editorial: Dejar de buscar qué había de malo en mí.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "rejection",
+        "self_criticism"
+      ],
+      "contextIds": [
+        "dating"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.rejection.show_again_after_rejection",
+      "universeId": "love_desire_romantic_relationships",
+      "themeId": "love_desire_romantic_relationships.rejection",
+      "title": "Volver a mostrarme después del rechazo",
+      "description": "Ángulo editorial: Volver a mostrarme después del rechazo.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "rejection",
+        "courage"
+      ],
+      "contextIds": [
+        "dating"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.breakup_recovery.miss_and_move_forward",
+      "universeId": "love_desire_romantic_relationships",
+      "themeId": "love_desire_romantic_relationships.breakup_recovery",
+      "title": "Puedo extrañar y seguir avanzando",
+      "description": "Ángulo editorial: Puedo extrañar y seguir avanzando.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "breakup"
+      ],
+      "contextIds": [
+        "breakup"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.breakup_recovery.let_go_what_ended",
+      "universeId": "love_desire_romantic_relationships",
+      "themeId": "love_desire_romantic_relationships.breakup_recovery",
+      "title": "Dejar ir lo que terminó",
+      "description": "Ángulo editorial: Dejar ir lo que terminó.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "breakup",
+        "letting_go"
+      ],
+      "contextIds": [
+        "breakup"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "love_desire_romantic_relationships.breakup_recovery.trust_love_again",
+      "universeId": "love_desire_romantic_relationships",
+      "themeId": "love_desire_romantic_relationships.breakup_recovery",
+      "title": "Volver a creer en el amor sin borrar lo aprendido",
+      "description": "Ángulo editorial: Volver a creer en el amor sin borrar lo aprendido.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "romantic_trust",
+        "breakup"
+      ],
+      "contextIds": [
+        "breakup"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.loneliness.lonely_not_destined",
+      "universeId": "connection_belonging",
+      "themeId": "connection_belonging.loneliness",
+      "title": "Sentirme solo no significa estar destinado a estarlo",
+      "description": "Ángulo editorial: Sentirme solo no significa estar destinado a estarlo.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "loneliness"
+      ],
+      "contextIds": [
+        "being_alone"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.loneliness.small_contacts",
+      "universeId": "connection_belonging",
+      "themeId": "connection_belonging.loneliness",
+      "title": "Abrirme a pequeños contactos",
+      "description": "Ángulo editorial: Abrirme a pequeños contactos.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "social_initiative"
+      ],
+      "contextIds": [
+        "social"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.loneliness.loneliness_not_identity",
+      "universeId": "connection_belonging",
+      "themeId": "connection_belonging.loneliness",
+      "title": "Dejar que la soledad sea una etapa y no una identidad",
+      "description": "Ángulo editorial: Dejar que la soledad sea una etapa y no una identidad.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "loneliness",
+        "identity_growth"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.belonging.right_to_belong",
+      "universeId": "connection_belonging",
+      "themeId": "connection_belonging.belonging",
+      "title": "Tengo derecho a ocupar un lugar",
+      "description": "Ángulo editorial: Tengo derecho a ocupar un lugar.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "belonging"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.belonging.belong_without_same",
+      "universeId": "connection_belonging",
+      "themeId": "connection_belonging.belonging",
+      "title": "No necesitar parecerme a todos",
+      "description": "Ángulo editorial: No necesitar parecerme a todos.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "belonging",
+        "authenticity"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.belonging.belong_without_losing_self",
+      "universeId": "connection_belonging",
+      "themeId": "connection_belonging.belonging",
+      "title": "Encontrar pertenencia sin dejar de ser yo",
+      "description": "Ángulo editorial: Encontrar pertenencia sin dejar de ser yo.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "belonging",
+        "authenticity"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.find_my_people.people_i_can_connect_with",
+      "universeId": "connection_belonging",
+      "themeId": "connection_belonging.find_my_people",
+      "title": "Existen personas con las que puedo conectar",
+      "description": "Ángulo editorial: Existen personas con las que puedo conectar.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "community"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.find_my_people.give_new_connections_chance",
+      "universeId": "connection_belonging",
+      "themeId": "connection_belonging.find_my_people",
+      "title": "Dar oportunidades a nuevas conexiones",
+      "description": "Ángulo editorial: Dar oportunidades a nuevas conexiones.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "social_initiative"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.find_my_people.build_my_community",
+      "universeId": "connection_belonging",
+      "themeId": "connection_belonging.find_my_people",
+      "title": "Construir activamente mi comunidad",
+      "description": "Ángulo editorial: Construir activamente mi comunidad.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "community",
+        "social_initiative"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.friendships.friendship_starts_small",
+      "universeId": "connection_belonging",
+      "themeId": "connection_belonging.friendships",
+      "title": "Una amistad también empieza con algo pequeño",
+      "description": "Ángulo editorial: Una amistad también empieza con algo pequeño.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "friendship"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.friendships.take_initiative",
+      "universeId": "connection_belonging",
+      "themeId": "connection_belonging.friendships",
+      "title": "Permitirme tomar iniciativa",
+      "description": "Ángulo editorial: Permitirme tomar iniciativa.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "friendship",
+        "social_initiative"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.friendships.care_for_valuable_friendships",
+      "universeId": "connection_belonging",
+      "themeId": "connection_belonging.friendships",
+      "title": "Cuidar vínculos que valen la pena",
+      "description": "Ángulo editorial: Cuidar vínculos que valen la pena.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "friendship",
+        "support"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.authentic_connection.no_need_to_act",
+      "universeId": "connection_belonging",
+      "themeId": "connection_belonging.authentic_connection",
+      "title": "No necesito actuar para conectar",
+      "description": "Ángulo editorial: No necesito actuar para conectar.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "authenticity"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.authentic_connection.show_more_of_me",
+      "universeId": "connection_belonging",
+      "themeId": "connection_belonging.authentic_connection",
+      "title": "Mostrar un poco más de mí",
+      "description": "Ángulo editorial: Mostrar un poco más de mí.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "authenticity",
+        "vulnerability"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.authentic_connection.be_truly_known",
+      "universeId": "connection_belonging",
+      "themeId": "connection_belonging.authentic_connection",
+      "title": "Ser conocido de verdad",
+      "description": "Ángulo editorial: Ser conocido de verdad.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "authenticity",
+        "vulnerability"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.own_company.alone_without_missing_something",
+      "universeId": "connection_belonging",
+      "themeId": "connection_belonging.own_company",
+      "title": "Puedo estar conmigo sin sentir que falta algo",
+      "description": "Ángulo editorial: Puedo estar conmigo sin sentir que falta algo.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "solitude"
+      ],
+      "contextIds": [
+        "being_alone"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.own_company.make_alone_time_habitable",
+      "universeId": "connection_belonging",
+      "themeId": "connection_belonging.own_company",
+      "title": "Hacer de mi tiempo solo un lugar habitable",
+      "description": "Ángulo editorial: Hacer de mi tiempo solo un lugar habitable.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "solitude"
+      ],
+      "contextIds": [
+        "being_alone"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "connection_belonging.own_company.good_relationship_with_myself",
+      "universeId": "connection_belonging",
+      "themeId": "connection_belonging.own_company",
+      "title": "Construir una buena relación conmigo cuando estoy solo",
+      "description": "Ángulo editorial: Construir una buena relación conmigo cuando estoy solo.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "solitude",
+        "self_acceptance"
+      ],
+      "contextIds": [
+        "being_alone"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.difficult_period.only_today",
+      "universeId": "change_loss_new_beginnings",
+      "themeId": "change_loss_new_beginnings.difficult_period",
+      "title": "Hoy no necesito resolver toda mi vida",
+      "description": "Ángulo editorial: Hoy no necesito resolver toda mi vida.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "difficult_period"
+      ],
+      "contextIds": [],
+      "momentIds": [
+        "difficult_moment"
+      ],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.difficult_period.keep_going_when_hard",
+      "universeId": "change_loss_new_beginnings",
+      "themeId": "change_loss_new_beginnings.difficult_period",
+      "title": "Seguir mientras las cosas están difíciles",
+      "description": "Ángulo editorial: Seguir mientras las cosas están difíciles.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "difficult_period"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.difficult_period.remember_who_i_am",
+      "universeId": "change_loss_new_beginnings",
+      "themeId": "change_loss_new_beginnings.difficult_period",
+      "title": "Recordar quién soy dentro de una mala etapa",
+      "description": "Ángulo editorial: Recordar quién soy dentro de una mala etapa.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "difficult_period",
+        "identity_growth"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.adapt_to_change.learn_new_reality",
+      "universeId": "change_loss_new_beginnings",
+      "themeId": "change_loss_new_beginnings.adapt_to_change",
+      "title": "Puedo aprender esta nueva realidad",
+      "description": "Ángulo editorial: Puedo aprender esta nueva realidad.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "change",
+        "adaptation"
+      ],
+      "contextIds": [
+        "life_transition"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.adapt_to_change.time_to_adapt",
+      "universeId": "change_loss_new_beginnings",
+      "themeId": "change_loss_new_beginnings.adapt_to_change",
+      "title": "Darme tiempo para adaptarme",
+      "description": "Ángulo editorial: Darme tiempo para adaptarme.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "adaptation"
+      ],
+      "contextIds": [
+        "life_transition"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.adapt_to_change.change_into_growth",
+      "universeId": "change_loss_new_beginnings",
+      "themeId": "change_loss_new_beginnings.adapt_to_change",
+      "title": "Convertir cambio en crecimiento",
+      "description": "Ángulo editorial: Convertir cambio en crecimiento.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "adaptation",
+        "identity_growth"
+      ],
+      "contextIds": [
+        "life_transition"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.grief.feel_what_i_feel",
+      "universeId": "change_loss_new_beginnings",
+      "themeId": "change_loss_new_beginnings.grief",
+      "title": "Puedo sentir lo que siento",
+      "description": "Ángulo editorial: Puedo sentir lo que siento.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "grief"
+      ],
+      "contextIds": [
+        "loss_grief"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.grief.remember_without_stopping",
+      "universeId": "change_loss_new_beginnings",
+      "themeId": "change_loss_new_beginnings.grief",
+      "title": "Recordar sin quedarme detenido",
+      "description": "Ángulo editorial: Recordar sin quedarme detenido.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "grief",
+        "loss"
+      ],
+      "contextIds": [
+        "loss_grief"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.grief.carry_love_and_live",
+      "universeId": "change_loss_new_beginnings",
+      "themeId": "change_loss_new_beginnings.grief",
+      "title": "Llevar conmigo lo amado y seguir viviendo",
+      "description": "Ángulo editorial: Llevar conmigo lo amado y seguir viviendo.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "grief",
+        "loss"
+      ],
+      "contextIds": [
+        "loss_grief"
+      ],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.closure.recognize_it_ended",
+      "universeId": "change_loss_new_beginnings",
+      "themeId": "change_loss_new_beginnings.closure",
+      "title": "Reconocer que algo terminó",
+      "description": "Ángulo editorial: Reconocer que algo terminó.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "closure"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.closure.stop_searching_closed_door",
+      "universeId": "change_loss_new_beginnings",
+      "themeId": "change_loss_new_beginnings.closure",
+      "title": "Dejar de buscar una puerta que ya cerró",
+      "description": "Ángulo editorial: Dejar de buscar una puerta que ya cerró.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "closure",
+        "letting_go"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.closure.honor_without_belonging",
+      "universeId": "change_loss_new_beginnings",
+      "themeId": "change_loss_new_beginnings.closure",
+      "title": "Honrar una etapa sin seguir perteneciendo a ella",
+      "description": "Ángulo editorial: Honrar una etapa sin seguir perteneciendo a ella.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "closure",
+        "past_acceptance"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.rebuild.start_with_whats_left",
+      "universeId": "change_loss_new_beginnings",
+      "themeId": "change_loss_new_beginnings.rebuild",
+      "title": "Empezar con lo que quedó",
+      "description": "Ángulo editorial: Empezar con lo que quedó.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "rebuilding"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.rebuild.rediscover_who_i_am",
+      "universeId": "change_loss_new_beginnings",
+      "themeId": "change_loss_new_beginnings.rebuild",
+      "title": "Redescubrir quién soy ahora",
+      "description": "Ángulo editorial: Redescubrir quién soy ahora.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "rebuilding",
+        "self_discovery"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.rebuild.build_new_from_lived",
+      "universeId": "change_loss_new_beginnings",
+      "themeId": "change_loss_new_beginnings.rebuild",
+      "title": "Construir algo nuevo desde lo vivido",
+      "description": "Ángulo editorial: Construir algo nuevo desde lo vivido.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "rebuilding",
+        "identity_growth"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.new_beginning.not_too_late",
+      "universeId": "change_loss_new_beginnings",
+      "themeId": "change_loss_new_beginnings.new_beginning",
+      "title": "No es demasiado tarde",
+      "description": "Ángulo editorial: No es demasiado tarde.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "new_beginning"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.new_beginning.learning_comes_with_me",
+      "universeId": "change_loss_new_beginnings",
+      "themeId": "change_loss_new_beginnings.new_beginning",
+      "title": "Lo aprendido viene conmigo",
+      "description": "Ángulo editorial: Lo aprendido viene conmigo.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "new_beginning",
+        "learning"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "change_loss_new_beginnings.new_beginning.allow_different_story",
+      "universeId": "change_loss_new_beginnings",
+      "themeId": "change_loss_new_beginnings.new_beginning",
+      "title": "Permitirme una historia distinta",
+      "description": "Ángulo editorial: Permitirme una historia distinta.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "new_beginning",
+        "second_chance"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom.external_expectations.not_live_all_expectations",
+      "universeId": "expectations_boundaries_freedom",
+      "themeId": "expectations_boundaries_freedom.external_expectations",
+      "title": "No tengo que vivir todas las expectativas de otros",
+      "description": "Ángulo editorial: No tengo que vivir todas las expectativas de otros.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "external_expectations"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom.external_expectations.tolerate_disapproval",
+      "universeId": "expectations_boundaries_freedom",
+      "themeId": "expectations_boundaries_freedom.external_expectations",
+      "title": "Tolerar que alguien no apruebe mi decisión",
+      "description": "Ángulo editorial: Tolerar que alguien no apruebe mi decisión.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "approval_seeking"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom.external_expectations.advice_not_command",
+      "universeId": "expectations_boundaries_freedom",
+      "themeId": "expectations_boundaries_freedom.external_expectations",
+      "title": "Diferenciar consejo de mandato",
+      "description": "Ángulo editorial: Diferenciar consejo de mandato.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "external_expectations"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom.external_expectations.stop_negotiating_self_for_approval",
+      "universeId": "expectations_boundaries_freedom",
+      "themeId": "expectations_boundaries_freedom.external_expectations",
+      "title": "Dejar de negociar quién soy por aprobación",
+      "description": "Ángulo editorial: Dejar de negociar quién soy por aprobación.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "approval_seeking",
+        "people_pleasing"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 4,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom.self_pressure.not_everything_needs_maximum",
+      "universeId": "expectations_boundaries_freedom",
+      "themeId": "expectations_boundaries_freedom.self_pressure",
+      "title": "No todo necesita mi máximo",
+      "description": "Ángulo editorial: No todo necesita mi máximo.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "self_pressure"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom.self_pressure.allow_enough",
+      "universeId": "expectations_boundaries_freedom",
+      "themeId": "expectations_boundaries_freedom.self_pressure",
+      "title": "Permitirme hacer suficiente",
+      "description": "Ángulo editorial: Permitirme hacer suficiente.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "self_pressure"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom.self_pressure.ambition_without_harm",
+      "universeId": "expectations_boundaries_freedom",
+      "themeId": "expectations_boundaries_freedom.self_pressure",
+      "title": "Construir ambición sin maltratarme",
+      "description": "Ángulo editorial: Construir ambición sin maltratarme.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "self_pressure",
+        "productivity_worth"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom.perfectionism.done_better_than_perfect",
+      "universeId": "expectations_boundaries_freedom",
+      "themeId": "expectations_boundaries_freedom.perfectionism",
+      "title": "Hecho puede ser mejor que perfecto",
+      "description": "Ángulo editorial: Hecho puede ser mejor que perfecto.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "perfectionism"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom.perfectionism.tolerate_flaws",
+      "universeId": "expectations_boundaries_freedom",
+      "themeId": "expectations_boundaries_freedom.perfectionism",
+      "title": "Tolerar que algo tenga defectos",
+      "description": "Ángulo editorial: Tolerar que algo tenga defectos.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "perfectionism"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom.perfectionism.stop_needing_impeccable",
+      "universeId": "expectations_boundaries_freedom",
+      "themeId": "expectations_boundaries_freedom.perfectionism",
+      "title": "Dejar de necesitar hacerlo impecable",
+      "description": "Ángulo editorial: Dejar de necesitar hacerlo impecable.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "perfectionism"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom.boundaries.saying_no_can_protect_me",
+      "universeId": "expectations_boundaries_freedom",
+      "themeId": "expectations_boundaries_freedom.boundaries",
+      "title": "Un no también puede cuidarme",
+      "description": "Ángulo editorial: Un no también puede cuidarme.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "boundaries",
+        "saying_no"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom.boundaries.tolerate_boundary_discomfort",
+      "universeId": "expectations_boundaries_freedom",
+      "themeId": "expectations_boundaries_freedom.boundaries",
+      "title": "Tolerar la incomodidad de poner un límite",
+      "description": "Ángulo editorial: Tolerar la incomodidad de poner un límite.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "boundaries"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom.boundaries.choose_myself_when_others_unhappy",
+      "universeId": "expectations_boundaries_freedom",
+      "themeId": "expectations_boundaries_freedom.boundaries",
+      "title": "Elegirme incluso cuando alguien no esté contento",
+      "description": "Ángulo editorial: Elegirme incluso cuando alguien no esté contento.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "boundaries",
+        "people_pleasing"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom.life_timeline.no_universal_calendar",
+      "universeId": "expectations_boundaries_freedom",
+      "themeId": "expectations_boundaries_freedom.life_timeline",
+      "title": "Mi vida no tiene un calendario universal",
+      "description": "Ángulo editorial: Mi vida no tiene un calendario universal.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "life_timeline"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom.life_timeline.release_should_ages",
+      "universeId": "expectations_boundaries_freedom",
+      "themeId": "expectations_boundaries_freedom.life_timeline",
+      "title": "Soltar las edades que “debería” tener para cada cosa",
+      "description": "Ángulo editorial: Soltar las edades que “debería” tener para cada cosa.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "life_timeline"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "expectations_boundaries_freedom.life_timeline.build_my_own_time",
+      "universeId": "expectations_boundaries_freedom",
+      "themeId": "expectations_boundaries_freedom.life_timeline",
+      "title": "Construir mi tiempo en lugar de correr detrás del ajeno",
+      "description": "Ángulo editorial: Construir mi tiempo en lugar de correr detrás del ajeno.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "life_timeline",
+        "comparison"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.self_discovery.listen_to_what_matters",
+      "universeId": "purpose_identity_direction",
+      "themeId": "purpose_identity_direction.self_discovery",
+      "title": "Escuchar lo que realmente me importa",
+      "description": "Ángulo editorial: Escuchar lo que realmente me importa.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "self_discovery"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.self_discovery.separate_self_from_should",
+      "universeId": "purpose_identity_direction",
+      "themeId": "purpose_identity_direction.self_discovery",
+      "title": "Separar quién soy de quién aprendí que debía ser",
+      "description": "Ángulo editorial: Separar quién soy de quién aprendí que debía ser.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "self_discovery",
+        "external_expectations"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.self_discovery.stay_open_to_self_discovery",
+      "universeId": "purpose_identity_direction",
+      "themeId": "purpose_identity_direction.self_discovery",
+      "title": "Seguir descubriéndome sin definirme por completo",
+      "description": "Ángulo editorial: Seguir descubriéndome sin definirme por completo.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "self_discovery",
+        "identity_growth"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.values.recognize_what_matters",
+      "universeId": "purpose_identity_direction",
+      "themeId": "purpose_identity_direction.values",
+      "title": "Reconocer lo que importa para mí",
+      "description": "Ángulo editorial: Reconocer lo que importa para mí.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "personal_values"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.values.choose_between_conflicting_priorities",
+      "universeId": "purpose_identity_direction",
+      "themeId": "purpose_identity_direction.values",
+      "title": "Elegir entre prioridades en conflicto",
+      "description": "Ángulo editorial: Elegir entre prioridades en conflicto.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "personal_values"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.values.decisions_around_values",
+      "universeId": "purpose_identity_direction",
+      "themeId": "purpose_identity_direction.values",
+      "title": "Construir decisiones alrededor de mis valores",
+      "description": "Ángulo editorial: Construir decisiones alrededor de mis valores.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "personal_values"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.direction.not_see_whole_path",
+      "universeId": "purpose_identity_direction",
+      "themeId": "purpose_identity_direction.direction",
+      "title": "No necesito ver todo el camino",
+      "description": "Ángulo editorial: No necesito ver todo el camino.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "direction"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.direction.choose_before_certainty",
+      "universeId": "purpose_identity_direction",
+      "themeId": "purpose_identity_direction.direction",
+      "title": "Elegir una dirección antes de tener certeza",
+      "description": "Ángulo editorial: Elegir una dirección antes de tener certeza.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "direction",
+        "uncertainty"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.direction.direction_through_movement",
+      "universeId": "purpose_identity_direction",
+      "themeId": "purpose_identity_direction.direction",
+      "title": "Construir dirección mediante movimiento",
+      "description": "Ángulo editorial: Construir dirección mediante movimiento.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "direction",
+        "personal_agency"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.purpose.everyday_meaning",
+      "universeId": "purpose_identity_direction",
+      "themeId": "purpose_identity_direction.purpose",
+      "title": "Lo cotidiano también puede tener sentido",
+      "description": "Ángulo editorial: Lo cotidiano también puede tener sentido.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "meaning"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.purpose.connect_actions_to_what_matters",
+      "universeId": "purpose_identity_direction",
+      "themeId": "purpose_identity_direction.purpose",
+      "title": "Conectar lo que hago con algo que me importa",
+      "description": "Ángulo editorial: Conectar lo que hago con algo que me importa.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "meaning",
+        "personal_values"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.purpose.life_that_feels_mine",
+      "universeId": "purpose_identity_direction",
+      "themeId": "purpose_identity_direction.purpose",
+      "title": "Crear una vida que siento verdaderamente mía",
+      "description": "Ángulo editorial: Crear una vida que siento verdaderamente mía.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "purpose",
+        "authenticity"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.identity_growth.decisions_form_identity",
+      "universeId": "purpose_identity_direction",
+      "themeId": "purpose_identity_direction.identity_growth",
+      "title": "Mis decisiones también forman mi identidad",
+      "description": "Ángulo editorial: Mis decisiones también forman mi identidad.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "identity_growth"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.identity_growth.practice_who_i_want_to_be",
+      "universeId": "purpose_identity_direction",
+      "themeId": "purpose_identity_direction.identity_growth",
+      "title": "Practicar la persona que quiero ser",
+      "description": "Ángulo editorial: Practicar la persona que quiero ser.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": 24
+      },
+      "conceptTagIds": [
+        "identity_growth"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.identity_growth.choose_next_version",
+      "universeId": "purpose_identity_direction",
+      "themeId": "purpose_identity_direction.identity_growth",
+      "title": "Elegir conscientemente mi próxima versión",
+      "description": "Ángulo editorial: Elegir conscientemente mi próxima versión.",
+      "access": {
+        "tier": "pro",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "identity_growth"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.trust_process.life_not_resolved",
+      "universeId": "purpose_identity_direction",
+      "themeId": "purpose_identity_direction.trust_process",
+      "title": "No necesito tener mi vida resuelta",
+      "description": "Ángulo editorial: No necesito tener mi vida resuelta.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "trust_process"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 1,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.trust_process.allow_unclear_seasons",
+      "universeId": "purpose_identity_direction",
+      "themeId": "purpose_identity_direction.trust_process",
+      "title": "Dar espacio a etapas que todavía no entiendo",
+      "description": "Ángulo editorial: Dar espacio a etapas que todavía no entiendo.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "trust_process"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 2,
+      "status": "active"
+    },
+    {
+      "id": "purpose_identity_direction.trust_process.trust_unfinished_story",
+      "universeId": "purpose_identity_direction",
+      "themeId": "purpose_identity_direction.trust_process",
+      "title": "Confiar en una historia que todavía estoy construyendo",
+      "description": "Ángulo editorial: Confiar en una historia que todavía estoy construyendo.",
+      "access": {
+        "tier": "free",
+        "rewardedUnlockHours": null
+      },
+      "conceptTagIds": [
+        "trust_process",
+        "meaning"
+      ],
+      "contextIds": [],
+      "momentIds": [],
+      "desiredStateIds": [],
+      "order": 3,
+      "status": "active"
+    }
+  ]
+}
