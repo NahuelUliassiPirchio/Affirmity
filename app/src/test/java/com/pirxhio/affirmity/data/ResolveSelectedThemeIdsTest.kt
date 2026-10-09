@@ -1,9 +1,7 @@
 package com.pirxhio.affirmity.data
 
-import com.pirxhio.affirmity.data.local.FeedSources
 import com.pirxhio.affirmity.ui.groups.catalogThemes
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -87,9 +85,21 @@ class ResolveSelectedThemeIdsTest {
     }
 
     @Test
-    fun `an explicitly empty persisted selection falls back to the default set`() {
+    fun `an explicitly empty persisted selection stays empty -- none is a valid choice`() {
         val resolved = resolveSelectedThemeIds(
             persistedThemeIds = emptySet(),
+            legacyGroupIds = null,
+            knownThemeIds = syntheticKnownIds,
+            defaultThemeIds = syntheticDefaultIds,
+        )
+
+        assertEquals(emptySet<String>(), resolved)
+    }
+
+    @Test
+    fun `a never-written selection still resolves to the default set`() {
+        val resolved = resolveSelectedThemeIds(
+            persistedThemeIds = null,
             legacyGroupIds = null,
             knownThemeIds = syntheticKnownIds,
             defaultThemeIds = syntheticDefaultIds,
@@ -120,41 +130,6 @@ class ResolveSelectedThemeIdsTest {
         )
 
         assertEquals(setOf("u1.t1", "u2.t1"), resolved)
-    }
-
-    @Test
-    fun `an empty draft with no feed sources on is never valid, regardless of custom affirmations -- personalizadas never factors in`() {
-        assertFalse(
-            isDraftThemeSelectionValid(
-                emptySet(),
-                FeedSources(includeFavorites = false, includeOwn = false),
-            ),
-        )
-    }
-
-    @Test
-    fun `a non-empty draft is valid`() {
-        assertTrue(isDraftThemeSelectionValid(setOf("u1.t1"), FeedSources()))
-    }
-
-    @Test
-    fun `an empty draft is valid when favorites alone is on`() {
-        assertTrue(
-            isDraftThemeSelectionValid(
-                emptySet(),
-                FeedSources(includeFavorites = true, includeOwn = false),
-            ),
-        )
-    }
-
-    @Test
-    fun `an empty draft is valid when own affirmations alone is on`() {
-        assertTrue(
-            isDraftThemeSelectionValid(
-                emptySet(),
-                FeedSources(includeFavorites = false, includeOwn = true),
-            ),
-        )
     }
 
     // --- Wiring sanity: every catalog theme resolves to a non-blank derived label -------------

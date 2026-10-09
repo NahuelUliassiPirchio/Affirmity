@@ -187,4 +187,22 @@ class EntitlementResolutionTest {
         )
         assertEquals(setOf(other), result)
     }
+
+    // --- deselectLockedThemes ----------------------------------------------------------------
+
+    @Test
+    fun `deselectLockedThemes keeps an explicitly empty selection empty`() {
+        val result = deselectLockedThemes(
+            selected = emptySet(), proOnlyIds = setOf("pro.t"), defaultThemeIds = setOf("free.t"),
+        )
+        assertEquals(emptySet<String>(), result)
+    }
+
+    @Test
+    fun `deselectLockedThemes falls back to defaults when the downgrade strips every theme`() {
+        val result = deselectLockedThemes(
+            selected = setOf("pro.t"), proOnlyIds = setOf("pro.t"), defaultThemeIds = setOf("free.t"),
+        )
+        assertEquals(setOf("free.t"), result)
+    }
 }

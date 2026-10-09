@@ -1,7 +1,6 @@
 package com.pirxhio.affirmity.data
 
 import com.pirxhio.affirmity.access.AccessTier
-import com.pirxhio.affirmity.data.local.FeedSources
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -194,31 +193,5 @@ class UserCollectionsTest {
             eligible = { it in owned },
         )
         assertEquals(listOf("a"), result)
-    }
-
-    // --- isDraftThemeSelectionValid ---------------------------------------------------------
-
-    @Test
-    fun `an enabled collection alone makes the draft valid`() {
-        assertTrue(
-            isDraftThemeSelectionValid(
-                emptySet(),
-                FeedSources(includeFavorites = false, includeOwn = false),
-                anyCollectionEnabled = true,
-            ),
-        )
-    }
-
-    @Test
-    fun `no themes, no sources and no enabled collection is invalid`() {
-        assertFalse(
-            isDraftThemeSelectionValid(
-                emptySet(),
-                FeedSources(includeFavorites = false, includeOwn = false),
-                anyCollectionEnabled = false,
-            ),
-        )
-        // The default keeps every pre-existing two-argument call site compiling and unchanged.
-        assertFalse(isDraftThemeSelectionValid(emptySet(), FeedSources(includeFavorites = false, includeOwn = false)))
     }
 }

@@ -285,7 +285,8 @@ private fun Affirmation.toEntity(): AffirmationEntity = AffirmationEntity(
  *    case.
  *
  * Once [persistedThemeIds] is non-null, the legacy path is dead: unknown ids (a theme removed in a
- * later catalog release) are dropped, and an empty or fully-unknown result falls back to
+ * later catalog release) are dropped. An explicitly empty persisted set means the user chose no
+ * catalog themes and is returned as-is; a non-empty set whose ids are ALL unknown falls back to
  * [defaultThemeIds] -- there is no `personalizadas`-only carve-out here, unlike the old group-level
  * resolver, since no catalog theme is ever `personalizadas` (scope decision #2).
  */
@@ -303,8 +304,10 @@ fun resolveSelectedThemeIds(
             .toSet()
         return migrated.ifEmpty { defaultThemeIds }
     }
-    val filtered = persistedThemeIds?.filter { it in knownThemeIds }?.toSet()
-    return if (filtered.isNullOrEmpty()) defaultThemeIds else filtered
+    if (persistedThemeIds == null) return defaultThemeIds
+    if (persistedThemeIds.isEmpty()) return persistedThemeIds
+    val filtered = persistedThemeIds.filter { it in knownThemeIds }.toSet()
+    return filtered.ifEmpty { defaultThemeIds }
 }
 
 /** Upper bound on the themes a freshly onboarded install starts with, so the first feed is a
@@ -348,21 +351,6 @@ fun deriveInitialThemeIds(
     if (broad.isNotEmpty()) return broad
     return freeThemeIds.sorted().take(max).toSet()
 }
-
-/** Minimum-selection rule used by the "Your feed" screen before it commits a draft: at least one
- *  theme must be selected, UNLESS an independent feed source ([FeedSources.includeFavorites] or
- *  [FeedSources.includeOwn]) is on -- both already contribute rows to [filteredAffirmations] with
- *  zero themes selected (see its kdoc), so requiring a theme on top of that blocked users from
- *  running a feed made entirely of favourites and/or their own affirmations. `personalizadas`
- *  itself never factors in here (scope decision #2) -- it is no longer part of the toggleable
- *  theme selection at all, so it can't satisfy or violate this. At least one enabled user
- *  collection ([anyCollectionEnabled]) is also a valid carrier. */
-internal fun isDraftThemeSelectionValid(
-    draftThemeIds: Set<String>,
-    feedSources: FeedSources,
-    anyCollectionEnabled: Boolean = false,
-): Boolean =
-    draftThemeIds.isNotEmpty() || feedSources.includeFavorites || feedSources.includeOwn || anyCollectionEnabled
 
 /**
  * Pure migration-default resolution for the onboarding guide's tri-state "seen" flag (spec R1.3,
@@ -497,14 +485,6 @@ class AffirmityAppState(
     private val widgetUpdater: WidgetUpdater,
     private val authRepository: AuthRepository,
     private val fcmTokenRepository: FcmTokenRepository,
-    /** Wire locale token (`"en"`/`"es"`) of the app's current language, synced to the server so
-     * push notifications are rendered in the language the user selected in-app. */
-    private val deviceLocaleToken: () -> String = {
-        val appLocales = AppCompatDelegate.getApplicationLocales()
-        notificationLocaleToken(
-            if (appLocales.isEmpty) java.util.Locale.getDefault().language else appLocales[0]?.language,
-        )
-    },
     private val fcmTokenProvider: suspend () -> String = {
         FirebaseMessaging.getInstance().token.await()
     },
@@ -517,6 +497,14 @@ class AffirmityAppState(
      * tests that build this class directly don't need to know about locale resolution. */
     private val dayLetters: List<String> = listOf("D", "L", "M", "M", "J", "V", "S"),
     private val deviceTimeZoneId: () -> String = { TimeZone.getDefault().id },
+    /** Wire locale token (`"en"`/`"es"`) of the app's current language, synced to the server so
+     * push notifications are rendered in the language the user selected in-app. */
+    private val deviceLocaleToken: () -> String = {
+        val appLocales = AppCompatDelegate.getApplicationLocales()
+        notificationLocaleToken(
+            if (appLocales.isEmpty) java.util.Locale.getDefault().language else appLocales[0]?.language,
+        )
+    },
     private val useRemoteSession: Boolean = true,
     /** Every known selectable group id (universes + `personalizadas`), resolved in
      * [rememberAffirmityAppState] from `selectableAffirmationGroups()` so this class never imports
@@ -696,15 +684,6 @@ class AffirmityAppState(
     private fun markFeedDraftReadyIfSeeded() {
         if (themeDraftInitialized && feedSourcesDraftInitialized) isFeedDraftReady = true
     }
-
-    /** True when [draftThemeIds] is non-empty, or when [draftFeedSources] can carry the feed on its
-     * own (Favorites and/or Mine). Reads the DRAFT, not the committed [feedSources] -- otherwise
-     * turning a source off in the draft would still validate against the stale committed value
-     * (resolved implementation-risk item, `sdd/feed-randomize-order` T4). Unlike the old
-     * group-level rule, `personalizadas` never factors in (scope decision #2) -- there is nothing
-     * to carve out for it. */
-    val isDraftThemeSelectionValid: Boolean
-        get() = isDraftThemeSelectionValid(draftThemeIds.value, draftFeedSources.value, anyCollectionEnabled)
 
     /** Extended "Actualizar mi feed" dirty check (spec "Extended isDirty Detection"): true when
      *  [draftThemeIds] differs from the committed [selectedThemeIds], or any of
@@ -1305,17 +1284,6 @@ class AffirmityAppState(
                             remoteSession.notifications.setTimeZone(zoneId)
                             Log.d(TAG, "fcm/timezone sync: timeZone write succeeded")
                             val token = fcmTokenProvider()
-                    // Best-effort and deliberately AFTER (and isolated from) the timezone/FCM
-                    // handshake above: a failed or stalled locale write must never block push
-                    // registration. Last step of this collectLatest body, so a session swap still
-                    // cancels it.
-                    try {
-                        remoteSession.notifications.setLocale(deviceLocaleToken())
-                    } catch (cancellation: CancellationException) {
-                        throw cancellation
-                    } catch (error: Exception) {
-                        Log.e(TAG, "locale sync: FAILED", error)
-                    }
                             if (BuildConfig.DEBUG) Log.d(TAG, "fcm/timezone sync: got FCM token, registering for uid=$uid")
                             fcmTokenOwnershipCoordinator.registerIfActive(
                                 uid = uid,
@@ -1336,6 +1304,17 @@ class AffirmityAppState(
                         } else {
                             Log.e(TAG, "fcm/timezone sync: FAILED", error)
                         }
+                    }
+                    // Best-effort and deliberately AFTER (and isolated from) the timezone/FCM
+                    // handshake above: a failed or stalled locale write must never block push
+                    // registration. Last step of this collectLatest body, so a session swap still
+                    // cancels it.
+                    try {
+                        remoteSession.notifications.setLocale(deviceLocaleToken())
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (error: Exception) {
+                        Log.e(TAG, "locale sync: FAILED", error)
                     }
                 }
         }
@@ -2320,17 +2299,16 @@ class AffirmityAppState(
     }
 
     /** Commits [draftThemeIds] as [selectedThemeIds] AND [draftFeedSources] as [feedSources],
-     * persisting both, unless the draft violates the minimum-selection invariant — in which case
-     * nothing is committed or persisted (spec "Commit Applies All Pending Feed-Source Changes":
-     * both changes take effect together). Returns whether the commit happened, so the caller can
-     * decide whether to close "Your feed".
+     * persisting both (spec "Commit Applies All Pending Feed-Source Changes": both changes take
+     * effect together). An empty draft is a valid commit: it means "no catalog themes" and is
+     * persisted as an explicit empty set, distinct from a never-written (default) selection.
+     * Always returns true; the Boolean is kept so callers can decide whether to close "Your feed".
      *
      * When the committed [FeedSources.randomizeOrder] is true, a fresh [FeedSources.orderSeed] is
      * generated via [feedSeedSource] for THIS commit, regardless of whether the toggle was already
      * on before it (spec "Seed Generation and Regeneration Timing"). When it is false, the previous
      * committed seed is carried over unchanged and [feedSeedSource] is not invoked. */
     fun applyThemeSelection(): Boolean {
-        if (!isDraftThemeSelectionValid) return false
         val committed = draftThemeIds.value
         val committedFeedSources = draftFeedSources.value.copy(
             orderSeed = if (draftFeedSources.value.randomizeOrder) {

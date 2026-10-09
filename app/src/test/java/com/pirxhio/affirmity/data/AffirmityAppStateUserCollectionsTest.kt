@@ -480,8 +480,6 @@ class AffirmityAppStateUserCollectionsTest {
 
         assertTrue(enabled.draftThemeIds.value.isEmpty())
         assertFalse(enabled.draftFeedSources.value.includeFavorites || enabled.draftFeedSources.value.includeOwn)
-        assertTrue(enabled.isDraftThemeSelectionValid)
-        assertFalse(none.isDraftThemeSelectionValid)
     }
 
     // --- rename / membership / ui -------------------------------------------------------------

@@ -59,9 +59,11 @@ fun deselectLockedGroups(
 /**
  * Theme-level equivalent of [deselectLockedGroups] ("Your feed" refactor): drops every id in
  * [proOnlyIds] from [selected] -- except one still covered by a durable ad grant
- * ([adUnlockedIds]) -- then falls back to [defaultThemeIds] if that removal left the selection
- * empty. Simpler than its group-level counterpart because no theme is ever `personalizadas`
- * (scope decision #2): there is no always-selected id to exempt from the emptiness check.
+ * ([adUnlockedIds]) -- then falls back to [defaultThemeIds] if that removal left a previously
+ * non-empty selection empty (the user never chose "none"). An already-empty [selected] is an
+ * explicit "no catalog themes" choice and is returned untouched. Simpler than its group-level
+ * counterpart because no theme is ever `personalizadas` (scope decision #2): there is no
+ * always-selected id to exempt from the emptiness check.
  */
 fun deselectLockedThemes(
     selected: Set<String>,
@@ -69,6 +71,7 @@ fun deselectLockedThemes(
     defaultThemeIds: Set<String>,
     adUnlockedIds: Set<String> = emptySet(),
 ): Set<String> {
+    if (selected.isEmpty()) return selected
     val cleaned = selected - (proOnlyIds - adUnlockedIds)
     return cleaned.ifEmpty { defaultThemeIds }
 }

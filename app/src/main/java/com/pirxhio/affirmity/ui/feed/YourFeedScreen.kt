@@ -61,7 +61,6 @@ import com.pirxhio.affirmity.ui.groups.displayLabel
 fun YourFeedScreen(
     draftThemeIds: Set<String>,
     isDirty: Boolean,
-    isValid: Boolean,
     catalogThemesById: Map<String, CatalogTheme>,
     recommendedSurfaces: List<SurfaceUiModel>,
     accessDecisionFor: (themeId: String) -> AccessDecision,
@@ -159,7 +158,7 @@ fun YourFeedScreen(
             )
         }
 
-        UpdateFeedButton(isDirty = isDirty, isValid = isValid, onClick = onUpdateFeed)
+        UpdateFeedButton(isDirty = isDirty, onClick = onUpdateFeed)
     }
 }
 
@@ -384,7 +383,6 @@ fun YourFeedSheetContent(
     isExpanded: Boolean,
     draftThemeIds: Set<String>,
     isDirty: Boolean,
-    isValid: Boolean,
     catalogThemesById: Map<String, CatalogTheme>,
     recommendedSurfaces: List<SurfaceUiModel>,
     accessDecisionFor: (themeId: String) -> AccessDecision,
@@ -415,7 +413,6 @@ fun YourFeedSheetContent(
             YourFeedScreen(
                 draftThemeIds = draftThemeIds,
                 isDirty = isDirty,
-                isValid = isValid,
                 catalogThemesById = catalogThemesById,
                 recommendedSurfaces = recommendedSurfaces,
                 accessDecisionFor = accessDecisionFor,

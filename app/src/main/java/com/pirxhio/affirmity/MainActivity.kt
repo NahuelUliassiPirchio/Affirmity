@@ -1673,9 +1673,6 @@ fun AffirmityApp(
                     val yourFeedSheetState = rememberStandardBottomSheetState(
                         initialValue = SheetValue.PartiallyExpanded,
                         skipHiddenState = true,
-                        confirmValueChange = { target ->
-                            target != SheetValue.PartiallyExpanded || appState.isDraftThemeSelectionValid
-                        },
                     )
                     val yourFeedScaffoldState = rememberBottomSheetScaffoldState(bottomSheetState = yourFeedSheetState)
                     val yourFeedScope = rememberCoroutineScope()
@@ -1690,7 +1687,6 @@ fun AffirmityApp(
                                 isExpanded = yourFeedSheetState.currentValue == SheetValue.Expanded,
                                 draftThemeIds = appState.draftThemeIds.value,
                                 isDirty = appState.isFeedDraftDirty,
-                                isValid = appState.isDraftThemeSelectionValid,
                                 catalogThemesById = catalogThemesById(),
                                 recommendedSurfaces = recommendedSurfaces,
                                 accessDecisionFor = accessDecisionFor,

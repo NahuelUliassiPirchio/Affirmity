@@ -62,31 +62,16 @@ private const val UNIVERSE_ID = "body_energy_wellbeing"
 private const val THEME_ID = "body_energy_wellbeing.body_acceptance"
 
 /** Covers the resolved implementation-risk item from `sdd/feed-randomize-order/tasks` T4 (
- * `isDraftThemeSelectionValid` must read the DRAFT feed sources, not the committed ones) and T5's
+ * an empty draft commits cleanly) and T5's
  * draft feed-sources state machine: pending toggles, commit-time persistence, seed generation
  * timing, and reset -- mirroring `AffirmityAppStateCatalogTest`'s Mockito helper pattern. */
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class AffirmityAppStateFeedSourcesDraftTest {
 
-    // --- T4: isDraftThemeSelectionValid reads the DRAFT, not the committed sources ------------
+    // --- T4: an empty draft with every source off is a valid, committable state -------------
 
     @Test
-    fun `validity reflects a draft toggle flipped off even though committed sources are still on`() = runTest {
-        val state = buildState(
-            backgroundScope,
-            committedFeedSources = FeedSources(includeFavorites = true, includeOwn = false),
-        )
-        runCurrent()
-        advanceUntilIdle()
-
-        state.setDraftFeedSources(FeedSources(includeFavorites = false, includeOwn = false))
-        state.removeThemesInUniverse(UNIVERSE_ID) // ensure draftThemeIds is empty for this check
-
-        assertFalse(state.isDraftThemeSelectionValid)
-    }
-
-    @Test
-    fun `validity reflects a draft toggle flipped on even though committed sources are both off`() = runTest {
+    fun `an empty theme draft with every source off commits and leaves the feed empty`() = runTest {
         val state = buildState(
             backgroundScope,
             committedFeedSources = FeedSources(includeFavorites = false, includeOwn = false),
@@ -94,10 +79,11 @@ class AffirmityAppStateFeedSourcesDraftTest {
         runCurrent()
         advanceUntilIdle()
 
-        state.setDraftFeedSources(FeedSources(includeFavorites = false, includeOwn = true))
         state.removeThemesInUniverse(UNIVERSE_ID)
 
-        assertTrue(state.isDraftThemeSelectionValid)
+        assertTrue(state.applyThemeSelection())
+        assertEquals(emptySet<String>(), state.selectedThemeIds.value)
+        assertTrue(state.filteredAffirmations.isEmpty())
     }
 
     // --- T5: draft toggling never touches the committed/visible feed --------------------------

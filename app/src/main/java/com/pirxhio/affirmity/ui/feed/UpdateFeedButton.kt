@@ -12,14 +12,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
 
-/** Sticky "Update my feed" CTA, enabled only when [isDirty] AND [isValid] -- adapted from the old
- *  selector sheet's Aplicar button, which gated on the same minimum-selection invariant rather
- *  than dirtiness alone (a dirty-but-empty draft must not look tappable, since committing it
- *  would silently no-op). */
+/** Sticky "Update my feed" CTA, enabled only when [isDirty]. An empty draft is a valid selection
+ *  (no catalog themes), so there is no separate validity gate. */
 @Composable
 fun UpdateFeedButton(
     isDirty: Boolean,
-    isValid: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -32,7 +29,7 @@ fun UpdateFeedButton(
     ) {
         Button(
             onClick = onClick,
-            enabled = isDirty && isValid,
+            enabled = isDirty,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(R.string.your_feed_update_button))
