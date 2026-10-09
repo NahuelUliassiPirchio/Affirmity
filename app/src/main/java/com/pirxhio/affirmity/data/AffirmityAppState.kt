@@ -585,6 +585,13 @@ class AffirmityAppState(
      *  when the session is Remote, [affirmations] is not in Room at all. */
     private val allAffirmations: List<Affirmation> get() = affirmations + catalogAffirmations
 
+    /** Id -> affirmation index over [allAffirmations], cached. [derivedStateOf] reads the snapshot
+     *  lists, so it recomputes only after [affirmations]/[catalogAffirmations] change (never stale)
+     *  instead of rebuilding per read. Duplicate ids resolve to the last row, like `associateBy`. */
+    private val allAffirmationsById: Map<String, Affirmation> by derivedStateOf {
+        allAffirmations.associateBy { it.id }
+    }
+
     var favoriteAffirmationIds = mutableStateOf<Set<String>>(emptySet())
         private set
 
@@ -621,8 +628,9 @@ class AffirmityAppState(
 
     /** The user's groups for the "Your groups" shelf and the Save-to sheet, in recency order. `resolvedItemCount` only counts affirmations that still
      *  exist (orphan ids excluded), including Pro-locked or hidden rows -- those stay members. */
-    val userCollections: List<UserCollectionUi>
-        get() = collectionsState.value.toUserCollectionUi(allAffirmations.mapTo(HashSet()) { it.id })
+    val userCollections: List<UserCollectionUi> by derivedStateOf {
+        collectionsState.value.toUserCollectionUi(allAffirmationsById.keys)
+    }
 
     /** True when at least one collection chip is on. With the feed empty, the UI uses this (plus
      *  [filteredAffirmations]) to decide between the generic and the collections empty state. */
@@ -638,8 +646,7 @@ class AffirmityAppState(
     fun userCollectionAffirmations(userCollectionId: String): List<Affirmation> {
         val memberIds = collectionsState.value.firstOrNull { it.id == userCollectionId }?.affirmationIds
             ?: return emptyList()
-        val byId = allAffirmations.associateBy { it.id }
-        return resolveCollectionMembers(memberIds, byId::get)
+        return resolveCollectionMembers(memberIds, allAffirmationsById::get)
     }
 
     /** Every affirmation id held by at least one collection, for the card's saved state. */

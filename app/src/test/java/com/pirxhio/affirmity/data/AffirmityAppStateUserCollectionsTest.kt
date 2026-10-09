@@ -46,6 +46,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -756,6 +757,96 @@ class AffirmityAppStateUserCollectionsTest {
         return state
     }
 
+    // --- cached id index (must never go stale) ---------------------------------------------------
+
+    @Test
+    fun `userCollections resolvedItemCount follows allAffirmations changes after a prior read`() = runTest {
+        val affirmations = RecordingAffirmationRepositoryUC(listOf(ucOwned("owned-1")))
+        val state = buildUcState(
+            backgroundScope,
+            RecordingUserCollectionRepository(listOf(uc("c1", items = listOf("owned-1", "owned-2")))),
+            affirmations = affirmations,
+        )
+        runCurrent()
+        advanceUntilIdle()
+        assertEquals(1, state.userCollections.single().resolvedItemCount)
+
+        affirmations.insert(ucOwned("owned-2"))
+        runCurrent()
+        advanceUntilIdle()
+        assertEquals(2, state.userCollections.single().resolvedItemCount)
+
+        affirmations.deleteById("owned-1")
+        runCurrent()
+        advanceUntilIdle()
+        assertEquals(1, state.userCollections.single().resolvedItemCount)
+    }
+
+    @Test
+    fun `userCollections follows collection changes after a prior read`() = runTest {
+        val repo = RecordingUserCollectionRepository(listOf(uc("c1", items = listOf("owned-1"))))
+        val state = buildUcState(
+            backgroundScope,
+            repo,
+            affirmations = RecordingAffirmationRepositoryUC(listOf(ucOwned("owned-1"))),
+        )
+        runCurrent()
+        advanceUntilIdle()
+        assertEquals(listOf("c1"), state.userCollections.map { it.id })
+
+        state.renameCollection("c1", "Renamed")
+        runCurrent()
+        advanceUntilIdle()
+        assertEquals("Renamed", state.userCollections.single().name)
+    }
+
+    @Test
+    fun `userCollectionAffirmations keeps member order and follows allAffirmations changes`() = runTest {
+        val affirmations = RecordingAffirmationRepositoryUC(listOf(ucOwned("owned-1")))
+        val state = buildUcState(
+            backgroundScope,
+            RecordingUserCollectionRepository(
+                listOf(
+                    uc("c1", items = listOf("owned-2", "orphan", "owned-1")),
+                    uc("c2", items = listOf("owned-1")),
+                ),
+            ),
+            affirmations = affirmations,
+        )
+        runCurrent()
+        advanceUntilIdle()
+        assertEquals(listOf("owned-1"), state.userCollectionAffirmations("c1").map { it.id })
+        assertEquals(listOf("owned-1"), state.userCollectionAffirmations("c2").map { it.id })
+        assertEquals(emptyList<String>(), state.userCollectionAffirmations("missing").map { it.id })
+
+        affirmations.insert(ucOwned("owned-2"))
+        runCurrent()
+        advanceUntilIdle()
+        assertEquals(listOf("owned-2", "owned-1"), state.userCollectionAffirmations("c1").map { it.id })
+    }
+
+    @Test
+    fun `cached index follows catalogAffirmations rewrites after a prior read`() = runTest {
+        val catalog = FakeCatalogRepositoryUC(listOf(ucCatalog(FREE_ROW, UC_FREE_COLLECTION_ID)))
+        val state = buildUcState(
+            backgroundScope,
+            RecordingUserCollectionRepository(listOf(uc("c1", items = listOf(FREE_ROW, FREE_ROW_2)))),
+            catalogRepository = catalog,
+        )
+        runCurrent()
+        advanceUntilIdle()
+        assertEquals(1, state.userCollections.single().resolvedItemCount)
+        assertEquals(listOf(FREE_ROW), state.userCollectionAffirmations("c1").map { it.id })
+
+        catalog.setRows(
+            listOf(ucCatalog(FREE_ROW, UC_FREE_COLLECTION_ID), ucCatalog(FREE_ROW_2, UC_FREE_COLLECTION_ID)),
+        )
+        runCurrent()
+        advanceUntilIdle()
+        assertEquals(2, state.userCollections.single().resolvedItemCount)
+        assertEquals(listOf(FREE_ROW, FREE_ROW_2), state.userCollectionAffirmations("c1").map { it.id })
+    }
+
     private companion object {
         const val IMPORT_JSON =
             """[{"title":"Title","subtitle":"Subtitle","background":{"type":"color","value":"#000000"}}]"""
@@ -800,9 +891,14 @@ private class RecordingAffirmationRepositoryUC(
     override suspend fun setOverrides(id: String, overrides: Map<String, String>) = Unit
 }
 
-private class FakeCatalogRepositoryUC(private val rows: List<CatalogAffirmationEntity>) : CatalogAffirmationRepository {
+private class FakeCatalogRepositoryUC(initialRows: List<CatalogAffirmationEntity>) : CatalogAffirmationRepository {
+    private val rowsFlow = MutableStateFlow(initialRows)
+    private val rows: List<CatalogAffirmationEntity> get() = rowsFlow.value
+    fun setRows(newRows: List<CatalogAffirmationEntity>) {
+        rowsFlow.value = newRows
+    }
     override fun observeByGroupIds(groupIds: Set<String>): Flow<List<CatalogAffirmationEntity>> =
-        flowOf(rows.filter { it.groupId in groupIds })
+        rowsFlow.map { all -> all.filter { it.groupId in groupIds } }
     override suspend fun getByIds(ids: List<String>): List<CatalogAffirmationEntity> = rows.filter { it.id in ids }
 }
 
@@ -837,6 +933,7 @@ private fun buildUcState(
     collections: RecordingUserCollectionRepository,
     affirmations: RecordingAffirmationRepositoryUC = RecordingAffirmationRepositoryUC(),
     catalogRows: List<CatalogAffirmationEntity> = emptyList(),
+    catalogRepository: FakeCatalogRepositoryUC = FakeCatalogRepositoryUC(catalogRows),
     tier: AccessTier = AccessTier.PRO,
     themeIds: Set<String>? = setOf(UC_THEME_ID),
     hiddenIds: Set<String> = emptySet(),
@@ -887,7 +984,7 @@ private fun buildUcState(
         knownThemeIds = setOf(UC_THEME_ID, UC_OTHER_THEME_ID),
         defaultThematicThemeIds = emptySet(),
         favorites = FavoritesFakeUC(favoriteIds),
-        catalog = FakeCatalogRepositoryUC(catalogRows),
+        catalog = catalogRepository,
         collectionRepository = collections,
         collectionClock = now,
         collectionIdFactory = { ids.next() },
