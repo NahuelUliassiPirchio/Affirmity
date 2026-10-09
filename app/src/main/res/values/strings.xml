@@ -255,9 +255,6 @@
     <string name="meditation_pause_content_description">Pausar</string>
     <string name="meditation_start_content_description">Iniciar</string>
     <string name="meditation_max_duration_label">30 min</string>
-    <string name="meditation_preset_relax">Relax</string>
-    <string name="meditation_preset_focus">Focus</string>
-    <string name="meditation_preset_sleep">Sleep</string>
     <string name="meditation_discover_header">Descubre más sesiones</string>
     <string name="meditation_category_all">Todo</string>
     <string name="meditation_badge_ad_unlock">Anuncio gratis</string>

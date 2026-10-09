@@ -31,7 +31,6 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -198,11 +197,6 @@ fun MeditationScreen(
     // Wall-clock instant of the first Start press, for DayClock.attributedEpochDay -- not touched
     // on resume, only on a fresh start (mirrors hasStarted).
     var sessionStartWallMillis by remember { mutableStateOf<Long?>(null) }
-    val presets = listOf(
-        stringResource(R.string.meditation_preset_relax) to 5 * 60,
-        stringResource(R.string.meditation_preset_focus) to 15 * 60,
-        stringResource(R.string.meditation_preset_sleep) to 30 * 60,
-    )
 
     val context = LocalContext.current
     val gongPlayer = remember { MediaPlayer.create(context, R.raw.meditation_gong) }
@@ -377,33 +371,6 @@ fun MeditationScreen(
                             activeTrackColor = MaterialTheme.colorScheme.primaryContainer,
                         )
                     )
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
-                    ) {
-                        presets.forEach { (label, seconds) ->
-                            FilterChip(
-                                // Item 14: derived straight from `durationSeconds` instead of a
-                                // separately tracked `selectedPreset` -- dragging the slider off a
-                                // preset's value now un-highlights every chip on its own, instead
-                                // of leaving a stale chip highlighted while the slider disagrees.
-                                selected = durationSeconds == seconds,
-                                onClick = {
-                                    if (!isRunning) {
-                                        durationSeconds = seconds
-                                        secondsRemaining = durationSeconds
-                                        hasStarted = false
-                                        onDurationSelected(durationSeconds)
-                                    }
-                                },
-                                label = { Text(label) },
-                                enabled = !isRunning
-                            )
-                        }
-                    }
                 }
             }
             }
