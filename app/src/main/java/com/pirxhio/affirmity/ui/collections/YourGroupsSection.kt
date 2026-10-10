@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.Affirmation
 import com.pirxhio.affirmity.data.CollectionNameResult
+import com.pirxhio.affirmity.data.CopySuffixes
 import com.pirxhio.affirmity.data.UserCollectionUi
 
 private val CoverSize = 126.dp
@@ -63,7 +64,7 @@ private const val InFeedBorderAlpha = 0.5f
  */
 @Composable
 internal fun YourGroupsSection(
-    collections: List<UserCollectionUi>,
+    allCollections: List<UserCollectionUi>,
     canCreate: Boolean,
     affirmationsFor: (userCollectionId: String) -> List<Affirmation>,
     onToggle: (userCollectionId: String) -> Unit,
@@ -73,9 +74,13 @@ internal fun YourGroupsSection(
     onRestoreItem: (userCollectionId: String, affirmationId: String) -> Unit,
     onGroupRoundCompleted: (groupSize: Int) -> Unit,
     onCreate: suspend (name: String, highlightId: String) -> CollectionNameResult,
+    onDuplicate: suspend (defaultGroupId: String, name: String, suffixes: CopySuffixes) -> CollectionNameResult,
     onUpgrade: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Localize the default groups' placeholder names once, so the cards, the detail sheet and the
+    // actions sheet all show the same locale-correct name (DG-6).
+    val collections = allCollections.withLocalizedDefaultNames()
     // Ids, not objects: the sheets read the live collection so a toggle shows immediately, and a
     // deleted group simply stops resolving and closes its sheet. Saveable so rotation keeps them.
     var openGroupId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -144,6 +149,11 @@ internal fun YourGroupsSection(
         onEvent = { event -> manageState = manageState.reduce(event) },
         onRename = onRename,
         onDelete = onDelete,
+        canCreate = canCreate,
+        enabledFor = { id -> allCollections.firstOrNull { it.id == id }?.enabled ?: false },
+        onToggle = onToggle,
+        onDuplicate = onDuplicate,
+        onUpgrade = onUpgrade,
     )
 }
 

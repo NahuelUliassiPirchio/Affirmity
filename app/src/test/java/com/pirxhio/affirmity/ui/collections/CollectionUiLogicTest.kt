@@ -27,6 +27,7 @@ class CollectionUiLogicTest {
         assertEquals(R.string.collection_name_error_too_long, CollectionNameResult.TooLong.errorStringRes())
         assertEquals(R.string.collection_name_error_duplicate, CollectionNameResult.Duplicate.errorStringRes())
         assertEquals(R.string.collection_limit_reached, CollectionNameResult.LimitReached.errorStringRes())
+        assertEquals(R.string.collection_name_error_read_only, CollectionNameResult.ReadOnly.errorStringRes())
     }
 
     // --- picker rows ---
@@ -205,5 +206,102 @@ class CollectionUiLogicTest {
     @Test
     fun `groups row with no groups only has the new group tile`() {
         assertEquals(listOf(GroupsRowEntry.NewGroup), groupsRowEntries(emptyList()))
+    }
+
+    // --- default groups (DG-6, DG-9, DG-12, UC-4) ---
+
+    private fun defaultUi(id: String = "default.morning_start", enabled: Boolean = false, count: Int = 12) =
+        UserCollectionUi(id, name = id, enabled = enabled, resolvedItemCount = count, highlightId = "amber", isDefault = true)
+
+    @Test
+    fun `save to rows never list default groups`() {
+        val rows = saveToRows(listOf(defaultUi(), ui("a"), defaultUi("default.everyday_essentials"), ui("b")), setOf("a"), isFavorite = false)
+
+        assertEquals(
+            listOf(SaveToRow.Favorites(false), SaveToRow.Group("a", "a", "teal", true), SaveToRow.Group("b", "b", "teal", false)),
+            rows,
+        )
+    }
+
+    @Test
+    fun `picker rows never list default groups`() {
+        val rows = pickerRows(listOf(defaultUi(), ui("a", name = "Calm")), memberIds = setOf("default.morning_start"))
+
+        assertEquals(listOf(PickerRow("a", "Calm", checked = false)), rows)
+    }
+
+    @Test
+    fun `reducer ignores rename and delete for a default group`() {
+        val actions = CollectionManageState.Actions(defaultUi())
+
+        assertEquals(actions, actions.reduce(CollectionManageEvent.ChooseRename))
+        assertEquals(actions, actions.reduce(CollectionManageEvent.ChooseDelete))
+        // A user group still moves on, so the guard is specific to defaults.
+        assertEquals(
+            CollectionManageState.Renaming(calm),
+            CollectionManageState.Actions(calm).reduce(CollectionManageEvent.ChooseRename),
+        )
+    }
+
+    @Test
+    fun `actions sheet offers duplicate and the feed switch for defaults and rename and delete for user groups`() {
+        assertEquals(
+            listOf(ManageAction.Duplicate, ManageAction.ToggleInFeed),
+            manageActionsFor(defaultUi()),
+        )
+        assertEquals(listOf(ManageAction.Rename, ManageAction.Delete), manageActionsFor(calm))
+    }
+
+    @Test
+    fun `detail sheet is read-only only for defaults`() {
+        assertEquals(true, isReadOnlyGroup(defaultUi()))
+        assertEquals(false, isReadOnlyGroup(calm))
+    }
+
+    @Test
+    fun `duplicate tap upgrades when the free limit is reached and duplicates otherwise`() {
+        assertEquals(DuplicateTap.Duplicate, duplicateTap(canCreate = true))
+        assertEquals(DuplicateTap.Upgrade, duplicateTap(canCreate = false))
+    }
+
+    @Test
+    fun `saver round trip keeps highlight and isDefault`() {
+        val scope = androidx.compose.runtime.saveable.SaverScope { true }
+        val state = CollectionManageState.Actions(defaultUi(enabled = true, count = 7))
+
+        val saved = with(CollectionManageStateSaver) { scope.save(state) }
+        val restored = CollectionManageStateSaver.restore(saved!!) as CollectionManageState.Actions
+
+        assertEquals(state, restored)
+        assertEquals(true, restored.collection.isDefault)
+        assertEquals("amber", restored.collection.highlightId)
+    }
+
+    @Test
+    fun `saver restores a legacy five-field payload with defaults`() {
+        val restored = CollectionManageStateSaver.restore(listOf("actions", "a", "Calm", true, 0))
+
+        assertEquals(CollectionManageState.Actions(UserCollectionUi("a", "Calm", true, 0)), restored)
+    }
+
+    @Test
+    fun `localizeDefaultNames renames defaults only and a locale switch only changes the name`() {
+        val list = listOf(defaultUi("default.everyday_essentials", enabled = true), defaultUi(), ui("u1", name = "Mine"))
+        val es = mapOf("default.everyday_essentials" to "Esenciales del día", "default.morning_start" to "Buen comienzo")
+        val en = mapOf("default.everyday_essentials" to "Everyday Essentials", "default.morning_start" to "Morning Start")
+
+        val inEs = localizeDefaultNames(list, es::get)
+        val inEn = localizeDefaultNames(list, en::get)
+
+        assertEquals(listOf("Esenciales del día", "Buen comienzo", "Mine"), inEs.map { it.name })
+        assertEquals(listOf("Everyday Essentials", "Morning Start", "Mine"), inEn.map { it.name })
+        assertEquals(inEs.map { it.copy(name = "") }, inEn.map { it.copy(name = "") })
+    }
+
+    @Test
+    fun `localizeDefaultNames keeps the current name when no string is known`() {
+        val localized = localizeDefaultNames(listOf(defaultUi("default.retired")), { null })
+
+        assertEquals("default.retired", localized.single().name)
     }
 }

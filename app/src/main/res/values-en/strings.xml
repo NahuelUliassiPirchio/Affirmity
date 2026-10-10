@@ -1078,4 +1078,8 @@
     <string name="default_group_everyday_essentials_name">Everyday Essentials</string>
     <string name="default_group_morning_start_name">Morning Start</string>
     <string name="collection_name_error_read_only">Default groups can\'t be edited.</string>
+    <string name="groups_action_duplicate">Duplicate</string>
+    <string name="groups_duplicate_copy_suffix">(copy)</string>
+    <string name="groups_duplicate_copy_suffix_numbered">(copy %1$d)</string>
+    <string name="groups_action_in_feed">Show in your feed</string>
 </resources>
