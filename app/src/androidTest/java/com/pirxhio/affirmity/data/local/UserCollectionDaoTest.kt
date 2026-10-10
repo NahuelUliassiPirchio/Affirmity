@@ -153,4 +153,33 @@ class UserCollectionDaoTest {
         assertEquals("Renamed", result.collection.name)
         assertTrue(result.affirmationIds.isEmpty())
     }
+
+    @Test
+    fun createWithItems_insertsCollectionAndAllItemsInOrder() = runBlocking {
+        dao.createWithItems(
+            collection("copy", created = 10L),
+            listOf(
+                UserCollectionItemEntity("copy", "aff-1", 1L),
+                UserCollectionItemEntity("copy", "aff-2", 2L),
+            ),
+        )
+
+        val result = dao.getAll().single()
+        assertEquals("copy", result.collection.id)
+        assertEquals(setOf("aff-1", "aff-2"), result.affirmationIds.toSet())
+    }
+
+    @Test
+    fun createWithItems_rollsBackTheCollectionWhenAnItemViolatesTheForeignKey() = runBlocking {
+        assertThrows(SQLiteConstraintException::class.java) {
+            runBlocking {
+                dao.createWithItems(
+                    collection("copy"),
+                    listOf(UserCollectionItemEntity("missing-parent", "aff-1", 1L)),
+                )
+            }
+        }
+
+        assertTrue(dao.getAll().isEmpty())
+    }
 }

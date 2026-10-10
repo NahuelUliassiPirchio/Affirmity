@@ -33,6 +33,16 @@ interface UserCollectionDao {
         if (item != null) insertItem(item)
     }
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertItems(entities: List<UserCollectionItemEntity>)
+
+    /** Atomic bulk create: an FK violation in any item rolls the collection insert back too. */
+    @Transaction
+    suspend fun createWithItems(collection: UserCollectionEntity, items: List<UserCollectionItemEntity>) {
+        insertCollection(collection)
+        if (items.isNotEmpty()) insertItems(items)
+    }
+
     @Query("UPDATE user_collections SET name = :name WHERE id = :id")
     suspend fun rename(id: String, name: String)
 

@@ -261,6 +261,16 @@ val MIGRATION_14_15 = object : androidx.room.migration.Migration(14, 15) {
     }
 }
 
+/** Additive: creates `default_group_state` empty. Defaults are code-defined; a missing row = disabled. */
+val MIGRATION_15_16 = object : androidx.room.migration.Migration(15, 16) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `default_group_state` (`id` TEXT NOT NULL, " +
+                "`enabled` INTEGER NOT NULL, `lastUsedAtMillis` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        )
+    }
+}
+
 @Database(
     entities = [
         AffirmationEntity::class,
@@ -276,8 +286,9 @@ val MIGRATION_14_15 = object : androidx.room.migration.Migration(14, 15) {
         PersonalizationSignalEntity::class,
         UserCollectionEntity::class,
         UserCollectionItemEntity::class,
+        DefaultGroupStateEntity::class,
     ],
-    version = 15,
+    version = 16,
     exportSchema = true,
 )
 @androidx.room.TypeConverters(OverridesConverters::class)
@@ -294,6 +305,7 @@ abstract class AffirmityDatabase : RoomDatabase() {
     abstract fun meditationCustomizationDao(): MeditationCustomizationDao
     abstract fun personalizationSignalDao(): PersonalizationSignalDao
     abstract fun userCollectionDao(): UserCollectionDao
+    abstract fun defaultGroupStateDao(): DefaultGroupStateDao
 
     companion object {
         @Volatile
@@ -320,6 +332,7 @@ abstract class AffirmityDatabase : RoomDatabase() {
                     MIGRATION_12_13,
                     MIGRATION_13_14,
                     MIGRATION_14_15,
+                    MIGRATION_15_16,
                 ).build().also { instance = it }
             }
     }
