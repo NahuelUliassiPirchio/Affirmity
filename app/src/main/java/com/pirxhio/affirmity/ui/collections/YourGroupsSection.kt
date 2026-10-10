@@ -27,7 +27,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,8 +51,12 @@ import com.pirxhio.affirmity.data.Affirmation
 import com.pirxhio.affirmity.data.CollectionNameResult
 import com.pirxhio.affirmity.data.CopySuffixes
 import com.pirxhio.affirmity.data.UserCollectionUi
+import com.pirxhio.affirmity.ui.theme.GroupCoverOnGround
 
 private val CoverSize = 126.dp
+private val PlayTargetSize = 48.dp
+private val PlayChipSize = 30.dp
+private val PlayIconSize = 18.dp
 private val ToggleIndicatorSize = 18.dp
 private val ToggleCheckSize = 12.dp
 private val ToggleRingWidth = 1.5.dp
@@ -84,6 +90,8 @@ internal fun YourGroupsSection(
     // Ids, not objects: the sheets read the live collection so a toggle shows immediately, and a
     // deleted group simply stops resolving and closes its sheet. Saveable so rotation keeps them.
     var openGroupId by rememberSaveable { mutableStateOf<String?>(null) }
+    // Same request flag + guard + dialog as the detail sheet's "Play group", driven from the tile.
+    var playingGroupId by rememberSaveable { mutableStateOf<String?>(null) }
     var showNewGroup by rememberSaveable { mutableStateOf(false) }
     var manageState by rememberSaveable(stateSaver = CollectionManageStateSaver) {
         mutableStateOf<CollectionManageState>(CollectionManageState.Closed)
@@ -117,6 +125,8 @@ internal fun YourGroupsSection(
                         card = entry.card,
                         onClick = { openGroupId = entry.card.id },
                         onToggle = { onToggle(entry.card.id) },
+                        play = entry.tilePlay(),
+                        onPlay = { playingGroupId = entry.card.id },
                     )
                     GroupsRowEntry.NewGroup -> NewGroupTile(onClick = { showNewGroup = true })
                 }
@@ -135,6 +145,17 @@ internal fun YourGroupsSection(
             onRoundCompleted = onGroupRoundCompleted,
             onDismiss = { openGroupId = null },
         )
+    }
+    val playingCollection = collections.firstOrNull { it.id == playingGroupId }
+    if (playingCollection != null) {
+        val playable = affirmationsFor(playingCollection.id)
+        if (shouldShowGroupPlayer(requested = true, itemCount = playable.size)) {
+            GroupPlayerDialog(
+                affirmations = playable,
+                onRoundCompleted = onGroupRoundCompleted,
+                onDismiss = { playingGroupId = null },
+            )
+        }
     }
     if (showNewGroup) {
         NewGroupSheet(
@@ -187,26 +208,78 @@ private fun NewGroupTile(onClick: () -> Unit) {
 }
 
 @Composable
-private fun GroupCardTile(card: GroupCardUi, onClick: () -> Unit, onToggle: () -> Unit) {
+private fun GroupCardTile(
+    card: GroupCardUi,
+    onClick: () -> Unit,
+    onToggle: () -> Unit,
+    play: TilePlay,
+    onPlay: () -> Unit,
+) {
     val inFeed = card.inFeed
     val openLabel = stringResource(R.string.groups_open_group_action)
     Column(modifier = Modifier.width(CoverSize)) {
-        GroupCover(
-            name = card.name,
-            highlight = card.highlight,
-            size = CoverSize,
-            modifier = Modifier.clickable(onClickLabel = openLabel, role = Role.Button, onClick = onClick),
-            border = BorderStroke(
-                1.dp,
-                if (inFeed) card.highlight.color.copy(alpha = InFeedBorderAlpha) else MaterialTheme.colorScheme.outlineVariant,
-            ),
-        )
+        // The play button is a sibling of the clickable cover, not a child, so the two touch targets
+        // never share a click; the cover's tap still opens the detail.
+        Box {
+            GroupCover(
+                name = card.name,
+                highlight = card.highlight,
+                size = CoverSize,
+                modifier = Modifier.clickable(onClickLabel = openLabel, role = Role.Button, onClick = onClick),
+                border = BorderStroke(
+                    1.dp,
+                    if (inFeed) card.highlight.color.copy(alpha = InFeedBorderAlpha) else MaterialTheme.colorScheme.outlineVariant,
+                ),
+            )
+            if (play != TilePlay.None) {
+                GroupPlayButton(
+                    name = card.name,
+                    color = card.highlight.color,
+                    enabled = play == TilePlay.Enabled,
+                    onClick = onPlay,
+                    modifier = Modifier.align(Alignment.TopEnd),
+                )
+            }
+        }
         GroupFeedToggle(name = card.name, inFeed = inFeed, onToggle = onToggle)
         Text(
             text = pluralStringResource(R.plurals.groups_affirmation_count, card.itemCount, card.itemCount),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+/**
+ * Understated play control in the cover's top-end corner: a 48dp target around a 30dp chip. The
+ * cover is always the dark ground, so a translucent light chip with a highlight-coloured ring reads
+ * the same in light and dark theme. Stays visible but inert (dimmed) when the group has nothing to
+ * play, mirroring the disabled "Play group" button in the detail sheet and keeping tiles uniform.
+ */
+@Composable
+private fun GroupPlayButton(
+    name: String,
+    color: Color,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    IconButton(onClick = onClick, enabled = enabled, modifier = modifier.size(PlayTargetSize)) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(PlayChipSize)
+                .clip(CircleShape)
+                .background(GroupCoverOnGround.copy(alpha = if (enabled) 0.16f else 0.08f))
+                .border(1.dp, color.copy(alpha = if (enabled) 0.7f else 0.25f), CircleShape),
+        ) {
+            Icon(
+                Icons.Filled.PlayArrow,
+                contentDescription = stringResource(R.string.groups_tile_play_a11y, name),
+                tint = GroupCoverOnGround.copy(alpha = if (enabled) 1f else 0.4f),
+                modifier = Modifier.size(PlayIconSize),
+            )
+        }
     }
 }
 

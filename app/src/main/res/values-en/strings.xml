@@ -617,6 +617,7 @@
     <string name="groups_highlight_gold">Gold</string>
     <string name="groups_toggle_state_in_feed">In your feed</string>
     <string name="groups_toggle_state_not_in_feed">Not in feed</string>
+    <string name="groups_tile_play_a11y">Play %1$s</string>
     <string name="groups_toggle_a11y_label">Toggle %1$s in your feed</string>
     <string name="collection_picker_done">Done</string>
     <string name="collection_picker_favorites">Favorites</string>

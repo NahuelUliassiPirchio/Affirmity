@@ -323,3 +323,11 @@ internal sealed interface GroupsRowEntry {
 /** The user's groups in their given order, then the "New group" tile as the LAST entry of the row. */
 internal fun groupsRowEntries(cards: List<GroupCardUi>): List<GroupsRowEntry> =
     cards.map { GroupsRowEntry.Group(it) } + GroupsRowEntry.NewGroup
+
+/** Play affordance of a "Your groups" tile: absent on "New group", present but inert when there is nothing to play. */
+internal enum class TilePlay { None, Disabled, Enabled }
+
+internal fun GroupsRowEntry.tilePlay(): TilePlay = when (this) {
+    is GroupsRowEntry.Group -> if (canPlayGroup(card.itemCount)) TilePlay.Enabled else TilePlay.Disabled
+    GroupsRowEntry.NewGroup -> TilePlay.None
+}

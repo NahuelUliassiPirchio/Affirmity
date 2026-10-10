@@ -1044,6 +1044,7 @@
     <string name="groups_highlight_gold">Dorado</string>
     <string name="groups_toggle_state_in_feed">En el feed</string>
     <string name="groups_toggle_state_not_in_feed">Fuera del feed</string>
+    <string name="groups_tile_play_a11y">Reproducir %1$s</string>
     <string name="groups_toggle_a11y_label">Alternar %1$s en tu feed</string>
     <string name="collection_picker_done">Listo</string>
     <string name="collection_picker_favorites">Favoritas</string>

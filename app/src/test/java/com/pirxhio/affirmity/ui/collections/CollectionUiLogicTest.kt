@@ -209,6 +209,30 @@ class CollectionUiLogicTest {
         assertEquals(listOf(GroupsRowEntry.NewGroup), groupsRowEntries(emptyList()))
     }
 
+    // --- tile play affordance ---
+
+    @Test
+    fun `a group tile with items has an enabled play affordance`() {
+        assertEquals(TilePlay.Enabled, GroupsRowEntry.Group(card("a")).tilePlay())
+    }
+
+    @Test
+    fun `a group tile with nothing resolved keeps its play affordance disabled`() {
+        val empty = card("a").copy(itemCount = 0)
+        assertEquals(TilePlay.Disabled, GroupsRowEntry.Group(empty).tilePlay())
+    }
+
+    @Test
+    fun `the new group tile has no play affordance`() {
+        assertEquals(TilePlay.None, GroupsRowEntry.NewGroup.tilePlay())
+    }
+
+    @Test
+    fun `a disabled default group tile is still playable`() {
+        val ui = UserCollectionUi("default.morning_start", "m", enabled = false, resolvedItemCount = 12, highlightId = "amber", isDefault = true)
+        assertEquals(TilePlay.Enabled, GroupsRowEntry.Group(ui.toGroupCardUi()).tilePlay())
+    }
+
     // --- default groups (DG-6, DG-9, DG-12, UC-4) ---
 
     private fun defaultUi(id: String = "default.morning_start", enabled: Boolean = false, count: Int = 12) =
