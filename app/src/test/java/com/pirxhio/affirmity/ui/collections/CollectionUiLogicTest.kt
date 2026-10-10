@@ -28,7 +28,6 @@ class CollectionUiLogicTest {
         assertEquals(R.string.collection_name_error_duplicate, CollectionNameResult.Duplicate.errorStringRes())
         assertEquals(R.string.collection_limit_reached, CollectionNameResult.LimitReached.errorStringRes())
         assertEquals(R.string.collection_name_error_read_only, CollectionNameResult.ReadOnly.errorStringRes())
-        assertEquals(R.string.collection_name_error_catalog_not_ready, CollectionNameResult.CatalogNotReady.errorStringRes())
     }
 
     // --- picker rows ---
@@ -351,14 +350,6 @@ class CollectionUiLogicTest {
     @Test
     fun `duplicate verdict Ok closes the sheet`() {
         assertEquals(DuplicateOutcome.Close, CollectionNameResult.Ok("id").duplicateOutcome())
-    }
-
-    @Test
-    fun `duplicate verdict CatalogNotReady keeps the sheet open with its localized message`() {
-        assertEquals(
-            DuplicateOutcome.ShowError(R.string.collection_name_error_catalog_not_ready),
-            CollectionNameResult.CatalogNotReady.duplicateOutcome(),
-        )
     }
 
     @Test

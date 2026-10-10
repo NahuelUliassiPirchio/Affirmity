@@ -1981,11 +1981,10 @@ class AffirmityAppState(
 
     /**
      * Copies a default group into a normal, editable user group named after [localizedName] with
-     * [suffixes] (DG-11). Members are the default's CURRENT resolvable affirmations (orphans drop
-     * out) and the highlight is kept. Counts toward the free limit and uses the normal create
+     * [suffixes] (DG-11). Members are the default's DEFINED affirmation ids, in definition order, and
+     * the highlight is kept. Counts toward the free limit and uses the normal create
      * validation: [CollectionNameResult.LimitReached] creates nothing. An id that is not a known
-     * default is a no-op reported as [CollectionNameResult.Blank]. If none of the default's
-     * affirmations resolve (catalog still seeding) nothing is created: [CollectionNameResult.CatalogNotReady].
+     * default is a no-op reported as [CollectionNameResult.Blank].
      */
     suspend fun duplicateDefaultGroup(
         defaultGroupId: String,
@@ -1994,11 +1993,9 @@ class AffirmityAppState(
     ): CollectionNameResult =
         userCollectionMutex.withLock {
             val group = defaultGroups.firstOrNull { it.id == defaultGroupId } ?: return@withLock CollectionNameResult.Blank
-            // user_collection_items has an FK to the affirmations table, so the defined ids cannot be
-            // copied blindly; and persisting an empty copy while the catalog is still seeding would
-            // burn a free slot with a group that is never repaired. Refuse until members resolve.
-            val members = resolveCollectionMembers(group.affirmationIds, allAffirmationsById::get).map { it.id }
-            if (members.isEmpty()) return@withLock CollectionNameResult.CatalogNotReady
+            // user_collection_items.affirmationId deliberately has no FK (only userCollectionId does),
+            // so ids the catalog has not seeded yet are safe to persist: orphans drop out at render
+            // and resolve once the catalog arrives.
             val existing = collectionRepository.getCollections()
             val name = copyCollectionName(localizedName, existing, suffixes)
             val verdict = validateNewCollection(name, existing, entitlementTier.value)
@@ -2007,7 +2004,7 @@ class AffirmityAppState(
                     id = collectionIdFactory(),
                     name = verdict.name,
                     nowMillis = collectionClock(),
-                    affirmationIds = members,
+                    affirmationIds = group.affirmationIds,
                     highlightId = group.highlightId,
                 )
             }

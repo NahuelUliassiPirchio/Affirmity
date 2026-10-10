@@ -884,7 +884,7 @@ class AffirmityAppStateUserCollectionsTest {
     }
 
     @Test
-    fun `duplicate creates an editable user group with resolved members, highlight and copy name`() = runTest {
+    fun `duplicate creates an editable user group with the defined members, highlight and copy name`() = runTest {
         val repo = RecordingUserCollectionRepository()
         val state = defaultsState(this, repo)
 
@@ -897,7 +897,7 @@ class AffirmityAppStateUserCollectionsTest {
         assertEquals("copy-1", created.id)
         assertEquals("Morning Start (copy)", created.name)
         assertEquals("amber", created.highlightId)
-        assertEquals(listOf(PRO_ROW, FREE_ROW), created.affirmationIds)
+        assertEquals(listOf(PRO_ROW, FREE_ROW, "cat_missing"), created.affirmationIds)
         assertFalse(created.isDefault)
         assertEquals(CollectionNameResult.Ok("Renamed"), state.renameCollection("copy-1", "Renamed"))
     }
@@ -931,8 +931,9 @@ class AffirmityAppStateUserCollectionsTest {
     }
 
     @Test
-    fun `duplicate before the catalog is seeded creates nothing and reports not ready`() = runTest {
+    fun `duplicate before the catalog is seeded persists every defined id in order`() = runTest {
         val repo = RecordingUserCollectionRepository()
+        val definedIds = (1..12).map { "cat_future.%03d".format(it) }
         val state = buildUcState(
             backgroundScope,
             repo,
@@ -942,7 +943,7 @@ class AffirmityAppStateUserCollectionsTest {
             feedSources = FeedSources(includeOwn = false),
             ids = sequenceOf("copy-1").iterator(),
             now = { 500L },
-            defaultGroups = testDefaults,
+            defaultGroups = listOf(DefaultGroup(morningId, 0, "amber", definedIds)),
             defaultGroupStates = RecordingDefaultGroupStateRepository(),
         )
         runCurrent()
@@ -950,9 +951,8 @@ class AffirmityAppStateUserCollectionsTest {
 
         val verdict = state.duplicateDefaultGroup(morningId, "Morning Start", copySuffixes)
 
-        assertEquals(CollectionNameResult.CatalogNotReady, verdict)
-        assertTrue(repo.events.isEmpty())
-        assertTrue(repo.current.isEmpty())
+        assertEquals(CollectionNameResult.Ok("Morning Start (copy)"), verdict)
+        assertEquals(definedIds, repo.current.single().affirmationIds)
     }
 
     @Test

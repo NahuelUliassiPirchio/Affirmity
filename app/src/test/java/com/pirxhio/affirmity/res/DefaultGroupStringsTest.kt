@@ -17,7 +17,6 @@ class DefaultGroupStringsTest {
         "groups_duplicate_copy_suffix_numbered",
         "groups_action_in_feed",
         "collection_name_error_read_only",
-        "collection_name_error_catalog_not_ready",
     )
 
     private fun load(path: String): Map<String, String> {
