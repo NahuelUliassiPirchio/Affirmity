@@ -69,6 +69,8 @@ private val PlayIconSize = 26.dp
 private val PlayElevation = 6.dp
 // Target is 48dp around a 40dp circle, so a 4dp pad puts the circle 8dp from the cover corner.
 private val PlayCornerInset = 4.dp
+// Bottom edge of the play circle measured from the cover top; the cover keeps its name below it.
+private val PlayClearance = PlayCornerInset + PlayTargetSize
 private const val PlayPressedScale = 0.92f
 private const val PlayPressMillis = 90
 private val ToggleIndicatorSize = 18.dp
@@ -239,6 +241,7 @@ private fun GroupCardTile(
                 name = card.name,
                 highlight = card.highlight,
                 size = CoverSize,
+                topReserve = if (play != TilePlay.None) PlayClearance else 0.dp,
                 modifier = Modifier.clickable(onClickLabel = openLabel, role = Role.Button, onClick = onClick),
                 border = BorderStroke(
                     1.dp,
@@ -250,7 +253,7 @@ private fun GroupCardTile(
                     name = card.name,
                     enabled = play == TilePlay.Enabled,
                     onClick = onPlay,
-                    // Top-end: the cover's name sits bottom-start, so a long title never runs under it.
+                    // Top-end; the cover reserves PlayClearance at the top so a long title never runs under it.
                     modifier = Modifier.align(Alignment.TopEnd).padding(PlayCornerInset),
                 )
             }
