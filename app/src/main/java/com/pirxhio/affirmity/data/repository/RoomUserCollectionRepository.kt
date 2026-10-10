@@ -37,6 +37,26 @@ class RoomUserCollectionRepository(
         )
     }
 
+    override suspend fun createWithItems(
+        id: String,
+        name: String,
+        nowMillis: Long,
+        affirmationIds: List<String>,
+        highlightId: String,
+    ) {
+        dao.createWithItems(
+            collection = UserCollectionEntity(
+                id = id,
+                name = name,
+                createdAtMillis = nowMillis,
+                enabled = true,
+                lastUsedAtMillis = nowMillis,
+                highlightId = highlightId,
+            ),
+            items = affirmationIds.map { UserCollectionItemEntity(id, it, nowMillis) },
+        )
+    }
+
     override suspend fun rename(id: String, name: String) = dao.rename(id, name)
 
     override suspend fun delete(id: String) = dao.deleteById(id)

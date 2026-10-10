@@ -17,11 +17,20 @@ class RoomUserCollectionRepositoryTest {
         val createdCollections = mutableListOf<UserCollectionEntity>()
         val createdItems = mutableListOf<UserCollectionItemEntity?>()
         val deleteBatches = mutableListOf<List<String>>()
+        val bulkCollections = mutableListOf<UserCollectionEntity>()
+        val bulkItems = mutableListOf<List<UserCollectionItemEntity>>()
 
         override suspend fun createWithItem(collection: UserCollectionEntity, item: UserCollectionItemEntity?) {
             createdCollections += collection
             createdItems += item
         }
+
+        override suspend fun createWithItems(collection: UserCollectionEntity, items: List<UserCollectionItemEntity>) {
+            bulkCollections += collection
+            bulkItems += items
+        }
+
+        override suspend fun insertItems(entities: List<UserCollectionItemEntity>) = Unit
 
         override suspend fun deleteItemsForAffirmations(affirmationIds: Collection<String>) {
             deleteBatches += affirmationIds.toList()
@@ -60,6 +69,42 @@ class RoomUserCollectionRepositoryTest {
         repository.create("c2", "Evening", nowMillis = 2L, initialAffirmationId = null)
 
         assertEquals(listOf("gold", DEFAULT_COLLECTION_HIGHLIGHT_ID), dao.createdCollections.map { it.highlightId })
+    }
+
+    @Test
+    fun createWithItems_mapsCollectionEnabledAndOrderedItemsWithHighlight() = runBlocking {
+        val dao = FakeDao()
+
+        RoomUserCollectionRepository(dao).createWithItems(
+            id = "copy-1",
+            name = "Morning Start (copy)",
+            nowMillis = 777L,
+            affirmationIds = listOf("aff-b", "aff-a", "aff-c"),
+            highlightId = "amber",
+        )
+
+        assertEquals(
+            UserCollectionEntity("copy-1", "Morning Start (copy)", 777L, true, 777L, "amber"),
+            dao.bulkCollections.single(),
+        )
+        assertEquals(
+            listOf(
+                UserCollectionItemEntity("copy-1", "aff-b", 777L),
+                UserCollectionItemEntity("copy-1", "aff-a", 777L),
+                UserCollectionItemEntity("copy-1", "aff-c", 777L),
+            ),
+            dao.bulkItems.single(),
+        )
+    }
+
+    @Test
+    fun createWithItems_emptyMembersStillCreatesTheCollection() = runBlocking {
+        val dao = FakeDao()
+
+        RoomUserCollectionRepository(dao).createWithItems("c", "Name", 5L, emptyList(), "teal")
+
+        assertEquals("c", dao.bulkCollections.single().id)
+        assertEquals(emptyList<UserCollectionItemEntity>(), dao.bulkItems.single())
     }
 
     @Test

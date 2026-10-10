@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.data.repository
 import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.access.AdUnlockRecord
 import com.pirxhio.affirmity.data.DEFAULT_COLLECTION_HIGHLIGHT_ID
+import com.pirxhio.affirmity.data.DefaultGroupState
 import com.pirxhio.affirmity.data.UserCollection
 import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.CatalogAffirmationEntity
@@ -67,6 +68,15 @@ interface UserCollectionRepository {
         initialAffirmationId: String?,
         highlightId: String = DEFAULT_COLLECTION_HIGHLIGHT_ID,
     )
+
+    /** Atomically creates an enabled collection holding [affirmationIds] in order (all or nothing). */
+    suspend fun createWithItems(
+        id: String,
+        name: String,
+        nowMillis: Long,
+        affirmationIds: List<String>,
+        highlightId: String,
+    )
     suspend fun rename(id: String, name: String)
     suspend fun delete(id: String)
     suspend fun addItem(userCollectionId: String, affirmationId: String, nowMillis: Long)
@@ -88,6 +98,13 @@ object NoOpUserCollectionRepository : UserCollectionRepository {
         initialAffirmationId: String?,
         highlightId: String,
     ) = Unit
+    override suspend fun createWithItems(
+        id: String,
+        name: String,
+        nowMillis: Long,
+        affirmationIds: List<String>,
+        highlightId: String,
+    ) = Unit
     override suspend fun rename(id: String, name: String) = Unit
     override suspend fun delete(id: String) = Unit
     override suspend fun addItem(userCollectionId: String, affirmationId: String, nowMillis: Long) = Unit
@@ -95,6 +112,21 @@ object NoOpUserCollectionRepository : UserCollectionRepository {
     override suspend fun enable(id: String, nowMillis: Long) = Unit
     override suspend fun disable(id: String) = Unit
     override suspend fun removeAffirmations(affirmationIds: Collection<String>) = Unit
+}
+
+/** Persisted enable state of the code-defined default groups. Missing id = disabled (DG-3). */
+interface DefaultGroupStateRepository {
+    fun observeStates(): Flow<Map<String, DefaultGroupState>>
+    suspend fun getStates(): Map<String, DefaultGroupState>
+
+    /** Enabling bumps `lastUsedAtMillis` to [nowMillis]; disabling leaves it untouched. */
+    suspend fun setEnabled(id: String, enabled: Boolean, nowMillis: Long)
+}
+
+object NoOpDefaultGroupStateRepository : DefaultGroupStateRepository {
+    override fun observeStates(): Flow<Map<String, DefaultGroupState>> = flowOf(emptyMap())
+    override suspend fun getStates(): Map<String, DefaultGroupState> = emptyMap()
+    override suspend fun setEnabled(id: String, enabled: Boolean, nowMillis: Long) = Unit
 }
 
 /** Store-agnostic contract for the daily habit-completion tracker (streak source of truth). */
