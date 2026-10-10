@@ -116,6 +116,7 @@ import com.pirxhio.affirmity.data.repository.RoomFavoriteAffirmationRepository
 import com.pirxhio.affirmity.data.repository.RoomMeditationPreferencesRepository
 import com.pirxhio.affirmity.data.repository.RoomNotificationSettingsRepository
 import com.pirxhio.affirmity.data.repository.RoomStreakHealerRepository
+import com.pirxhio.affirmity.data.repository.RoomDefaultGroupStateRepository
 import com.pirxhio.affirmity.data.repository.RoomUserCollectionRepository
 import com.pirxhio.affirmity.data.repository.UserCollectionRepository
 import com.pirxhio.affirmity.meditation.SessionEndReason
@@ -2609,6 +2610,10 @@ fun rememberAffirmityAppState(userGoalsStore: UserGoalsStore): AffirmityAppState
             onboardingRepository = FirestoreOnboardingRepository(firestore),
             favorites = RoomFavoriteAffirmationRepository(database.favoriteAffirmationDao()),
             collectionRepository = RoomUserCollectionRepository(database.userCollectionDao()),
+            // Composition-root wiring (DG-1, DG-3): defaults are code-defined and their state is
+            // persisted lazily, so there is deliberately no seeding step or DataStore flag here.
+            defaultGroups = DefaultGroups.all,
+            defaultGroupStates = RoomDefaultGroupStateRepository(database.defaultGroupStateDao()),
             catalog = RoomCatalogAffirmationRepository(database.catalogAffirmationDao()),
             catalogSeeder = CatalogSeeder(
                 assetReader = AndroidCatalogAssetReader(context.applicationContext),

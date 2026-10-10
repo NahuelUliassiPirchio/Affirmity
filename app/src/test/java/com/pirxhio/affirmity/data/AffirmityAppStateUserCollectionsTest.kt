@@ -984,6 +984,47 @@ class AffirmityAppStateUserCollectionsTest {
         assertTrue(state.userCollections.first { it.id == "u1" }.enabled)
     }
 
+    @Test
+    fun `fresh install with the real registry shows both defaults disabled and seeds nothing`() = runTest {
+        val repo = RecordingUserCollectionRepository()
+        val states = RecordingDefaultGroupStateRepository()
+        val state = buildUcState(
+            backgroundScope, repo, defaultGroups = DefaultGroups.all, defaultGroupStates = states,
+        )
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(DefaultGroups.all.map { it.id }, state.userCollections.map { it.id })
+        assertEquals(listOf(false, false), state.userCollections.map { it.enabled })
+        // The catalog has not seeded yet: counts start at 0 and nothing is written (S1, S2, S16).
+        assertEquals(listOf(0, 0), state.userCollections.map { it.resolvedItemCount })
+        assertTrue(repo.events.isEmpty())
+        assertTrue(states.events.isEmpty())
+        assertTrue(states.current.isEmpty())
+    }
+
+    @Test
+    fun `repeated construction is idempotent and persisted enable survives a restart`() = runTest {
+        val repo = RecordingUserCollectionRepository()
+        val states = RecordingDefaultGroupStateRepository()
+        val first = buildUcState(backgroundScope, repo, defaultGroups = DefaultGroups.all, defaultGroupStates = states, now = { 9L })
+        runCurrent()
+        first.setCollectionEnabled(DefaultGroups.MORNING_START_ID, true)
+        runCurrent()
+        advanceUntilIdle()
+
+        val second = buildUcState(backgroundScope, repo, defaultGroups = DefaultGroups.all, defaultGroupStates = states)
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(DefaultGroups.all.map { it.id }, second.userCollections.map { it.id })
+        assertEquals(listOf(false, true), second.userCollections.map { it.enabled })
+        // Only the one explicit enable ever wrote; constructing again added no rows.
+        assertEquals(listOf("setEnabled:${DefaultGroups.MORNING_START_ID}:true:9"), states.events)
+        assertEquals(1, states.current.size)
+        assertTrue(repo.events.isEmpty())
+    }
+
     // --- harness ------------------------------------------------------------------------------
 
     private suspend fun feedState(
