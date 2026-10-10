@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
@@ -132,6 +133,8 @@ import com.pirxhio.affirmity.personalization.signal.RoomPersonalizationSignalRec
 import com.pirxhio.affirmity.personalization.signal.SignalType
 import com.pirxhio.affirmity.notifications.processFcmTokenOwnershipCoordinator
 import com.pirxhio.affirmity.data.catalog.AndroidCatalogAssetReader
+import com.pirxhio.affirmity.data.catalog.CatalogLocale
+import com.pirxhio.affirmity.data.catalog.CatalogLocaleSwitcher
 import com.pirxhio.affirmity.data.catalog.CATALOG_ID_PREFIX
 import com.pirxhio.affirmity.data.catalog.CatalogSeeder
 import com.pirxhio.affirmity.data.local.AndroidCatalogPreferences
@@ -184,7 +187,10 @@ data class Affirmation(
     val subtitle: String,
     val background: AffirmationBackground,
     val groupId: String = PERSONALIZADAS_GROUP_ID,
+    /** Render/edit VIEW of [storedOverrides] ([OverrideKeys.displayView]); never written back. */
     val overrides: Map<String, String> = emptyMap(),
+    /** The raw persisted override map, never filtered. The write path builds from THIS (D7). */
+    val storedOverrides: Map<String, String> = emptyMap(),
     /** Presentation-level provenance (design D14). The UI reads THIS to decide what to render
      *  (e.g. hide the delete affordance); write routing reads the id prefix instead, which is the
      *  storage-level ground truth and cannot drift from the row's real home. */
@@ -229,7 +235,8 @@ private fun AffirmationEntity.toAffirmation(): Affirmation = Affirmation(
         AffirmationBackground.Color(backgroundValue)
     },
     groupId = groupId,
-    overrides = overrides,
+    overrides = OverrideKeys.displayView(overrides),
+    storedOverrides = overrides,
 )
 
 /** Catalog row -> read-model [Affirmation] (design D4/D8/D14): `text` maps to `title` (accepted
@@ -244,7 +251,8 @@ private fun com.pirxhio.affirmity.data.local.CatalogAffirmationEntity.toAffirmat
     subtitle = subtitle,
     background = com.pirxhio.affirmity.ui.affirmations.forCatalogAffirmation(groupId, id),
     groupId = groupId,
-    overrides = overrides,
+    overrides = OverrideKeys.displayView(overrides),
+    storedOverrides = overrides,
     source = AffirmationSource.CATALOG,
     collectionId = collectionId,
     tone = tone,
@@ -266,7 +274,7 @@ private fun Affirmation.toEntity(): AffirmationEntity = AffirmationEntity(
     // [Affirmation.groupId] (spec: personalizadas Always-On; user-authored content is out of the
     // thematic-group scope for this change).
     groupId = PERSONALIZADAS_GROUP_ID,
-    overrides = overrides,
+    overrides = storedOverrides,
 )
 
 /**
@@ -500,12 +508,7 @@ class AffirmityAppState(
     private val deviceTimeZoneId: () -> String = { TimeZone.getDefault().id },
     /** Wire locale token (`"en"`/`"es"`) of the app's current language, synced to the server so
      * push notifications are rendered in the language the user selected in-app. */
-    private val deviceLocaleToken: () -> String = {
-        val appLocales = AppCompatDelegate.getApplicationLocales()
-        notificationLocaleToken(
-            if (appLocales.isEmpty) java.util.Locale.getDefault().language else appLocales[0]?.language,
-        )
-    },
+    private val deviceLocaleToken: () -> String = { CatalogLocale.resolve().tag },
     private val useRemoteSession: Boolean = true,
     /** Every known selectable group id (universes + `personalizadas`), resolved in
      * [rememberAffirmityAppState] from `selectableAffirmationGroups()` so this class never imports
@@ -1085,6 +1088,24 @@ class AffirmityAppState(
         remoteAdUnlocks: AdUnlockRepository,
     ) {
         localRecords.forEach { remoteAdUnlocks.grantDurableUnlock(it) }
+    }
+
+    /** In-app language switch (design D5); null in unit tests that build this class without a seeder. */
+    private val catalogLocaleSwitcher: CatalogLocaleSwitcher? by lazy {
+        catalogSeeder?.let {
+            CatalogLocaleSwitcher(
+                scope = CatalogLocaleSwitcher.processScope,
+                seeder = it,
+                applyLocales = { locales -> AppCompatDelegate.setApplicationLocales(locales) },
+            )
+        }
+    }
+
+    /** Settings entry point: pre-seed [target], apply [locales], reconcile. Falls back to a plain
+     *  locale change when no seeder is wired. */
+    fun switchCatalogLocale(target: CatalogLocale, locales: LocaleListCompat) {
+        val switcher = catalogLocaleSwitcher
+        if (switcher == null) AppCompatDelegate.setApplicationLocales(locales) else switcher.switch(target, locales)
     }
 
     init {
@@ -2016,13 +2037,20 @@ class AffirmityAppState(
             // a flag could drift from the row's actual home and send a catalog write into
             // `users/{uid}/affirmations`.
             val current = allAffirmations.firstOrNull { it.id == affirmationId } ?: return@launch
-            val next = current.overrides.toMutableMap().apply {
-                when (val normalized = AffirmationTemplateParser.normalizeOverrideValue(rawValue)) {
-                    null -> remove(tokenKey) // empty input == revert to the authored original
-                    else -> put(tokenKey, normalized)
-                }
-            }
-            val pruned = AffirmationTemplateParser.pruneOverrides(current.title, current.subtitle, next)
+            // tokenKey is the canonical `field:ordinal` slot key; anything else is not a slot.
+            val slot = tokenKey.split(':').let { parts ->
+                val field = TemplateField.entries.firstOrNull { it.prefix == parts.getOrNull(0) }
+                val ordinal = parts.getOrNull(1)?.toIntOrNull()
+                if (parts.size == 2 && field != null && ordinal != null) field to ordinal else null
+            } ?: return@launch
+            // Built from the RAW stored map (D7): the display view would lose unknown/extra keys.
+            val pruned = OverrideKeys.applyEdit(
+                stored = current.storedOverrides,
+                field = slot.first,
+                ordinal = slot.second,
+                value = AffirmationTemplateParser.normalizeOverrideValue(rawValue), // null == revert
+                tokenCounts = OverrideKeys.tokenCounts(current.title, current.subtitle),
+            )
             if (affirmationId.startsWith(CATALOG_ID_PREFIX)) {
                 ready().catalogOverrides.setOverrides(affirmationId, pruned)
             } else {

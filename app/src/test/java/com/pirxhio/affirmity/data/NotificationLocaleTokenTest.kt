@@ -9,4 +9,6 @@ class NotificationLocaleTokenTest {
     @Test fun spanishMapsToEs() = assertEquals("es", notificationLocaleToken("es"))
     @Test fun unsupportedFallsBackToEs() = assertEquals("es", notificationLocaleToken("fr"))
     @Test fun nullFallsBackToEs() = assertEquals("es", notificationLocaleToken(null))
+    @Test fun englishGbMapsToEn() = assertEquals("en", notificationLocaleToken("en-GB"))
+    @Test fun frenchRegionFallsBackToEs() = assertEquals("es", notificationLocaleToken("fr-CA"))
 }

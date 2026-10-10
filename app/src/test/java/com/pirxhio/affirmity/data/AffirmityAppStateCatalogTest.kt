@@ -16,6 +16,7 @@ import com.pirxhio.affirmity.data.local.ThemeSelectionPreferences
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.OnboardingGuidePreferences
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
+import com.pirxhio.affirmity.data.catalog.CatalogLocale
 import com.pirxhio.affirmity.data.catalog.CatalogSeeder
 import com.pirxhio.affirmity.data.local.CatalogPreferences
 import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
@@ -105,7 +106,7 @@ class AffirmityAppStateCatalogTest {
         runCurrent()
         advanceUntilIdle()
 
-        val tokenKey = AffirmationTemplateParser.tokenKey(TemplateField.TITLE, 0, "name")
+        val tokenKey = AffirmationTemplateParser.tokenKey(TemplateField.TITLE, 0)
         state.setTokenOverride("cat_$FREE_COLLECTION_ID.001", tokenKey, "Alex")
         runCurrent()
         advanceUntilIdle()
@@ -126,13 +127,49 @@ class AffirmityAppStateCatalogTest {
         val state = buildState(backgroundScope, affirmations = affirmations, catalogOverrides = catalogOverrides)
         runCurrent()
 
-        val tokenKey = AffirmationTemplateParser.tokenKey(TemplateField.TITLE, 0, "name")
+        val tokenKey = AffirmationTemplateParser.tokenKey(TemplateField.TITLE, 0)
         state.setTokenOverride("owned-1", tokenKey, "Alex")
         runCurrent()
         advanceUntilIdle()
 
         assertEquals(listOf("owned-1" to mapOf(tokenKey to "Alex")), affirmations.setOverridesCalls)
         assertTrue(catalogOverrides.written.isEmpty())
+    }
+
+    @Test
+    fun `setTokenOverride builds the next map from the stored overrides, never the display view`() = runTest {
+        val stored = mapOf("title:0:name" to "Ana", "title:0:other" to "Bea", "weird" to "z")
+        val affirmations = RecordingAffirmationRepository2(
+            initial = listOf(affirmationEntity("owned-1", withToken = true, overrides = stored)),
+        )
+        val state = buildState(backgroundScope, affirmations = affirmations)
+        runCurrent()
+
+        state.setTokenOverride("owned-1", AffirmationTemplateParser.tokenKey(TemplateField.TITLE, 0), "Alex")
+        runCurrent()
+        advanceUntilIdle()
+
+        // Display view would have hidden "weird" and collapsed the legacy pair; storage keeps all.
+        assertEquals(
+            listOf("owned-1" to (stored + ("title:0" to "Alex"))),
+            affirmations.setOverridesCalls,
+        )
+    }
+
+    @Test
+    fun `reverting a token removes the canonical and legacy keys of that slot only`() = runTest {
+        val stored = mapOf("title:0" to "Ana", "title:0:name" to "Old", "weird" to "z")
+        val affirmations = RecordingAffirmationRepository2(
+            initial = listOf(affirmationEntity("owned-1", withToken = true, overrides = stored)),
+        )
+        val state = buildState(backgroundScope, affirmations = affirmations)
+        runCurrent()
+
+        state.setTokenOverride("owned-1", "title:0", "  ")
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(listOf("owned-1" to mapOf("weird" to "z")), affirmations.setOverridesCalls)
     }
 
     @Test
@@ -350,6 +387,7 @@ class AffirmityAppStateCatalogTest {
             assetReader = { """{"version":"1.0.0","affirmations":[]}""" },
             dao = dao,
             prefs = prefs,
+            currentLocale = { CatalogLocale.ES },
             knownCollectionIds = { emptySet() },
         )
         buildState(backgroundScope, catalogSeeder = seeder)
@@ -357,17 +395,19 @@ class AffirmityAppStateCatalogTest {
         advanceUntilIdle()
 
         assertEquals(listOf("replaceAll"), dao.calls)
-        assertEquals("1.0.0", prefs.saved.single())
+        assertEquals("1.0.0|es", prefs.saved.single())
     }
 
     @Test
     fun `CatalogSeeder seedIfNeeded is idempotent -- a second construction with the same marker no-ops`() = runTest {
-        val dao = RecordingSeederDao()
-        val prefs = RecordingSeederPrefs(initial = "1.0.0")
+        // A matching marker over a NON-empty table is the only no-op case (empty-table guard).
+        val dao = RecordingSeederDao(rowCount = 1)
+        val prefs = RecordingSeederPrefs(initial = "1.0.0|es")
         val seeder = CatalogSeeder(
             assetReader = { """{"version":"1.0.0","affirmations":[]}""" },
             dao = dao,
             prefs = prefs,
+            currentLocale = { CatalogLocale.ES },
             knownCollectionIds = { emptySet() },
         )
         buildState(backgroundScope, catalogSeeder = seeder)
@@ -378,12 +418,12 @@ class AffirmityAppStateCatalogTest {
     }
 }
 
-private class RecordingSeederDao : com.pirxhio.affirmity.data.local.CatalogAffirmationDao {
+private class RecordingSeederDao(private val rowCount: Int = 0) : com.pirxhio.affirmity.data.local.CatalogAffirmationDao {
     val calls = mutableListOf<String>()
     override fun observeAll(): Flow<List<CatalogAffirmationEntity>> = flowOf(emptyList())
     override fun observeByGroupIds(groupIds: Set<String>): Flow<List<CatalogAffirmationEntity>> = flowOf(emptyList())
     override suspend fun getByIds(ids: List<String>): List<CatalogAffirmationEntity> = emptyList()
-    override suspend fun count(): Int = 0
+    override suspend fun count(): Int = rowCount
     override suspend fun replaceAll(rows: List<CatalogAffirmationEntity>) {
         calls += "replaceAll"
     }
@@ -415,6 +455,7 @@ private fun affirmationEntity(
     id: String,
     groupId: String = PERSONALIZADAS_GROUP_ID,
     withToken: Boolean = false,
+    overrides: Map<String, String> = emptyMap(),
 ) = AffirmationEntity(
     id = id,
     title = if (withToken) "Title $id, [name]" else "Title $id",
@@ -422,6 +463,7 @@ private fun affirmationEntity(
     backgroundType = "color",
     backgroundValue = "#000000",
     groupId = groupId,
+    overrides = overrides,
 )
 
 private class FakeCatalogAffirmationRepository(

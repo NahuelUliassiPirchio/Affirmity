@@ -16,11 +16,11 @@ class AffirmationTemplateTest {
         assertEquals(
             listOf(
                 TemplateSegment.Literal("Gano "),
-                TemplateSegment.Token(AffirmationTemplateParser.tokenKey(TemplateField.TITLE, 0, "10k"), "10k"),
+                TemplateSegment.Token(AffirmationTemplateParser.tokenKey(TemplateField.TITLE, 0), "10k"),
                 TemplateSegment.Literal(" "),
-                TemplateSegment.Token(AffirmationTemplateParser.tokenKey(TemplateField.TITLE, 1, "dolares"), "dolares"),
+                TemplateSegment.Token(AffirmationTemplateParser.tokenKey(TemplateField.TITLE, 1), "dolares"),
                 TemplateSegment.Literal(" al "),
-                TemplateSegment.Token(AffirmationTemplateParser.tokenKey(TemplateField.TITLE, 2, "mes"), "mes"),
+                TemplateSegment.Token(AffirmationTemplateParser.tokenKey(TemplateField.TITLE, 2), "mes"),
             ),
             template.segments,
         )
@@ -72,7 +72,7 @@ class AffirmationTemplateTest {
         assertEquals(
             listOf(
                 TemplateSegment.Literal("[a"),
-                TemplateSegment.Token(AffirmationTemplateParser.tokenKey(TemplateField.TITLE, 0, "b"), "b"),
+                TemplateSegment.Token(AffirmationTemplateParser.tokenKey(TemplateField.TITLE, 0), "b"),
             ),
             template.segments,
         )
@@ -101,11 +101,11 @@ class AffirmationTemplateTest {
     }
 
     @Test
-    fun `token key format is field colon ordinal colon content`() {
+    fun `token key format is field colon ordinal`() {
         val template = AffirmationTemplateParser.parse(TemplateField.TITLE, "[10k]")
 
         val token = template.segments.filterIsInstance<TemplateSegment.Token>().single()
-        assertEquals("title:0:10k", token.key)
+        assertEquals("title:0", token.key)
     }
 
     @Test
@@ -113,7 +113,7 @@ class AffirmationTemplateTest {
         val template = AffirmationTemplateParser.parse(TemplateField.TITLE, "[hoy] y [hoy]")
 
         val tokens = template.segments.filterIsInstance<TemplateSegment.Token>()
-        assertEquals(listOf("title:0:hoy", "title:1:hoy"), tokens.map { it.key })
+        assertEquals(listOf("title:0", "title:1"), tokens.map { it.key })
     }
 
     @Test
@@ -124,8 +124,8 @@ class AffirmationTemplateTest {
         val titleKey = title.segments.filterIsInstance<TemplateSegment.Token>().single().key
         val subtitleKey = subtitle.segments.filterIsInstance<TemplateSegment.Token>().single().key
 
-        assertEquals("title:0:hoy", titleKey)
-        assertEquals("subtitle:0:hoy", subtitleKey)
+        assertEquals("title:0", titleKey)
+        assertEquals("subtitle:0", subtitleKey)
         assertTrue(titleKey != subtitleKey)
     }
 
@@ -156,7 +156,7 @@ class AffirmationTemplateTest {
         val template = AffirmationTemplateParser.parse(TemplateField.TITLE, "Gano [10k]")
         val token = template.segments.filterIsInstance<TemplateSegment.Token>().single()
 
-        val value = template.valueOf(token, mapOf("title:99:unknown" to "999"))
+        val value = template.valueOf(token, mapOf("title:99" to "999"))
 
         assertEquals("10k", value)
     }
@@ -176,42 +176,6 @@ class AffirmationTemplateTest {
         val rendered = template.render(mapOf(tokens[0].key to "20k"))
 
         assertEquals("Gano 20k al mes", rendered)
-    }
-
-    // --- Prune ---
-
-    @Test
-    fun `editing token content drops the stale override key`() {
-        val before = AffirmationTemplateParser.parse(TemplateField.TITLE, "Gano [10k]")
-        val staleKey = before.segments.filterIsInstance<TemplateSegment.Token>().single().key
-        val overrides = mapOf(staleKey to "15k")
-
-        val pruned = AffirmationTemplateParser.pruneOverrides("Gano [20k]", "", overrides)
-
-        assertTrue(pruned.isEmpty())
-    }
-
-    @Test
-    fun `surrounding text only edit keeps the override key`() {
-        val before = AffirmationTemplateParser.parse(TemplateField.TITLE, "Gano [10k]")
-        val key = before.segments.filterIsInstance<TemplateSegment.Token>().single().key
-        val overrides = mapOf(key to "15k")
-
-        val pruned = AffirmationTemplateParser.pruneOverrides("Gano mucho [10k] al mes", "", overrides)
-
-        assertEquals(overrides, pruned)
-    }
-
-    @Test
-    fun `inserting a token before shifts ordinals and drops downstream keys`() {
-        val before = AffirmationTemplateParser.parse(TemplateField.TITLE, "Gano [10k] al [mes]")
-        val tokens = before.segments.filterIsInstance<TemplateSegment.Token>()
-        val overrides = mapOf(tokens[0].key to "20k", tokens[1].key to "año")
-
-        val pruned = AffirmationTemplateParser.pruneOverrides("Gano [ahora] [10k] al [mes]", "", overrides)
-
-        // tokens[1] ("mes") shifted from ordinal 1 to ordinal 2, so its old key no longer matches.
-        assertTrue(pruned.isEmpty())
     }
 
     // --- normalizeOverrideValue ---
