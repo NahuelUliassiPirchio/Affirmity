@@ -103,6 +103,8 @@ import com.pirxhio.affirmity.data.repository.DataSession
 import com.pirxhio.affirmity.data.repository.FavoriteAffirmationRepository
 import com.pirxhio.affirmity.data.repository.NoOpCatalogAffirmationRepository
 import com.pirxhio.affirmity.data.repository.NoOpFavoriteAffirmationRepository
+import com.pirxhio.affirmity.data.repository.DefaultGroupStateRepository
+import com.pirxhio.affirmity.data.repository.NoOpDefaultGroupStateRepository
 import com.pirxhio.affirmity.data.repository.NoOpUserCollectionRepository
 import com.pirxhio.affirmity.data.repository.RoomAdUnlockRepository
 import com.pirxhio.affirmity.data.repository.RoomAffirmationRepository
@@ -570,6 +572,11 @@ class AffirmityAppState(
      *  [NoOpUserCollectionRepository] so every existing JVM test construction is unaffected. Named
      *  `collectionRepository` so it never clashes with the [userCollections] UI property. */
     private val collectionRepository: UserCollectionRepository = NoOpUserCollectionRepository,
+    /** Code-defined read-only default groups (DG-1). Empty by default so existing JVM tests are
+     *  unaffected; the composition root passes [DefaultGroups.all]. */
+    private val defaultGroups: List<DefaultGroup> = emptyList(),
+    /** Persisted enable state of [defaultGroups]; a missing row means disabled (DG-3). */
+    private val defaultGroupStates: DefaultGroupStateRepository = NoOpDefaultGroupStateRepository,
     /** Wall clock for collection writes (design D9): `lastUsedAtMillis`/`createdAtMillis`. */
     private val collectionClock: () -> Long = { System.currentTimeMillis() },
     /** Id factory for new collections (design D9). */
@@ -627,28 +634,42 @@ class AffirmityAppState(
     /** Latest emission of [collectionRepository], in chip order. */
     private val collectionsState = mutableStateOf<List<UserCollection>>(emptyList())
 
+    /** Latest emission of [defaultGroupStates]; absent ids are disabled. */
+    private val defaultGroupStatesState = mutableStateOf<Map<String, DefaultGroupState>>(emptyMap())
+
+    /** Default groups (pinned first) merged with the user's groups. [collectionsState] stays
+     *  user-only so limits, the picker and the saved-state checks never see defaults. */
+    private val allCollections: List<UserCollection> by derivedStateOf {
+        mergeWithDefaultGroups(defaultGroups, defaultGroupStatesState.value, collectionsState.value)
+    }
+
     /** Serialises every collection write (and the re-validation each one does) -- design D7. */
     private val userCollectionMutex = Mutex()
 
     /** The user's groups for the "Your groups" shelf and the Save-to sheet, in recency order. `resolvedItemCount` only counts affirmations that still
      *  exist (orphan ids excluded), including Pro-locked or hidden rows -- those stay members. */
     val userCollections: List<UserCollectionUi> by derivedStateOf {
-        collectionsState.value.toUserCollectionUi(allAffirmationsById.keys)
+        allCollections.toUserCollectionUi(allAffirmationsById.keys)
     }
 
     /** True when at least one collection chip is on. With the feed empty, the UI uses this (plus
      *  [filteredAffirmations]) to decide between the generic and the collections empty state. */
     val anyCollectionEnabled: Boolean
-        get() = collectionsState.value.any { it.enabled }
+        get() = allCollections.any { it.enabled }
 
-    /** Free tier caps NEW creation at [FREE_COLLECTION_LIMIT]; existing collections stay usable. */
+    /** Number of user-created groups; defaults never count (UC-1, UC-3). */
+    val userCreatedCollectionCount: Int
+        get() = collectionsState.value.size
+
+    /** Free tier caps NEW creation at [FREE_COLLECTION_LIMIT]; existing collections stay usable.
+     *  Counts user groups only. */
     val canCreateCollection: Boolean
-        get() = canCreateUserCollection(entitlementTier.value, collectionsState.value.size)
+        get() = canCreateUserCollection(entitlementTier.value, userCreatedCollectionCount)
 
     /** The affirmations of one collection in member order, for the group detail sheet. Orphaned ids
      *  (rows that no longer exist) are skipped, like in the chip counts. */
     fun userCollectionAffirmations(userCollectionId: String): List<Affirmation> {
-        val memberIds = collectionsState.value.firstOrNull { it.id == userCollectionId }?.affirmationIds
+        val memberIds = allCollections.firstOrNull { it.id == userCollectionId }?.affirmationIds
             ?: return emptyList()
         return resolveCollectionMembers(memberIds, allAffirmationsById::get)
     }
@@ -727,7 +748,7 @@ class AffirmityAppState(
                     emptyList()
                 } else {
                     val byId = allAffirmations.associateBy { it.id }
-                    resolveEnabledCollectionRows(collectionsState.value, byId::get, eligible)
+                    resolveEnabledCollectionRows(allCollections, byId::get, eligible)
                 }
             // Pre-resolution the feed is owned-rows-only (see kdoc), so a favourite or collection
             // member can only contribute an owned row here -- never a catalog one, whose access
@@ -1134,6 +1155,11 @@ class AffirmityAppState(
             collectionRepository.observeCollections()
                 .catch { error -> Log.e(TAG, "user collections flow failed", error) }
                 .collect { collectionsState.value = it }
+        }
+        scope.launch {
+            defaultGroupStates.observeStates()
+                .catch { error -> Log.e(TAG, "default group state flow failed", error) }
+                .collect { defaultGroupStatesState.value = it }
         }
         scope.launch {
             session.flatMapLatest { it.affirmations.observeAll() }
@@ -1866,6 +1892,7 @@ class AffirmityAppState(
      *  returned verdict is authoritative, like [createCollection]'s. */
     suspend fun renameCollection(userCollectionId: String, name: String): CollectionNameResult =
         userCollectionMutex.withLock {
+            if (DefaultGroups.isDefaultGroupId(userCollectionId)) return@withLock CollectionNameResult.ReadOnly
             val verdict = validateCollectionName(
                 name,
                 collectionRepository.getCollections(),
@@ -1876,6 +1903,7 @@ class AffirmityAppState(
         }
 
     fun deleteCollection(userCollectionId: String) {
+        if (DefaultGroups.isDefaultGroupId(userCollectionId)) return
         scope.launch { userCollectionMutex.withLock { collectionRepository.delete(userCollectionId) } }
     }
 
@@ -1883,6 +1911,7 @@ class AffirmityAppState(
      *  [userCollectionMutex] like [toggleCollection]: two fast taps end as add-then-remove no matter
      *  what the UI had rendered. A deleted collection is a no-op. */
     fun toggleAffirmationInCollection(userCollectionId: String, affirmationId: String) {
+        if (DefaultGroups.isDefaultGroupId(userCollectionId)) return
         scope.launch {
             userCollectionMutex.withLock {
                 val current = collectionRepository.getCollections().firstOrNull { it.id == userCollectionId }
@@ -1899,6 +1928,7 @@ class AffirmityAppState(
     /** Idempotent: re-adding an existing member is a no-op in the repository. A collection deleted
      *  in the meantime is skipped (the item insert would violate the foreign key). */
     fun addToCollection(userCollectionId: String, affirmationId: String) {
+        if (DefaultGroups.isDefaultGroupId(userCollectionId)) return
         scope.launch {
             userCollectionMutex.withLock {
                 if (!userCollectionExists(userCollectionId)) return@withLock
@@ -1908,6 +1938,7 @@ class AffirmityAppState(
     }
 
     fun removeFromCollection(userCollectionId: String, affirmationId: String) {
+        if (DefaultGroups.isDefaultGroupId(userCollectionId)) return
         scope.launch {
             userCollectionMutex.withLock {
                 if (!userCollectionExists(userCollectionId)) return@withLock
@@ -1921,6 +1952,10 @@ class AffirmityAppState(
     fun setCollectionEnabled(userCollectionId: String, enabled: Boolean) {
         scope.launch {
             userCollectionMutex.withLock {
+                if (DefaultGroups.isDefaultGroupId(userCollectionId)) {
+                    defaultGroupStates.setEnabled(userCollectionId, enabled, collectionClock())
+                    return@withLock
+                }
                 if (!userCollectionExists(userCollectionId)) return@withLock
                 writeCollectionEnabled(userCollectionId, enabled)
             }
@@ -1931,12 +1966,46 @@ class AffirmityAppState(
     fun toggleCollection(userCollectionId: String) {
         scope.launch {
             userCollectionMutex.withLock {
+                if (DefaultGroups.isDefaultGroupId(userCollectionId)) {
+                    val enabled = defaultGroupStates.getStates()[userCollectionId]?.enabled ?: false
+                    defaultGroupStates.setEnabled(userCollectionId, !enabled, collectionClock())
+                    return@withLock
+                }
                 val current = collectionRepository.getCollections().firstOrNull { it.id == userCollectionId }
                     ?: return@withLock
                 writeCollectionEnabled(userCollectionId, !current.enabled)
             }
         }
     }
+
+    /**
+     * Copies a default group into a normal, editable user group named after [localizedName] with
+     * [suffixes] (DG-11). Members are the default's CURRENT resolvable affirmations (orphans drop
+     * out) and the highlight is kept. Counts toward the free limit and uses the normal create
+     * validation: [CollectionNameResult.LimitReached] creates nothing. An id that is not a known
+     * default is a no-op reported as [CollectionNameResult.Blank].
+     */
+    suspend fun duplicateDefaultGroup(
+        defaultGroupId: String,
+        localizedName: String,
+        suffixes: CopySuffixes,
+    ): CollectionNameResult =
+        userCollectionMutex.withLock {
+            val group = defaultGroups.firstOrNull { it.id == defaultGroupId } ?: return@withLock CollectionNameResult.Blank
+            val existing = collectionRepository.getCollections()
+            val name = copyCollectionName(localizedName, existing, suffixes)
+            val verdict = validateNewCollection(name, existing, entitlementTier.value)
+            if (verdict is CollectionNameResult.Ok) {
+                collectionRepository.createWithItems(
+                    id = collectionIdFactory(),
+                    name = verdict.name,
+                    nowMillis = collectionClock(),
+                    affirmationIds = resolveCollectionMembers(group.affirmationIds, allAffirmationsById::get).map { it.id },
+                    highlightId = group.highlightId,
+                )
+            }
+            verdict
+        }
 
     /** Must be called under [userCollectionMutex]. */
     private suspend fun userCollectionExists(userCollectionId: String): Boolean =

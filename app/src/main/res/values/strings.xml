@@ -1146,4 +1146,5 @@
     <string name="catalog_theme_work_money_growth_work_value_compensation">Valor y remuneración laboral</string>
     <string name="default_group_everyday_essentials_name">Esenciales del día</string>
     <string name="default_group_morning_start_name">Buen comienzo</string>
+    <string name="collection_name_error_read_only">Los grupos predeterminados no se pueden editar.</string>
 </resources>

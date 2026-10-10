@@ -72,3 +72,28 @@ object DefaultGroups {
 
     fun isDefaultGroupId(id: String): Boolean = id in ids
 }
+
+/**
+ * Read-time merge (DG-4): [defaults] first in registry order (fixed, independent of state), then
+ * [user] groups as given. A default's state comes from [states]; a missing row is disabled and never
+ * used (DG-3), and state ids not in [defaults] are ignored. The name is the id as a placeholder:
+ * the UI localizes it from the string resource at render time (DG-6).
+ */
+internal fun mergeWithDefaultGroups(
+    defaults: List<DefaultGroup>,
+    states: Map<String, DefaultGroupState>,
+    user: List<UserCollection>,
+): List<UserCollection> =
+    defaults.map { group ->
+        val state = states[group.id]
+        UserCollection(
+            id = group.id,
+            name = group.id,
+            createdAtMillis = 0L,
+            enabled = state?.enabled ?: false,
+            lastUsedAtMillis = state?.lastUsedAtMillis ?: 0L,
+            affirmationIds = group.affirmationIds,
+            highlightId = group.highlightId,
+            isDefault = true,
+        )
+    } + user

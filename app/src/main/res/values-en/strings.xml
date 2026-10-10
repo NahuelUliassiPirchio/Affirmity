@@ -1077,4 +1077,5 @@
     <string name="catalog_theme_work_money_growth_work_value_compensation">Work value compensation</string>
     <string name="default_group_everyday_essentials_name">Everyday Essentials</string>
     <string name="default_group_morning_start_name">Morning Start</string>
+    <string name="collection_name_error_read_only">Default groups can\'t be edited.</string>
 </resources>

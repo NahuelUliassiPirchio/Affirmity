@@ -23,6 +23,7 @@ internal fun CollectionNameResult.errorStringRes(): Int? = when (this) {
     CollectionNameResult.TooLong -> R.string.collection_name_error_too_long
     CollectionNameResult.Duplicate -> R.string.collection_name_error_duplicate
     CollectionNameResult.LimitReached -> R.string.collection_limit_reached
+    CollectionNameResult.ReadOnly -> R.string.collection_name_error_read_only
 }
 
 /** One line of the collection picker: whether the affirmation is already a member. */

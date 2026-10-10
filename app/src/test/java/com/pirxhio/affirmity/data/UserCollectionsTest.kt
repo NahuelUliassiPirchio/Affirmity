@@ -194,4 +194,58 @@ class UserCollectionsTest {
         )
         assertEquals(listOf("a"), result)
     }
+
+    // --- copyCollectionName (DG-11, S13, S14) --------------------------------------------------
+
+    private val en = CopySuffixes(first = "(copy)", numbered = "(copy %1\$d)")
+    private val es = CopySuffixes(first = "(copia)", numbered = "(copia %1\$d)")
+
+    @Test
+    fun `copy name appends the first suffix when free`() {
+        assertEquals("Everyday Essentials (copy)", copyCollectionName("Everyday Essentials", emptyList(), en))
+        assertEquals("Esenciales del día (copia)", copyCollectionName("Esenciales del día", emptyList(), es))
+    }
+
+    @Test
+    fun `copy name increments the numbered suffix on clashes`() {
+        val one = listOf(collection("a", name = "Everyday Essentials (copy)"))
+        val two = one + collection("b", name = "Everyday Essentials (copy 2)")
+
+        assertEquals("Everyday Essentials (copy 2)", copyCollectionName("Everyday Essentials", one, en))
+        assertEquals("Everyday Essentials (copy 3)", copyCollectionName("Everyday Essentials", two, en))
+        val esTaken = listOf(collection("a", name = "Esenciales del día (copia)"))
+        assertEquals("Esenciales del día (copia 2)", copyCollectionName("Esenciales del día", esTaken, es))
+    }
+
+    @Test
+    fun `copy name clash check is case-insensitive`() {
+        val existing = listOf(collection("a", name = "everyday essentials (COPY)"))
+
+        assertEquals("Everyday Essentials (copy 2)", copyCollectionName("Everyday Essentials", existing, en))
+    }
+
+    @Test
+    fun `copy name truncates the base by code points so the whole name fits`() {
+        val base = "\uD83D\uDE00".repeat(COLLECTION_NAME_MAX) // 40 emoji, 80 UTF-16 units
+
+        val name = copyCollectionName(base, emptyList(), en)
+
+        assertEquals(COLLECTION_NAME_MAX, name.codePointCount(0, name.length))
+        assertTrue(name.endsWith(" (copy)"))
+        assertEquals("\uD83D\uDE00".repeat(COLLECTION_NAME_MAX - " (copy)".length), name.removeSuffix(" (copy)"))
+        assertEquals(CollectionNameResult.Ok(name), validateCollectionName(name, emptyList()))
+    }
+
+    @Test
+    fun `copy name stays unique and within the limit when the longer numbered suffix overflows`() {
+        val base = "A".repeat(COLLECTION_NAME_MAX)
+        val first = copyCollectionName(base, emptyList(), en)
+        val second = copyCollectionName(base, listOf(collection("a", name = first)), en)
+
+        assertTrue(first.length <= COLLECTION_NAME_MAX)
+        assertTrue(second.length <= COLLECTION_NAME_MAX)
+        assertTrue(second != first)
+        assertTrue(second.endsWith("(copy 2)"))
+        assertEquals(CollectionNameResult.Ok(second), validateCollectionName(second, listOf(collection("a", name = first))))
+    }
 }
