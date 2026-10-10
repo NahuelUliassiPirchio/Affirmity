@@ -1144,4 +1144,6 @@
     <string name="catalog_theme_work_money_growth_entrepreneurship">Emprendimiento</string>
     <string name="catalog_theme_work_money_growth_money_relationship">Mi relación con el dinero</string>
     <string name="catalog_theme_work_money_growth_work_value_compensation">Valor y remuneración laboral</string>
+    <string name="default_group_everyday_essentials_name">Esenciales del día</string>
+    <string name="default_group_morning_start_name">Buen comienzo</string>
 </resources>
