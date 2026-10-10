@@ -1,5 +1,14 @@
 package com.pirxhio.affirmity.ui.collections
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
+import com.pirxhio.affirmity.ui.theme.GroupPlayAccent
+import com.pirxhio.affirmity.ui.theme.GroupPlayOnAccent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -51,12 +60,19 @@ import com.pirxhio.affirmity.data.Affirmation
 import com.pirxhio.affirmity.data.CollectionNameResult
 import com.pirxhio.affirmity.data.CopySuffixes
 import com.pirxhio.affirmity.data.UserCollectionUi
+import com.pirxhio.affirmity.ui.theme.GroupCoverGround
 import com.pirxhio.affirmity.ui.theme.GroupCoverOnGround
 
 private val CoverSize = 126.dp
 private val PlayTargetSize = 48.dp
-private val PlayChipSize = 30.dp
-private val PlayIconSize = 18.dp
+private val PlayCircleSize = 40.dp
+private val PlayIconSize = 26.dp
+private val PlayElevation = 6.dp
+private val PlayRingWidth = 2.dp
+// Target is 48dp around a 40dp circle, so a 4dp pad puts the circle 8dp from the cover corner.
+private val PlayCornerInset = 4.dp
+private const val PlayPressedScale = 0.92f
+private const val PlayPressMillis = 90
 private val ToggleIndicatorSize = 18.dp
 private val ToggleCheckSize = 12.dp
 private val ToggleRingWidth = 1.5.dp
@@ -234,10 +250,9 @@ private fun GroupCardTile(
             if (play != TilePlay.None) {
                 GroupPlayButton(
                     name = card.name,
-                    color = card.highlight.color,
                     enabled = play == TilePlay.Enabled,
                     onClick = onPlay,
-                    modifier = Modifier.align(Alignment.TopEnd),
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(PlayCornerInset),
                 )
             }
         }
@@ -251,32 +266,50 @@ private fun GroupCardTile(
 }
 
 /**
- * Understated play control in the cover's top-end corner: a 48dp target around a 30dp chip. The
- * cover is always the dark ground, so a translucent light chip with a highlight-coloured ring reads
- * the same in light and dark theme. Stays visible but inert (dimmed) when the group has nothing to
- * play, mirroring the disabled "Play group" button in the detail sheet and keeping tiles uniform.
+ * Primary play control, Spotify-style: a solid 40dp accent circle with a near-black triangle, inset
+ * 8dp from the cover's bottom-end corner and lifted by a soft shadow. The accent is the same for
+ * every group (the group's colour stays on the cover). It sits inside the cover's bounds because a
+ * child drawn outside its parent's bounds would not receive touches. The 48dp target wraps the
+ * circle. When the group has nothing to play it stays in place but turns into a dim, flat, ghost
+ * circle without a shadow, mirroring the disabled "Play group" button in the detail sheet.
  */
 @Composable
 private fun GroupPlayButton(
     name: String,
-    color: Color,
     enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    IconButton(onClick = onClick, enabled = enabled, modifier = modifier.size(PlayTargetSize)) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed && enabled) PlayPressedScale else 1f,
+        animationSpec = tween(durationMillis = PlayPressMillis),
+        label = "playPressScale",
+    )
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        interactionSource = interactionSource,
+        modifier = modifier.size(PlayTargetSize),
+    ) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(PlayChipSize)
+                .size(PlayCircleSize)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .then(if (enabled) Modifier.shadow(PlayElevation, CircleShape) else Modifier)
                 .clip(CircleShape)
-                .background(GroupCoverOnGround.copy(alpha = if (enabled) 0.16f else 0.08f))
-                .border(1.dp, color.copy(alpha = if (enabled) 0.7f else 0.25f), CircleShape),
+                .background(if (enabled) GroupPlayAccent else GroupCoverOnGround.copy(alpha = 0.16f))
+                .border(PlayRingWidth, if (enabled) GroupCoverGround else Color.Transparent, CircleShape),
         ) {
             Icon(
                 Icons.Filled.PlayArrow,
                 contentDescription = stringResource(R.string.groups_tile_play_a11y, name),
-                tint = GroupCoverOnGround.copy(alpha = if (enabled) 1f else 0.4f),
+                tint = if (enabled) GroupPlayOnAccent else GroupCoverOnGround.copy(alpha = 0.45f),
                 modifier = Modifier.size(PlayIconSize),
             )
         }

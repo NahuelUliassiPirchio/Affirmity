@@ -92,3 +92,9 @@ val OnPremiumContainerDark = Color(0xFFFFD9AD)
 // highlight reads the same everywhere; the group name on it is therefore always near-white.
 val GroupCoverGround = Color(0xFF0F1216)
 val GroupCoverOnGround = Color(0xFFF2F3F5)
+
+// Group-tile play button: ONE accent for every group (the group's own colour stays on the cover).
+// It is the brand teal's bright tone, deliberately theme-independent because the cover it sits on is
+// the dark ground in both themes. The glyph is the near-black teal used on the dark-theme containers.
+val GroupPlayAccent = Color(0xFF5BBCC3)
+val GroupPlayOnAccent = Color(0xFF00252A)
