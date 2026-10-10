@@ -21,7 +21,7 @@ class CatalogIdSchemeTest {
     @Test
     fun `every committed catalog id matches the cat_ dotted scheme and is unique`() {
         val ids = readCatalogIds()
-        assertEquals(888, ids.size)
+        assertEquals(889, ids.size)
         assertEquals("no duplicate ids", ids.size, ids.toSet().size)
         for (id in ids) {
             assertTrue("id $id does not match the cat_ scheme", idPattern.matches(id))

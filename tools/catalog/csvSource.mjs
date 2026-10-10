@@ -5,7 +5,7 @@
  * `buildCatalog.mjs` expects.
  */
 
-export const CATALOG_SOURCE_VERSION = '5.0.0';
+export const CATALOG_SOURCE_VERSION = '5.1.0';
 
 const REQUIRED_COLUMNS = ['group', 'theme', 'collection', 'id', 'tone', 'semanticAngle', 'title', 'subtitle'];
 const CSV_ID_PREFIX = 'cat_';
