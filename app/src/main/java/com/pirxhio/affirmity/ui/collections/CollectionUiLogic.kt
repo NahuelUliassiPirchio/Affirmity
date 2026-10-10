@@ -159,6 +159,15 @@ internal enum class DuplicateTap { Duplicate, Upgrade }
 /** Duplicating creates a user group, so at the free limit the row upsells instead (DG-11). */
 internal fun duplicateTap(canCreate: Boolean): DuplicateTap = if (canCreate) DuplicateTap.Duplicate else DuplicateTap.Upgrade
 
+/** What the actions sheet does with the verdict of a duplicate: close, or stay open and explain. */
+internal sealed interface DuplicateOutcome {
+    data object Close : DuplicateOutcome
+    data class ShowError(@StringRes val messageRes: Int) : DuplicateOutcome
+}
+
+internal fun CollectionNameResult.duplicateOutcome(): DuplicateOutcome =
+    errorStringRes()?.let { DuplicateOutcome.ShowError(it) } ?: DuplicateOutcome.Close
+
 /**
  * Default groups carry their id as a placeholder name; this swaps in the localized name from
  * [nameFor] (null keeps the current name). User groups are untouched. Pure so a locale switch is

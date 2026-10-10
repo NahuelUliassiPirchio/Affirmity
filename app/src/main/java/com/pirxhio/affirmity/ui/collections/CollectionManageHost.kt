@@ -19,7 +19,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -52,6 +56,8 @@ internal fun CollectionManageHost(
     onUpgrade: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    // Inline feedback for a duplicate that did not happen; the sheet stays open, like the rename dialog's errors.
+    var duplicateError by rememberSaveable { mutableStateOf<Int?>(null) }
     val defaultNames = DefaultGroups.all.associate { it.id to stringResource(it.nameRes) }
     val state = savedState.withLocalizedDefaultName(defaultNames::get)
     val suffixes = CopySuffixes(
@@ -61,7 +67,10 @@ internal fun CollectionManageHost(
     when (state) {
         CollectionManageState.Closed -> Unit
         is CollectionManageState.Actions -> ModalBottomSheet(
-            onDismissRequest = { onEvent(CollectionManageEvent.Dismiss) },
+            onDismissRequest = {
+                duplicateError = null
+                onEvent(CollectionManageEvent.Dismiss)
+            },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
@@ -87,7 +96,8 @@ internal fun CollectionManageHost(
                             CollectionActionRow(
                                 icon = Icons.Filled.ContentCopy,
                                 label = stringResource(R.string.groups_action_duplicate),
-                                supporting = if (limited) stringResource(R.string.collection_limit_reached) else null,
+                                supporting = duplicateError?.let { stringResource(it) }
+                                    ?: if (limited) stringResource(R.string.collection_limit_reached) else null,
                                 onClick = {
                                     when (duplicateTap(canCreate)) {
                                         DuplicateTap.Upgrade -> {
@@ -96,7 +106,13 @@ internal fun CollectionManageHost(
                                         }
                                         DuplicateTap.Duplicate -> scope.launch {
                                             val verdict = onDuplicate(state.collection.id, state.collection.name, suffixes)
-                                            if (verdict is CollectionNameResult.Ok) onEvent(CollectionManageEvent.Dismiss)
+                                            when (val outcome = verdict.duplicateOutcome()) {
+                                                DuplicateOutcome.Close -> {
+                                                    duplicateError = null
+                                                    onEvent(CollectionManageEvent.Dismiss)
+                                                }
+                                                is DuplicateOutcome.ShowError -> duplicateError = outcome.messageRes
+                                            }
                                         }
                                     }
                                 },

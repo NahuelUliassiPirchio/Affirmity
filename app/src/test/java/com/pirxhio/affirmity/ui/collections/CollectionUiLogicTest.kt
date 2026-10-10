@@ -347,4 +347,25 @@ class CollectionUiLogicTest {
         assertEquals(user, user.withLocalizedDefaultName { "X" })
         assertEquals(CollectionManageState.Closed, CollectionManageState.Closed.withLocalizedDefaultName { "X" })
     }
+
+    @Test
+    fun `duplicate verdict Ok closes the sheet`() {
+        assertEquals(DuplicateOutcome.Close, CollectionNameResult.Ok("id").duplicateOutcome())
+    }
+
+    @Test
+    fun `duplicate verdict CatalogNotReady keeps the sheet open with its localized message`() {
+        assertEquals(
+            DuplicateOutcome.ShowError(R.string.collection_name_error_catalog_not_ready),
+            CollectionNameResult.CatalogNotReady.duplicateOutcome(),
+        )
+    }
+
+    @Test
+    fun `duplicate verdict LimitReached keeps the sheet open with the limit message`() {
+        assertEquals(
+            DuplicateOutcome.ShowError(R.string.collection_limit_reached),
+            CollectionNameResult.LimitReached.duplicateOutcome(),
+        )
+    }
 }
