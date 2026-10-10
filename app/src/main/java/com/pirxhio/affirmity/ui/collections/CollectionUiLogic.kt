@@ -168,6 +168,41 @@ internal fun CollectionNameResult.duplicateOutcome(): DuplicateOutcome =
     errorStringRes()?.let { DuplicateOutcome.ShowError(it) } ?: DuplicateOutcome.Close
 
 /**
+ * Per-sheet-session state of the Duplicate row. [session] changes whenever the sheet is dismissed
+ * ([reset]), so a verdict that arrives for an earlier session is ignored by [finish] instead of
+ * resurrecting an error on a later sheet. [inFlight] lets the row refuse a second tap while the
+ * first write is still suspended.
+ */
+internal data class DuplicateUi(val session: Int = 0, val inFlight: Boolean = false, val error: Int? = null) {
+    fun begin(): DuplicateUi = copy(inFlight = true, error = null)
+
+    fun reset(): DuplicateUi = DuplicateUi(session = session + 1)
+
+    fun finish(startedSession: Int, outcome: DuplicateOutcome): DuplicateUi =
+        if (startedSession != session) {
+            this
+        } else {
+            when (outcome) {
+                DuplicateOutcome.Close -> copy(inFlight = false, error = null)
+                is DuplicateOutcome.ShowError -> copy(inFlight = false, error = outcome.messageRes)
+            }
+        }
+
+    companion object {
+        /** Only session and error survive recreation; a suspended write does not. */
+        val Saver: Saver<DuplicateUi, Any> = Saver(
+            save = { listOf(it.session, it.error ?: NO_ERROR) },
+            restore = { raw ->
+                @Suppress("UNCHECKED_CAST")
+                val values = raw as List<Int>
+                DuplicateUi(session = values[0], error = values[1].takeIf { it != NO_ERROR })
+            },
+        )
+        private const val NO_ERROR = -1
+    }
+}
+
+/**
  * Default groups carry their id as a placeholder name; this swaps in the localized name from
  * [nameFor] (null keeps the current name). User groups are untouched. Pure so a locale switch is
  * testable without Compose (DG-6).

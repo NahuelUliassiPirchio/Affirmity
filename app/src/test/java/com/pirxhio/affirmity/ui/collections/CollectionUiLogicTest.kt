@@ -5,6 +5,8 @@ import com.pirxhio.affirmity.data.CollectionNameResult
 import com.pirxhio.affirmity.data.UserCollectionUi
 import com.pirxhio.affirmity.ui.theme.GroupHighlight
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -359,4 +361,52 @@ class CollectionUiLogicTest {
             CollectionNameResult.LimitReached.duplicateOutcome(),
         )
     }
+
+    @Test
+    fun `begin marks a duplicate in flight and clears any previous error`() {
+        val ui = DuplicateUi(error = R.string.collection_limit_reached).begin()
+
+        assertTrue(ui.inFlight)
+        assertEquals(null, ui.error)
+    }
+
+    @Test
+    fun `finish with an error ends the flight and shows the message`() {
+        val started = DuplicateUi().begin()
+
+        val ui = started.finish(started.session, DuplicateOutcome.ShowError(R.string.collection_limit_reached))
+
+        assertFalse(ui.inFlight)
+        assertEquals(R.string.collection_limit_reached, ui.error)
+    }
+
+    @Test
+    fun `finish with Close ends the flight without an error`() {
+        val started = DuplicateUi().begin()
+
+        val ui = started.finish(started.session, DuplicateOutcome.Close)
+
+        assertFalse(ui.inFlight)
+        assertEquals(null, ui.error)
+    }
+
+    @Test
+    fun `a result arriving after the sheet was dismissed is ignored`() {
+        val started = DuplicateUi().begin()
+        val dismissed = started.reset()
+
+        val ui = dismissed.finish(started.session, DuplicateOutcome.ShowError(R.string.collection_limit_reached))
+
+        assertEquals(dismissed, ui)
+        assertEquals(null, ui.error)
+        assertFalse(ui.inFlight)
+    }
+
+    @Test
+    fun `reset clears the error and the flight and starts a new session`() {
+        val ui = DuplicateUi(session = 2, inFlight = true, error = R.string.collection_limit_reached).reset()
+
+        assertEquals(DuplicateUi(session = 3), ui)
+    }
 }
+

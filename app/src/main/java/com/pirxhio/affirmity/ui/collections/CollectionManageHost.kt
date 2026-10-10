@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -26,6 +27,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -34,6 +36,8 @@ import com.pirxhio.affirmity.data.CollectionNameResult
 import com.pirxhio.affirmity.data.CopySuffixes
 import com.pirxhio.affirmity.data.DefaultGroups
 import kotlinx.coroutines.launch
+
+private const val DisabledRowAlpha = 0.5f
 
 /**
  * Renders the long-press flow ([CollectionManageState]) for chips: an actions sheet (Rename,
@@ -57,18 +61,21 @@ internal fun CollectionManageHost(
 ) {
     val scope = rememberCoroutineScope()
     // Inline feedback for a duplicate that did not happen; the sheet stays open, like the rename dialog's errors.
-    var duplicateError by rememberSaveable { mutableStateOf<Int?>(null) }
+    var duplicateUi by rememberSaveable(stateSaver = DuplicateUi.Saver) { mutableStateOf(DuplicateUi()) }
     val defaultNames = DefaultGroups.all.associate { it.id to stringResource(it.nameRes) }
     val state = savedState.withLocalizedDefaultName(defaultNames::get)
     val suffixes = CopySuffixes(
         first = stringResource(R.string.groups_duplicate_copy_suffix),
         numbered = stringResource(R.string.groups_duplicate_copy_suffix_numbered),
     )
+    // A sheet session ends whenever the actions sheet leaves the screen, however it got there.
+    val sheetOpen = state is CollectionManageState.Actions
+    LaunchedEffect(sheetOpen) { if (!sheetOpen) duplicateUi = duplicateUi.reset() }
     when (state) {
         CollectionManageState.Closed -> Unit
         is CollectionManageState.Actions -> ModalBottomSheet(
             onDismissRequest = {
-                duplicateError = null
+                duplicateUi = duplicateUi.reset()
                 onEvent(CollectionManageEvent.Dismiss)
             },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -96,22 +103,26 @@ internal fun CollectionManageHost(
                             CollectionActionRow(
                                 icon = Icons.Filled.ContentCopy,
                                 label = stringResource(R.string.groups_action_duplicate),
-                                supporting = duplicateError?.let { stringResource(it) }
+                                supporting = duplicateUi.error?.let { stringResource(it) }
                                     ?: if (limited) stringResource(R.string.collection_limit_reached) else null,
+                                enabled = !duplicateUi.inFlight,
                                 onClick = {
                                     when (duplicateTap(canCreate)) {
                                         DuplicateTap.Upgrade -> {
+                                            duplicateUi = duplicateUi.reset()
                                             onEvent(CollectionManageEvent.Dismiss)
                                             onUpgrade()
                                         }
-                                        DuplicateTap.Duplicate -> scope.launch {
-                                            val verdict = onDuplicate(state.collection.id, state.collection.name, suffixes)
-                                            when (val outcome = verdict.duplicateOutcome()) {
-                                                DuplicateOutcome.Close -> {
-                                                    duplicateError = null
+                                        DuplicateTap.Duplicate -> {
+                                            val session = duplicateUi.session
+                                            duplicateUi = duplicateUi.begin()
+                                            scope.launch {
+                                                val outcome = onDuplicate(state.collection.id, state.collection.name, suffixes)
+                                                    .duplicateOutcome()
+                                                duplicateUi = duplicateUi.finish(session, outcome)
+                                                if (outcome == DuplicateOutcome.Close && duplicateUi.session == session) {
                                                     onEvent(CollectionManageEvent.Dismiss)
                                                 }
-                                                is DuplicateOutcome.ShowError -> duplicateError = outcome.messageRes
                                             }
                                         }
                                     }
@@ -168,11 +179,18 @@ internal fun CollectionManageHost(
 
 // Same look as the feed's AffirmationActionRow (private there; promoting it is deferred).
 @Composable
-private fun CollectionActionRow(icon: ImageVector, label: String, onClick: () -> Unit, supporting: String? = null) {
+private fun CollectionActionRow(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    supporting: String? = null,
+    enabled: Boolean = true,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
+            .alpha(if (enabled) 1f else DisabledRowAlpha)
             .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
