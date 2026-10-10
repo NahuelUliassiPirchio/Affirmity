@@ -43,6 +43,7 @@ import androidx.core.os.LocaleListCompat
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.auth.AuthState
+import com.pirxhio.affirmity.data.catalog.CatalogLocale
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DaySegment
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
@@ -69,6 +70,17 @@ enum class LanguageOption {
         }
     }
 }
+
+/**
+ * Catalog locale the pre-seed must target for [option], computed with the SAME pure core the
+ * seeder uses (design D5). SYSTEM means "no app locale" -> the device language; explicit options
+ * never consult the device. Deliberately NOT the no-arg resolver: before `setApplicationLocales`
+ * that still answers with the OLD locale.
+ */
+internal fun catalogLocaleFor(
+    option: LanguageOption,
+    deviceLanguage: () -> String? = CatalogLocale::systemDeviceLanguage,
+): CatalogLocale = CatalogLocale.resolve(option.toLanguageTag(), deviceLanguage)
 
 @Composable
 fun SettingsScreen(
@@ -104,6 +116,9 @@ fun SettingsScreen(
     onUpgradeClick: () -> Unit,
     onManageSubscriptionClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onLanguageSelected: (target: CatalogLocale, locales: LocaleListCompat) -> Unit = { _, locales ->
+        AppCompatDelegate.setApplicationLocales(locales)
+    },
 ) {
     val areNotificationControlsEnabled = notificationControlsEnabled(authState)
     LazyColumn(
@@ -190,7 +205,7 @@ fun SettingsScreen(
         }
 
         item {
-            LanguageSettingsCard()
+            LanguageSettingsCard(onLanguageSelected = onLanguageSelected)
         }
 
         item {
@@ -338,13 +353,13 @@ private fun PermissionBanner() {
 /**
  * System / Español / English toggle (spec: `In-App Language Selection`). Reads
  * [AppCompatDelegate.getApplicationLocales] fresh on every composition (not `remember`-cached), so
- * the selected option reflects reality again after a process restart. Writing calls
- * [AppCompatDelegate.setApplicationLocales], which is the single source of truth — no parallel
+ * the selected option reflects reality again after a process restart. Writing goes through
+ * [onLanguageSelected] (pre-seed, then [AppCompatDelegate.setApplicationLocales]), which is the single source of truth — no parallel
  * DataStore (D5) — and triggers the Activity recreate that re-resolves every `stringResource` in
  * the app (D5's reactivity model).
  */
 @Composable
-private fun LanguageSettingsCard() {
+private fun LanguageSettingsCard(onLanguageSelected: (CatalogLocale, LocaleListCompat) -> Unit) {
     val currentTag = AppCompatDelegate.getApplicationLocales().let { locales ->
         if (locales.isEmpty) null else locales[0]?.language
     }
@@ -368,7 +383,7 @@ private fun LanguageSettingsCard() {
                                 onClick = {
                                     val localeList = option.toLanguageTag()?.let { LocaleListCompat.forLanguageTags(it) }
                                         ?: LocaleListCompat.getEmptyLocaleList()
-                                    AppCompatDelegate.setApplicationLocales(localeList)
+                                    onLanguageSelected(catalogLocaleFor(option), localeList)
                                 },
                             )
                             .padding(vertical = 4.dp),

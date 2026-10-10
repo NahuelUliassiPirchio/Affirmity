@@ -19,13 +19,14 @@
  * (content) + `tools/catalog/source/taxonomy.json` (universes/themes/collections), joined by
  * `csvSource.mjs`. An explicit JSON path (full source shape) is still accepted for back-compat.
  */
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { findIllegalBrackets } from "./bracketGate.mjs";
 import { buildCatalog } from "./buildCatalog.mjs";
 import { csvToSource } from "./csvSource.mjs";
+import { assertLocaleParity } from "./localeParity.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, "..", "..");
@@ -34,6 +35,15 @@ const sourcePath = process.argv[2];
 const CSV_SOURCE = join(__dirname, "source/affirmations.v5.csv");
 const TAXONOMY_SOURCE = join(__dirname, "source/taxonomy.json");
 const ASSET_OUT = join(REPO_ROOT, "app/src/main/assets/catalog.v1.json");
+/** Supported locales (REQ-PAR-2). `es` is the base: parity and the compiled taxonomy come from it. */
+export const LOCALES = [
+  { locale: "es", csv: join(__dirname, "source/affirmations.v5.csv"), asset: ASSET_OUT },
+  {
+    locale: "en",
+    csv: join(__dirname, "source/affirmations.v5.en.csv"),
+    asset: join(REPO_ROOT, "app/src/main/assets/catalog.v1.en.json"),
+  },
+];
 const TAXONOMY_OUT = join(
   REPO_ROOT,
   "app/src/main/java/com/pirxhio/affirmity/ui/groups/CatalogTaxonomy.kt",
@@ -104,24 +114,73 @@ export function generateCatalogFiles(source) {
   return { asset, assetJson: JSON.stringify(asset), taxonomyKt };
 }
 
-function main() {
-  const source = sourcePath
-    ? JSON.parse(readFileSync(sourcePath, "utf8"))
-    : csvToSource(readFileSync(CSV_SOURCE, "utf8"), JSON.parse(readFileSync(TAXONOMY_SOURCE, "utf8")));
+/**
+ * Pure multi-locale transform (no I/O). `csvByLocale` MUST contain `es` (the base). Parity of every
+ * other locale against es runs BEFORE anything is returned, so a caller that writes only the result
+ * never writes a partial set. The taxonomy Kotlin comes from es and must be identical for the rest.
+ * @returns {{assets: Record<string, {asset: object, assetJson: string}>, taxonomyKt: string, warnings: string[]}}
+ */
+export function generateAllLocales(csvByLocale, taxonomy) {
+  if (typeof csvByLocale.es !== "string") fail("generateAllLocales requires the base locale 'es'");
+  const sources = Object.fromEntries(
+    Object.entries(csvByLocale).map(([locale, csv]) => [locale, csvToSource(csv, taxonomy)]),
+  );
 
+  const warnings = [];
+  for (const [locale, source] of Object.entries(sources)) {
+    if (locale === "es") continue;
+    const { warnings: localeWarnings } = assertLocaleParity(sources.es, source);
+    warnings.push(...localeWarnings.map((w) => `[${locale}] ${w}`));
+  }
+
+  const esFiles = generateCatalogFiles(sources.es);
+  const taxonomyKt = esFiles.taxonomyKt;
+  const assets = { es: { asset: esFiles.asset, assetJson: esFiles.assetJson } };
+  for (const [locale, source] of Object.entries(sources)) {
+    if (locale === "es") continue;
+    const files = generateCatalogFiles(source);
+    if (files.taxonomyKt !== taxonomyKt) fail(`taxonomy Kotlin for locale '${locale}' differs from the es taxonomy`);
+    assets[locale] = { asset: files.asset, assetJson: files.assetJson };
+  }
+  return { assets, taxonomyKt, warnings };
+}
+
+function main() {
   let result;
+  let source;
+  const pending = [];
   try {
-    result = generateCatalogFiles(source);
+    if (sourcePath) {
+      // Back-compat: explicit full-shape JSON builds the es asset only.
+      source = JSON.parse(readFileSync(sourcePath, "utf8"));
+      const files = generateCatalogFiles(source);
+      result = { assets: { es: { asset: files.asset, assetJson: files.assetJson } }, taxonomyKt: files.taxonomyKt, warnings: [] };
+    } else {
+      const taxonomy = JSON.parse(readFileSync(TAXONOMY_SOURCE, "utf8"));
+      const csvByLocale = {};
+      for (const { locale, csv } of LOCALES) {
+        if (existsSync(csv)) csvByLocale[locale] = readFileSync(csv, "utf8");
+        else if (locale === "es") fail(`missing base CSV ${csv}`);
+        else pending.push(locale);
+      }
+      source = csvToSource(csvByLocale.es, taxonomy);
+      result = generateAllLocales(csvByLocale, taxonomy);
+    }
   } catch (error) {
     console.error(error.message.startsWith("[generate-catalog] FAILED:") ? error.message : `[generate-catalog] FAILED: ${error.message}`);
     process.exit(1);
     return;
   }
 
-  const { asset, assetJson, taxonomyKt } = result;
+  const { assets, taxonomyKt, warnings } = result;
 
-  mkdirSync(dirname(ASSET_OUT), { recursive: true });
-  writeFileSync(ASSET_OUT, assetJson, "utf8");
+  // Parity already passed for every locale: only now touch the disk.
+  for (const { locale, asset: assetOut } of LOCALES) {
+    if (!assets[locale]) continue;
+    mkdirSync(dirname(assetOut), { recursive: true });
+    writeFileSync(assetOut, assets[locale].assetJson, "utf8");
+    console.log(`[generate-catalog] wrote ${assetOut}`);
+  }
 
   mkdirSync(dirname(TAXONOMY_OUT), { recursive: true });
   writeFileSync(TAXONOMY_OUT, taxonomyKt, "utf8");
@@ -130,11 +189,12 @@ function main() {
   const gatedCount = (taxonomyKt.match(/setOf\(([^)]*)\)/)?.[1].split(",").filter((s) => s.trim()).length) ?? 0;
 
   console.log(
-    `[generate-catalog] OK: ${asset.affirmations.length} affirmations, ${source.universes.length} universes, ` +
+    `[generate-catalog] OK: ${assets.es.asset.affirmations.length} affirmations, ${source.universes.length} universes, ` +
       `${collectionsCount} collections. CATALOG_GATED_GROUP_IDS size=${gatedCount}/${source.universes.length}.`,
   );
-  console.log(`[generate-catalog] wrote ${ASSET_OUT}`);
   console.log(`[generate-catalog] wrote ${TAXONOMY_OUT}`);
+  for (const w of warnings) console.warn(`[generate-catalog] WARNING: ${w}`);
+  for (const locale of pending) console.warn(`[generate-catalog] skipped locale '${locale}': source CSV not present yet`);
 }
 
 // ESM equivalent of CommonJS's `require.main === module` -- only run `main()` when this file is

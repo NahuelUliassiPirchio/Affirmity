@@ -4,6 +4,8 @@ import com.pirxhio.affirmity.data.local.CatalogAffirmationDao
 import com.pirxhio.affirmity.data.local.CatalogPreferences
 import com.pirxhio.affirmity.ui.groups.catalogCollectionsById
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Bundled-asset-first seeding (design D2/D13). Runs off the main thread at app start.
@@ -14,22 +16,37 @@ class CatalogSeeder(
     private val assetReader: CatalogAssetReader,
     private val dao: CatalogAffirmationDao,
     private val prefs: CatalogPreferences,
+    /** Effective catalog locale, consulted ONLY by the no-arg [seedIfNeeded] and only INSIDE the lock. */
+    private val currentLocale: () -> CatalogLocale = { CatalogLocale.resolve() },
     private val knownCollectionIds: () -> Set<String> = { catalogCollectionsById().keys },
 ) {
 
-    /** No-op when `prefs.observeSeededCatalogVersion() == bundled version` AND the table holds
-     * rows. Idempotent by full replace otherwise. */
-    suspend fun seedIfNeeded() {
-        val bundled = CatalogAssetParser.parse(assetReader.readCatalogJson(), knownCollectionIds())
-        val seededVersion = prefs.observeSeededCatalogVersion().first()
+    /**
+     * No-op when the stored marker equals `"<bundled version>|<locale tag>"` AND the table holds
+     * rows. Otherwise a single transactional full replace, then the marker (REQ-LOC-4/7).
+     *
+     * Everything -- locale resolution, asset read, replace, marker -- runs inside one process-wide
+     * lock (design D4): a no-arg call always resolves the locale AFTER any in-flight seed finishes,
+     * so the last no-arg seed after a locale change decides the final table. Only the Settings
+     * pre-seed passes an explicit [locale].
+     */
+    suspend fun seedIfNeeded(locale: CatalogLocale? = null) = mutex.withLock {
+        val target = locale ?: currentLocale()
+        val bundled = CatalogAssetParser.parse(assetReader.readCatalogJson(target), knownCollectionIds())
+        val marker = "${bundled.version}|${target.tag}"
+        val seededMarker = prefs.observeSeededCatalogVersion().first()
         // The marker lives in DataStore, which Auto Backup restores, while the Room DB is excluded
         // from backup. A matching marker over an empty table therefore means "restored/cleared
         // DB", not "already seeded" -- trusting the marker alone leaves the catalog empty forever.
-        if (seededVersion == bundled.version && dao.count() > 0) return
+        if (seededMarker == marker && dao.count() > 0) return@withLock
 
         dao.replaceAll(bundled.affirmations)
         // MARKER LAST (design D13): if this throws, the rows are already committed and the next
         // call simply re-seeds (a harmless, idempotent replace), never leaving a half-seeded state.
-        prefs.saveSeededCatalogVersion(bundled.version)
+        prefs.saveSeededCatalogVersion(marker)
+    }
+
+    private companion object {
+        val mutex = Mutex()
     }
 }

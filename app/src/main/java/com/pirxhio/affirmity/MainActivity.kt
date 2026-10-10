@@ -1457,6 +1457,7 @@ fun AffirmityApp(
         ) { innerPadding ->
             SettingsScreen(
                 modifier = Modifier.padding(innerPadding),
+                onLanguageSelected = { target, locales -> appState.switchCatalogLocale(target, locales) },
                 reminderSettings = appState.reminderSettings.value,
                 reflectionSettings = appState.reflectionSettings.value,
                 moodSettings = appState.moodSettings.value,

@@ -5,14 +5,13 @@ import android.content.Context
 /**
  * Narrow contract extracted so `CatalogSeeder` can be unit-tested with a fake, without needing an
  * Android `AssetManager` (mirrors `GroupSelectionPreferences`'s testability split, design risk
- * #4). The real implementation reads the bundled `assets/catalog.v1.json` (design D2).
+ * #4). The real implementation reads the bundled per-locale asset (design D2).
  */
 fun interface CatalogAssetReader {
-    fun readCatalogJson(): String
+    fun readCatalogJson(locale: CatalogLocale): String
 }
 
-class AndroidCatalogAssetReader(private val context: Context, private val assetName: String = "catalog.v1.json") :
-    CatalogAssetReader {
-    override fun readCatalogJson(): String =
-        context.assets.open(assetName).bufferedReader(Charsets.UTF_8).use { it.readText() }
+class AndroidCatalogAssetReader(private val context: Context) : CatalogAssetReader {
+    override fun readCatalogJson(locale: CatalogLocale): String =
+        context.assets.open(locale.assetName).bufferedReader(Charsets.UTF_8).use { it.readText() }
 }

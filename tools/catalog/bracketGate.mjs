@@ -28,3 +28,12 @@ export function findIllegalBrackets(text) {
   }
   return offsets;
 }
+
+/** Number of legal (non-blank) `[token]` sequences in [text]; empty `[]` is not a token. */
+export function countTokens(text) {
+  let count = 0;
+  for (const match of text.matchAll(TOKEN_REGEX)) {
+    if (match[1].trim() !== '') count++;
+  }
+  return count;
+}
