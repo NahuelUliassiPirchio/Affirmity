@@ -47,6 +47,27 @@ internal class RecordingUserCollectionRepository(
         }
     }
 
+    override suspend fun createWithItems(
+        id: String,
+        name: String,
+        nowMillis: Long,
+        affirmationIds: List<String>,
+        highlightId: String,
+    ) {
+        events += "createWithItems:$id:$name:$nowMillis:${affirmationIds.joinToString(",")}:$highlightId"
+        update {
+            it + UserCollection(
+                id = id,
+                name = name,
+                createdAtMillis = nowMillis,
+                enabled = true,
+                lastUsedAtMillis = nowMillis,
+                affirmationIds = affirmationIds,
+                highlightId = highlightId,
+            )
+        }
+    }
+
     override suspend fun rename(id: String, name: String) {
         events += "rename:$id:$name"
         update { list -> list.map { if (it.id == id) it.copy(name = name) else it } }

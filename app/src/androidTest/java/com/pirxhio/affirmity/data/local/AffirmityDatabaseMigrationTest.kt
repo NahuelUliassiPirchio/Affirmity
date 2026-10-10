@@ -416,6 +416,38 @@ class AffirmityDatabaseMigrationTest {
         }
     }
 
+    /** MIGRATION_15_16: user data survives and the default_group_state table exists, empty. */
+    @Test
+    fun migrate15To16_createsDefaultGroupStateEmptyAndKeepsUserData() {
+        helper.createDatabase(TEST_DB, 15).apply {
+            execSQL(
+                "INSERT INTO user_collections (id, name, createdAtMillis, enabled, lastUsedAtMillis, highlightId) " +
+                    "VALUES ('c1', 'Morning', 1, 1, 1, 'rose')",
+            )
+            execSQL(
+                "INSERT INTO user_collection_items (userCollectionId, affirmationId, addedAtMillis) " +
+                    "VALUES ('c1', 'cat_id-1', 1)",
+            )
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(TEST_DB, 16, true, MIGRATION_15_16)
+
+        migrated.query("SELECT name, highlightId FROM user_collections WHERE id = 'c1'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("Morning", cursor.getString(0))
+            assertEquals("rose", cursor.getString(1))
+        }
+        migrated.query("SELECT COUNT(*) FROM user_collection_items").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(1, cursor.getInt(0))
+        }
+        migrated.query("SELECT COUNT(*) FROM default_group_state").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0))
+        }
+    }
+
     private companion object {
         const val TEST_DB = "migration-test"
     }

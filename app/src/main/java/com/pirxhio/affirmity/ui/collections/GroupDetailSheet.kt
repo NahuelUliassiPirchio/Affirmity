@@ -66,6 +66,7 @@ internal fun GroupDetailSheet(
     onDismiss: () -> Unit,
 ) {
     val card = collection.toGroupCardUi()
+    val readOnly = isReadOnlyGroup(collection)
     var playing by rememberSaveable { mutableStateOf(false) }
     // The app-level SnackbarHost sits behind modal sheets, so Undo lives in a host of its own here.
     val snackbarHostState = remember { SnackbarHostState() }
@@ -167,7 +168,7 @@ internal fun GroupDetailSheet(
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.weight(1f).padding(vertical = 14.dp),
                         )
-                        IconButton(
+                        if (!readOnly) IconButton(
                             onClick = {
                                 onRemoveItem(affirmation.id)
                                 scope.launch {

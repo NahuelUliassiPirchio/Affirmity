@@ -726,6 +726,330 @@ class AffirmityAppStateUserCollectionsTest {
         assertTrue(shared.isEmpty())
     }
 
+    // --- default groups (DG-7..11, UC-1, UC-3) -------------------------------------------------
+
+    private val morningId = DefaultGroups.MORNING_START_ID
+    private val essentialsId = DefaultGroups.EVERYDAY_ESSENTIALS_ID
+    private val copySuffixes = CopySuffixes(first = "(copy)", numbered = "(copy %1\$d)")
+
+    /** A registry stand-in whose members exist in the test catalog (real ids drive the guards). */
+    private val testDefaults = listOf(
+        DefaultGroup(essentialsId, 0, "violet", listOf(FREE_ROW_2)),
+        DefaultGroup(morningId, 0, "amber", listOf(PRO_ROW, FREE_ROW, "cat_missing")),
+    )
+
+    private suspend fun defaultsState(
+        scope: kotlinx.coroutines.test.TestScope,
+        repo: RecordingUserCollectionRepository = RecordingUserCollectionRepository(),
+        states: RecordingDefaultGroupStateRepository = RecordingDefaultGroupStateRepository(),
+        tier: AccessTier = AccessTier.FREE,
+        ids: Iterator<String> = sequenceOf("copy-1", "copy-2").iterator(),
+        now: () -> Long = { 500L },
+        owned: List<AffirmationEntity> = emptyList(),
+    ): AffirmityAppState {
+        val state = buildUcState(
+            scope.backgroundScope,
+            repo,
+            affirmations = RecordingAffirmationRepositoryUC(owned),
+            catalogRows = listOf(
+                ucCatalog(FREE_ROW, UC_FREE_COLLECTION_ID),
+                ucCatalog(FREE_ROW_2, UC_FREE_COLLECTION_ID),
+                ucCatalog(PRO_ROW, UC_PRO_COLLECTION_ID),
+            ),
+            tier = tier,
+            feedSources = FeedSources(includeOwn = false),
+            ids = ids,
+            now = now,
+            defaultGroups = testDefaults,
+            defaultGroupStates = states,
+        )
+        scope.runCurrent()
+        scope.advanceUntilIdle()
+        return state
+    }
+
+    @Test
+    fun `defaults are merged first, disabled, with isDefault and resolved counts`() = runTest {
+        val repo = RecordingUserCollectionRepository(listOf(uc("u1", items = listOf(FREE_ROW))))
+        val state = defaultsState(this, repo)
+
+        assertEquals(listOf(essentialsId, morningId, "u1"), state.userCollections.map { it.id })
+        assertEquals(listOf(true, true, false), state.userCollections.map { it.isDefault })
+        assertEquals(listOf(false, false, true), state.userCollections.map { it.enabled })
+        // "cat_missing" is an orphan: the count excludes it.
+        assertEquals(listOf(1, 2, 1), state.userCollections.map { it.resolvedItemCount })
+    }
+
+    @Test
+    fun `read-only guards reject every membership mutation on a default with no repo change`() = runTest {
+        val repo = RecordingUserCollectionRepository(listOf(uc("u1")))
+        val states = RecordingDefaultGroupStateRepository()
+        val state = defaultsState(this, repo, states)
+
+        val rename = state.renameCollection(morningId, "Hacked")
+        state.deleteCollection(morningId)
+        state.addToCollection(morningId, FREE_ROW_2)
+        state.removeFromCollection(morningId, FREE_ROW)
+        state.toggleAffirmationInCollection(morningId, FREE_ROW_2)
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(CollectionNameResult.ReadOnly, rename)
+        assertTrue(repo.events.isEmpty())
+        assertTrue(states.events.isEmpty())
+        assertEquals(listOf(PRO_ROW, FREE_ROW), state.userCollectionAffirmations(morningId).map { it.id })
+    }
+
+    @Test
+    fun `renaming a user group still works next to defaults`() = runTest {
+        val repo = RecordingUserCollectionRepository(listOf(uc("u1", name = "Old")))
+        val state = defaultsState(this, repo)
+
+        assertEquals(CollectionNameResult.Ok("New"), state.renameCollection("u1", "New"))
+        assertEquals(listOf("rename:u1:New"), repo.events)
+    }
+
+    @Test
+    fun `enabling a default persists to the state repository and adds its members to the feed`() = runTest {
+        val repo = RecordingUserCollectionRepository()
+        val states = RecordingDefaultGroupStateRepository()
+        val state = defaultsState(this, repo, states, tier = AccessTier.PRO, now = { 777L })
+        assertFalse(PRO_ROW in state.filteredAffirmations.map { it.id })
+        assertFalse(state.anyCollectionEnabled)
+
+        state.setCollectionEnabled(morningId, true)
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(listOf("setEnabled:$morningId:true:777"), states.events)
+        assertTrue(repo.events.isEmpty())
+        assertTrue(PRO_ROW in state.filteredAffirmations.map { it.id })
+        assertTrue(state.anyCollectionEnabled)
+        assertTrue(state.userCollections.first { it.id == morningId }.enabled)
+    }
+
+    @Test
+    fun `disabling a default removes its members from the feed`() = runTest {
+        val states = RecordingDefaultGroupStateRepository(mapOf(morningId to DefaultGroupState(true, 10L)))
+        val state = defaultsState(this, states = states, tier = AccessTier.PRO)
+        assertTrue(PRO_ROW in state.filteredAffirmations.map { it.id })
+
+        state.setCollectionEnabled(morningId, false)
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(listOf("setEnabled:$morningId:false:500"), states.events)
+        assertFalse(PRO_ROW in state.filteredAffirmations.map { it.id })
+    }
+
+    @Test
+    fun `toggleCollection on a default flips the persisted state`() = runTest {
+        val states = RecordingDefaultGroupStateRepository()
+        val state = defaultsState(this, states = states)
+
+        state.toggleCollection(essentialsId)
+        runCurrent()
+        advanceUntilIdle()
+        state.toggleCollection(essentialsId)
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf("setEnabled:$essentialsId:true:500", "setEnabled:$essentialsId:false:500"),
+            states.events,
+        )
+    }
+
+    @Test
+    fun `a disabled default stays visible with its members playable`() = runTest {
+        val state = defaultsState(this)
+
+        assertFalse(state.userCollections.first { it.id == morningId }.enabled)
+        assertEquals(listOf(PRO_ROW, FREE_ROW), state.userCollectionAffirmations(morningId).map { it.id })
+    }
+
+    @Test
+    fun `removeAffirmations still cleans user groups and never touches defaults`() = runTest {
+        val repo = RecordingUserCollectionRepository(listOf(uc("u1", items = listOf("owned-1", "keep"))))
+        val states = RecordingDefaultGroupStateRepository()
+        val state = defaultsState(this, repo, states, owned = listOf(ucOwned("owned-1")))
+
+        state.removeAffirmation("owned-1")
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(listOf("removeAffirmations:[owned-1]"), repo.events)
+        assertTrue(states.events.isEmpty())
+        assertEquals(listOf(PRO_ROW, FREE_ROW), state.userCollectionAffirmations(morningId).map { it.id })
+    }
+
+    @Test
+    fun `duplicate creates an editable user group with the defined members, highlight and copy name`() = runTest {
+        val repo = RecordingUserCollectionRepository()
+        val state = defaultsState(this, repo)
+
+        val verdict = state.duplicateDefaultGroup(morningId, "Morning Start", copySuffixes)
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(CollectionNameResult.Ok("Morning Start (copy)"), verdict)
+        val created = repo.current.single()
+        assertEquals("copy-1", created.id)
+        assertEquals("Morning Start (copy)", created.name)
+        assertEquals("amber", created.highlightId)
+        assertEquals(listOf(PRO_ROW, FREE_ROW, "cat_missing"), created.affirmationIds)
+        assertFalse(created.isDefault)
+        assertEquals(CollectionNameResult.Ok("Renamed"), state.renameCollection("copy-1", "Renamed"))
+    }
+
+    @Test
+    fun `duplicate at the free limit is refused and nothing is created`() = runTest {
+        val repo = RecordingUserCollectionRepository(listOf(uc("u1"), uc("u2")))
+        val state = defaultsState(this, repo)
+
+        val verdict = state.duplicateDefaultGroup(morningId, "Morning Start", copySuffixes)
+
+        assertEquals(CollectionNameResult.LimitReached, verdict)
+        assertTrue(repo.events.isEmpty())
+    }
+
+    @Test
+    fun `duplicate twice yields copy then copy 2`() = runTest {
+        val repo = RecordingUserCollectionRepository()
+        val state = defaultsState(this, repo)
+
+        state.duplicateDefaultGroup(essentialsId, "Everyday Essentials", copySuffixes)
+        runCurrent()
+        advanceUntilIdle()
+        val second = state.duplicateDefaultGroup(essentialsId, "Everyday Essentials", copySuffixes)
+
+        assertEquals(CollectionNameResult.Ok("Everyday Essentials (copy 2)"), second)
+        assertEquals(
+            setOf("Everyday Essentials (copy)", "Everyday Essentials (copy 2)"),
+            repo.current.map { it.name }.toSet(),
+        )
+    }
+
+    @Test
+    fun `duplicate before the catalog is seeded persists every defined id in order`() = runTest {
+        val repo = RecordingUserCollectionRepository()
+        val definedIds = (1..12).map { "cat_future.%03d".format(it) }
+        val state = buildUcState(
+            backgroundScope,
+            repo,
+            affirmations = RecordingAffirmationRepositoryUC(emptyList()),
+            catalogRows = emptyList(),
+            tier = AccessTier.FREE,
+            feedSources = FeedSources(includeOwn = false),
+            ids = sequenceOf("copy-1").iterator(),
+            now = { 500L },
+            defaultGroups = listOf(DefaultGroup(morningId, 0, "amber", definedIds)),
+            defaultGroupStates = RecordingDefaultGroupStateRepository(),
+        )
+        runCurrent()
+        advanceUntilIdle()
+
+        val verdict = state.duplicateDefaultGroup(morningId, "Morning Start", copySuffixes)
+
+        assertEquals(CollectionNameResult.Ok("Morning Start (copy)"), verdict)
+        assertEquals(definedIds, repo.current.single().affirmationIds)
+    }
+
+    @Test
+    fun `duplicate of an unknown id is a no-op`() = runTest {
+        val repo = RecordingUserCollectionRepository()
+        val state = defaultsState(this, repo)
+
+        state.duplicateDefaultGroup("not-a-default", "X", copySuffixes)
+
+        assertTrue(repo.events.isEmpty())
+    }
+
+    @Test
+    fun `canCreateCollection and userCreatedCollectionCount ignore defaults`() = runTest {
+        val none = defaultsState(this)
+        assertTrue(none.canCreateCollection)
+        assertEquals(0, none.userCreatedCollectionCount)
+
+        val two = defaultsState(this, RecordingUserCollectionRepository(listOf(uc("u1"), uc("u2"))))
+        assertFalse(two.canCreateCollection)
+        assertEquals(2, two.userCreatedCollectionCount)
+    }
+
+    @Test
+    fun `createCollection is limited only by user groups`() = runTest {
+        val repo = RecordingUserCollectionRepository(listOf(uc("u1")))
+        val state = defaultsState(this, repo, ids = sequenceOf("n1", "n2").iterator())
+
+        assertEquals(CollectionNameResult.Ok("Second"), state.createCollection("Second"))
+        assertEquals(CollectionNameResult.LimitReached, state.createCollection("Third"))
+    }
+
+    @Test
+    fun `saved and picker ids exclude defaults`() = runTest {
+        val repo = RecordingUserCollectionRepository(listOf(uc("u1", items = listOf(FREE_ROW_2))))
+        val state = defaultsState(this, repo)
+
+        // FREE_ROW is a morning member, FREE_ROW_2 an essentials member and a u1 member.
+        assertEquals(setOf(FREE_ROW_2), state.affirmationIdsInUserCollections)
+        assertEquals(setOf("u1"), state.userCollectionIdsFor(FREE_ROW_2))
+        assertEquals(emptySet<String>(), state.userCollectionIdsFor(FREE_ROW))
+    }
+
+    @Test
+    fun `an enabled user group with only defaults disabled keeps user group behaviour`() = runTest {
+        val repo = RecordingUserCollectionRepository(listOf(uc("u1", enabled = false)))
+        val state = defaultsState(this, repo)
+
+        state.toggleCollection("u1")
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(listOf("enable:u1:500"), repo.events)
+        assertTrue(state.userCollections.first { it.id == "u1" }.enabled)
+    }
+
+    @Test
+    fun `fresh install with the real registry shows both defaults disabled and seeds nothing`() = runTest {
+        val repo = RecordingUserCollectionRepository()
+        val states = RecordingDefaultGroupStateRepository()
+        val state = buildUcState(
+            backgroundScope, repo, defaultGroups = DefaultGroups.all, defaultGroupStates = states,
+        )
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(DefaultGroups.all.map { it.id }, state.userCollections.map { it.id })
+        assertEquals(listOf(false, false), state.userCollections.map { it.enabled })
+        // The catalog has not seeded yet: counts start at 0 and nothing is written (S1, S2, S16).
+        assertEquals(listOf(0, 0), state.userCollections.map { it.resolvedItemCount })
+        assertTrue(repo.events.isEmpty())
+        assertTrue(states.events.isEmpty())
+        assertTrue(states.current.isEmpty())
+    }
+
+    @Test
+    fun `repeated construction is idempotent and persisted enable survives a restart`() = runTest {
+        val repo = RecordingUserCollectionRepository()
+        val states = RecordingDefaultGroupStateRepository()
+        val first = buildUcState(backgroundScope, repo, defaultGroups = DefaultGroups.all, defaultGroupStates = states, now = { 9L })
+        runCurrent()
+        first.setCollectionEnabled(DefaultGroups.MORNING_START_ID, true)
+        runCurrent()
+        advanceUntilIdle()
+
+        val second = buildUcState(backgroundScope, repo, defaultGroups = DefaultGroups.all, defaultGroupStates = states)
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(DefaultGroups.all.map { it.id }, second.userCollections.map { it.id })
+        assertEquals(listOf(false, true), second.userCollections.map { it.enabled })
+        // Only the one explicit enable ever wrote; constructing again added no rows.
+        assertEquals(listOf("setEnabled:${DefaultGroups.MORNING_START_ID}:true:9"), states.events)
+        assertEquals(1, states.current.size)
+        assertTrue(repo.events.isEmpty())
+    }
+
     // --- harness ------------------------------------------------------------------------------
 
     private suspend fun feedState(
@@ -941,6 +1265,8 @@ private fun buildUcState(
     favoriteIds: List<String> = emptyList(),
     ids: Iterator<String> = emptyList<String>().iterator(),
     now: () -> Long = { 0L },
+    defaultGroups: List<DefaultGroup> = emptyList(),
+    defaultGroupStates: RecordingDefaultGroupStateRepository = RecordingDefaultGroupStateRepository(),
 ): AffirmityAppState {
     val trackerPreferences = mock(TrackerPreferences::class.java)
     whenever(trackerPreferences.observeAffirmationsViewedToday())
@@ -986,6 +1312,8 @@ private fun buildUcState(
         favorites = FavoritesFakeUC(favoriteIds),
         catalog = catalogRepository,
         collectionRepository = collections,
+        defaultGroups = defaultGroups,
+        defaultGroupStates = defaultGroupStates,
         collectionClock = now,
         collectionIdFactory = { ids.next() },
         useRemoteSession = false,

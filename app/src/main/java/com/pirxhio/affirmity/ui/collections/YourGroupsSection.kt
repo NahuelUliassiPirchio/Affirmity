@@ -1,5 +1,14 @@
 package com.pirxhio.affirmity.ui.collections
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
+import com.pirxhio.affirmity.ui.theme.GroupPlayAccent
+import com.pirxhio.affirmity.ui.theme.GroupPlayOnAccent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,7 +36,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,9 +58,21 @@ import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.Affirmation
 import com.pirxhio.affirmity.data.CollectionNameResult
+import com.pirxhio.affirmity.data.CopySuffixes
 import com.pirxhio.affirmity.data.UserCollectionUi
+import com.pirxhio.affirmity.ui.theme.GroupCoverOnGround
 
 private val CoverSize = 126.dp
+private val PlayTargetSize = 48.dp
+private val PlayCircleSize = 40.dp
+private val PlayIconSize = 26.dp
+private val PlayElevation = 6.dp
+// Target is 48dp around a 40dp circle, so a 4dp pad puts the circle 8dp from the cover corner.
+private val PlayCornerInset = 4.dp
+// Bottom edge of the play circle measured from the cover top; the cover keeps its name below it.
+private val PlayClearance = PlayCornerInset + PlayTargetSize
+private const val PlayPressedScale = 0.92f
+private const val PlayPressMillis = 90
 private val ToggleIndicatorSize = 18.dp
 private val ToggleCheckSize = 12.dp
 private val ToggleRingWidth = 1.5.dp
@@ -63,7 +86,7 @@ private const val InFeedBorderAlpha = 0.5f
  */
 @Composable
 internal fun YourGroupsSection(
-    collections: List<UserCollectionUi>,
+    allCollections: List<UserCollectionUi>,
     canCreate: Boolean,
     affirmationsFor: (userCollectionId: String) -> List<Affirmation>,
     onToggle: (userCollectionId: String) -> Unit,
@@ -73,12 +96,18 @@ internal fun YourGroupsSection(
     onRestoreItem: (userCollectionId: String, affirmationId: String) -> Unit,
     onGroupRoundCompleted: (groupSize: Int) -> Unit,
     onCreate: suspend (name: String, highlightId: String) -> CollectionNameResult,
+    onDuplicate: suspend (defaultGroupId: String, name: String, suffixes: CopySuffixes) -> CollectionNameResult,
     onUpgrade: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Localize the default groups' placeholder names once, so the cards, the detail sheet and the
+    // actions sheet all show the same locale-correct name (DG-6).
+    val collections = allCollections.withLocalizedDefaultNames()
     // Ids, not objects: the sheets read the live collection so a toggle shows immediately, and a
     // deleted group simply stops resolving and closes its sheet. Saveable so rotation keeps them.
     var openGroupId by rememberSaveable { mutableStateOf<String?>(null) }
+    // Same request flag + guard + dialog as the detail sheet's "Play group", driven from the tile.
+    var playingGroupId by rememberSaveable { mutableStateOf<String?>(null) }
     var showNewGroup by rememberSaveable { mutableStateOf(false) }
     var manageState by rememberSaveable(stateSaver = CollectionManageStateSaver) {
         mutableStateOf<CollectionManageState>(CollectionManageState.Closed)
@@ -112,6 +141,8 @@ internal fun YourGroupsSection(
                         card = entry.card,
                         onClick = { openGroupId = entry.card.id },
                         onToggle = { onToggle(entry.card.id) },
+                        play = entry.tilePlay(),
+                        onPlay = { playingGroupId = entry.card.id },
                     )
                     GroupsRowEntry.NewGroup -> NewGroupTile(onClick = { showNewGroup = true })
                 }
@@ -131,6 +162,17 @@ internal fun YourGroupsSection(
             onDismiss = { openGroupId = null },
         )
     }
+    val playingCollection = collections.firstOrNull { it.id == playingGroupId }
+    if (playingCollection != null) {
+        val playable = affirmationsFor(playingCollection.id)
+        if (shouldShowGroupPlayer(requested = true, itemCount = playable.size)) {
+            GroupPlayerDialog(
+                affirmations = playable,
+                onRoundCompleted = onGroupRoundCompleted,
+                onDismiss = { playingGroupId = null },
+            )
+        }
+    }
     if (showNewGroup) {
         NewGroupSheet(
             canCreate = canCreate,
@@ -140,10 +182,15 @@ internal fun YourGroupsSection(
         )
     }
     CollectionManageHost(
-        state = manageState,
+        savedState = manageState,
         onEvent = { event -> manageState = manageState.reduce(event) },
         onRename = onRename,
         onDelete = onDelete,
+        canCreate = canCreate,
+        enabledFor = { id -> allCollections.firstOrNull { it.id == id }?.enabled ?: false },
+        onToggle = onToggle,
+        onDuplicate = onDuplicate,
+        onUpgrade = onUpgrade,
     )
 }
 
@@ -177,26 +224,96 @@ private fun NewGroupTile(onClick: () -> Unit) {
 }
 
 @Composable
-private fun GroupCardTile(card: GroupCardUi, onClick: () -> Unit, onToggle: () -> Unit) {
+private fun GroupCardTile(
+    card: GroupCardUi,
+    onClick: () -> Unit,
+    onToggle: () -> Unit,
+    play: TilePlay,
+    onPlay: () -> Unit,
+) {
     val inFeed = card.inFeed
     val openLabel = stringResource(R.string.groups_open_group_action)
     Column(modifier = Modifier.width(CoverSize)) {
-        GroupCover(
-            name = card.name,
-            highlight = card.highlight,
-            size = CoverSize,
-            modifier = Modifier.clickable(onClickLabel = openLabel, role = Role.Button, onClick = onClick),
-            border = BorderStroke(
-                1.dp,
-                if (inFeed) card.highlight.color.copy(alpha = InFeedBorderAlpha) else MaterialTheme.colorScheme.outlineVariant,
-            ),
-        )
+        // The play button is a sibling of the clickable cover, not a child, so the two touch targets
+        // never share a click; the cover's tap still opens the detail.
+        Box {
+            GroupCover(
+                name = card.name,
+                highlight = card.highlight,
+                size = CoverSize,
+                topReserve = if (play != TilePlay.None) PlayClearance else 0.dp,
+                modifier = Modifier.clickable(onClickLabel = openLabel, role = Role.Button, onClick = onClick),
+                border = BorderStroke(
+                    1.dp,
+                    if (inFeed) card.highlight.color.copy(alpha = InFeedBorderAlpha) else MaterialTheme.colorScheme.outlineVariant,
+                ),
+            )
+            if (play != TilePlay.None) {
+                GroupPlayButton(
+                    name = card.name,
+                    enabled = play == TilePlay.Enabled,
+                    onClick = onPlay,
+                    // Top-end; the cover reserves PlayClearance at the top so a long title never runs under it.
+                    modifier = Modifier.align(Alignment.TopEnd).padding(PlayCornerInset),
+                )
+            }
+        }
         GroupFeedToggle(name = card.name, inFeed = inFeed, onToggle = onToggle)
         Text(
             text = pluralStringResource(R.plurals.groups_affirmation_count, card.itemCount, card.itemCount),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+/**
+ * Primary play control, Spotify-style: a solid 40dp accent circle with a near-black triangle, inset
+ * 8dp from the cover's top-end corner and lifted by a soft shadow. The accent is the same for
+ * every group (the group's colour stays on the cover). It sits inside the cover's bounds because a
+ * child drawn outside its parent's bounds would not receive touches. The 48dp target wraps the
+ * circle. When the group has nothing to play it stays in place but turns into a dim, flat, ghost
+ * circle without a shadow, mirroring the disabled "Play group" button in the detail sheet.
+ */
+@Composable
+private fun GroupPlayButton(
+    name: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed && enabled) PlayPressedScale else 1f,
+        animationSpec = tween(durationMillis = PlayPressMillis),
+        label = "playPressScale",
+    )
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        interactionSource = interactionSource,
+        modifier = modifier.size(PlayTargetSize),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(PlayCircleSize)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .then(if (enabled) Modifier.shadow(PlayElevation, CircleShape) else Modifier)
+                .clip(CircleShape)
+                .background(if (enabled) GroupPlayAccent else GroupCoverOnGround.copy(alpha = 0.16f)),
+        ) {
+            Icon(
+                Icons.Filled.PlayArrow,
+                contentDescription = stringResource(R.string.groups_tile_play_a11y, name),
+                tint = if (enabled) GroupPlayOnAccent else GroupCoverOnGround.copy(alpha = 0.45f),
+                modifier = Modifier.size(PlayIconSize),
+            )
+        }
     }
 }
 

@@ -1044,6 +1044,7 @@
     <string name="groups_highlight_gold">Dorado</string>
     <string name="groups_toggle_state_in_feed">En el feed</string>
     <string name="groups_toggle_state_not_in_feed">Fuera del feed</string>
+    <string name="groups_tile_play_a11y">Reproducir %1$s</string>
     <string name="groups_toggle_a11y_label">Alternar %1$s en tu feed</string>
     <string name="collection_picker_done">Listo</string>
     <string name="collection_picker_favorites">Favoritas</string>
@@ -1144,4 +1145,11 @@
     <string name="catalog_theme_work_money_growth_entrepreneurship">Emprendimiento</string>
     <string name="catalog_theme_work_money_growth_money_relationship">Mi relación con el dinero</string>
     <string name="catalog_theme_work_money_growth_work_value_compensation">Valor y remuneración laboral</string>
+    <string name="default_group_everyday_essentials_name">Esenciales del día</string>
+    <string name="default_group_morning_start_name">Buen comienzo</string>
+    <string name="collection_name_error_read_only">Los grupos predeterminados no se pueden editar.</string>
+    <string name="groups_action_duplicate">Duplicar</string>
+    <string name="groups_duplicate_copy_suffix">(copia)</string>
+    <string name="groups_duplicate_copy_suffix_numbered">(copia %1$d)</string>
+    <string name="groups_action_in_feed">Mostrar en tu feed</string>
 </resources>

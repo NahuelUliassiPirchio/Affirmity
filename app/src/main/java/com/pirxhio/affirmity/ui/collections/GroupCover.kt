@@ -34,6 +34,9 @@ import com.pirxhio.affirmity.ui.theme.GroupHighlight
  * with an SVG turbulence filter; the slightly irregular Béziers below stand in for it.
  *
  * [name] may be null for a cover that only shows the highlight (the detail sheet header).
+ * [topReserve] keeps the top of the cover clear of the name (an overlay such as the tile play
+ * button sits there): the name starts below it, and a long name grows the cover instead of
+ * running underneath the overlay. It is a no-op while it is within the normal 12dp padding.
  */
 @Composable
 internal fun GroupCover(
@@ -44,6 +47,7 @@ internal fun GroupCover(
     cornerRadius: Dp = 16.dp,
     nameSize: TextUnit = 18.sp,
     border: BorderStroke? = null,
+    topReserve: Dp = 0.dp,
 ) {
     val shape = RoundedCornerShape(cornerRadius)
     Box(
@@ -65,7 +69,7 @@ internal fun GroupCover(
                 fontWeight = FontWeight.SemiBold,
                 fontSize = nameSize,
                 lineHeight = nameSize * 1.1f,
-                modifier = Modifier.padding(12.dp),
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = maxOf(12.dp, topReserve)),
             )
         }
     }

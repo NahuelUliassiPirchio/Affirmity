@@ -1727,7 +1727,7 @@ fun AffirmityApp(
                                 isLoading = !appState.isFeedDraftReady,
                                 yourGroups = {
                                     YourGroupsSection(
-                                        collections = appState.userCollections,
+                                        allCollections = appState.userCollections,
                                         canCreate = appState.canCreateCollection,
                                         affirmationsFor = appState::userCollectionAffirmations,
                                         onToggle = appState::toggleCollection,
@@ -1739,6 +1739,7 @@ fun AffirmityApp(
                                         onCreate = { name, highlightId ->
                                             appState.createCollection(name, highlightId = highlightId)
                                         },
+                                        onDuplicate = appState::duplicateDefaultGroup,
                                         onUpgrade = { onUpgradeClick(PaywallSource.OTHER) },
                                     )
                                 },
@@ -1788,7 +1789,8 @@ fun AffirmityApp(
                                 groupedIds = appState.affirmationIdsInUserCollections,
                                 emptyState = feedEmptyState(
                                     feedIsEmpty = appState.filteredAffirmations.isEmpty(),
-                                    hasCollections = appState.userCollections.isNotEmpty(),
+                                    // Default groups do not count: only user-created groups make the empty feed point to collections.
+                                    hasCollections = appState.userCreatedCollectionCount > 0,
                                 ),
                             )
                             CollectionsFeedOverlay(

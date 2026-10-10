@@ -1,10 +1,15 @@
 package com.pirxhio.affirmity.ui.collections
 
 import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
+import androidx.compose.ui.res.stringResource
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.CollectionNameResult
 import com.pirxhio.affirmity.data.COLLECTION_NAME_MAX
+import com.pirxhio.affirmity.data.DEFAULT_COLLECTION_HIGHLIGHT_ID
+import com.pirxhio.affirmity.data.DefaultGroups
 import com.pirxhio.affirmity.data.UserCollectionUi
 import com.pirxhio.affirmity.ui.affirmations.LOOP_MULTIPLIER
 import com.pirxhio.affirmity.ui.affirmations.centeredStartPage
@@ -23,6 +28,7 @@ internal fun CollectionNameResult.errorStringRes(): Int? = when (this) {
     CollectionNameResult.TooLong -> R.string.collection_name_error_too_long
     CollectionNameResult.Duplicate -> R.string.collection_name_error_duplicate
     CollectionNameResult.LimitReached -> R.string.collection_limit_reached
+    CollectionNameResult.ReadOnly -> R.string.collection_name_error_read_only
 }
 
 /** One line of the collection picker: whether the affirmation is already a member. */
@@ -34,7 +40,7 @@ internal fun PickerRow.toggle(): PickerToggle = if (checked) PickerToggle.Remove
 
 /** Picker rows in collection (chip) order; [memberIds] ids that match no collection are ignored. */
 internal fun pickerRows(collections: List<UserCollectionUi>, memberIds: Set<String>): List<PickerRow> =
-    collections.map { PickerRow(id = it.id, name = it.name, checked = it.id in memberIds) }
+    collections.filterNot { it.isDefault }.map { PickerRow(id = it.id, name = it.name, checked = it.id in memberIds) }
 
 /** Which message to show when the feed has no affirmations. */
 enum class FeedEmptyState { None, Collections, Generic }
@@ -80,12 +86,13 @@ internal sealed interface CollectionManageEvent {
 
 internal fun CollectionManageState.reduce(event: CollectionManageEvent): CollectionManageState = when (event) {
     is CollectionManageEvent.LongPress -> CollectionManageState.Actions(event.collection)
-    CollectionManageEvent.ChooseRename -> when (this) {
-        is CollectionManageState.Actions -> CollectionManageState.Renaming(collection)
+    // Default groups are read-only (DG-9): rename and delete never leave the actions stage.
+    CollectionManageEvent.ChooseRename -> when {
+        this is CollectionManageState.Actions && !collection.isDefault -> CollectionManageState.Renaming(collection)
         else -> this
     }
-    CollectionManageEvent.ChooseDelete -> when (this) {
-        is CollectionManageState.Actions -> CollectionManageState.ConfirmingDelete(collection)
+    CollectionManageEvent.ChooseDelete -> when {
+        this is CollectionManageState.Actions && !collection.isDefault -> CollectionManageState.ConfirmingDelete(collection)
         else -> this
     }
     CollectionManageEvent.ConfirmDelete, CollectionManageEvent.Dismiss -> CollectionManageState.Closed
@@ -115,6 +122,9 @@ internal val CollectionManageStateSaver: Saver<CollectionManageState, Any> = Sav
                 name = list[2] as String,
                 enabled = list[3] as Boolean,
                 resolvedItemCount = list[4] as Int,
+                // Tolerant restore: a payload saved by an older build lacks these two fields.
+                highlightId = list.getOrNull(5) as? String ?: DEFAULT_COLLECTION_HIGHLIGHT_ID,
+                isDefault = list.getOrNull(6) as? Boolean ?: false,
             )
             when (kind) {
                 KIND_ACTIONS -> CollectionManageState.Actions(collection)
@@ -130,7 +140,100 @@ private const val KIND_ACTIONS = "actions"
 private const val KIND_RENAMING = "renaming"
 private const val KIND_CONFIRMING_DELETE = "confirming_delete"
 
-private fun UserCollectionUi.toSaved(kind: String): List<Any> = listOf(kind, id, name, enabled, resolvedItemCount)
+private fun UserCollectionUi.toSaved(kind: String): List<Any> =
+    listOf(kind, id, name, enabled, resolvedItemCount, highlightId, isDefault)
+
+/** A row of the long-press actions sheet. */
+internal enum class ManageAction { Rename, Delete, Duplicate, ToggleInFeed }
+
+/** Default groups are read-only: they offer Duplicate and the feed switch; user groups Rename and Delete. */
+internal fun manageActionsFor(collection: UserCollectionUi): List<ManageAction> =
+    if (collection.isDefault) listOf(ManageAction.Duplicate, ManageAction.ToggleInFeed) else listOf(ManageAction.Rename, ManageAction.Delete)
+
+/** Read-only groups hide the per-item remove control and its undo (DG-9). */
+internal fun isReadOnlyGroup(collection: UserCollectionUi): Boolean = collection.isDefault
+
+internal enum class DuplicateTap { Duplicate, Upgrade }
+
+/** Duplicating creates a user group, so at the free limit the row upsells instead (DG-11). */
+internal fun duplicateTap(canCreate: Boolean): DuplicateTap = if (canCreate) DuplicateTap.Duplicate else DuplicateTap.Upgrade
+
+/** What the actions sheet does with the verdict of a duplicate: close, or stay open and explain. */
+internal sealed interface DuplicateOutcome {
+    data object Close : DuplicateOutcome
+    data class ShowError(@StringRes val messageRes: Int) : DuplicateOutcome
+}
+
+internal fun CollectionNameResult.duplicateOutcome(): DuplicateOutcome =
+    errorStringRes()?.let { DuplicateOutcome.ShowError(it) } ?: DuplicateOutcome.Close
+
+/**
+ * Per-sheet-session state of the Duplicate row. [session] changes whenever the sheet is dismissed
+ * ([reset]), so a verdict that arrives for an earlier session is ignored by [finish] instead of
+ * resurrecting an error on a later sheet. [inFlight] lets the row refuse a second tap while the
+ * first write is still suspended.
+ */
+internal data class DuplicateUi(val session: Int = 0, val inFlight: Boolean = false, val error: Int? = null) {
+    fun begin(): DuplicateUi = copy(inFlight = true, error = null)
+
+    fun reset(): DuplicateUi = DuplicateUi(session = session + 1)
+
+    fun finish(startedSession: Int, outcome: DuplicateOutcome): DuplicateUi =
+        if (startedSession != session) {
+            this
+        } else {
+            when (outcome) {
+                DuplicateOutcome.Close -> copy(inFlight = false, error = null)
+                is DuplicateOutcome.ShowError -> copy(inFlight = false, error = outcome.messageRes)
+            }
+        }
+
+    companion object {
+        /** Only session and error survive recreation; a suspended write does not. */
+        val Saver: Saver<DuplicateUi, Any> = Saver(
+            save = { listOf(it.session, it.error ?: NO_ERROR) },
+            restore = { raw ->
+                @Suppress("UNCHECKED_CAST")
+                val values = raw as List<Int>
+                DuplicateUi(session = values[0], error = values[1].takeIf { it != NO_ERROR })
+            },
+        )
+        private const val NO_ERROR = -1
+    }
+}
+
+/**
+ * Default groups carry their id as a placeholder name; this swaps in the localized name from
+ * [nameFor] (null keeps the current name). User groups are untouched. Pure so a locale switch is
+ * testable without Compose (DG-6).
+ */
+internal fun localizeDefaultNames(
+    collections: List<UserCollectionUi>,
+    nameFor: (String) -> String?,
+): List<UserCollectionUi> =
+    collections.map { if (it.isDefault) it.copy(name = nameFor(it.id) ?: it.name) else it }
+
+/**
+ * The saver restores the chip's name snapshot, which is stale after a locale change plus activity
+ * recreation. For default groups this re-resolves the name from [nameFor] (by default id); user
+ * groups and the closed state are unchanged.
+ */
+internal fun CollectionManageState.withLocalizedDefaultName(nameFor: (String) -> String?): CollectionManageState {
+    fun UserCollectionUi.fresh() = localizeDefaultNames(listOf(this), nameFor).single()
+    return when (this) {
+        CollectionManageState.Closed -> this
+        is CollectionManageState.Actions -> copy(collection = collection.fresh())
+        is CollectionManageState.Renaming -> copy(collection = collection.fresh())
+        is CollectionManageState.ConfirmingDelete -> copy(collection = collection.fresh())
+    }
+}
+
+/** [localizeDefaultNames] fed by the string resources of the registry, so names follow the locale. */
+@Composable
+internal fun List<UserCollectionUi>.withLocalizedDefaultNames(): List<UserCollectionUi> {
+    val names = DefaultGroups.all.associate { it.id to stringResource(it.nameRes) }
+    return remember(this, names) { localizeDefaultNames(this, names::get) }
+}
 
 // --- "Your groups" shelf and new-group sheet (design 7a / 7b) ---
 
@@ -214,7 +317,7 @@ internal fun saveToRows(
     isFavorite: Boolean,
 ): List<SaveToRow> =
     listOf<SaveToRow>(SaveToRow.Favorites(isFavorite)) +
-        collections.map { SaveToRow.Group(it.id, it.name, it.highlightId, it.id in memberIds) }
+        collections.filterNot { it.isDefault }.map { SaveToRow.Group(it.id, it.name, it.highlightId, it.id in memberIds) }
 
 internal fun SaveToRow.toggle(): SaveToAction = when (this) {
     is SaveToRow.Favorites -> SaveToAction.ToggleFavorite
@@ -263,3 +366,11 @@ internal sealed interface GroupsRowEntry {
 /** The user's groups in their given order, then the "New group" tile as the LAST entry of the row. */
 internal fun groupsRowEntries(cards: List<GroupCardUi>): List<GroupsRowEntry> =
     cards.map { GroupsRowEntry.Group(it) } + GroupsRowEntry.NewGroup
+
+/** Play affordance of a "Your groups" tile: absent on "New group", present but inert when there is nothing to play. */
+internal enum class TilePlay { None, Disabled, Enabled }
+
+internal fun GroupsRowEntry.tilePlay(): TilePlay = when (this) {
+    is GroupsRowEntry.Group -> if (canPlayGroup(card.itemCount)) TilePlay.Enabled else TilePlay.Disabled
+    GroupsRowEntry.NewGroup -> TilePlay.None
+}
