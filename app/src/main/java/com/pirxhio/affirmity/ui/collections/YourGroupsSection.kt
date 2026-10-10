@@ -60,7 +60,6 @@ import com.pirxhio.affirmity.data.Affirmation
 import com.pirxhio.affirmity.data.CollectionNameResult
 import com.pirxhio.affirmity.data.CopySuffixes
 import com.pirxhio.affirmity.data.UserCollectionUi
-import com.pirxhio.affirmity.ui.theme.GroupCoverGround
 import com.pirxhio.affirmity.ui.theme.GroupCoverOnGround
 
 private val CoverSize = 126.dp
@@ -68,7 +67,6 @@ private val PlayTargetSize = 48.dp
 private val PlayCircleSize = 40.dp
 private val PlayIconSize = 26.dp
 private val PlayElevation = 6.dp
-private val PlayRingWidth = 2.dp
 // Target is 48dp around a 40dp circle, so a 4dp pad puts the circle 8dp from the cover corner.
 private val PlayCornerInset = 4.dp
 private const val PlayPressedScale = 0.92f
@@ -252,7 +250,8 @@ private fun GroupCardTile(
                     name = card.name,
                     enabled = play == TilePlay.Enabled,
                     onClick = onPlay,
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(PlayCornerInset),
+                    // Top-end: the cover's name sits bottom-start, so a long title never runs under it.
+                    modifier = Modifier.align(Alignment.TopEnd).padding(PlayCornerInset),
                 )
             }
         }
@@ -267,7 +266,7 @@ private fun GroupCardTile(
 
 /**
  * Primary play control, Spotify-style: a solid 40dp accent circle with a near-black triangle, inset
- * 8dp from the cover's bottom-end corner and lifted by a soft shadow. The accent is the same for
+ * 8dp from the cover's top-end corner and lifted by a soft shadow. The accent is the same for
  * every group (the group's colour stays on the cover). It sits inside the cover's bounds because a
  * child drawn outside its parent's bounds would not receive touches. The 48dp target wraps the
  * circle. When the group has nothing to play it stays in place but turns into a dim, flat, ghost
@@ -303,8 +302,7 @@ private fun GroupPlayButton(
                 }
                 .then(if (enabled) Modifier.shadow(PlayElevation, CircleShape) else Modifier)
                 .clip(CircleShape)
-                .background(if (enabled) GroupPlayAccent else GroupCoverOnGround.copy(alpha = 0.16f))
-                .border(PlayRingWidth, if (enabled) GroupCoverGround else Color.Transparent, CircleShape),
+                .background(if (enabled) GroupPlayAccent else GroupCoverOnGround.copy(alpha = 0.16f)),
         ) {
             Icon(
                 Icons.Filled.PlayArrow,
