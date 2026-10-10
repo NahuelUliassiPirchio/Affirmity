@@ -170,6 +170,21 @@ internal fun localizeDefaultNames(
 ): List<UserCollectionUi> =
     collections.map { if (it.isDefault) it.copy(name = nameFor(it.id) ?: it.name) else it }
 
+/**
+ * The saver restores the chip's name snapshot, which is stale after a locale change plus activity
+ * recreation. For default groups this re-resolves the name from [nameFor] (by default id); user
+ * groups and the closed state are unchanged.
+ */
+internal fun CollectionManageState.withLocalizedDefaultName(nameFor: (String) -> String?): CollectionManageState {
+    fun UserCollectionUi.fresh() = localizeDefaultNames(listOf(this), nameFor).single()
+    return when (this) {
+        CollectionManageState.Closed -> this
+        is CollectionManageState.Actions -> copy(collection = collection.fresh())
+        is CollectionManageState.Renaming -> copy(collection = collection.fresh())
+        is CollectionManageState.ConfirmingDelete -> copy(collection = collection.fresh())
+    }
+}
+
 /** [localizeDefaultNames] fed by the string resources of the registry, so names follow the locale. */
 @Composable
 internal fun List<UserCollectionUi>.withLocalizedDefaultNames(): List<UserCollectionUi> {

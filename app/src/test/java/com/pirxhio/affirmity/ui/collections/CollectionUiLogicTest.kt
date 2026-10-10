@@ -305,4 +305,22 @@ class CollectionUiLogicTest {
 
         assertEquals("default.retired", localized.single().name)
     }
+
+    @Test
+    fun `restored actions state for a default takes the current locale name, not the saved snapshot`() {
+        val stale = CollectionManageState.Actions(defaultUi().copy(name = "Inicio de mañana"))
+        val en = mapOf("default.morning_start" to "Morning Start")
+
+        val resolved = stale.withLocalizedDefaultName(en::get) as CollectionManageState.Actions
+
+        assertEquals("Morning Start", resolved.collection.name)
+    }
+
+    @Test
+    fun `withLocalizedDefaultName leaves user groups and closed state untouched`() {
+        val user = CollectionManageState.Actions(ui("u1", name = "Mine"))
+
+        assertEquals(user, user.withLocalizedDefaultName { "X" })
+        assertEquals(CollectionManageState.Closed, CollectionManageState.Closed.withLocalizedDefaultName { "X" })
+    }
 }

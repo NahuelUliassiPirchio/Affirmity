@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.CollectionNameResult
 import com.pirxhio.affirmity.data.CopySuffixes
+import com.pirxhio.affirmity.data.DefaultGroups
 import kotlinx.coroutines.launch
 
 /**
@@ -40,7 +41,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun CollectionManageHost(
-    state: CollectionManageState,
+    savedState: CollectionManageState,
     onEvent: (CollectionManageEvent) -> Unit,
     onRename: suspend (userCollectionId: String, name: String) -> CollectionNameResult,
     onDelete: (userCollectionId: String) -> Unit,
@@ -51,6 +52,8 @@ internal fun CollectionManageHost(
     onUpgrade: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val defaultNames = DefaultGroups.all.associate { it.id to stringResource(it.nameRes) }
+    val state = savedState.withLocalizedDefaultName(defaultNames::get)
     val suffixes = CopySuffixes(
         first = stringResource(R.string.groups_duplicate_copy_suffix),
         numbered = stringResource(R.string.groups_duplicate_copy_suffix_numbered),

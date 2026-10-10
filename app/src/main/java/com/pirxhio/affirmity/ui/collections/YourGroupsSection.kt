@@ -145,7 +145,7 @@ internal fun YourGroupsSection(
         )
     }
     CollectionManageHost(
-        state = manageState,
+        savedState = manageState,
         onEvent = { event -> manageState = manageState.reduce(event) },
         onRename = onRename,
         onDelete = onDelete,
