@@ -1147,6 +1147,7 @@
     <string name="default_group_everyday_essentials_name">Esenciales del día</string>
     <string name="default_group_morning_start_name">Buen comienzo</string>
     <string name="collection_name_error_read_only">Los grupos predeterminados no se pueden editar.</string>
+    <string name="collection_name_error_catalog_not_ready">Las afirmaciones aún se están preparando. Inténtalo de nuevo en un momento.</string>
     <string name="groups_action_duplicate">Duplicar</string>
     <string name="groups_duplicate_copy_suffix">(copia)</string>
     <string name="groups_duplicate_copy_suffix_numbered">(copia %1$d)</string>

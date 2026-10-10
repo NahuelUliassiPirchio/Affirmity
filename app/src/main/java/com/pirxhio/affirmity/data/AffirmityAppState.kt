@@ -1984,7 +1984,8 @@ class AffirmityAppState(
      * [suffixes] (DG-11). Members are the default's CURRENT resolvable affirmations (orphans drop
      * out) and the highlight is kept. Counts toward the free limit and uses the normal create
      * validation: [CollectionNameResult.LimitReached] creates nothing. An id that is not a known
-     * default is a no-op reported as [CollectionNameResult.Blank].
+     * default is a no-op reported as [CollectionNameResult.Blank]. If none of the default's
+     * affirmations resolve (catalog still seeding) nothing is created: [CollectionNameResult.CatalogNotReady].
      */
     suspend fun duplicateDefaultGroup(
         defaultGroupId: String,
@@ -1993,6 +1994,11 @@ class AffirmityAppState(
     ): CollectionNameResult =
         userCollectionMutex.withLock {
             val group = defaultGroups.firstOrNull { it.id == defaultGroupId } ?: return@withLock CollectionNameResult.Blank
+            // user_collection_items has an FK to the affirmations table, so the defined ids cannot be
+            // copied blindly; and persisting an empty copy while the catalog is still seeding would
+            // burn a free slot with a group that is never repaired. Refuse until members resolve.
+            val members = resolveCollectionMembers(group.affirmationIds, allAffirmationsById::get).map { it.id }
+            if (members.isEmpty()) return@withLock CollectionNameResult.CatalogNotReady
             val existing = collectionRepository.getCollections()
             val name = copyCollectionName(localizedName, existing, suffixes)
             val verdict = validateNewCollection(name, existing, entitlementTier.value)
@@ -2001,7 +2007,7 @@ class AffirmityAppState(
                     id = collectionIdFactory(),
                     name = verdict.name,
                     nowMillis = collectionClock(),
-                    affirmationIds = resolveCollectionMembers(group.affirmationIds, allAffirmationsById::get).map { it.id },
+                    affirmationIds = members,
                     highlightId = group.highlightId,
                 )
             }

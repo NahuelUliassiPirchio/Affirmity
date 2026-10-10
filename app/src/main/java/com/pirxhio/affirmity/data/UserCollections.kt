@@ -45,6 +45,9 @@ sealed interface CollectionNameResult {
 
     /** The target is a read-only default group: rename is rejected. */
     data object ReadOnly : CollectionNameResult
+
+    /** Duplicate refused: none of the default's affirmations resolve yet (catalog still seeding). */
+    data object CatalogNotReady : CollectionNameResult
 }
 
 /** Free-tier cap on the number of collections; Pro is unlimited. */

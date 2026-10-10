@@ -931,6 +931,31 @@ class AffirmityAppStateUserCollectionsTest {
     }
 
     @Test
+    fun `duplicate before the catalog is seeded creates nothing and reports not ready`() = runTest {
+        val repo = RecordingUserCollectionRepository()
+        val state = buildUcState(
+            backgroundScope,
+            repo,
+            affirmations = RecordingAffirmationRepositoryUC(emptyList()),
+            catalogRows = emptyList(),
+            tier = AccessTier.FREE,
+            feedSources = FeedSources(includeOwn = false),
+            ids = sequenceOf("copy-1").iterator(),
+            now = { 500L },
+            defaultGroups = testDefaults,
+            defaultGroupStates = RecordingDefaultGroupStateRepository(),
+        )
+        runCurrent()
+        advanceUntilIdle()
+
+        val verdict = state.duplicateDefaultGroup(morningId, "Morning Start", copySuffixes)
+
+        assertEquals(CollectionNameResult.CatalogNotReady, verdict)
+        assertTrue(repo.events.isEmpty())
+        assertTrue(repo.current.isEmpty())
+    }
+
+    @Test
     fun `duplicate of an unknown id is a no-op`() = runTest {
         val repo = RecordingUserCollectionRepository()
         val state = defaultsState(this, repo)

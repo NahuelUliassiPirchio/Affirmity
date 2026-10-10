@@ -28,6 +28,7 @@ class CollectionUiLogicTest {
         assertEquals(R.string.collection_name_error_duplicate, CollectionNameResult.Duplicate.errorStringRes())
         assertEquals(R.string.collection_limit_reached, CollectionNameResult.LimitReached.errorStringRes())
         assertEquals(R.string.collection_name_error_read_only, CollectionNameResult.ReadOnly.errorStringRes())
+        assertEquals(R.string.collection_name_error_catalog_not_ready, CollectionNameResult.CatalogNotReady.errorStringRes())
     }
 
     // --- picker rows ---

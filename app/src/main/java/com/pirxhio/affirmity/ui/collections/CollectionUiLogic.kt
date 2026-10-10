@@ -29,6 +29,7 @@ internal fun CollectionNameResult.errorStringRes(): Int? = when (this) {
     CollectionNameResult.Duplicate -> R.string.collection_name_error_duplicate
     CollectionNameResult.LimitReached -> R.string.collection_limit_reached
     CollectionNameResult.ReadOnly -> R.string.collection_name_error_read_only
+    CollectionNameResult.CatalogNotReady -> R.string.collection_name_error_catalog_not_ready
 }
 
 /** One line of the collection picker: whether the affirmation is already a member. */
