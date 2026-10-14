@@ -67,7 +67,7 @@ class CatalogTextSanitizerTest {
             if (title.contains('[') || subtitle.contains('[')) legalTokenRows++
             scanned++
         }
-        assertEquals(889, scanned)
+        assertEquals(892, scanned)
         assertEquals("rows carrying a legal placeholder token in the v5.1 catalog", 6, legalTokenRows)
     }
 
