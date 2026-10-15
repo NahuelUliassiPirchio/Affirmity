@@ -47,8 +47,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Stores the chosen [source] for one widget instance, starts rotation and requests the first
- * render. The initial queue is built by that first `provideGlance`, not here (spec clarification
- * R1.3/S1.2). Kept free of UI so it can be tested directly.
+ * render. The initial queue is built by that first `provideGlance`, not here. Kept free of UI so it can be tested directly.
  */
 suspend fun confirmCarouselSource(context: Context, glanceId: GlanceId, source: CarouselSource) {
     GlanceCarouselStateStore(context, glanceId).update { CarouselState(source = source) }
@@ -68,9 +67,9 @@ internal fun carouselConfigureResult(appWidgetId: Int): Intent =
     Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
 
 /**
- * Launched by the system when a carousel widget is placed (R1). The result is `RESULT_CANCELED`
+ * Launched by the system when a carousel widget is placed. The result is `RESULT_CANCELED`
  * from the start so backing out never adds a widget; only a confirmed pick flips it to OK. There
- * is no reconfiguration after placement in v1 (R1.5).
+ * is no reconfiguration after placement in v1.
  */
 class CarouselConfigureActivity : AppCompatActivity() {
 
@@ -137,9 +136,9 @@ private fun CarouselConfigureScreen(onPick: (CarouselSource) -> Unit, onCancel: 
             item { SectionHeader(stringResource(R.string.your_feed_source_favorites)) }
             item { OptionRow(loaded.favorites, onPick) }
             item { SectionHeader(stringResource(R.string.carousel_configure_section_themes)) }
-            items(loaded.themes, key = { "theme:" + CarouselStateCodec.encodeSource(it.source) }) { OptionRow(it, onPick) }
+            items(loaded.themes, key = { CarouselStateCodec.encodeSource(it.source) }) { OptionRow(it, onPick) }
             item { SectionHeader(stringResource(R.string.groups_section_title)) }
-            items(loaded.collections, key = { "col:" + CarouselStateCodec.encodeSource(it.source) }) { OptionRow(it, onPick) }
+            items(loaded.collections, key = { CarouselStateCodec.encodeSource(it.source) }) { OptionRow(it, onPick) }
         }
     }
 }
