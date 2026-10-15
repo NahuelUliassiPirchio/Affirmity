@@ -1,6 +1,7 @@
 package com.pirxhio.affirmity.data.remote
 
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.SetOptions
 import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.repository.AffirmationRepository
@@ -36,9 +37,14 @@ class FirestoreAffirmationRepository(
         awaitClose { registration.remove() }
     }
 
-    /** Like [observeAll] but exposes cache provenance; used by the widget (R6.3). Other callers unaffected. */
+    /**
+     * Like [observeAll] but exposes cache provenance; used by the widget (R6.3). Other callers unaffected.
+     * Metadata changes are included: when the server confirms a cached result without changing its
+     * documents (for example an empty collection), only the metadata differs, and without them that
+     * confirmation would never arrive.
+     */
     fun observeAllWithSource(): Flow<OwnedSnapshot> = callbackFlow {
-        val registration = collection().addSnapshotListener { snapshot, error ->
+        val registration = collection().addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
             if (error != null) {
                 close(error)
                 return@addSnapshotListener
