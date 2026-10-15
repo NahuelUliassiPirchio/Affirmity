@@ -16,7 +16,6 @@ import com.pirxhio.affirmity.data.remote.FirestoreAffirmationRepository
 import com.pirxhio.affirmity.data.remote.FirestoreEntitlementRepository
 import com.pirxhio.affirmity.data.repository.LocalFreeEntitlementRepository
 import com.pirxhio.affirmity.data.repository.RoomAdUnlockRepository
-import kotlinx.coroutines.flow.first
 
 /** [CarouselStateStore] over Glance's per-widget preferences store (design D3). */
 class GlanceCarouselStateStore(
@@ -51,7 +50,7 @@ class AppCarouselPorts(
 
     override suspend fun ownedAffirmations(): List<AffirmationEntity> =
         if (uid != null && firestore != null) {
-            FirestoreAffirmationRepository(firestore, uid).observeAll().first()
+            FirestoreAffirmationRepository(firestore, uid).observeAllWithSource().firstTrustworthyOwned()
         } else {
             database.affirmationDao().getAll()
         }

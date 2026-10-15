@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
+/** Owned rows plus whether the snapshot came from the local cache only (not confirmed by the server). */
+data class OwnedSnapshot(val rows: List<AffirmationEntity>, val fromCache: Boolean)
+
 /**
  * [AffirmationRepository] backed by `users/{uid}/affirmations`. Snapshot-listener reads,
  * `set(..., merge)` writes (design.md's "Completion writes" decision generalized to every
@@ -29,6 +32,23 @@ class FirestoreAffirmationRepository(
                 return@addSnapshotListener
             }
             trySend(snapshot?.documents.orEmpty().mapNotNull { doc -> doc.data?.let(::affirmationFromMap) })
+        }
+        awaitClose { registration.remove() }
+    }
+
+    /** Like [observeAll] but exposes cache provenance; used by the widget (R6.3). Other callers unaffected. */
+    fun observeAllWithSource(): Flow<OwnedSnapshot> = callbackFlow {
+        val registration = collection().addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                close(error)
+                return@addSnapshotListener
+            }
+            trySend(
+                OwnedSnapshot(
+                    rows = snapshot?.documents.orEmpty().mapNotNull { doc -> doc.data?.let(::affirmationFromMap) },
+                    fromCache = snapshot?.metadata?.isFromCache ?: true,
+                ),
+            )
         }
         awaitClose { registration.remove() }
     }

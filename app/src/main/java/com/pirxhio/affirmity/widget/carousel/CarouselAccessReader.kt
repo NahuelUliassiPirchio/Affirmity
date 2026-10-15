@@ -1,11 +1,14 @@
 package com.pirxhio.affirmity.widget.carousel
 
 import com.pirxhio.affirmity.access.AdUnlockState
+import com.pirxhio.affirmity.data.local.AffirmationEntity
+import com.pirxhio.affirmity.data.remote.OwnedSnapshot
 import com.pirxhio.affirmity.data.repository.AdUnlockRepository
 import com.pirxhio.affirmity.data.repository.EntitlementRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -62,3 +65,11 @@ class CarouselAccessReader(
         }
     }
 }
+
+/**
+ * First owned snapshot the widget may trust (R6.3): an empty snapshot served only from the cache is
+ * "unknown", not "no affirmations", so it is skipped. Offline with a cold cache nothing else
+ * arrives and the caller's timeout maps the read to [OwnedRead.Unavailable].
+ */
+internal suspend fun Flow<OwnedSnapshot>.firstTrustworthyOwned(): List<AffirmationEntity> =
+    first { !(it.rows.isEmpty() && it.fromCache) }.rows
