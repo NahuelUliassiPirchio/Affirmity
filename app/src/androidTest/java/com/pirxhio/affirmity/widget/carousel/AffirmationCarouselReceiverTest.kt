@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.widget.carousel
 
+import android.annotation.SuppressLint
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
@@ -24,6 +25,7 @@ import org.junit.Before
 import org.junit.Test
 
 /** Receiver lifecycle, manifest and Glance state cleanup (S2.1, S2.4, S4.3, S4.4, S11.1). Emulator only. */
+@SuppressLint("RestrictedApi") // AppWidgetId stands in for a bound widget id in tests
 class AffirmationCarouselReceiverTest {
 
     private lateinit var context: Context

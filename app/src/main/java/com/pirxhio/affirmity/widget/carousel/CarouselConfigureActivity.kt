@@ -28,7 +28,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.glance.appwidget.AppWidgetId
+import androidx.glance.GlanceId
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.lifecycle.lifecycleScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -47,8 +48,7 @@ import kotlinx.coroutines.withContext
  * render. The initial queue is built by that first `provideGlance`, not here (spec clarification
  * R1.3/S1.2). Kept free of UI so it can be tested directly.
  */
-suspend fun confirmCarouselSource(context: Context, appWidgetId: Int, source: CarouselSource) {
-    val glanceId = AppWidgetId(appWidgetId)
+suspend fun confirmCarouselSource(context: Context, glanceId: GlanceId, source: CarouselSource) {
     GlanceCarouselStateStore(context, glanceId).update { CarouselState(source = source) }
     CarouselRotationWorker.enqueue(context)
     AffirmationCarouselWidget().update(context, glanceId)
@@ -90,7 +90,8 @@ class CarouselConfigureActivity : AppCompatActivity() {
 
     private fun confirm(source: CarouselSource) {
         lifecycleScope.launch {
-            confirmCarouselSource(applicationContext, appWidgetId, source)
+            val glanceId = GlanceAppWidgetManager(applicationContext).getGlanceIdBy(appWidgetId)
+            confirmCarouselSource(applicationContext, glanceId, source)
             setResult(Activity.RESULT_OK, carouselConfigureResult(appWidgetId))
             finish()
         }

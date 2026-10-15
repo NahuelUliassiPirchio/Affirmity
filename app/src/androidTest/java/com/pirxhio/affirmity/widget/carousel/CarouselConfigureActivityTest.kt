@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.widget.carousel
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
@@ -23,6 +24,7 @@ import org.junit.Before
 import org.junit.Test
 
 /** Configure flow (S1.1-S1.4). Emulator only; Compose UI interaction is covered by the pure seams. */
+@SuppressLint("RestrictedApi") // AppWidgetId stands in for a bound widget id in tests
 class CarouselConfigureActivityTest {
 
     private lateinit var context: Context
@@ -65,7 +67,7 @@ class CarouselConfigureActivityTest {
     fun confirmingASource_storesItAndSchedulesRotation() = runBlocking {
         val source = CarouselSource.Theme("self_worth")
 
-        confirmCarouselSource(context, appWidgetId, source)
+        confirmCarouselSource(context, AppWidgetId(appWidgetId), source)
 
         assertEquals(source, storedState().source)
         val info = WorkManager.getInstance(context)
