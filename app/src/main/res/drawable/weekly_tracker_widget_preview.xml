@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Static picker fallback below API 31 (no previewLayout): dark card with two day cells and legend lines. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="20dp" />
+            <solid android:color="@color/widget_preview_tracker_surface" />
+        </shape>
+    </item>
+    <item android:left="14dp" android:top="34dp" android:right="190dp" android:bottom="34dp">
+        <shape android:shape="oval">
+            <solid android:color="@color/widget_preview_tracker_affirm" />
+        </shape>
+    </item>
+    <item android:left="52dp" android:top="34dp" android:right="152dp" android:bottom="34dp">
+        <shape android:shape="oval">
+            <solid android:color="@color/widget_preview_tracker_meditate" />
+        </shape>
+    </item>
+    <item android:left="90dp" android:top="34dp" android:right="114dp" android:bottom="34dp">
+        <shape android:shape="oval">
+            <solid android:color="@color/widget_preview_tracker_empty" />
+        </shape>
+    </item>
+    <item android:left="170dp" android:top="36dp" android:right="40dp" android:bottom="68dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="4dp" />
+            <solid android:color="@color/widget_preview_tracker_affirm" />
+        </shape>
+    </item>
+    <item android:left="170dp" android:top="68dp" android:right="60dp" android:bottom="36dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="4dp" />
+            <solid android:color="@color/widget_preview_tracker_meditate" />
+        </shape>
+    </item>
+</layer-list>

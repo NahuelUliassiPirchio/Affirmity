@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Picker preview (RemoteViews-safe widgets only): a representative week, mirroring WeeklyTrackerContent. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="SmallSp,UseCompoundDrawables"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_preview_tracker_bg"
+    android:paddingStart="12dp"
+    android:paddingTop="6dp"
+    android:paddingEnd="12dp"
+    android:paddingBottom="6dp">
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <FrameLayout android:layout_width="26dp" android:layout_height="26dp">
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_left" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_affirm" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_right" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_meditate" android:importantForAccessibility="no" />
+                </FrameLayout>
+                <FrameLayout android:layout_width="26dp" android:layout_height="26dp">
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_left" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_affirm" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_right" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_meditate" android:importantForAccessibility="no" />
+                </FrameLayout>
+                <FrameLayout android:layout_width="26dp" android:layout_height="26dp">
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_left" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_affirm" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_right" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_empty" android:importantForAccessibility="no" />
+                </FrameLayout>
+                <FrameLayout android:layout_width="26dp" android:layout_height="26dp">
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_left" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_affirm" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_right" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_meditate" android:importantForAccessibility="no" />
+                </FrameLayout>
+                <FrameLayout android:layout_width="26dp" android:layout_height="26dp">
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_left" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_empty" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_right" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_meditate" android:importantForAccessibility="no" />
+                </FrameLayout>
+                <FrameLayout android:layout_width="26dp" android:layout_height="26dp">
+                    <ImageView android:layout_width="26dp" android:layout_height="26dp" android:src="@drawable/widget_cell_ring" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_text" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_left" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_affirm" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_right" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_empty" android:importantForAccessibility="no" />
+                </FrameLayout>
+                <FrameLayout android:layout_width="26dp" android:layout_height="26dp">
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_left" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_empty" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_right" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_empty" android:importantForAccessibility="no" />
+                </FrameLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:orientation="horizontal">
+                <TextView android:layout_width="26dp" android:layout_height="wrap_content" android:gravity="center" android:text="@string/widget_preview_day_1" android:textColor="@color/widget_preview_tracker_text" android:textSize="10sp" />
+                <TextView android:layout_width="26dp" android:layout_height="wrap_content" android:gravity="center" android:text="@string/widget_preview_day_2" android:textColor="@color/widget_preview_tracker_text" android:textSize="10sp" />
+                <TextView android:layout_width="26dp" android:layout_height="wrap_content" android:gravity="center" android:text="@string/widget_preview_day_3" android:textColor="@color/widget_preview_tracker_text" android:textSize="10sp" />
+                <TextView android:layout_width="26dp" android:layout_height="wrap_content" android:gravity="center" android:text="@string/widget_preview_day_4" android:textColor="@color/widget_preview_tracker_text" android:textSize="10sp" />
+                <TextView android:layout_width="26dp" android:layout_height="wrap_content" android:gravity="center" android:text="@string/widget_preview_day_5" android:textColor="@color/widget_preview_tracker_text" android:textSize="10sp" />
+                <TextView android:layout_width="26dp" android:layout_height="wrap_content" android:gravity="center" android:text="@string/widget_preview_day_6" android:textColor="@color/widget_preview_tracker_text" android:textSize="10sp" />
+                <TextView android:layout_width="26dp" android:layout_height="wrap_content" android:gravity="center" android:text="@string/widget_preview_day_7" android:textColor="@color/widget_preview_tracker_text" android:textSize="10sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/widget_action_affirm_label"
+                android:textColor="@color/widget_preview_tracker_affirm"
+                android:textSize="16sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:text="@string/widget_action_meditate_label"
+                android:textColor="@color/widget_preview_tracker_meditate"
+                android:textSize="16sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:src="@drawable/ic_streak_flame"
+            tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_text"
+            android:importantForAccessibility="no" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/widget_preview_streak"
+            android:textColor="@color/widget_preview_tracker_text"
+            android:textSize="10sp" />
+    </LinearLayout>
+</FrameLayout>
