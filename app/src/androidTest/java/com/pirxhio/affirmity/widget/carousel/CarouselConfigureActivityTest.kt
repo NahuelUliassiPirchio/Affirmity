@@ -26,7 +26,7 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 
-/** Configure flow (S1.1-S1.4). Emulator only; Compose UI interaction is covered by the pure seams. */
+/** Configure flow. Emulator only; Compose UI interaction is covered by the pure seams. */
 @SuppressLint("RestrictedApi") // AppWidgetId stands in for a bound widget id in tests
 class CarouselConfigureActivityTest {
 
@@ -112,7 +112,7 @@ class CarouselConfigureActivityTest {
         )
     }
 
-    // --- S1.4: provider XML ---
+    // --- provider XML ---
 
     private val providerInfo
         get() = AppWidgetManager.getInstance(context).installedProviders.firstOrNull {

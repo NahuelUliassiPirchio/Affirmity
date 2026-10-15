@@ -17,7 +17,7 @@ sealed interface CarouselSource {
 
 /**
  * Lightweight, text-free handle on one affirmation. [isFreeTier] is computed under
- * `AccessTier.FREE` with no grants (design D3b), NEVER under the user's tier or grants, so it is
+ * `AccessTier.FREE` with no grants, NEVER under the user's tier or grants, so it is
  * the only thing deciding whether a rendered text may be persisted.
  */
 data class CarouselRef(
@@ -45,7 +45,7 @@ sealed interface OwnedRead {
     data object Unavailable : OwnedRead
 }
 
-/** Resolved tier and ad-unlock grants. `sessionUnlocks` is always empty in the widget (W4). */
+/** Resolved tier and ad-unlock grants. `sessionUnlocks` is always empty in the widget. */
 data class CarouselAccess(val tier: AccessTier, val grants: AdUnlockState) {
     companion object {
         /** Used whenever entitlement or grants cannot be determined (fail closed). */

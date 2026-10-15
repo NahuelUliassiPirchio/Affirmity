@@ -26,7 +26,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** Receiver lifecycle, manifest and Glance state cleanup (S2.1, S2.4, S4.3, S4.4, S11.1). Emulator only. */
+/** Receiver lifecycle, manifest and Glance state cleanup. Emulator only. */
 @SuppressLint("RestrictedApi") // AppWidgetId stands in for a bound widget id in tests
 class AffirmationCarouselReceiverTest {
 

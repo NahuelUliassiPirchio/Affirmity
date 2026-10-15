@@ -13,7 +13,7 @@ import com.pirxhio.affirmity.ui.groups.catalogCollectionsById
 import com.pirxhio.affirmity.ui.groups.catalogUniverseGroups
 
 /**
- * Pure pool resolution with Pro gating and free fallback (spec R5-R7, design D6). Rows are gated
+ * Pure pool resolution with Pro gating and free fallback. Rows are gated
  * one by one through [catalogAccessDecision]; the free fallback is used only when nothing
  * survives the gate. Unknown groups are never allowed (fail closed).
  */
@@ -147,7 +147,7 @@ object CarouselPoolBuilder {
             return catalogAccessDecision(group, collectionsById[row.collectionId], tier, grants, nowMillis).isUnlocked
         }
 
-        /** Free for everyone: resolved under FREE with no grants (design D3b). */
+        /** Free for everyone: resolved under FREE with no grants. */
         fun isFreeTier(row: CatalogAffirmationRef): Boolean =
             isAllowed(row, AccessTier.FREE, AdUnlockState(), nowMillis = 0L)
     }

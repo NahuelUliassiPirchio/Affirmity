@@ -12,13 +12,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** Per-read budget for remote data; the widget must render even when offline (design D2). */
+/** Per-read budget for remote data; the widget must render even when offline. */
 const val CAROUSEL_READ_TIMEOUT_MILLIS = 4_000L
 
 /**
  * Runs [block] and returns its result, or `null` on any failure or when [timeoutMillis] elapses.
  * `withTimeoutOrNull` alone does not catch listener errors and failed `get()` calls, which throw
- * (W1), so both are handled. Cancellation always propagates.
+ * (not just time out), so both are handled. Cancellation always propagates.
  */
 internal suspend fun <T : Any> guardedRead(timeoutMillis: Long, block: suspend () -> T): T? =
     try {
@@ -34,10 +34,10 @@ suspend fun readOwned(timeoutMillis: Long, block: suspend () -> List<String>): O
     guardedRead(timeoutMillis, block)?.let { OwnedRead.Available(it) } ?: OwnedRead.Unavailable
 
 /**
- * Resolves [CarouselAccess] from the entitlement and ad-unlock repositories (design D1/D2). If
+ * Resolves [CarouselAccess] from the entitlement and ad-unlock repositories. If
  * ANY of the three reads fails or times out, access falls back to [CarouselAccess.FailClosed]:
  * never Pro text to a user whose entitlement is unknown. `sessionUnlocks` stays empty because
- * PER_USE unlocks only live in the app process (W4).
+ * PER_USE unlocks only live in the app process.
  */
 class CarouselAccessReader(
     private val entitlements: EntitlementRepository,
@@ -67,7 +67,7 @@ class CarouselAccessReader(
 }
 
 /**
- * First owned snapshot the widget may trust (R6.3): an empty snapshot served only from the cache is
+ * First owned snapshot the widget may trust: an empty snapshot served only from the cache is
  * "unknown", not "no affirmations", so it is skipped. Offline with a cold cache nothing else
  * arrives and the caller's timeout maps the read to [OwnedRead.Unavailable].
  */

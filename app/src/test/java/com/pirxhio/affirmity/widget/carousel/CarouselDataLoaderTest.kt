@@ -43,7 +43,7 @@ class CarouselDataLoaderTest {
     }
 
     @Test
-    fun `personalizadas loads the owned affirmations from the data source (S6-1 S6-2)`() = runTest {
+    fun `personalizadas loads the owned affirmations from the data source`() = runTest {
         val ports = FakeCarouselPorts(catalog, owned)
 
         val load = loader(ports).load(CarouselSource.Theme(PERSONALIZADAS_GROUP_ID))
@@ -85,7 +85,7 @@ class CarouselDataLoaderTest {
     }
 
     @Test
-    fun `an owned read failure makes owned data unavailable (S6-4)`() = runTest {
+    fun `an owned read failure makes owned data unavailable`() = runTest {
         val ports = FakeCarouselPorts(catalog, ownedRead = { throw IOException("offline") })
 
         val load = loader(ports).load(CarouselSource.Theme(PERSONALIZADAS_GROUP_ID))
@@ -95,7 +95,7 @@ class CarouselDataLoaderTest {
     }
 
     @Test
-    fun `an owned read timeout makes owned data unavailable (S6-3)`() = runTest {
+    fun `an owned read timeout makes owned data unavailable`() = runTest {
         val ports = FakeCarouselPorts(catalog, ownedRead = { awaitCancellation() })
 
         val load = loader(ports).load(CarouselSource.Theme(PERSONALIZADAS_GROUP_ID))

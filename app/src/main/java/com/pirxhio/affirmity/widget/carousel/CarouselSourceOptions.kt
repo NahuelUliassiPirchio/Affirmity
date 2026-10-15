@@ -17,7 +17,7 @@ sealed interface SourceTitle {
 
 data class SourceOption(val source: CarouselSource, val title: SourceTitle, val badge: GroupBadge?)
 
-/** The three kinds of source the configure screen offers (R1.2). Every option is selectable. */
+/** The three kinds of source the configure screen offers. Every option is selectable. */
 data class SourceOptions(
     val favorites: SourceOption,
     val themes: List<SourceOption>,
@@ -26,7 +26,7 @@ data class SourceOptions(
 
 /**
  * Pure model for the configure screen. Locked content is never hidden or disabled: picking it
- * simply renders the free fallback with a notice (R5), so the badge is informational only.
+ * simply renders the free fallback with a notice, so the badge is informational only.
  */
 fun buildSourceOptions(
     partiallyLockedGroupIds: Set<String>,

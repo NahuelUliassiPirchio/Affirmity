@@ -12,16 +12,16 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 const val CAROUSEL_REFRESH_DEBOUNCE_MS = 500L
 
 /**
- * Everything that can change which affirmations the carousel may show (spec R8): the tier, the
+ * Everything that can change which affirmations the carousel may show: the tier, the
  * durable and timed ad-unlock grants, and the favorites. Tracker state is deliberately absent, and
- * so are PER_USE session unlocks, which never count in the widget (W4).
+ * so are PER_USE session unlocks, which never count in the widget.
  */
 data class CarouselRefreshKey(
     val tier: AccessTier,
     val durable: Map<ContentKey, AdUnlockRecord>,
     val timed: Map<ContentKey, AdUnlockRecord>,
     val favoriteIds: List<String>,
-    /** Signed-in uid, `null` when signed out: sign-in and sign-out must refresh (owned text, W3b). */
+    /** Signed-in uid, `null` when signed out: sign-in and sign-out must refresh (owned text). */
     val uid: String? = null,
 )
 

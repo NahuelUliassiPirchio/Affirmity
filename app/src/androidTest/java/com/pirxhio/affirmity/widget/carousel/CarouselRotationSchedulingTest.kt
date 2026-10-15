@@ -8,10 +8,11 @@ import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
 import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-/** Covers S2.1, S2.2 and S2.4 with WorkManager's test driver. Emulator only. */
+/** Covers the rotation schedule with WorkManager's test driver. Emulator only. */
 class CarouselRotationSchedulingTest {
 
     private lateinit var context: Context
@@ -35,7 +36,8 @@ class CarouselRotationSchedulingTest {
         CarouselRotationWorker.enqueue(context)
 
         val info = infos().single()
-        assertEquals(WorkInfo.State.ENQUEUED, info.state)
+        // Periodic work with no constraints may already be running its first pass.
+        assertTrue(info.state in setOf(WorkInfo.State.ENQUEUED, WorkInfo.State.RUNNING))
         assertEquals(TimeUnit.MINUTES.toMillis(15), info.periodicityInfo?.repeatIntervalMillis)
     }
 

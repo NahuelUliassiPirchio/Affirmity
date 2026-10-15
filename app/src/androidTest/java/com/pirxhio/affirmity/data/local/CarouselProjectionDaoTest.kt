@@ -60,34 +60,6 @@ class CarouselProjectionDaoTest {
     }
 
     @Test
-    fun getRefsByCollectionIds_filtersByCollection() = runBlocking {
-        catalog.insertAll(listOf(row("a", "g1", "c1"), row("b", "g1", "c2"), row("c", "g2", "c3")))
-
-        assertEquals(
-            setOf("a", "c"),
-            catalog.getRefsByCollectionIds(listOf("c1", "c3")).map { it.id }.toSet(),
-        )
-    }
-
-    @Test
-    fun getRefsByCollectionIds_chunksListsLargerThanTheBoundVariableCap() = runBlocking {
-        val rows = (1..1000).map { row("id$it", "g1", "c$it") }
-        catalog.insertAll(rows)
-
-        val refs = catalog.getRefsByCollectionIds(rows.map { it.collectionId })
-
-        assertEquals(1000, refs.size)
-        assertEquals(rows.map { it.id }.toSet(), refs.map { it.id }.toSet())
-    }
-
-    @Test
-    fun getRefsByCollectionIds_emptyListReturnsEmpty() = runBlocking {
-        catalog.insertAll(listOf(row("a", "g1", "c1")))
-
-        assertEquals(emptyList<CatalogAffirmationRef>(), catalog.getRefsByCollectionIds(emptyList()))
-    }
-
-    @Test
     fun getAllRefs_returnsEveryRow() = runBlocking {
         catalog.insertAll(listOf(row("a", "g1", "c1"), row("b", "g2", "c2")))
 

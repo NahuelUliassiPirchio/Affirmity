@@ -2,13 +2,12 @@ package com.pirxhio.affirmity.widget.carousel
 
 import kotlin.random.Random
 
-/** Upper bound on the persisted queue length, keeping per-widget prefs small (design D7). */
+/** Upper bound on the persisted queue length, keeping per-widget prefs small. */
 const val MAX_ORDER = 400
 
 /** A shuffled queue of affirmation ids and the index of the one currently shown. */
 data class QueueState(val order: List<String>, val cursor: Int) {
     fun currentOrNull(): String? = order.getOrNull(cursor)
-    fun current(): String = order[cursor]
 
     companion object {
         val Empty = QueueState(emptyList(), 0)
@@ -16,7 +15,7 @@ data class QueueState(val order: List<String>, val cursor: Int) {
 }
 
 /**
- * Pure shuffle queue (spec R3). Each cycle is a permutation of at most [MAX_ORDER] pool ids drawn
+ * Pure shuffle queue. Each cycle is a permutation of at most [MAX_ORDER] pool ids drawn
  * with the injected [random], so tests are deterministic. A pool larger than the cap is sampled;
  * the next cycle resamples from the then-current pool.
  */
@@ -34,7 +33,7 @@ class ShuffleQueue(private val random: Random) {
         return QueueState(order, 0)
     }
 
-    /** Moves to the next item; at exhaustion starts a new cycle from [pool] (R3.2-R3.4). */
+    /** Moves to the next item; at exhaustion starts a new cycle from [pool]. */
     fun advance(state: QueueState, pool: List<String>): QueueState {
         if (state.order.isEmpty()) return start(pool)
         val next = state.cursor + 1
@@ -43,7 +42,7 @@ class ShuffleQueue(private val random: Random) {
     }
 
     /**
-     * Rebuilds [state] against a freshly resolved [pool] (R3.6, R8.5): ids still in the pool keep
+     * Rebuilds [state] against a freshly resolved [pool]: ids still in the pool keep
      * their order, missing ones are dropped, the cursor is clamped, and newcomers are appended
      * only while the order is below [MAX_ORDER].
      */

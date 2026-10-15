@@ -7,7 +7,7 @@ import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
 
 /**
  * One-shot reads the carousel needs, abstracted from Room/Firestore so loading is testable.
- * Owned affirmations come from Room when signed out and Firestore when signed in (R6).
+ * Owned affirmations come from Room when signed out and Firestore when signed in.
  */
 interface CarouselDataPorts {
     suspend fun favoriteIds(): List<String>

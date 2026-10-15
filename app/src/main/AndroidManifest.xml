@@ -41,7 +41,7 @@
                 android:resource="@xml/weekly_tracker_widget_info" />
         </receiver>
 
-        <!-- Exported: the launcher/AppWidgetHost starts it with APPWIDGET_CONFIGURE (R1). -->
+        <!-- Exported: the launcher/AppWidgetHost starts it with APPWIDGET_CONFIGURE. -->
         <activity
             android:name=".widget.carousel.CarouselConfigureActivity"
             android:exported="true"

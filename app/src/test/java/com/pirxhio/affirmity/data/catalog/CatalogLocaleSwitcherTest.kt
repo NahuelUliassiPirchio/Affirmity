@@ -53,7 +53,6 @@ class CatalogLocaleSwitcherTest {
         override suspend fun getByIds(ids: List<String>): List<CatalogAffirmationEntity> = emptyList()
         override suspend fun count(): Int = 1
         override suspend fun getRefsByGroupId(groupId: String): List<CatalogAffirmationRef> = emptyList()
-        override suspend fun getRefsByCollectionIdsChunk(ids: List<String>): List<CatalogAffirmationRef> = emptyList()
         override suspend fun getAllRefs(): List<CatalogAffirmationRef> = emptyList()
         override suspend fun getById(id: String): CatalogAffirmationEntity? = null
         override suspend fun replaceAll(rows: List<CatalogAffirmationEntity>) {

@@ -58,7 +58,7 @@ class CarouselPoolBuilderTest {
         return AdUnlockState(timedUnlocks = mapOf(key to AdUnlockRecord(key, now - 10, expiresAt)))
     }
 
-    // --- S5: gating ---
+    // --- gating ---
 
     @Test
     fun `theme source with a Pro collection resolves fully for a Pro user`() {
@@ -152,7 +152,7 @@ class CarouselPoolBuilderTest {
         assertEquals(FallbackReason.SOURCE_LOCKED, (result as PoolResult.Fallback).reason)
     }
 
-    // --- isFreeTier (D3b) ---
+    // --- isFreeTier ---
 
     @Test
     fun `isFreeTier is false for a Pro collection even when access is Pro`() {
@@ -182,7 +182,7 @@ class CarouselPoolBuilderTest {
         assertEquals(listOf(CarouselRef("o1", PERSONALIZADAS_GROUP_ID, null, true)), result.refs)
     }
 
-    // --- S6: owned affirmations ---
+    // --- owned affirmations ---
 
     @Test
     fun `personalizadas resolves from the owned ids`() {
@@ -241,7 +241,7 @@ class CarouselPoolBuilderTest {
         assertEquals(FallbackReason.DATA_UNAVAILABLE, (result as PoolResult.Fallback).reason)
     }
 
-    // --- S7: empty, deleted or locked sources ---
+    // --- empty, deleted or locked sources ---
 
     @Test
     fun `favorites with no favorites fall back as empty`() {

@@ -6,7 +6,7 @@ import androidx.glance.appwidget.GlanceAppWidgetReceiver
 
 /**
  * Entry point for the carousel widget. Rotation is scheduled with the first instance and cancelled
- * with the last. Per-instance state is removed by Glance's own `onDeleted` handling (D3), so there
+ * with the last. Per-instance state is removed by Glance's own `onDeleted` handling, so there
  * is deliberately no override for it here.
  */
 class AffirmationCarouselReceiver : GlanceAppWidgetReceiver() {

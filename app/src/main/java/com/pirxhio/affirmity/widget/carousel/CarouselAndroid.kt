@@ -17,7 +17,7 @@ import com.pirxhio.affirmity.data.remote.FirestoreEntitlementRepository
 import com.pirxhio.affirmity.data.repository.LocalFreeEntitlementRepository
 import com.pirxhio.affirmity.data.repository.RoomAdUnlockRepository
 
-/** [CarouselStateStore] over Glance's per-widget preferences store (design D3). */
+/** [CarouselStateStore] over Glance's per-widget preferences store. */
 class GlanceCarouselStateStore(
     private val context: Context,
     private val glanceId: GlanceId,
@@ -38,7 +38,7 @@ suspend fun CarouselStateStore.read(): CarouselState = update { it }
 
 /**
  * Production [CarouselDataPorts]: Room for the catalog, favorites and collections; owned
- * affirmations from Room when signed out and from Firestore (cache-first) when signed in (R6).
+ * affirmations from Room when signed out and from Firestore (cache-first) when signed in.
  */
 class AppCarouselPorts(
     private val database: AffirmityDatabase,

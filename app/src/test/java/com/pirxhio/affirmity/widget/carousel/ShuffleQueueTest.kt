@@ -25,10 +25,10 @@ class ShuffleQueueTest {
     fun `advancing through a full cycle shows each item once`() {
         val q = queue()
         var state = q.start(pool(5))
-        val shown = mutableListOf(state.current())
+        val shown = mutableListOf(state.currentOrNull())
         repeat(4) {
             state = q.advance(state, pool(5))
-            shown += state.current()
+            shown += state.currentOrNull()
         }
 
         assertEquals(5, shown.toSet().size)
@@ -40,14 +40,14 @@ class ShuffleQueueTest {
             val q = queue(seed)
             var state = q.start(pool(5))
             repeat(4) { state = q.advance(state, pool(5)) }
-            val previousLast = state.current()
+            val previousLast = state.currentOrNull()
 
             state = q.advance(state, pool(5))
 
             assertEquals(0, state.cursor)
             assertEquals(5, state.order.size)
             assertEquals(pool(5).toSet(), state.order.toSet())
-            assertNotEquals("seed $seed", previousLast, state.current())
+            assertNotEquals("seed $seed", previousLast, state.currentOrNull())
         }
     }
 
@@ -57,7 +57,7 @@ class ShuffleQueueTest {
         var state = q.start(pool(1))
         repeat(5) {
             state = q.advance(state, pool(1))
-            assertEquals("id1", state.current())
+            assertEquals("id1", state.currentOrNull())
         }
     }
 
@@ -75,7 +75,7 @@ class ShuffleQueueTest {
         fun sequence(): List<String> {
             val q = queue(42)
             var state = q.start(pool(7))
-            return List(20) { state.current().also { state = q.advance(state, pool(7)) } }
+            return List(20) { state.currentOrNull()!!.also { state = q.advance(state, pool(7)) } }
         }
 
         assertEquals(sequence(), sequence())
@@ -108,7 +108,7 @@ class ShuffleQueueTest {
 
         val result = q.reconcile(state, listOf("a", "c", "d"))
 
-        assertEquals("c", result.current())
+        assertEquals("c", result.currentOrNull())
     }
 
     @Test
@@ -179,13 +179,13 @@ class ShuffleQueueTest {
         repeat(MAX_ORDER - 1) { state = q.advance(state, pool(1000)) }
         assertEquals(MAX_ORDER - 1, state.cursor)
 
-        val last = state.current()
+        val last = state.currentOrNull()
         state = q.advance(state, pool(1000))
 
         assertEquals(0, state.cursor)
         assertEquals(MAX_ORDER, state.order.size)
         assertEquals(MAX_ORDER, state.order.toSet().size)
-        assertNotEquals(last, state.current())
+        assertNotEquals(last, state.currentOrNull())
         assertNotEquals("resample should differ from the first sample", firstSample, state.order.toSet())
     }
 }
