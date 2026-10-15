@@ -22,7 +22,12 @@ data class CarouselFrame(
 object CarouselAccount {
     const val SIGNED_OUT = "signed-out"
 
-    fun of(uid: String?): String = if (uid == null) SIGNED_OUT else "uid:$uid"
+    private const val UID_PREFIX = "uid:"
+
+    fun of(uid: String?): String = if (uid == null) SIGNED_OUT else UID_PREFIX + uid
+
+    /** The uid [account] was made from by [of]; `null` when signed out. */
+    fun uidOf(account: String): String? = if (account == SIGNED_OUT) null else account.removePrefix(UID_PREFIX)
 }
 
 /** Text that is safe to persist and replay: only ever taken from a free-tier frame. */

@@ -50,9 +50,6 @@ suspend fun refreshAllCarousels(context: Context) {
     }
 }
 
-/** Current state without changing it. */
-suspend fun CarouselStateStore.read(): CarouselState = update { it }
-
 /**
  * Production [CarouselDataPorts]: Room for the catalog, favorites and collections; owned
  * affirmations from Room when signed out and from Firestore (cache-first) when signed in.

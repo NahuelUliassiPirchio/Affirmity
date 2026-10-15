@@ -38,13 +38,13 @@ interface CarouselStateStore {
 }
 
 /**
- * Reads AND clears `advancePending` in one update before [load] starts. The flag is held
- * in memory for the call, so a failed load cannot strand it: the worst case is one skipped advance.
+ * Captures the state a load renders from AND clears `advancePending` in ONE update. The returned
+ * state still carries the flag (whether this load advances) and the refresh nonce it covers, so the
+ * two always belong together: an advance raised after the capture stays stored for the next load.
+ * A failed load cannot strand the flag; the worst case is one skipped advance.
  */
-suspend fun <T> withAdvanceConsumed(store: CarouselStateStore, load: suspend (advance: Boolean) -> T): T {
-    val previous = store.update { it.copy(advancePending = false) }
-    return load(previous.advancePending)
-}
+suspend fun captureForLoad(store: CarouselStateStore): CarouselState =
+    store.update { it.copy(advancePending = false) }
 
 /**
  * The state to store once a render based on [basedOn] produced [rendered], given what is stored

@@ -119,4 +119,11 @@ class CarouselGuardedRenderTest {
 
         assertFalse(out.stale)
     }
+
+    @Test
+    fun `an account maps back to the uid it was made from`() {
+        assertEquals("A", CarouselAccount.uidOf(CarouselAccount.of("A")))
+        assertEquals("uid:x", CarouselAccount.uidOf(CarouselAccount.of("uid:x")))
+        assertNull(CarouselAccount.uidOf(CarouselAccount.SIGNED_OUT))
+    }
 }

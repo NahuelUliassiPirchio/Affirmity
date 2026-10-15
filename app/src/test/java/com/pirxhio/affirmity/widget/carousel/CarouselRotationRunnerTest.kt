@@ -27,10 +27,9 @@ class CarouselRotationRunnerTest {
 
     /** What `provideGlance` does for one instance, minus I/O. */
     private suspend fun render(store: InMemoryStore, load: suspend () -> List<String> = { pool }) {
-        withAdvanceConsumed(store) { advance ->
-            val resolvedPool = load()
-            store.update { CarouselRotation.next(it, resolvedPool, queue, advance) }
-        }
+        val captured = captureForLoad(store)
+        val resolvedPool = load()
+        store.update { CarouselRotation.next(it, resolvedPool, queue, captured.advancePending) }
     }
 
     private suspend fun rotate(stores: Map<Int, InMemoryStore>, load: suspend (Int) -> List<String> = { pool }) =
@@ -114,16 +113,11 @@ class CarouselRotationRunnerTest {
     @Test
     fun `the flag is read and cleared before the load runs`() = runTest {
         val store = InMemoryStore(stateAt(0).copy(advancePending = true))
-        var flagSeenByLoad: Boolean? = null
-        var advanceSeen: Boolean? = null
 
-        withAdvanceConsumed(store) { advance ->
-            advanceSeen = advance
-            flagSeenByLoad = store.state.advancePending
-        }
+        val captured = captureForLoad(store)
 
-        assertEquals(true, advanceSeen)
-        assertEquals(false, flagSeenByLoad)
+        assertEquals(true, captured.advancePending)
+        assertEquals(false, store.state.advancePending)
     }
 
     @Test
