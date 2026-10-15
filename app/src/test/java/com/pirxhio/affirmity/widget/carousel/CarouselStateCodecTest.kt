@@ -16,6 +16,8 @@ class CarouselStateCodecTest {
         return CarouselStateCodec.read(prefs)
     }
 
+    private val ACCOUNT = CarouselAccount.of("me")
+
     private val full = CarouselState(
         source = CarouselSource.Theme("self_worth"),
         order = listOf("cat_a", "cat_b", "cat_c"),
@@ -25,9 +27,9 @@ class CarouselStateCodecTest {
         lastText = "I am enough",
         lastSubtitle = "Always",
         lastFree = true,
+        lastAccount = ACCOUNT,
     )
 
-    // --- S4.1 ---
 
     @Test
     fun `encode then decode is the identity`() {
@@ -78,7 +80,6 @@ class CarouselStateCodecTest {
         assertEquals(400, roundTrip(big).order.size)
     }
 
-    // --- S4.2 ---
 
     @Test
     fun `instances are independent`() {
@@ -93,7 +94,7 @@ class CarouselStateCodecTest {
         assertEquals(before, CarouselStateCodec.read(b))
     }
 
-    // --- persistedLast (D3b, S5.5) ---
+    // --- persistedLast ---
 
     private fun frame(isFree: Boolean) =
         CarouselFrame(text = "Pro text", subtitle = "sub", notice = null, isFreeTier = isFree)
@@ -110,7 +111,7 @@ class CarouselStateCodecTest {
 
     @Test
     fun `showing a non-free frame clears previously stored last text`() {
-        val stored = full.withShown(frame(isFree = false))
+        val stored = full.withShown(frame(isFree = false), ACCOUNT)
 
         assertNull(stored.lastText)
         assertNull(stored.lastSubtitle)
@@ -119,7 +120,7 @@ class CarouselStateCodecTest {
 
     @Test
     fun `showing a free frame stores the text and marks it free`() {
-        val stored = CarouselState().withShown(frame(isFree = true))
+        val stored = CarouselState().withShown(frame(isFree = true), ACCOUNT)
 
         assertEquals("Pro text", stored.lastText)
         assertEquals("sub", stored.lastSubtitle)
@@ -130,7 +131,7 @@ class CarouselStateCodecTest {
     fun `clearing a non-free frame removes the keys from the encoded prefs`() {
         val prefs = mutablePreferencesOf()
         CarouselStateCodec.write(prefs, full)
-        CarouselStateCodec.write(prefs, full.withShown(frame(isFree = false)))
+        CarouselStateCodec.write(prefs, full.withShown(frame(isFree = false), ACCOUNT))
 
         assertFalse(prefs.contains(CarouselStateCodec.LAST_TEXT))
         assertFalse(prefs.contains(CarouselStateCodec.LAST_SUBTITLE))
@@ -141,9 +142,9 @@ class CarouselStateCodecTest {
     fun `lapse - a Pro frame persisted then rebuilt under Free leaves no gated text in state`() {
         // Pro user sees a gated item: nothing textual is persisted.
         val afterPro = CarouselState(order = listOf("cat_pro", "cat_free"), cursor = 0)
-            .withShown(frame(isFree = false))
+            .withShown(frame(isFree = false), ACCOUNT)
         // The user lapses; the rebuild now resolves a free frame.
-        val afterLapse = afterPro.withShown(CarouselFrame("Free text", null, FallbackReason.SOURCE_LOCKED, true))
+        val afterLapse = afterPro.withShown(CarouselFrame("Free text", null, FallbackReason.SOURCE_LOCKED, true), ACCOUNT)
 
         assertNull(afterPro.lastText)
         assertEquals("Free text", afterLapse.lastText)
@@ -154,7 +155,7 @@ class CarouselStateCodecTest {
 
     @Test
     fun `order may contain Pro ids but the encoded state never contains gated text`() {
-        val state = CarouselState(order = listOf("cat_pro_id"), cursor = 0).withShown(frame(isFree = false))
+        val state = CarouselState(order = listOf("cat_pro_id"), cursor = 0).withShown(frame(isFree = false), ACCOUNT)
         val prefs = mutablePreferencesOf()
         CarouselStateCodec.write(prefs, state)
 
@@ -162,21 +163,21 @@ class CarouselStateCodecTest {
         assertTrue(prefs.asMap().values.none { it.toString().contains("Pro text") })
     }
 
-    // --- replay (S6.3, S6.4) ---
+    // --- replay ---
 
     @Test
     fun `replay returns the stored text only when it was free`() {
-        assertEquals(LastShown("I am enough", "Always"), full.replayableLast())
+        assertEquals(LastShown("I am enough", "Always"), full.replayableLast(ACCOUNT))
     }
 
     @Test
     fun `replay returns nothing when the stored frame was not free`() {
-        assertNull(full.copy(lastFree = false).replayableLast())
+        assertNull(full.copy(lastFree = false).replayableLast(ACCOUNT))
     }
 
     @Test
     fun `replay returns nothing when no text was stored`() {
-        assertNull(full.copy(lastText = null).replayableLast())
+        assertNull(full.copy(lastText = null).replayableLast(ACCOUNT))
     }
 
     @Test
@@ -185,6 +186,34 @@ class CarouselStateCodecTest {
             CarouselStateCodec.write(it, full.copy(lastFree = false))
         }
 
-        assertNull(CarouselStateCodec.read(prefs).replayableLast())
+        assertNull(CarouselStateCodec.read(prefs).replayableLast(ACCOUNT))
+    }
+
+    @Test
+    fun `replay returns nothing for another account or an unmarked frame`() {
+        assertNull(full.replayableLast(CarouselAccount.of("other")))
+        assertNull(full.replayableLast(CarouselAccount.SIGNED_OUT))
+        assertNull(full.copy(lastAccount = null).replayableLast(ACCOUNT))
+    }
+
+    @Test
+    fun `showing a free frame records the account and a non-free frame clears it`() {
+        assertEquals(ACCOUNT, CarouselState().withShown(frame(isFree = true), ACCOUNT).lastAccount)
+        assertNull(full.withShown(frame(isFree = false), ACCOUNT).lastAccount)
+    }
+
+    @Test
+    fun `an unmarked legacy state decodes without an account`() {
+        val prefs = mutablePreferencesOf().also { CarouselStateCodec.write(it, full) }
+        prefs.remove(CarouselStateCodec.LAST_ACCOUNT)
+
+        assertNull(CarouselStateCodec.read(prefs).lastAccount)
+    }
+
+    @Test
+    fun `the account marker is not stored in plain uid form for signed-out users`() {
+        assertEquals("signed-out", CarouselAccount.SIGNED_OUT)
+        assertEquals("uid:abc", CarouselAccount.of("abc"))
+        assertEquals(CarouselAccount.SIGNED_OUT, CarouselAccount.of(null))
     }
 }

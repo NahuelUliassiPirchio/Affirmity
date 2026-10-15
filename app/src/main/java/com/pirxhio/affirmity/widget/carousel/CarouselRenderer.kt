@@ -5,6 +5,7 @@ import com.pirxhio.affirmity.data.OverrideKeys
 import com.pirxhio.affirmity.data.TemplateField
 import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.CatalogAffirmationEntity
+import kotlinx.coroutines.CancellationException
 
 /** Turns a queue entry into displayable text, loading text only for the frame being shown. */
 class CarouselFrameResolver(private val catalogRow: suspend (String) -> CatalogAffirmationEntity?) {
@@ -48,20 +49,51 @@ class CarouselRenderer(
         advance: Boolean,
         load: CarouselLoad,
         nowMillis: Long,
+        account: String,
     ): RenderOutcome {
         val result = CarouselPoolBuilder.build(state.source, load.snapshot, load.access, nowMillis)
 
-        // Owned data could not be read: keep showing the last text, but only if it was free (R6.3).
-        val replay = state.replayableLast()
+        // A stored frame that belongs to a different account must never reach this one.
+        val scoped = state.forAccount(account)
+
+        // Owned data could not be read: keep showing the last text, but only if it was free and
+        // belongs to this account.
+        val replay = scoped.replayableLast(account)
         if (result is PoolResult.Fallback && result.reason == FallbackReason.DATA_UNAVAILABLE && replay != null) {
-            return RenderOutcome(state, CarouselFrame(replay.text, replay.subtitle, null, isFreeTier = true))
+            return RenderOutcome(scoped, CarouselFrame(replay.text, replay.subtitle, null, isFreeTier = true))
         }
 
-        val next = CarouselRotation.next(state, result.refs.map { it.id }, queue, advance)
+        val next = CarouselRotation.next(scoped, result.refs.map { it.id }, queue, advance)
         val current = next.queue.currentOrNull()
         val ref = result.refs.firstOrNull { it.id == current }
         val frame = ref?.let { resolver.resolve(it, result, load.ownedById) }
         val withFlag = next.copy(fallback = result is PoolResult.Fallback)
-        return RenderOutcome(if (frame != null) withFlag.withShown(frame) else withFlag, frame)
+        return RenderOutcome(if (frame != null) withFlag.withShown(frame, account) else withFlag, frame)
+    }
+}
+
+/**
+ * Runs [render] so that no failure can blank the widget or crash the host. [resolveAccount] and
+ * [render] both run inside the guard; on failure the last free frame is replayed only when it
+ * belongs to the same account, otherwise the placeholder is shown and the stored frame dropped.
+ * [CancellationException] is always rethrown.
+ */
+suspend fun renderGuarded(
+    state: CarouselState,
+    resolveAccount: () -> String,
+    onError: (Exception) -> Unit = {},
+    render: suspend (account: String) -> RenderOutcome,
+): RenderOutcome {
+    var account: String? = null
+    return try {
+        account = resolveAccount()
+        render(account)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        onError(e)
+        val scoped = state.forAccount(account)
+        val last = account?.let { scoped.replayableLast(it) }
+        RenderOutcome(scoped, last?.let { CarouselFrame(it.text, it.subtitle, null, isFreeTier = true) })
     }
 }

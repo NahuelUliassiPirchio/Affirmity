@@ -21,7 +21,7 @@ import org.junit.runner.RunWith
 
 /**
  * Pipeline tests over a real in-memory Room database: loader -> pool -> queue -> frame, as
- * `provideGlance` runs it (S8.1, S8.2, S5.5). Emulator only.
+ * `provideGlance` runs it. Emulator only.
  */
 @RunWith(AndroidJUnit4::class)
 class CarouselRefreshInstrumentedTest {
@@ -58,7 +58,7 @@ class CarouselRefreshInstrumentedTest {
     ): RenderOutcome {
         val loader = CarouselDataLoader(ports, readAccess = { access })
         val renderer = CarouselRenderer(ShuffleQueue(Random(1)), CarouselFrameResolver { ports.catalogRow(it) })
-        return renderer.render(state, advance = false, load = loader.load(state.source), nowMillis = 0)
+        return renderer.render(state, advance = false, load = loader.load(state.source), nowMillis = 0, account = CarouselAccount.SIGNED_OUT)
     }
 
     @Test

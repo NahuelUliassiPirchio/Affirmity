@@ -25,7 +25,7 @@ private const val TAG = "AffirmationCarousel"
  * Mirrors [com.pirxhio.affirmity.widget.WeeklyTrackerWidget]: everything is loaded off the main
  * thread before `provideContent`, all rules live in pure units, and the content is a pure
  * composable. Rotation is driven by [CarouselRotationWorker], which flags `advancePending` and
- * requests an update; this class consumes the flag before loading anything (D4/W3).
+ * requests an update; this class consumes the flag before loading anything.
  */
 class AffirmationCarouselWidget : GlanceAppWidget() {
 
@@ -38,20 +38,45 @@ class AffirmationCarouselWidget : GlanceAppWidget() {
         val store = GlanceCarouselStateStore(context, id)
         val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
 
-        val outcome = withAdvanceConsumed(store) { advance ->
-            val state = store.read()
-            renderInstance(context, appWidgetId, state, advance).also { rendered ->
-                // Keep any advance request a worker raised while this render was loading.
-                store.update { current -> rendered.state.copy(advancePending = current.advancePending) }
+        // Whatever fails (state store, Room, Firebase, loading), the widget shows the replayable
+        // last free frame or the placeholder instead of going blank.
+        val outcome = try {
+            withAdvanceConsumed(store) { advance ->
+                val state = store.read()
+                renderInstance(context, appWidgetId, state, advance).also { rendered ->
+                    persist(store, rendered)
+                }
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Carousel state access failed for widget $appWidgetId", e)
+            RenderOutcome(CarouselState(), null)
         }
 
-        // Strings follow the same locale the catalog text was seeded in (R8.1), whichever process
-        // path triggered the update (worker, receiver, or the app).
-        val localized = context.withCatalogLocale()
+        // Strings follow the same locale the catalog text was seeded in, whichever process path
+        // triggered the update (worker, receiver, or the app).
+        val localized = try {
+            context.withCatalogLocale()
+        } catch (e: Exception) {
+            Log.w(TAG, "Catalog locale lookup failed", e)
+            context
+        }
         val theme = themeFor(context, outcome)
         provideContent {
             CompositionLocalProvider(LocalContext provides localized) { CarouselContent(outcome.frame, theme) }
+        }
+    }
+
+    /** A failed write must not hide a frame that was rendered fine. */
+    private suspend fun persist(store: GlanceCarouselStateStore, rendered: RenderOutcome) {
+        try {
+            // Keep any advance request a worker raised while this render was loading.
+            store.update { current -> rendered.state.copy(advancePending = current.advancePending) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Carousel state write failed", e)
         }
     }
 
@@ -79,23 +104,20 @@ class AffirmationCarouselWidget : GlanceAppWidget() {
         state: CarouselState,
         advance: Boolean,
     ): RenderOutcome {
-        val database = AffirmityDatabase.getInstance(context)
-        val uid = FirebaseAuth.getInstance().currentUser?.uid
-        val firestore = if (uid != null) FirebaseFirestore.getInstance() else null
-        val ports = AppCarouselPorts(database, firestore, uid)
-        val reader = carouselAccessReader(database, firestore, uid)
-        val loader = CarouselDataLoader(ports, readAccess = { reader.read() })
-        val seed = appWidgetId.toLong() * 31 + System.currentTimeMillis()
-        val renderer = CarouselRenderer(ShuffleQueue(Random(seed)), CarouselFrameResolver { ports.catalogRow(it) })
-        return try {
-            renderer.render(state, advance, loader.load(state.source), System.currentTimeMillis())
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            // Never blank and never crash the host: keep the last free text if there is one.
-            Log.w(TAG, "Carousel render failed for widget $appWidgetId", e)
-            val last = state.replayableLast()
-            RenderOutcome(state, last?.let { CarouselFrame(it.text, it.subtitle, null, isFreeTier = true) })
+        var uid: String? = null
+        return renderGuarded(
+            state = state,
+            resolveAccount = { CarouselAccount.of(FirebaseAuth.getInstance().currentUser?.uid.also { uid = it }) },
+            onError = { Log.w(TAG, "Carousel render failed for widget $appWidgetId", it) },
+        ) { account ->
+            val database = AffirmityDatabase.getInstance(context)
+            val firestore = if (uid != null) FirebaseFirestore.getInstance() else null
+            val ports = AppCarouselPorts(database, firestore, uid)
+            val reader = carouselAccessReader(database, firestore, uid)
+            val loader = CarouselDataLoader(ports, readAccess = { reader.read() })
+            val seed = appWidgetId.toLong() * 31 + System.currentTimeMillis()
+            val renderer = CarouselRenderer(ShuffleQueue(Random(seed)), CarouselFrameResolver { ports.catalogRow(it) })
+            renderer.render(state, advance, loader.load(state.source), System.currentTimeMillis(), account)
         }
     }
 }

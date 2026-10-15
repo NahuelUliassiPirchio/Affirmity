@@ -20,6 +20,7 @@ class CarouselRendererTest {
     )
     private val ports = FakeCarouselPorts(catalog)
     private val free = CarouselAccess.FailClosed
+    private val ME = CarouselAccount.of("me")
     private val pro = CarouselAccess(AccessTier.PRO, AdUnlockState())
 
     private fun renderer(seed: Int = 1) =
@@ -88,7 +89,7 @@ class CarouselRendererTest {
     fun `the first render builds the queue and shows an item`() = runTest {
         val state = CarouselState(source = CarouselSource.Theme(UNIVERSE))
 
-        val out = renderer().render(state, advance = false, load = load(state.source), nowMillis = 0)
+        val out = renderer().render(state, advance = false, load = load(state.source), nowMillis = 0, account = ME)
 
         assertEquals(setOf("cat_a", "cat_b"), out.state.order.toSet())
         assertEquals(0, out.state.cursor)
@@ -102,18 +103,18 @@ class CarouselRendererTest {
             source = CarouselSource.Theme(UNIVERSE), order = listOf("cat_a", "cat_b"), cursor = 0,
         )
 
-        val out = renderer().render(state, advance = true, load = load(state.source), nowMillis = 0)
+        val out = renderer().render(state, advance = true, load = load(state.source), nowMillis = 0, account = ME)
 
         assertEquals(1, out.state.cursor)
         assertEquals("B text", out.frame?.text)
     }
 
     @Test
-    fun `an empty catalog renders no frame without crashing (S7-4)`() = runTest {
+    fun `an empty catalog renders no frame without crashing`() = runTest {
         val empty = FakeCarouselPorts()
         val state = CarouselState(source = CarouselSource.Favorites)
 
-        val out = renderer().render(state, advance = true, load = load(state.source, p = empty), nowMillis = 0)
+        val out = renderer().render(state, advance = true, load = load(state.source, p = empty), nowMillis = 0, account = ME)
 
         assertNull(out.frame)
         assertTrue(out.state.order.isEmpty())
@@ -123,7 +124,7 @@ class CarouselRendererTest {
     fun `an empty source shows the fallback with a notice and persists the flag`() = runTest {
         val state = CarouselState(source = CarouselSource.Favorites)
 
-        val out = renderer().render(state, advance = false, load = load(state.source), nowMillis = 0)
+        val out = renderer().render(state, advance = false, load = load(state.source), nowMillis = 0, account = ME)
 
         assertEquals(FallbackReason.SOURCE_EMPTY, out.frame?.notice)
         assertTrue(out.state.fallback)
@@ -131,11 +132,11 @@ class CarouselRendererTest {
     }
 
     @Test
-    fun `the notice clears once the source is valid again (S7-3)`() = runTest {
+    fun `the notice clears once the source is valid again`() = runTest {
         val withFavorite = FakeCarouselPorts(catalog, favorites = listOf("cat_a"))
         val state = CarouselState(source = CarouselSource.Favorites, order = listOf("cat_b"), fallback = true)
 
-        val out = renderer().render(state, advance = false, load = load(state.source, p = withFavorite), nowMillis = 0)
+        val out = renderer().render(state, advance = false, load = load(state.source, p = withFavorite), nowMillis = 0, account = ME)
 
         assertNull(out.frame?.notice)
         assertFalse(out.state.fallback)
@@ -143,12 +144,12 @@ class CarouselRendererTest {
     }
 
     @Test
-    fun `a Pro user sees Pro text but it is never persisted (S5-1)`() = runTest {
+    fun `a Pro user sees Pro text but it is never persisted`() = runTest {
         val state = CarouselState(
             source = CarouselSource.Theme(UNIVERSE), order = listOf("cat_pro", "cat_a", "cat_b"), cursor = 0,
         )
 
-        val out = renderer().render(state, advance = false, load = load(state.source, pro), nowMillis = 0)
+        val out = renderer().render(state, advance = false, load = load(state.source, pro), nowMillis = 0, account = ME)
 
         assertEquals("Pro text", out.frame?.text)
         assertFalse(out.frame!!.isFreeTier)
@@ -157,13 +158,13 @@ class CarouselRendererTest {
     }
 
     @Test
-    fun `lapse - after a Pro frame the Free rebuild shows free text and keeps no gated text (S5-5)`() = runTest {
+    fun `lapse - after a Pro frame the Free rebuild shows free text and keeps no gated text`() = runTest {
         val proState = CarouselState(
             source = CarouselSource.Theme(UNIVERSE), order = listOf("cat_pro", "cat_a", "cat_b"), cursor = 0,
         )
-        val afterPro = renderer().render(proState, advance = false, load = load(proState.source, pro), nowMillis = 0)
+        val afterPro = renderer().render(proState, advance = false, load = load(proState.source, pro), nowMillis = 0, account = ME)
 
-        val afterLapse = renderer().render(afterPro.state, advance = false, load = load(proState.source, free), nowMillis = 0)
+        val afterLapse = renderer().render(afterPro.state, advance = false, load = load(proState.source, free), nowMillis = 0, account = ME)
 
         assertFalse(afterLapse.frame?.text == "Pro text")
         assertTrue(afterLapse.frame!!.isFreeTier)
@@ -172,15 +173,15 @@ class CarouselRendererTest {
     }
 
     @Test
-    fun `unavailable owned data replays the last free text without advancing (S6-3)`() = runTest {
+    fun `unavailable owned data replays the last free text without advancing`() = runTest {
         val broken = FakeCarouselPorts(catalog, ownedRead = { throw java.io.IOException("offline") })
         val state = CarouselState(
             source = CarouselSource.Theme(PERSONALIZADAS_GROUP_ID),
             order = listOf("o1", "o2"), cursor = 1,
-            lastText = "Stored", lastSubtitle = "S", lastFree = true,
+            lastText = "Stored", lastSubtitle = "S", lastFree = true, lastAccount = ME,
         )
 
-        val out = renderer().render(state, advance = true, load = load(state.source, p = broken), nowMillis = 0)
+        val out = renderer().render(state, advance = true, load = load(state.source, p = broken), nowMillis = 0, account = ME)
 
         assertEquals(CarouselFrame("Stored", "S", null, true), out.frame)
         assertEquals(state.order, out.state.order)
@@ -188,7 +189,7 @@ class CarouselRendererTest {
     }
 
     @Test
-    fun `unavailable owned data without a free last text falls back with a notice (S6-4)`() = runTest {
+    fun `unavailable owned data without a free last text falls back with a notice`() = runTest {
         val broken = FakeCarouselPorts(catalog, ownedRead = { throw java.io.IOException("offline") })
         val state = CarouselState(
             source = CarouselSource.Theme(PERSONALIZADAS_GROUP_ID),
@@ -196,10 +197,95 @@ class CarouselRendererTest {
             lastText = "Gated", lastFree = false,
         )
 
-        val out = renderer().render(state, advance = false, load = load(state.source, p = broken), nowMillis = 0)
+        val out = renderer().render(state, advance = false, load = load(state.source, p = broken), nowMillis = 0, account = ME)
 
         assertEquals(FallbackReason.DATA_UNAVAILABLE, out.frame?.notice)
         assertTrue(out.state.fallback)
         assertTrue(out.frame!!.text in setOf("A text", "B text"))
+    }
+
+    // --- account binding ---
+
+    private val offline = FakeCarouselPorts(catalog, ownedRead = { throw java.io.IOException("offline") })
+
+    private fun storedFor(account: String?) = CarouselState(
+        source = CarouselSource.Theme(PERSONALIZADAS_GROUP_ID),
+        order = listOf("o1"), cursor = 0,
+        lastText = "Private of A", lastSubtitle = "S", lastFree = true, lastAccount = account,
+    )
+
+    @Test
+    fun `text stored for one account is never replayed to another account`() = runTest {
+        val state = storedFor(CarouselAccount.of("A"))
+
+        val out = renderer().render(state, advance = false, load = load(state.source, p = offline), nowMillis = 0,
+            account = CarouselAccount.of("B"))
+
+        assertFalse(out.frame?.text == "Private of A")
+        assertEquals(FallbackReason.DATA_UNAVAILABLE, out.frame?.notice)
+        assertFalse(out.state.lastText == "Private of A")
+        assertNull(out.state.lastAccount.takeIf { out.state.lastText == null && out.state.lastFree })
+    }
+
+    @Test
+    fun `text stored for an account is never replayed to a signed-out user`() = runTest {
+        val state = storedFor(CarouselAccount.of("A"))
+
+        val out = renderer().render(state, advance = false, load = load(state.source, p = offline), nowMillis = 0,
+            account = CarouselAccount.SIGNED_OUT)
+
+        assertFalse(out.frame?.text == "Private of A")
+        assertFalse(out.state.lastText == "Private of A")
+        assertEquals(CarouselAccount.SIGNED_OUT, out.state.lastAccount)
+    }
+
+    @Test
+    fun `a mismatch replaces the stored frame with one bound to the current account`() = runTest {
+        val state = storedFor(CarouselAccount.of("A")).copy(source = CarouselSource.Favorites, order = emptyList())
+
+        val out = renderer().render(state, advance = false, load = load(state.source), nowMillis = 0,
+            account = CarouselAccount.of("B"))
+
+        assertFalse(out.state.lastText == "Private of A")
+        assertEquals(CarouselAccount.of("B"), out.state.lastAccount)
+    }
+
+    @Test
+    fun `text stored without an account marker is not replayed`() = runTest {
+        val state = storedFor(account = null)
+
+        val out = renderer().render(state, advance = false, load = load(state.source, p = offline), nowMillis = 0,
+            account = ME)
+
+        assertFalse(out.frame?.text == "Private of A")
+    }
+
+    @Test
+    fun `the same account still replays its last free text`() = runTest {
+        val state = storedFor(CarouselAccount.of("A"))
+
+        val out = renderer().render(state, advance = false, load = load(state.source, p = offline), nowMillis = 0,
+            account = CarouselAccount.of("A"))
+
+        assertEquals(CarouselFrame("Private of A", "S", null, true), out.frame)
+    }
+
+    @Test
+    fun `signed-out to signed-out still replays`() = runTest {
+        val state = storedFor(CarouselAccount.SIGNED_OUT)
+
+        val out = renderer().render(state, advance = false, load = load(state.source, p = offline), nowMillis = 0,
+            account = CarouselAccount.SIGNED_OUT)
+
+        assertEquals("Private of A", out.frame?.text)
+    }
+
+    @Test
+    fun `a rendered free frame is stamped with the current account`() = runTest {
+        val state = CarouselState(source = CarouselSource.Theme(UNIVERSE))
+
+        val out = renderer().render(state, advance = false, load = load(state.source), nowMillis = 0, account = ME)
+
+        assertEquals(ME, out.state.lastAccount)
     }
 }
