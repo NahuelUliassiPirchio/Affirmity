@@ -172,4 +172,26 @@ class CarouselRotationRunnerTest {
         assertTrue(cancelled)
         assertFalse(store.state.advancePending)
     }
+
+    @Test
+    fun `requestAdvance requests a refresh before the update so a live session renders the advance`() = runTest {
+        val store = InMemoryStore(stateAt(0).copy(refreshNonce = 4))
+        var nonceSeenByUpdate = -1L
+
+        requestAdvance(store) { nonceSeenByUpdate = store.state.refreshNonce }
+
+        assertEquals(5L, nonceSeenByUpdate)
+    }
+
+    @Test
+    fun `requestRefresh raises the nonce before the update without advancing`() = runTest {
+        val store = InMemoryStore(stateAt(2).copy(refreshNonce = 0))
+        var nonceSeenByUpdate = -1L
+
+        requestRefresh(store) { nonceSeenByUpdate = store.state.refreshNonce }
+
+        assertEquals(1L, nonceSeenByUpdate)
+        assertFalse(store.state.advancePending)
+        assertEquals(2, store.state.cursor)
+    }
 }

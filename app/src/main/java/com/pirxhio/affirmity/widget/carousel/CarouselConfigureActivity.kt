@@ -50,7 +50,7 @@ import kotlinx.coroutines.withContext
  * render. The initial queue is built by that first `provideGlance`, not here. Kept free of UI so it can be tested directly.
  */
 suspend fun confirmCarouselSource(context: Context, glanceId: GlanceId, source: CarouselSource) {
-    GlanceCarouselStateStore(context, glanceId).update { CarouselState(source = source) }
+    GlanceCarouselStateStore(context, glanceId).update { it.reconfigured(source) }
     CarouselRotationWorker.enqueue(context)
     AffirmationCarouselWidget().update(context, glanceId)
 }

@@ -1,6 +1,7 @@
 package com.pirxhio.affirmity.widget.carousel
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -38,5 +39,28 @@ class CarouselRenderMergeTest {
         val merged = mergeRendered(current = configured, basedOn = basedOn, rendered = rendered.copy(source = CarouselSource.Favorites))
 
         assertEquals(configured, merged)
+    }
+
+    @Test
+    fun `a refresh requested while rendering is kept so the live session renders again`() {
+        val merged = mergeRendered(unconfigured.copy(refreshNonce = 3), unconfigured.copy(refreshNonce = 2), rendered.copy(refreshNonce = 2))
+
+        assertEquals(3L, merged.refreshNonce)
+    }
+
+    @Test
+    fun `configuring a source starts a fresh queue and requests a refresh`() {
+        val stored = rendered.copy(refreshNonce = 4, advancePending = true)
+
+        val configured = stored.reconfigured(CarouselSource.Favorites)
+
+        assertEquals(CarouselState(source = CarouselSource.Favorites, refreshNonce = 5), configured)
+    }
+
+    @Test
+    fun `a live session reloads only for a refresh newer than the frame it shows`() {
+        assertTrue(needsReload(requestedNonce = 3, renderedNonce = 2))
+        assertFalse(needsReload(requestedNonce = 2, renderedNonce = 2))
+        assertFalse(needsReload(requestedNonce = 1, renderedNonce = 2))
     }
 }

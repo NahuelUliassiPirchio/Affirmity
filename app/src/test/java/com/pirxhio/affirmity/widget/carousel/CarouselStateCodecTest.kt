@@ -28,6 +28,7 @@ class CarouselStateCodecTest {
         lastSubtitle = "Always",
         lastFree = true,
         lastAccount = ACCOUNT,
+        refreshNonce = 7,
     )
 
 

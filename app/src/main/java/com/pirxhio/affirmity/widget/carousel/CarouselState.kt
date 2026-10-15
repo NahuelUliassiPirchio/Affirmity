@@ -4,6 +4,7 @@ import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 
 /** What a rendered frame shows. [notice] is non-null iff the free fallback is active. */
@@ -46,6 +47,11 @@ data class CarouselState(
     val lastFree: Boolean = false,
     /** Whose frame [lastText] is (see [CarouselAccount]); null when nothing is stored. */
     val lastAccount: String? = null,
+    /**
+     * Raised by every path that wants a new frame before it requests an update. A running Glance
+     * session does not call `provideGlance` again, so the content reloads when it sees a newer value.
+     */
+    val refreshNonce: Long = 0,
 ) {
     val queue: QueueState get() = QueueState(order, cursor)
 
@@ -74,6 +80,12 @@ data class CarouselState(
     fun forAccount(account: String?): CarouselState =
         if (account != null && lastAccount == account) this else withoutLast()
 
+    fun withRefreshRequested(): CarouselState = copy(refreshNonce = refreshNonce + 1)
+
+    /** A newly chosen [source] starts from scratch, and the live session must render it. */
+    fun reconfigured(source: CarouselSource): CarouselState =
+        CarouselState(source = source, refreshNonce = refreshNonce + 1)
+
     fun withoutLast(): CarouselState =
         copy(lastText = null, lastSubtitle = null, lastFree = false, lastAccount = null)
 }
@@ -89,6 +101,7 @@ object CarouselStateCodec {
     val LAST_SUBTITLE = stringPreferencesKey("lastSubtitle")
     val LAST_FREE = booleanPreferencesKey("lastFree")
     val LAST_ACCOUNT = stringPreferencesKey("lastAccount")
+    val REFRESH_NONCE = longPreferencesKey("refreshNonce")
 
     private const val ORDER_SEPARATOR = "\n"
 
@@ -102,6 +115,7 @@ object CarouselStateCodec {
         lastSubtitle = prefs[LAST_SUBTITLE],
         lastFree = prefs[LAST_FREE] ?: false,
         lastAccount = prefs[LAST_ACCOUNT],
+        refreshNonce = prefs[REFRESH_NONCE] ?: 0,
     )
 
     fun write(prefs: MutablePreferences, state: CarouselState) {
@@ -115,6 +129,7 @@ object CarouselStateCodec {
         state.lastSubtitle?.let { prefs[LAST_SUBTITLE] = it } ?: prefs.remove(LAST_SUBTITLE)
         prefs[LAST_FREE] = state.lastFree
         state.lastAccount?.let { prefs[LAST_ACCOUNT] = it } ?: prefs.remove(LAST_ACCOUNT)
+        prefs[REFRESH_NONCE] = state.refreshNonce
     }
 
     private const val FAVORITES = "favorites"

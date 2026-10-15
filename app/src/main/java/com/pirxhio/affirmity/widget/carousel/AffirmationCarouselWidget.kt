@@ -2,9 +2,7 @@ package com.pirxhio.affirmity.widget.carousel
 
 import android.content.Context
 import android.util.Log
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.glance.GlanceId
-import androidx.glance.LocalContext
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.SizeMode
@@ -22,10 +20,11 @@ private const val TAG = "AffirmationCarousel"
 
 /**
  * Home-screen carousel showing one affirmation at a time (spec: affirmation-carousel-widget).
- * Mirrors [com.pirxhio.affirmity.widget.WeeklyTrackerWidget]: everything is loaded off the main
- * thread before `provideContent`, all rules live in pure units, and the content is a pure
- * composable. Rotation is driven by [CarouselRotationWorker], which flags `advancePending` and
- * requests an update; this class consumes the flag before loading anything.
+ * All rules live in pure units and the content is a pure composable. The first frame is loaded
+ * before `provideContent`; while the Glance session keeps running, `update` does not call
+ * `provideGlance` again, so [CarouselLiveContent] reloads whenever a caller raised the stored
+ * refresh nonce (rotation, app refreshes, configure). Rotation is driven by [CarouselRotationWorker],
+ * which flags `advancePending` and requests an update; each load consumes the flag first.
  */
 class AffirmationCarouselWidget : GlanceAppWidget() {
 
@@ -37,12 +36,23 @@ class AffirmationCarouselWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val store = GlanceCarouselStateStore(context, id)
         val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
+        val first = loadView(context, store, appWidgetId)
+        provideContent {
+            CarouselLiveContent(first, reload = { loadView(context, store, appWidgetId) })
+        }
+    }
 
-        // Whatever fails (state store, Room, Firebase, loading), the widget shows the replayable
-        // last free frame or the placeholder instead of going blank.
+    /**
+     * One full render pass: consume the advance, render, store, resolve the theme and locale. Never
+     * throws except for cancellation; whatever fails (state store, Room, Firebase, loading), the
+     * widget shows the replayable last free frame or the placeholder instead of going blank.
+     */
+    private suspend fun loadView(context: Context, store: GlanceCarouselStateStore, appWidgetId: Int): CarouselView {
+        var nonce = 0L
         val outcome = try {
             withAdvanceConsumed(store) { advance ->
                 val state = store.read()
+                nonce = state.refreshNonce
                 renderInstance(context, appWidgetId, state, advance).also { rendered ->
                     // A render for an account that signed out or switched meanwhile is never stored.
                     if (!rendered.stale) persist(store, state, rendered)
@@ -59,14 +69,13 @@ class AffirmationCarouselWidget : GlanceAppWidget() {
         // triggered the update (worker, receiver, or the app).
         val localized = try {
             context.withCatalogLocale()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "Catalog locale lookup failed", e)
             context
         }
-        val theme = themeFor(context, outcome)
-        provideContent {
-            CompositionLocalProvider(LocalContext provides localized) { CarouselContent(outcome.frame, theme) }
-        }
+        return CarouselView(outcome.frame, themeFor(context, outcome), nonce, localized)
     }
 
     /** A failed write must not hide a frame that was rendered fine. */

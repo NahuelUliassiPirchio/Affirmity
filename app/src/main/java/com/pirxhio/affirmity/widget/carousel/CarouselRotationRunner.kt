@@ -53,14 +53,28 @@ suspend fun <T> withAdvanceConsumed(store: CarouselStateStore, load: suspend (ad
  * the update that came with the new source renders it.
  */
 fun mergeRendered(current: CarouselState, basedOn: CarouselState, rendered: CarouselState): CarouselState =
-    if (current.source != basedOn.source) current else rendered.copy(advancePending = current.advancePending)
+    if (current.source != basedOn.source) {
+        current
+    } else {
+        rendered.copy(advancePending = current.advancePending, refreshNonce = current.refreshNonce)
+    }
+
+/** A running session shows a frame rendered for [renderedNonce]; it reloads only for a newer request. */
+fun needsReload(requestedNonce: Long, renderedNonce: Long): Boolean = requestedNonce > renderedNonce
+
+/** Requests a new frame: raises the refresh nonce (so a running session reloads) and asks for an update. */
+suspend fun requestRefresh(store: CarouselStateStore, requestUpdate: suspend () -> Unit) {
+    store.update { it.withRefreshRequested() }
+    requestUpdate()
+}
 
 /**
- * Raises `advancePending` and asks for an update. If the update request fails, the flag is cleared
- * again so an unrelated later refresh does not advance the carousel unexpectedly.
+ * Raises `advancePending` (and the refresh nonce, so a running session reloads) and asks for an
+ * update. If the update request fails, the flag is cleared again so an unrelated later refresh
+ * does not advance the carousel unexpectedly.
  */
 suspend fun requestAdvance(store: CarouselStateStore, requestUpdate: suspend () -> Unit) {
-    store.update { it.copy(advancePending = true) }
+    store.update { it.copy(advancePending = true).withRefreshRequested() }
     try {
         requestUpdate()
     } catch (e: Throwable) {

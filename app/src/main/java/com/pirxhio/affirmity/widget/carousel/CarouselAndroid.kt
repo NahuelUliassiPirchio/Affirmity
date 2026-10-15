@@ -1,8 +1,10 @@
 package com.pirxhio.affirmity.widget.carousel
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.preferences.core.Preferences
 import androidx.glance.GlanceId
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import com.google.firebase.firestore.FirebaseFirestore
@@ -30,6 +32,21 @@ class GlanceCarouselStateStore(
             prefs.toMutablePreferences().also { CarouselStateCodec.write(it, transform(previous)) }
         }
         return previous
+    }
+}
+
+/**
+ * Asks every carousel instance for a new frame, including instances whose Glance session is still
+ * running (those only reload when the refresh nonce moves). Instances are isolated: one failure
+ * never stops the others.
+ */
+suspend fun refreshAllCarousels(context: Context) {
+    val widget = AffirmationCarouselWidget()
+    val ids = GlanceAppWidgetManager(context).getGlanceIds(AffirmationCarouselWidget::class.java)
+    CarouselRotationRunner.runAll(ids) { id ->
+        requestRefresh(GlanceCarouselStateStore(context, id)) { widget.update(context, id) }
+    }.forEach { (id, outcome) ->
+        if (outcome is RotationOutcome.Failed) Log.w("CarouselRefresh", "Refresh failed for $id", outcome.error)
     }
 }
 

@@ -152,9 +152,9 @@ import com.pirxhio.affirmity.access.isUnlocked
 import com.pirxhio.affirmity.ui.myaffirmations.customAffirmationAccessDecision
 import com.pirxhio.affirmity.ui.theme.GroupHighlight
 import com.pirxhio.affirmity.widget.WeeklyTrackerWidget
-import com.pirxhio.affirmity.widget.carousel.AffirmationCarouselWidget
 import com.pirxhio.affirmity.widget.carousel.CarouselRefreshKey
 import com.pirxhio.affirmity.widget.carousel.carouselRefreshTriggers
+import com.pirxhio.affirmity.widget.carousel.refreshAllCarousels
 import androidx.glance.appwidget.updateAll
 import java.util.TimeZone
 import kotlin.random.Random
@@ -2730,7 +2730,7 @@ private fun widgetUpdater(context: android.content.Context): WidgetUpdater = Wid
     WeeklyTrackerWidget().updateAll(context)
 }
 
-/** Pushes a Glance `updateAll` for the affirmation carousel (kept apart from [widgetUpdater]). */
+/** Asks every affirmation carousel for a new frame (kept apart from [widgetUpdater]). */
 private fun carouselWidgetUpdater(context: android.content.Context): WidgetUpdater = WidgetUpdater {
-    AffirmationCarouselWidget().updateAll(context)
+    refreshAllCarousels(context)
 }
