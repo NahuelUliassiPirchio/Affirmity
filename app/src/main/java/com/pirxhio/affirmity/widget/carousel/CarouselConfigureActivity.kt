@@ -2,6 +2,7 @@ package com.pirxhio.affirmity.widget.carousel
 
 import android.app.Activity
 import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -39,6 +40,7 @@ import com.pirxhio.affirmity.data.local.AffirmityDatabase
 import com.pirxhio.affirmity.ui.groups.AffirmationGroupAccessBadge
 import com.pirxhio.affirmity.ui.groups.partiallyLockedGroupIds
 import com.pirxhio.affirmity.ui.theme.AffirmityTheme
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -53,6 +55,13 @@ suspend fun confirmCarouselSource(context: Context, glanceId: GlanceId, source: 
     CarouselRotationWorker.enqueue(context)
     AffirmationCarouselWidget().update(context, glanceId)
 }
+
+/**
+ * The activity is exported, so the widget id in its intent is untrusted. It is accepted only when
+ * the id is valid and the system says it is bound to our own provider (flattened component names).
+ */
+internal fun isOwnCarouselWidget(appWidgetId: Int, providerFlattened: String?, expectedFlattened: String): Boolean =
+    appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID && providerFlattened == expectedFlattened
 
 /** Result intent carrying the widget id, required for both RESULT_OK and RESULT_CANCELED. */
 internal fun carouselConfigureResult(appWidgetId: Int): Intent =
@@ -74,7 +83,9 @@ class CarouselConfigureActivity : AppCompatActivity() {
             AppWidgetManager.INVALID_APPWIDGET_ID,
         ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
         setResult(Activity.RESULT_CANCELED, carouselConfigureResult(appWidgetId))
-        if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
+        val provider = AppWidgetManager.getInstance(this).getAppWidgetInfo(appWidgetId)?.provider
+        val expected = ComponentName(this, AffirmationCarouselReceiver::class.java)
+        if (!isOwnCarouselWidget(appWidgetId, provider?.flattenToString(), expected.flattenToString())) {
             finish()
             return
         }
@@ -90,9 +101,15 @@ class CarouselConfigureActivity : AppCompatActivity() {
 
     private fun confirm(source: CarouselSource) {
         lifecycleScope.launch {
-            val glanceId = GlanceAppWidgetManager(applicationContext).getGlanceIdBy(appWidgetId)
-            confirmCarouselSource(applicationContext, glanceId, source)
-            setResult(Activity.RESULT_OK, carouselConfigureResult(appWidgetId))
+            try {
+                val glanceId = GlanceAppWidgetManager(applicationContext).getGlanceIdBy(appWidgetId)
+                confirmCarouselSource(applicationContext, glanceId, source)
+                setResult(Activity.RESULT_OK, carouselConfigureResult(appWidgetId))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                setResult(Activity.RESULT_CANCELED, carouselConfigureResult(appWidgetId))
+            }
             finish()
         }
     }
