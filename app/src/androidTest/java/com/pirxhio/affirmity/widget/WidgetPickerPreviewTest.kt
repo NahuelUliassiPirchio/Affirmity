@@ -4,6 +4,9 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
 import android.content.Context
 import android.graphics.BlendMode
+import android.graphics.Rect
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.LayerDrawable
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -38,6 +41,7 @@ class WidgetPickerPreviewTest {
         // Launchers below API 31 size the fallback from its intrinsic dimensions; -1 renders nothing.
         val fallback = requireNotNull(info.loadPreviewImage(context, 0)) { "previewImage did not load" }
         assertTrue("previewImage has no intrinsic size", fallback.intrinsicWidth > 0 && fallback.intrinsicHeight > 0)
+        assertFallbackLayersAreSeparate(fallback)
 
         var failure: Throwable? = null
         var root: View? = null
@@ -52,6 +56,20 @@ class WidgetPickerPreviewTest {
         val tinted = tintedImages(root!!)
         assertTrue("Expected tinted images in the preview", tinted.isNotEmpty())
         tinted.forEach { assertEquals("Tint must honor alpha", BlendMode.SRC_IN, it.imageTintBlendMode) }
+    }
+
+    /** Layer 0 is the card; every other layer must sit inside it without overlapping its siblings. */
+    private fun assertFallbackLayersAreSeparate(fallback: Drawable) {
+        val layers = fallback as? LayerDrawable ?: return
+        val canvas = Rect(0, 0, layers.intrinsicWidth, layers.intrinsicHeight)
+        layers.bounds = canvas
+        val shapes = (1 until layers.numberOfLayers).map { Rect(layers.getDrawable(it).bounds) }
+        shapes.forEachIndexed { i, shape ->
+            assertTrue("Layer ${i + 1} $shape is empty or outside $canvas", !shape.isEmpty && canvas.contains(shape))
+            shapes.drop(i + 1).forEach { other ->
+                assertTrue("Layers overlap: $shape and $other", !Rect.intersects(shape, other))
+            }
+        }
     }
 
     private fun tintedImages(view: View): List<ImageView> = when (view) {
