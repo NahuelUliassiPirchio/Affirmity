@@ -28,33 +28,33 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
                 <FrameLayout android:layout_width="26dp" android:layout_height="26dp">
-                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_left" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_affirm" android:importantForAccessibility="no" />
-                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_right" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_meditate" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_left" tools:ignore="UseAppTint" android:tintMode="src_in" android:tint="@color/widget_preview_tracker_affirm" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_right" tools:ignore="UseAppTint" android:tintMode="src_in" android:tint="@color/widget_preview_tracker_meditate" android:importantForAccessibility="no" />
                 </FrameLayout>
                 <FrameLayout android:layout_width="26dp" android:layout_height="26dp">
-                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_left" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_affirm" android:importantForAccessibility="no" />
-                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_right" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_meditate" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_left" tools:ignore="UseAppTint" android:tintMode="src_in" android:tint="@color/widget_preview_tracker_affirm" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_right" tools:ignore="UseAppTint" android:tintMode="src_in" android:tint="@color/widget_preview_tracker_meditate" android:importantForAccessibility="no" />
                 </FrameLayout>
                 <FrameLayout android:layout_width="26dp" android:layout_height="26dp">
-                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_left" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_affirm" android:importantForAccessibility="no" />
-                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_right" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_empty" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_left" tools:ignore="UseAppTint" android:tintMode="src_in" android:tint="@color/widget_preview_tracker_affirm" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_right" tools:ignore="UseAppTint" android:tintMode="src_in" android:tint="@color/widget_preview_tracker_empty" android:importantForAccessibility="no" />
                 </FrameLayout>
                 <FrameLayout android:layout_width="26dp" android:layout_height="26dp">
-                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_left" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_affirm" android:importantForAccessibility="no" />
-                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_right" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_meditate" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_left" tools:ignore="UseAppTint" android:tintMode="src_in" android:tint="@color/widget_preview_tracker_affirm" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_right" tools:ignore="UseAppTint" android:tintMode="src_in" android:tint="@color/widget_preview_tracker_meditate" android:importantForAccessibility="no" />
                 </FrameLayout>
                 <FrameLayout android:layout_width="26dp" android:layout_height="26dp">
-                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_left" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_empty" android:importantForAccessibility="no" />
-                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_right" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_meditate" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_left" tools:ignore="UseAppTint" android:tintMode="src_in" android:tint="@color/widget_preview_tracker_empty" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_right" tools:ignore="UseAppTint" android:tintMode="src_in" android:tint="@color/widget_preview_tracker_meditate" android:importantForAccessibility="no" />
                 </FrameLayout>
                 <FrameLayout android:layout_width="26dp" android:layout_height="26dp">
-                    <ImageView android:layout_width="26dp" android:layout_height="26dp" android:src="@drawable/widget_cell_ring" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_text" android:importantForAccessibility="no" />
-                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_left" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_affirm" android:importantForAccessibility="no" />
-                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_right" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_empty" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="26dp" android:layout_height="26dp" android:src="@drawable/widget_cell_ring" tools:ignore="UseAppTint" android:tintMode="src_in" android:tint="@color/widget_preview_tracker_text" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_left" tools:ignore="UseAppTint" android:tintMode="src_in" android:tint="@color/widget_preview_tracker_affirm" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_right" tools:ignore="UseAppTint" android:tintMode="src_in" android:tint="@color/widget_preview_tracker_empty" android:importantForAccessibility="no" />
                 </FrameLayout>
                 <FrameLayout android:layout_width="26dp" android:layout_height="26dp">
-                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_left" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_empty" android:importantForAccessibility="no" />
-                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_right" tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_empty" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_left" tools:ignore="UseAppTint" android:tintMode="src_in" android:tint="@color/widget_preview_tracker_empty" android:importantForAccessibility="no" />
+                    <ImageView android:layout_width="20dp" android:layout_height="20dp" android:layout_gravity="center" android:src="@drawable/half_circle_right" tools:ignore="UseAppTint" android:tintMode="src_in" android:tint="@color/widget_preview_tracker_empty" android:importantForAccessibility="no" />
                 </FrameLayout>
             </LinearLayout>
 
@@ -107,7 +107,7 @@
             android:layout_width="12dp"
             android:layout_height="12dp"
             android:src="@drawable/ic_streak_flame"
-            tools:ignore="UseAppTint" android:tint="@color/widget_preview_tracker_text"
+            tools:ignore="UseAppTint" android:tintMode="src_in" android:tint="@color/widget_preview_tracker_text"
             android:importantForAccessibility="no" />
 
         <TextView

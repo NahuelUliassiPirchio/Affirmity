@@ -3,6 +3,8 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
+            <!-- Gives the layer-list an intrinsic size (the insets below assume this canvas). -->
+            <size android:width="300dp" android:height="120dp" />
             <corners android:radius="20dp" />
             <solid android:color="@color/widget_preview_tracker_surface" />
         </shape>
