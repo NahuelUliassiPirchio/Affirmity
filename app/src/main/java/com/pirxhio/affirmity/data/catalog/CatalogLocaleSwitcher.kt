@@ -28,6 +28,9 @@ class CatalogLocaleSwitcher(
     private val applyLocales: (LocaleListCompat) -> Unit,
     private val timeoutMs: Long = DEFAULT_TIMEOUT_MS,
     private val seedDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    /** Runs after the switch has fully settled (seed, apply and reconcile), e.g. to refresh widgets
+     *  that render catalog text. A failure here is logged and never breaks the switch. */
+    private val onSettled: suspend () -> Unit = {},
 ) {
 
     /** [target] MUST be the explicit locale the user picked (never the no-arg resolver, which still
@@ -40,6 +43,7 @@ class CatalogLocaleSwitcher(
         // switch took; re-seeds back if applyLocales was a no-op / produced no recreate.
         // Off the (Main) process dispatcher: the seeder reads + parses the asset before checking the marker.
         runLogged("reconcile") { withContext(seedDispatcher) { seeder.seedIfNeeded() } }
+        runLogged("settled") { onSettled() }
     }
 
     private suspend fun runLogged(what: String, block: suspend () -> Unit) {

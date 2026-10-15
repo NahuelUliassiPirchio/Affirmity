@@ -1152,4 +1152,15 @@
     <string name="groups_duplicate_copy_suffix">(copia)</string>
     <string name="groups_duplicate_copy_suffix_numbered">(copia %1$d)</string>
     <string name="groups_action_in_feed">Mostrar en tu feed</string>
+    <!-- Affirmation carousel widget -->
+    <string name="carousel_notice_source_missing">Esa fuente ya no existe. Mostrando afirmaciones gratuitas.</string>
+    <string name="carousel_notice_source_empty">Esa fuente está vacía. Mostrando afirmaciones gratuitas.</string>
+    <string name="carousel_notice_source_locked">Esa fuente requiere Pro. Mostrando afirmaciones gratuitas.</string>
+    <string name="carousel_notice_data_unavailable">No se pudo cargar tu contenido. Mostrando afirmaciones gratuitas.</string>
+    <string name="carousel_placeholder">Abre la app para empezar</string>
+    <string name="carousel_widget_label">Carrusel de afirmaciones</string>
+    <string name="carousel_widget_description">Una afirmación distinta cada 15 minutos</string>
+    <string name="carousel_configure_title">Elige qué mostrar</string>
+    <string name="carousel_configure_section_themes">Temas</string>
+    <string name="carousel_configure_cancel">Cancelar</string>
 </resources>

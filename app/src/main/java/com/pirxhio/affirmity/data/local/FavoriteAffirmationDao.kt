@@ -20,6 +20,10 @@ interface FavoriteAffirmationDao {
     @Query("SELECT affirmationId FROM favorite_affirmations ORDER BY favoritedAtMillis DESC")
     fun observeFavoriteIds(): Flow<List<String>>
 
+    /** One-shot read, most recently favorited first (carousel widget). */
+    @Query("SELECT affirmationId FROM favorite_affirmations ORDER BY favoritedAtMillis DESC")
+    suspend fun getFavoriteIds(): List<String>
+
     @Query("SELECT EXISTS(SELECT 1 FROM favorite_affirmations WHERE affirmationId = :id)")
     suspend fun isFavorite(id: String): Boolean
 }

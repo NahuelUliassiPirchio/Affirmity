@@ -2,6 +2,7 @@ package com.pirxhio.affirmity.data.catalog
 
 import com.pirxhio.affirmity.data.local.CatalogAffirmationDao
 import com.pirxhio.affirmity.data.local.CatalogAffirmationEntity
+import com.pirxhio.affirmity.data.local.CatalogAffirmationRef
 import com.pirxhio.affirmity.data.local.CatalogPreferences
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
@@ -41,6 +42,9 @@ private class RecordingFakeDao(private val existingRows: Int? = null) : CatalogA
     override fun observeByGroupIds(groupIds: Set<String>): Flow<List<CatalogAffirmationEntity>> = throw NotImplementedError()
     override suspend fun getByIds(ids: List<String>): List<CatalogAffirmationEntity> = emptyList()
     override suspend fun count(): Int = existingRows ?: lastReplaced.size
+    override suspend fun getRefsByGroupId(groupId: String): List<CatalogAffirmationRef> = emptyList()
+    override suspend fun getAllRefs(): List<CatalogAffirmationRef> = emptyList()
+    override suspend fun getById(id: String): CatalogAffirmationEntity? = null
 
     override suspend fun replaceAll(rows: List<CatalogAffirmationEntity>) {
         calls += "replaceAll"

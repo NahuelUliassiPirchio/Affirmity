@@ -35,6 +35,8 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider as GlanceColorProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.pirxhio.affirmity.AppDestinations
+import com.pirxhio.affirmity.EXTRA_START_DESTINATION
 import com.pirxhio.affirmity.MainActivity
 import com.pirxhio.affirmity.data.DayClock
 import com.pirxhio.affirmity.data.StreakHealerStats
@@ -45,9 +47,6 @@ import com.pirxhio.affirmity.data.remote.FirestorePaths
 import com.pirxhio.affirmity.data.remote.FirestoreStreakHealerRepository
 import com.pirxhio.affirmity.data.repository.RoomStreakHealerRepository
 import kotlinx.coroutines.tasks.await
-
-private const val EXTRA_START_DESTINATION = "start_destination"
-private const val HOME_DESTINATION = "AFIRMACIONES"
 
 /** Per-habit fill colors; empty color for an incomplete half. */
 private val MEDITATION_COLOR = Color(0xFF00696F)
@@ -156,7 +155,7 @@ internal fun WeeklyTrackerContent(
     val context = LocalContext.current
     val tapIntent = Intent(context, MainActivity::class.java).apply {
         setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        putExtra(EXTRA_START_DESTINATION, HOME_DESTINATION)
+        putExtra(EXTRA_START_DESTINATION, AppDestinations.AFIRMACIONES.name)
     }
 
     Box(

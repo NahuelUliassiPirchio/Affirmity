@@ -26,6 +26,21 @@ interface CatalogAffirmationDao {
     @Query("SELECT COUNT(*) FROM catalog_affirmations")
     suspend fun count(): Int
 
+    /** Carousel projection: ids only, in feed order. Never loads text. */
+    @Query(
+        "SELECT id, groupId, collectionId FROM catalog_affirmations " +
+            "WHERE groupId = :groupId ORDER BY sortOrder ASC, id ASC",
+    )
+    suspend fun getRefsByGroupId(groupId: String): List<CatalogAffirmationRef>
+
+    /** Whole-catalog projection for the free fallback (~2k rows of three short columns). */
+    @Query("SELECT id, groupId, collectionId FROM catalog_affirmations ORDER BY groupId ASC, sortOrder ASC")
+    suspend fun getAllRefs(): List<CatalogAffirmationRef>
+
+    /** Single full row, used to load text only for the frame being shown. */
+    @Query("SELECT * FROM catalog_affirmations WHERE id = :id")
+    suspend fun getById(id: String): CatalogAffirmationEntity?
+
     /** Seed path only (design D13). `@Transaction` makes replace-then-insert atomic. */
     @Transaction
     suspend fun replaceAll(rows: List<CatalogAffirmationEntity>) {

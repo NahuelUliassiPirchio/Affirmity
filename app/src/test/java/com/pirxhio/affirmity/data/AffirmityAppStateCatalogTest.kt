@@ -7,6 +7,7 @@ import com.pirxhio.affirmity.auth.AuthState
 import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.local.AffirmationImageStore
 import com.pirxhio.affirmity.data.local.CatalogAffirmationEntity
+import com.pirxhio.affirmity.data.local.CatalogAffirmationRef
 import com.pirxhio.affirmity.data.local.ChannelSettings
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.DailyMoodEntity
@@ -424,6 +425,9 @@ private class RecordingSeederDao(private val rowCount: Int = 0) : com.pirxhio.af
     override fun observeByGroupIds(groupIds: Set<String>): Flow<List<CatalogAffirmationEntity>> = flowOf(emptyList())
     override suspend fun getByIds(ids: List<String>): List<CatalogAffirmationEntity> = emptyList()
     override suspend fun count(): Int = rowCount
+    override suspend fun getRefsByGroupId(groupId: String): List<CatalogAffirmationRef> = emptyList()
+    override suspend fun getAllRefs(): List<CatalogAffirmationRef> = emptyList()
+    override suspend fun getById(id: String): CatalogAffirmationEntity? = null
     override suspend fun replaceAll(rows: List<CatalogAffirmationEntity>) {
         calls += "replaceAll"
     }

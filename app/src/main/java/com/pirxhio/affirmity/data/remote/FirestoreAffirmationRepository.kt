@@ -1,6 +1,7 @@
 package com.pirxhio.affirmity.data.remote
 
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.SetOptions
 import com.pirxhio.affirmity.data.local.AffirmationEntity
 import com.pirxhio.affirmity.data.repository.AffirmationRepository
@@ -8,6 +9,9 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+
+/** Owned rows plus whether the snapshot came from the local cache only (not confirmed by the server). */
+data class OwnedSnapshot(val rows: List<AffirmationEntity>, val fromCache: Boolean)
 
 /**
  * [AffirmationRepository] backed by `users/{uid}/affirmations`. Snapshot-listener reads,
@@ -29,6 +33,28 @@ class FirestoreAffirmationRepository(
                 return@addSnapshotListener
             }
             trySend(snapshot?.documents.orEmpty().mapNotNull { doc -> doc.data?.let(::affirmationFromMap) })
+        }
+        awaitClose { registration.remove() }
+    }
+
+    /**
+     * Like [observeAll] but exposes cache provenance; used by the widget (R6.3). Other callers unaffected.
+     * Metadata changes are included: when the server confirms a cached result without changing its
+     * documents (for example an empty collection), only the metadata differs, and without them that
+     * confirmation would never arrive.
+     */
+    fun observeAllWithSource(): Flow<OwnedSnapshot> = callbackFlow {
+        val registration = collection().addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
+            if (error != null) {
+                close(error)
+                return@addSnapshotListener
+            }
+            trySend(
+                OwnedSnapshot(
+                    rows = snapshot?.documents.orEmpty().mapNotNull { doc -> doc.data?.let(::affirmationFromMap) },
+                    fromCache = snapshot?.metadata?.isFromCache ?: true,
+                ),
+            )
         }
         awaitClose { registration.remove() }
     }
