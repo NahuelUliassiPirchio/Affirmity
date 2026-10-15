@@ -82,6 +82,8 @@ class RoomFavoriteAffirmationRepositoryTest {
 
         override fun observeFavoriteIds(): Flow<List<String>> = observedIds
 
+        override suspend fun getFavoriteIds(): List<String> = emptyList()
+
         override suspend fun isFavorite(id: String): Boolean {
             isFavoriteId = id
             return isFavoriteResult

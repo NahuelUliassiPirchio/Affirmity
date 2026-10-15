@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.data.catalog
 import androidx.core.os.LocaleListCompat
 import com.pirxhio.affirmity.data.local.CatalogAffirmationDao
 import com.pirxhio.affirmity.data.local.CatalogAffirmationEntity
+import com.pirxhio.affirmity.data.local.CatalogAffirmationRef
 import com.pirxhio.affirmity.data.local.CatalogPreferences
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
@@ -51,6 +52,10 @@ class CatalogLocaleSwitcherTest {
             throw NotImplementedError()
         override suspend fun getByIds(ids: List<String>): List<CatalogAffirmationEntity> = emptyList()
         override suspend fun count(): Int = 1
+        override suspend fun getRefsByGroupId(groupId: String): List<CatalogAffirmationRef> = emptyList()
+        override suspend fun getRefsByCollectionIdsChunk(ids: List<String>): List<CatalogAffirmationRef> = emptyList()
+        override suspend fun getAllRefs(): List<CatalogAffirmationRef> = emptyList()
+        override suspend fun getById(id: String): CatalogAffirmationEntity? = null
         override suspend fun replaceAll(rows: List<CatalogAffirmationEntity>) {
             if (failNextReplace) {
                 failNextReplace = false

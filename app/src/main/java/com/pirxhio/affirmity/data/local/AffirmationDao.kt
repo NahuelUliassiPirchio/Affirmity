@@ -10,6 +10,10 @@ interface AffirmationDao {
     @Query("SELECT * FROM affirmations ORDER BY rowid ASC")
     fun observeAll(): Flow<List<AffirmationEntity>>
 
+    /** One-shot read of the owned affirmations (carousel widget). */
+    @Query("SELECT * FROM affirmations ORDER BY rowid ASC")
+    suspend fun getAll(): List<AffirmationEntity>
+
     @Insert
     suspend fun insert(entity: AffirmationEntity)
 
