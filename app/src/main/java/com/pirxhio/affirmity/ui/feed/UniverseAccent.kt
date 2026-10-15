@@ -43,6 +43,9 @@ private val UniverseAccents: Map<String, Color> = mapOf(
     "purpose_identity_direction" to Color(0xFFE08BC4), // orchid
 )
 
+/** Non-composable lookup for surfaces outside Compose (e.g. the Glance widget); `null` when unknown. */
+internal fun universeAccentOrNull(groupId: String): Color? = UniverseAccents[groupId]
+
 /** Accent for [groupId], falling back to the theme's `primary` for any id the map doesn't know --
  *  a future catalog regeneration adding a universe degrades to on-brand teal instead of crashing
  *  or rendering an unstyled tile. */

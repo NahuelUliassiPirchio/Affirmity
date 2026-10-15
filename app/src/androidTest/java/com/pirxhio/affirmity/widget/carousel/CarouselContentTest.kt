@@ -1,6 +1,8 @@
 package com.pirxhio.affirmity.widget.carousel
 
 import android.content.Intent
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import androidx.glance.appwidget.testing.unit.runGlanceAppWidgetUnitTest
 import androidx.glance.testing.unit.hasClickAction
 import androidx.glance.testing.unit.hasStartActivityClickAction
@@ -77,6 +79,37 @@ class CarouselContentTest {
 
             // The only clickable node is the root tap target that opens the app.
             onAllNodes(hasClickAction()).assertCountEquals(1)
+        }
+    }
+
+    private val themed = CarouselTheme(SourceTitle.Text("Self-worth"), CarouselTheme.Default.highlight)
+
+    @Test
+    fun mediumHeaderShowsTheUppercaseThemeAndRefreshGlyph() = runTest {
+        runGlanceAppWidgetUnitTest {
+            provideComposable { CarouselContent(frame(), themed, DpSize(250.dp, 110.dp)) }
+
+            onNode(hasText("SELF-WORTH")).assertExists()
+            onNode(hasText("\u21BB")).assertExists()
+        }
+    }
+
+    @Test
+    fun smallShowsOnlyTheStarInTheHeader() = runTest {
+        runGlanceAppWidgetUnitTest {
+            provideComposable { CarouselContent(frame(), themed, DpSize(110.dp, 110.dp)) }
+
+            onNode(hasText("SELF-WORTH")).assertDoesNotExist()
+            onNode(hasText("\u2726")).assertExists()
+        }
+    }
+
+    @Test
+    fun largeHeaderShowsTheBrandAndTheme() = runTest {
+        runGlanceAppWidgetUnitTest {
+            provideComposable { CarouselContent(frame(), themed, DpSize(250.dp, 250.dp)) }
+
+            onNode(hasText("AFFIRMITY \u00B7 SELF-WORTH")).assertExists()
         }
     }
 }

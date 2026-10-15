@@ -7,6 +7,7 @@ import androidx.glance.GlanceId
 import androidx.glance.LocalContext
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
+import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
 import androidx.glance.state.GlanceStateDefinition
 import androidx.glance.state.PreferencesGlanceStateDefinition
@@ -30,6 +31,9 @@ class AffirmationCarouselWidget : GlanceAppWidget() {
 
     override val stateDefinition: GlanceStateDefinition<*> = PreferencesGlanceStateDefinition
 
+    // Small, medium and large layouts of design 8; Glance picks the largest that fits the host cell.
+    override val sizeMode: SizeMode = SizeMode.Responsive(CAROUSEL_RESPONSIVE_SIZES)
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val store = GlanceCarouselStateStore(context, id)
         val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
@@ -45,8 +49,27 @@ class AffirmationCarouselWidget : GlanceAppWidget() {
         // Strings follow the same locale the catalog text was seeded in (R8.1), whichever process
         // path triggered the update (worker, receiver, or the app).
         val localized = context.withCatalogLocale()
+        val theme = themeFor(context, outcome)
         provideContent {
-            CompositionLocalProvider(LocalContext provides localized) { CarouselContent(outcome.frame) }
+            CompositionLocalProvider(LocalContext provides localized) { CarouselContent(outcome.frame, theme) }
+        }
+    }
+
+    /** Header name and marker colour; never fails the render (falls back to the untitled default). */
+    private suspend fun themeFor(context: Context, outcome: RenderOutcome): CarouselTheme {
+        val source = outcome.state.source
+        return try {
+            val userCollections = if (source is CarouselSource.Collection) {
+                AffirmityDatabase.getInstance(context).userCollectionDao().getAll().map { it.collection }
+            } else {
+                emptyList()
+            }
+            carouselTheme(source, outcome.state.fallback, userCollections = userCollections)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Carousel theme lookup failed", e)
+            CarouselTheme.Default
         }
     }
 

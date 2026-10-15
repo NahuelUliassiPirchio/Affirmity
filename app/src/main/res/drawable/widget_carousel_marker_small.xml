@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hand-drawn corner marker (design 8). White so the widget can tint it with the theme highlight. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="100dp"
+    android:height="100dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M52,-4 C74,6 90,0 104,-2 L104,44 C88,38 70,42 58,32 C52,20 56,8 52,-4 Z" />
+</vector>
