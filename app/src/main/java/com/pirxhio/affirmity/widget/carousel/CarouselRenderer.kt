@@ -36,8 +36,11 @@ class CarouselFrameResolver(private val catalogRow: suspend (String) -> CatalogA
             AffirmationTemplateParser.parse(TemplateField.SUBTITLE, subtitle).render(overrides)
 }
 
-/** Result of one render: the state to persist and the frame to draw (`null` = placeholder). */
-data class RenderOutcome(val state: CarouselState, val frame: CarouselFrame?)
+/**
+ * Result of one render: the state to persist and the frame to draw (`null` = placeholder).
+ * A [stale] outcome was produced for an account that is no longer signed in: it must not be stored.
+ */
+data class RenderOutcome(val state: CarouselState, val frame: CarouselFrame?, val stale: Boolean = false)
 
 /** Pure orchestration of one widget render: pool -> queue -> frame -> state to persist. */
 class CarouselRenderer(
@@ -76,7 +79,9 @@ class CarouselRenderer(
  * Runs [render] so that no failure can blank the widget or crash the host. [resolveAccount] and
  * [render] both run inside the guard; on failure the last free frame is replayed only when it
  * belongs to the same account, otherwise the placeholder is shown and the stored frame dropped.
- * [CancellationException] is always rethrown.
+ * The account is resolved again once the render is done: if it changed (or cannot be resolved)
+ * while loading, the result belongs to someone else, so the placeholder is shown and the outcome
+ * is marked [RenderOutcome.stale] so it is never stored. [CancellationException] is always rethrown.
  */
 suspend fun renderGuarded(
     state: CarouselState,
@@ -85,7 +90,7 @@ suspend fun renderGuarded(
     render: suspend (account: String) -> RenderOutcome,
 ): RenderOutcome {
     var account: String? = null
-    return try {
+    val outcome = try {
         account = resolveAccount()
         render(account)
     } catch (e: CancellationException) {
@@ -96,4 +101,14 @@ suspend fun renderGuarded(
         val last = account?.let { scoped.replayableLast(it) }
         RenderOutcome(scoped, last?.let { CarouselFrame(it.text, it.subtitle, null, isFreeTier = true) })
     }
+    if (account == null) return outcome
+    val stillSameAccount = try {
+        resolveAccount() == account
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        onError(e)
+        false
+    }
+    return if (stillSameAccount) outcome else RenderOutcome(state.withoutLast(), null, stale = true)
 }

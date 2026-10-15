@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.widget.carousel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -73,5 +74,49 @@ class CarouselGuardedRenderTest {
         renderGuarded(stored, { account }, onError = { reported = it }) { throw IllegalStateException("boom") }
 
         assertEquals("boom", reported?.message)
+    }
+
+    /** Answers [first] once, then [then] for every later call (a sign-out or switch mid-load). */
+    private fun switchingAccount(first: String, then: String): () -> String {
+        var calls = 0
+        return { if (calls++ == 0) first else then }
+    }
+
+    @Test
+    fun `a render whose account changed while loading is discarded`() = runTest {
+        val loaded = RenderOutcome(stored.copy(order = listOf("y")), CarouselFrame("A's private text", null, null, false))
+
+        val out = renderGuarded(stored, switchingAccount(account, CarouselAccount.of("B"))) { loaded }
+
+        assertNull(out.frame)
+        assertTrue(out.stale)
+    }
+
+    @Test
+    fun `a failed render whose account changed while loading never replays the old account's frame`() = runTest {
+        val out = renderGuarded(stored, switchingAccount(account, CarouselAccount.SIGNED_OUT)) {
+            throw IllegalStateException("boom")
+        }
+
+        assertNull(out.frame)
+        assertTrue(out.stale)
+    }
+
+    @Test
+    fun `an account that cannot be resolved after loading discards the render`() = runTest {
+        var calls = 0
+        val out = renderGuarded(stored, { if (calls++ == 0) account else throw IllegalStateException("auth") }) {
+            RenderOutcome(stored, CarouselFrame("Shown", null, null, true))
+        }
+
+        assertNull(out.frame)
+        assertTrue(out.stale)
+    }
+
+    @Test
+    fun `a render for an unchanged account is not stale`() = runTest {
+        val out = renderGuarded(stored, { account }) { RenderOutcome(stored, CarouselFrame("Shown", null, null, true)) }
+
+        assertFalse(out.stale)
     }
 }

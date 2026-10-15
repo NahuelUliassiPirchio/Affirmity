@@ -44,7 +44,8 @@ class AffirmationCarouselWidget : GlanceAppWidget() {
             withAdvanceConsumed(store) { advance ->
                 val state = store.read()
                 renderInstance(context, appWidgetId, state, advance).also { rendered ->
-                    persist(store, state, rendered)
+                    // A render for an account that signed out or switched meanwhile is never stored.
+                    if (!rendered.stale) persist(store, state, rendered)
                 }
             }
         } catch (e: CancellationException) {
