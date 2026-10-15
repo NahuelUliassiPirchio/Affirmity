@@ -21,6 +21,8 @@ data class CarouselRefreshKey(
     val durable: Map<ContentKey, AdUnlockRecord>,
     val timed: Map<ContentKey, AdUnlockRecord>,
     val favoriteIds: List<String>,
+    /** Signed-in uid, `null` when signed out: sign-in and sign-out must refresh (owned text, W3b). */
+    val uid: String? = null,
 )
 
 /** Emits only when the key actually changed, and only after the changes settle. */

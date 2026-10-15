@@ -19,7 +19,8 @@ class CarouselRefreshTest {
     private fun key(
         tier: AccessTier = AccessTier.FREE,
         favorites: List<String> = emptyList(),
-    ) = CarouselRefreshKey(tier, durable = emptyMap(), timed = emptyMap(), favoriteIds = favorites)
+        uid: String? = null,
+    ) = CarouselRefreshKey(tier, durable = emptyMap(), timed = emptyMap(), favoriteIds = favorites, uid = uid)
 
     private suspend fun collect(steps: List<Pair<Long, CarouselRefreshKey>>): List<CarouselRefreshKey> {
         val seen = mutableListOf<CarouselRefreshKey>()
@@ -84,5 +85,18 @@ class CarouselRefreshTest {
 
         assertEquals(listOf(500L), emittedAt)
         job.cancel()
+    }
+
+    @Test
+    fun `signing in and signing out each trigger a refresh even when nothing else changed`() = runTest {
+        val seen = collect(
+            listOf(
+                0L to key(uid = null),
+                1_000L to key(uid = "u1"),
+                1_000L to key(uid = null),
+            ),
+        )
+
+        assertEquals(listOf(key(uid = null), key(uid = "u1"), key(uid = null)), seen)
     }
 }

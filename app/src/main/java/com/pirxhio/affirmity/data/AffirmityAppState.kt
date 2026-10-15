@@ -960,6 +960,7 @@ class AffirmityAppState(
         durable = durableAdUnlocks.value,
         timed = timedAdUnlocks.value,
         favoriteIds = favoriteOrderedIds.value,
+        uid = (authState.value as? AuthState.SignedIn)?.uid,
     )
 
     private fun publishCarouselRefreshKey() {
@@ -1423,7 +1424,10 @@ class AffirmityAppState(
             }
         }
         scope.launch {
-            authRepository.authState.collect { authState.value = it }
+            authRepository.authState.collect {
+                authState.value = it
+                publishCarouselRefreshKey()
+            }
         }
         scope.launch {
             onboardingPreferences.observeHasCompletedOnboarding().collect { hasCompletedOnboarding.value = it }
