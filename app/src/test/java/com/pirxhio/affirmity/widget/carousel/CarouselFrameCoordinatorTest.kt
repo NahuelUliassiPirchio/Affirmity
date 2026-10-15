@@ -248,4 +248,54 @@ class CarouselFrameCoordinatorTest {
         assertEquals(1, store.updates)
         assertEquals(base, store.state)
     }
+
+    @Test
+    fun `a published frame carries the account it was rendered for`() = runTest {
+        val coordinator = coordinator(FakeStore(base))
+        start(coordinator)
+
+        assertEquals(accountA, coordinator.views.value?.account)
+    }
+
+    @Test
+    fun `a placeholder carries no account`() = runTest {
+        val store = FakeStore(base)
+        store.beforeUpdate = { throw java.io.IOException("disk") }
+        val coordinator = coordinator(store)
+        start(coordinator)
+
+        assertNull(coordinator.views.value?.account)
+    }
+
+    @Test
+    fun `a reload request loads again even when the nonce is covered`() = runTest {
+        val store = FakeStore(base)
+        val coordinator = coordinator(store)
+        start(coordinator)
+        assertEquals("$accountA n0", coordinator.views.value?.frame?.text)
+
+        account = accountB
+        coordinator.requestReload()
+        runCurrent()
+
+        assertEquals(2, renders.size)
+        assertEquals(accountB, coordinator.views.value?.account)
+    }
+
+    @Test
+    fun `cancellation while checking the account before publishing is not swallowed`() = runTest {
+        val store = FakeStore(base)
+        var calls = 0
+        val coordinator = CarouselFrameCoordinator(
+            store = store,
+            resolveAccount = { if (++calls >= 3) throw kotlinx.coroutines.CancellationException("done") else account },
+            render = recordingRender(),
+            style = { CarouselStyle(themed) },
+        )
+
+        val session = start(coordinator)
+
+        assertTrue(session.isCancelled)
+        assertNull(coordinator.views.value)
+    }
 }

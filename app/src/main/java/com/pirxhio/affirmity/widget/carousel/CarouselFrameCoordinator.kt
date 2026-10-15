@@ -2,6 +2,11 @@ package com.pirxhio.affirmity.widget.carousel
 
 import android.content.Context
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,13 +29,28 @@ const val CAROUSEL_LOAD_TIMEOUT_MILLIS = 15_000L
  *
  * @property nonce the refresh nonce of the state this frame was rendered from.
  * @property context resources in the catalog locale; `null` keeps the composition's own context.
+ * @property account whom [frame] belongs to (see [CarouselAccount]); `null` for a placeholder, which
+ *   has no frame and is safe for anyone.
  */
 internal data class CarouselView(
     val frame: CarouselFrame?,
     val theme: CarouselTheme,
     val nonce: Long,
     val context: Context? = null,
+    val account: String? = null,
 )
+
+/**
+ * The view a composition may draw for [currentAccount], resolved when it renders. The coordinator
+ * checks the account when it publishes, but the shared view is drawn later, so a switch in between
+ * must not show the previous account's frame. Returns [view] itself when it is acceptable (a
+ * placeholder, or a frame of [currentAccount]); otherwise the placeholder in the default theme.
+ */
+internal fun viewForRender(view: CarouselView?, currentAccount: String?): CarouselView? {
+    if (view == null || view.frame == null) return view
+    if (currentAccount != null && view.account == currentAccount) return view
+    return view.copy(frame = null, theme = CarouselTheme.Default, account = null)
+}
 
 /** How a frame is drawn: header/marker theme and the localized context for its strings. */
 internal data class CarouselStyle(val theme: CarouselTheme, val context: Context? = null)
@@ -61,6 +81,8 @@ internal class CarouselFrameCoordinator(
 ) {
     private val requested = MutableStateFlow(0L)
     private val published = MutableStateFlow<CarouselView?>(null)
+    private val reloads = Channel<Unit>(Channel.CONFLATED)
+    private val loading = Mutex()
     private var covered = Long.MIN_VALUE
 
     /** The latest frame; `null` only until the first load has finished. */
@@ -71,14 +93,25 @@ internal class CarouselFrameCoordinator(
         requested.update { maxOf(it, nonce) }
     }
 
+    /** Loads again whatever the nonce says, e.g. when a composition found the account changed. */
+    fun requestReload() {
+        reloads.trySend(Unit)
+    }
+
     suspend fun awaitFirstView(): CarouselView = views.filterNotNull().first()
 
     /** Loads the first frame, then one more for every newer request. Runs until cancelled. */
     suspend fun run(): Nothing {
-        load()
-        requested.collect { nonce -> if (needsReload(nonce, covered)) load() }
+        coroutineScope {
+            // Forced and nonce-driven loads share a lock, so only one load runs at a time.
+            launch { for (ignored in reloads) loadExclusively() }
+            loadExclusively()
+            requested.collect { nonce -> if (needsReload(nonce, covered)) loadExclusively() }
+        }
         error("unreachable: a StateFlow never completes")
     }
+
+    private suspend fun loadExclusively() = loading.withLock { load() }
 
     private class Loaded(val outcome: RenderOutcome, val account: String?, val style: CarouselStyle)
 
@@ -112,7 +145,7 @@ internal class CarouselFrameCoordinator(
             loaded == null -> fallbackView(snapshot, account, nonce)
             account == null || account != loaded.account ->
                 CarouselView(null, CarouselTheme.Default, nonce, loaded.style.context)
-            else -> CarouselView(loaded.outcome.frame, loaded.style.theme, nonce, loaded.style.context)
+            else -> CarouselView(loaded.outcome.frame, loaded.style.theme, nonce, loaded.style.context, account)
         }
     }
 
@@ -124,7 +157,9 @@ internal class CarouselFrameCoordinator(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            // A failed write must not hide a frame that was rendered fine.
+            // A failed write must not hide a frame that was rendered fine. An advance consumed by
+            // this load is lost with it (skipped once), the same accepted worst case as a timeout
+            // or a cancelled session; see captureForLoad.
             onError(e)
         }
     }
@@ -133,11 +168,13 @@ internal class CarouselFrameCoordinator(
     private fun fallbackView(snapshot: CarouselState?, account: String?, nonce: Long): CarouselView {
         val replay = account?.let { snapshot?.replayableLast(it) }
         val frame = replay?.let { CarouselFrame(it.text, it.subtitle, null, isFreeTier = true) }
-        return CarouselView(frame, CarouselTheme.Default, nonce)
+        return CarouselView(frame, CarouselTheme.Default, nonce, account = if (frame != null) account else null)
     }
 
     private fun currentAccountOrNull(): String? = try {
         resolveAccount()
+    } catch (e: CancellationException) {
+        throw e
     } catch (e: Exception) {
         onError(e)
         null

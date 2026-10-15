@@ -28,10 +28,12 @@ class CarouselSessionContentTest {
 
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
 
+    private val ME = CarouselAccount.of("me")
+
     private fun prefs(nonce: Long): Preferences = mutablePreferencesOf(CarouselStateCodec.REFRESH_NONCE to nonce)
 
     private fun view(text: String, nonce: Long) =
-        CarouselView(CarouselFrame(text, null, null, isFreeTier = true), CarouselTheme.Default, nonce)
+        CarouselView(CarouselFrame(text, null, null, isFreeTier = true), CarouselTheme.Default, nonce, account = ME)
 
     private fun drawsTheSharedFrameAt(size: DpSize) = runTest {
         val views = MutableStateFlow<CarouselView?>(view("Shared frame", 0))
@@ -40,7 +42,7 @@ class CarouselSessionContentTest {
             setAppWidgetSize(size)
             provideComposable {
                 CompositionLocalProvider(LocalState provides prefs(0)) {
-                    CarouselSessionContent(views, onRefreshRequested = {})
+                    CarouselSessionContent(views, onRefreshRequested = {}, currentAccount = { ME }, onReloadRequested = {})
                 }
             }
 
@@ -67,7 +69,9 @@ class CarouselSessionContentTest {
             setAppWidgetSize(CAROUSEL_RESPONSIVE_SIZES.elementAt(1))
             provideComposable {
                 CompositionLocalProvider(LocalState provides state) {
-                    CarouselSessionContent(views, onRefreshRequested = { reported += it })
+                    CarouselSessionContent(
+                        views, onRefreshRequested = { reported += it }, currentAccount = { ME }, onReloadRequested = {},
+                    )
                 }
             }
             onNode(hasText("Shown")).assertExists()
@@ -76,5 +80,26 @@ class CarouselSessionContentTest {
             awaitIdle()
         }
         assertEquals(listOf(2L, 3L), reported)
+    }
+
+    @Test
+    fun aFrameOfAnotherAccountIsNotDrawnAndAReloadIsRequested() = runTest {
+        var reloads = 0
+        val views = MutableStateFlow<CarouselView?>(view("Someone else's text", 0))
+        runGlanceAppWidgetUnitTest {
+            setContext(context)
+            setAppWidgetSize(CAROUSEL_RESPONSIVE_SIZES.elementAt(1))
+            provideComposable {
+                CompositionLocalProvider(LocalState provides prefs(0)) {
+                    CarouselSessionContent(
+                        views, onRefreshRequested = {}, currentAccount = { CarouselAccount.of("other") },
+                        onReloadRequested = { reloads++ },
+                    )
+                }
+            }
+            onNode(hasText("Someone else's text")).assertDoesNotExist()
+            awaitIdle()
+        }
+        assertEquals(1, reloads)
     }
 }

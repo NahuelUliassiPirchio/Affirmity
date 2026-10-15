@@ -40,7 +40,7 @@ class AffirmationCarouselWidget : GlanceAppWidget() {
         val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
         val coordinator = CarouselFrameCoordinator(
             store = GlanceCarouselStateStore(context, id),
-            resolveAccount = { CarouselAccount.of(FirebaseAuth.getInstance().currentUser?.uid) },
+            resolveAccount = ::currentCarouselAccount,
             render = { state, advance, account -> renderInstance(context, appWidgetId, state, advance, account) },
             style = { state -> CarouselStyle(themeFor(context, state), localized(context)) },
             onError = { Log.w(TAG, "Carousel load failed for widget $appWidgetId", it) },
@@ -50,7 +50,14 @@ class AffirmationCarouselWidget : GlanceAppWidget() {
         coroutineScope {
             launch { coordinator.run() }
             coordinator.awaitFirstView()
-            provideContent { CarouselSessionContent(coordinator.views, coordinator::request) }
+            provideContent {
+                CarouselSessionContent(
+                    views = coordinator.views,
+                    onRefreshRequested = coordinator::request,
+                    currentAccount = ::currentCarouselAccountOrNull,
+                    onReloadRequested = coordinator::requestReload,
+                )
+            }
         }
     }
 
@@ -108,4 +115,14 @@ internal fun Context.withCatalogLocale(): Context {
     val locale = java.util.Locale.forLanguageTag(CatalogLocale.resolve().tag)
     val configuration = android.content.res.Configuration(resources.configuration).apply { setLocale(locale) }
     return createConfigurationContext(configuration)
+}
+
+/** The signed-in account right now; `FirebaseAuth.currentUser` is a synchronous getter. */
+private fun currentCarouselAccount(): String = CarouselAccount.of(FirebaseAuth.getInstance().currentUser?.uid)
+
+/** Same, for rendering: an unresolvable account is `null` and draws the placeholder. */
+private fun currentCarouselAccountOrNull(): String? = try {
+    currentCarouselAccount()
+} catch (e: Exception) {
+    null
 }
