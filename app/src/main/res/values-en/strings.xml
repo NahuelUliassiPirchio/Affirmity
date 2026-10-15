@@ -1083,4 +1083,11 @@
     <string name="groups_duplicate_copy_suffix">(copy)</string>
     <string name="groups_duplicate_copy_suffix_numbered">(copy %1$d)</string>
     <string name="groups_action_in_feed">Show in your feed</string>
+    <!-- Affirmation carousel widget -->
+    <string name="carousel_notice_source_missing">That source no longer exists. Showing free affirmations.</string>
+    <string name="carousel_notice_source_empty">That source is empty. Showing free affirmations.</string>
+    <string name="carousel_notice_source_locked">That source requires Pro. Showing free affirmations.</string>
+    <string name="carousel_notice_data_unavailable">Couldn\'t load your content. Showing free affirmations.</string>
+    <string name="carousel_placeholder">Open the app to get started</string>
+    <string name="carousel_widget_description">A different affirmation every 15 minutes</string>
 </resources>
