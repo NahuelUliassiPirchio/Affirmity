@@ -3,9 +3,10 @@ package com.pirxhio.affirmity.widget.carousel
 import android.content.Intent
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.glance.appwidget.testing.unit.GlanceAppWidgetUnitTest
 import androidx.glance.appwidget.testing.unit.runGlanceAppWidgetUnitTest
 import androidx.glance.testing.unit.hasClickAction
-import androidx.glance.testing.unit.hasStartActivityClickAction
+import androidx.glance.appwidget.testing.unit.hasStartActivityClickAction
 import androidx.glance.testing.unit.hasText
 import androidx.test.platform.app.InstrumentationRegistry
 import com.pirxhio.affirmity.MainActivity
@@ -18,12 +19,20 @@ class CarouselContentTest {
 
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
 
+    /** The unit-test harness has no default context; Glance reads LocalContext, so supply it. */
+    private suspend fun glanceTest(size: DpSize = DpSize(250.dp, 110.dp), block: GlanceAppWidgetUnitTest.() -> Unit) =
+        runGlanceAppWidgetUnitTest {
+            setContext(context)
+            setAppWidgetSize(size)
+            block()
+        }
+
     private fun frame(notice: FallbackReason? = null, subtitle: String? = "Always") =
         CarouselFrame(text = "I am enough", subtitle = subtitle, notice = notice, isFreeTier = true)
 
     @Test
     fun showsTextAndSubtitle() = runTest {
-        runGlanceAppWidgetUnitTest {
+        glanceTest {
             provideComposable { CarouselContent(frame()) }
 
             onNode(hasText("I am enough")).assertExists()
@@ -33,7 +42,7 @@ class CarouselContentTest {
 
     @Test
     fun omitsSubtitleWhenAbsent() = runTest {
-        runGlanceAppWidgetUnitTest {
+        glanceTest {
             provideComposable { CarouselContent(frame(subtitle = null)) }
 
             onNode(hasText("I am enough")).assertExists()
@@ -44,11 +53,11 @@ class CarouselContentTest {
     @Test
     fun noticeIsShownOnlyForFallback() = runTest {
         val notice = context.getString(noticeStringRes(FallbackReason.SOURCE_LOCKED))
-        runGlanceAppWidgetUnitTest {
+        glanceTest {
             provideComposable { CarouselContent(frame(notice = FallbackReason.SOURCE_LOCKED)) }
             onNode(hasText(notice)).assertExists()
         }
-        runGlanceAppWidgetUnitTest {
+        glanceTest {
             provideComposable { CarouselContent(frame(notice = null)) }
             onNode(hasText(notice)).assertDoesNotExist()
         }
@@ -56,7 +65,7 @@ class CarouselContentTest {
 
     @Test
     fun emptyCatalogShowsThePlaceholder() = runTest {
-        runGlanceAppWidgetUnitTest {
+        glanceTest {
             provideComposable { CarouselContent(null) }
 
             onNode(hasText(context.getString(R.string.carousel_placeholder))).assertExists()
@@ -65,16 +74,16 @@ class CarouselContentTest {
 
     @Test
     fun tappingTheBodyStartsMainActivity() = runTest {
-        runGlanceAppWidgetUnitTest {
+        glanceTest {
             provideComposable { CarouselContent(frame()) }
 
-            onNode(hasStartActivityClickAction<MainActivity>()).assertExists()
+            onNode(hasStartActivityClickAction(Intent(context, MainActivity::class.java))).assertExists()
         }
     }
 
     @Test
     fun hasNoPreviousOrNextControls() = runTest {
-        runGlanceAppWidgetUnitTest {
+        glanceTest {
             provideComposable { CarouselContent(frame()) }
 
             // The only clickable node is the root tap target that opens the app.
@@ -86,7 +95,7 @@ class CarouselContentTest {
 
     @Test
     fun mediumHeaderShowsTheUppercaseThemeAndRefreshGlyph() = runTest {
-        runGlanceAppWidgetUnitTest {
+        glanceTest(DpSize(250.dp, 110.dp)) {
             provideComposable { CarouselContent(frame(), themed, DpSize(250.dp, 110.dp)) }
 
             onNode(hasText("SELF-WORTH")).assertExists()
@@ -96,7 +105,7 @@ class CarouselContentTest {
 
     @Test
     fun smallShowsOnlyTheStarInTheHeader() = runTest {
-        runGlanceAppWidgetUnitTest {
+        glanceTest(DpSize(110.dp, 110.dp)) {
             provideComposable { CarouselContent(frame(), themed, DpSize(110.dp, 110.dp)) }
 
             onNode(hasText("SELF-WORTH")).assertDoesNotExist()
@@ -106,7 +115,7 @@ class CarouselContentTest {
 
     @Test
     fun largeHeaderShowsTheBrandAndTheme() = runTest {
-        runGlanceAppWidgetUnitTest {
+        glanceTest(DpSize(250.dp, 250.dp)) {
             provideComposable { CarouselContent(frame(), themed, DpSize(250.dp, 250.dp)) }
 
             onNode(hasText("AFFIRMITY \u00B7 SELF-WORTH")).assertExists()

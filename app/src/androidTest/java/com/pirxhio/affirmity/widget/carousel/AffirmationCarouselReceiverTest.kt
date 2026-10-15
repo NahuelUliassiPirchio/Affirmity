@@ -1,6 +1,7 @@
 package com.pirxhio.affirmity.widget.carousel
 
 import android.annotation.SuppressLint
+import android.appwidget.AppWidgetHost
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
@@ -15,6 +16,7 @@ import androidx.work.Configuration
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
+import java.io.File
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -39,11 +41,18 @@ class AffirmationCarouselReceiverTest {
     private fun workInfos() = WorkManager.getInstance(context)
         .getWorkInfosForUniqueWork(CarouselRotationSchedule.UNIQUE_WORK_NAME).get()
 
+    private val host by lazy { AppWidgetHost(context, 9201) }
+
+    /** Deleting through the host makes the system deliver a real ACTION_APPWIDGET_DELETED. */
+    private fun deleteViaHost(appWidgetId: Int) = host.deleteAppWidgetId(appWidgetId)
+
     @Test
     fun onEnabled_schedulesTheRotation() {
         AffirmationCarouselReceiver().onEnabled(context)
 
-        assertEquals(WorkInfo.State.ENQUEUED, workInfos().single().state)
+        // The test executor may start the job immediately, so any live (non-finished) state is a pass.
+        val state = workInfos().single().state
+        assertTrue("expected a live state but was $state", state == WorkInfo.State.ENQUEUED || state == WorkInfo.State.RUNNING)
     }
 
     @Test
@@ -72,8 +81,10 @@ class AffirmationCarouselReceiverTest {
 
     @Test
     fun onDeleted_removesOnlyTheDeletedInstancesState() = runBlocking {
-        val one = AppWidgetId(9001)
-        val two = AppWidgetId(9002)
+        val oneId = bindRealCarouselWidgetId(context, host)
+        val twoId = bindRealCarouselWidgetId(context, host)
+        val one = AppWidgetId(oneId)
+        val two = AppWidgetId(twoId)
         listOf(one, two).forEach { id ->
             updateAppWidgetState(context, PreferencesGlanceStateDefinition, id) { prefs ->
                 prefs.toMutablePreferences().also {
@@ -82,27 +93,32 @@ class AffirmationCarouselReceiverTest {
             }
         }
 
-        AffirmationCarouselReceiver().onDeleted(context, intArrayOf(9001))
+        val file0 = File(context.filesDir, "datastore/appWidget-$oneId.preferences_pb")
+        assertTrue("fixture state should exist before deletion", file0.exists())
+        deleteViaHost(oneId)
 
+        // Reading the deleted store through Glance would race its own store teardown (two DataStores
+        // on one file), so assert on the backing file that Glance's deleteStore removes.
+        val file = File(context.filesDir, "datastore/appWidget-$oneId.preferences_pb")
         var removed = false
         for (attempt in 0 until 50) {
-            val state = CarouselStateCodec.read(getAppWidgetState(context, PreferencesGlanceStateDefinition, one))
-            if (state.source == null) {
+            if (!file.exists()) {
                 removed = true
                 break
             }
             delay(100)
         }
-        assertTrue("state(9001) should be removed", removed)
+        assertTrue("state of the deleted instance should be removed", removed)
         val kept = CarouselStateCodec.read(getAppWidgetState(context, PreferencesGlanceStateDefinition, two))
         assertEquals(CarouselSource.Favorites, kept.source)
         // Clean up the surviving fixture.
-        AffirmationCarouselReceiver().onDeleted(context, intArrayOf(9002))
+        deleteViaHost(twoId)
     }
 
     @Test
     fun onDeleted_forAnIdWithoutStateDoesNotFail() {
-        // Must simply not throw.
-        AffirmationCarouselReceiver().onDeleted(context, intArrayOf(424242))
+        // Must simply not crash the process; delivered through the system so goAsync has a PendingResult.
+        deleteViaHost(bindRealCarouselWidgetId(context, host))
+        Thread.sleep(500)
     }
 }

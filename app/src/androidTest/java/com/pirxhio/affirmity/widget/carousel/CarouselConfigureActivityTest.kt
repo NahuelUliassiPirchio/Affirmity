@@ -2,6 +2,7 @@ package com.pirxhio.affirmity.widget.carousel
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.appwidget.AppWidgetHost
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
 import android.content.ComponentName
@@ -20,6 +21,8 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 
@@ -28,12 +31,22 @@ import org.junit.Test
 class CarouselConfigureActivityTest {
 
     private lateinit var context: Context
-    private val appWidgetId = 9100
+    private val foreignId = 9100
+    private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
+    private lateinit var host: AppWidgetHost
 
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         WorkManagerTestInitHelper.initializeTestWorkManager(context, Configuration.Builder().build())
+        // A real id bound to our provider: the activity rejects ids the system does not map to it.
+        host = AppWidgetHost(context, HOST_ID)
+        appWidgetId = bindRealCarouselWidgetId(context, host)
+    }
+
+    @After
+    fun tearDown() {
+        host.deleteAppWidgetId(appWidgetId)
     }
 
     private fun launchIntent() = Intent(context, CarouselConfigureActivity::class.java)
@@ -55,6 +68,21 @@ class CarouselConfigureActivityTest {
     }
 
     @Test
+    fun aForeignWidgetId_isRejectedCanceledAndStoresNothing() {
+        val intent = Intent(context, CarouselConfigureActivity::class.java)
+            .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, foreignId)
+
+        ActivityScenario.launchActivityForResult<CarouselConfigureActivity>(intent).use { scenario ->
+            assertEquals(Activity.RESULT_CANCELED, scenario.result.resultCode)
+            assertEquals(foreignId, scenario.result.resultData.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1))
+        }
+        val state = runBlocking {
+            CarouselStateCodec.read(getAppWidgetState(context, PreferencesGlanceStateDefinition, AppWidgetId(foreignId)))
+        }
+        assertNull(state.source)
+    }
+
+    @Test
     fun launchedWithoutAWidgetId_finishesCanceled() {
         val intent = Intent(context, CarouselConfigureActivity::class.java)
 
@@ -72,7 +100,8 @@ class CarouselConfigureActivityTest {
         assertEquals(source, storedState().source)
         val info = WorkManager.getInstance(context)
             .getWorkInfosForUniqueWork(CarouselRotationSchedule.UNIQUE_WORK_NAME).get().single()
-        assertEquals(WorkInfo.State.ENQUEUED, info.state)
+        // The test executor may start the job immediately, so any live (non-finished) state is a pass.
+        assertTrue("expected a live state but was ${info.state}", info.state == WorkInfo.State.ENQUEUED || info.state == WorkInfo.State.RUNNING)
     }
 
     @Test
@@ -97,5 +126,9 @@ class CarouselConfigureActivityTest {
 
         assertEquals(ComponentName(context, CarouselConfigureActivity::class.java), info!!.configure)
         assertEquals(0, info.widgetFeatures and AppWidgetProviderInfo.WIDGET_FEATURE_RECONFIGURABLE)
+    }
+
+    private companion object {
+        const val HOST_ID = 9200
     }
 }
