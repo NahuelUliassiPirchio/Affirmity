@@ -1091,4 +1091,7 @@
     <string name="carousel_placeholder">Open the app to get started</string>
     <string name="carousel_widget_label">Affirmation carousel</string>
     <string name="carousel_widget_description">A different affirmation every 15 minutes</string>
+    <string name="carousel_configure_title">Choose what to show</string>
+    <string name="carousel_configure_section_themes">Themes</string>
+    <string name="carousel_configure_cancel">Cancel</string>
 </resources>

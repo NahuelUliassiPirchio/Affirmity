@@ -1160,4 +1160,7 @@
     <string name="carousel_placeholder">Abre la app para empezar</string>
     <string name="carousel_widget_label">Carrusel de afirmaciones</string>
     <string name="carousel_widget_description">Una afirmación distinta cada 15 minutos</string>
+    <string name="carousel_configure_title">Elige qué mostrar</string>
+    <string name="carousel_configure_section_themes">Temas</string>
+    <string name="carousel_configure_cancel">Cancelar</string>
 </resources>

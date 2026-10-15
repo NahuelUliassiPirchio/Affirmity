@@ -41,6 +41,17 @@
                 android:resource="@xml/weekly_tracker_widget_info" />
         </receiver>
 
+        <!-- Exported: the launcher/AppWidgetHost starts it with APPWIDGET_CONFIGURE (R1). -->
+        <activity
+            android:name=".widget.carousel.CarouselConfigureActivity"
+            android:exported="true"
+            android:label="@string/carousel_widget_label"
+            android:theme="@style/Theme.Affirmity">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <receiver
             android:name=".widget.carousel.AffirmationCarouselReceiver"
             android:exported="false"
