@@ -49,7 +49,6 @@ private object Palette {
 
     val star = pair(0xFF2E7F86, 0xFF5BBCC3)
     val header = pair(0xFF6A6E76, 0xFF9AA0A8)
-    val glyph = pair(0xFF6A6E76, 0xFF6B7076)
     val title = pair(0xFF1B1D22, 0xFFF2F3F5)
     val subtitle = pair(0xFF50545C, 0xFFB4B9C0)
     val divider = dayNightColorProvider(day = Color(0x8C2E7F86), night = Color(0x8C5BBCC3))
@@ -57,7 +56,6 @@ private object Palette {
 }
 
 private const val STAR = "\u2726"
-private const val REFRESH_GLYPH = "\u21BB"
 
 /** The localized notice line for a fallback reason (R5.5). */
 fun noticeStringRes(reason: FallbackReason): Int = when (reason) {
@@ -144,7 +142,7 @@ private fun Frame(
             .fillMaxSize()
             .padding(horizontal = spec.paddingHorizontal, vertical = spec.paddingVertical),
     ) {
-        Header(size, spec, headerLabel(size, themeName))
+        Header(headerLabel(size, themeName))
         Spacer(GlanceModifier.defaultWeight())
         Text(
             text = frame.text,
@@ -181,17 +179,13 @@ private fun Frame(
 }
 
 @Composable
-private fun Header(size: CarouselSize, spec: CarouselLayoutSpec, label: String?) {
+private fun Header(label: String?) {
     Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(text = STAR, style = TextStyle(fontSize = 11.sp, color = Palette.star))
         label?.let {
             Spacer(GlanceModifier.width(6.dp))
             // Glance 1.1 has no letter spacing, so the design's 0.6px tracking is not reproduced.
             Text(text = it, maxLines = 1, style = TextStyle(fontSize = 11.sp, color = Palette.header))
-        }
-        if (spec.showRefreshGlyph) {
-            Spacer(GlanceModifier.defaultWeight())
-            Text(text = REFRESH_GLYPH, style = TextStyle(fontSize = 13.sp, color = Palette.glyph))
         }
     }
 }

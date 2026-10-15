@@ -33,24 +33,23 @@ data class CarouselLayoutSpec(
     val subtitleMaxLines: Int,
     val markerAlpha: Float,
     val showDivider: Boolean,
-    val showRefreshGlyph: Boolean,
 )
 
 fun carouselLayoutSpec(size: CarouselSize): CarouselLayoutSpec = when (size) {
     CarouselSize.Small -> CarouselLayoutSpec(
         paddingHorizontal = 14.dp, paddingVertical = 14.dp,
         titleSp = 19f, subtitleSp = 11.5f, titleMaxLines = 4, subtitleMaxLines = 2,
-        markerAlpha = 0.24f, showDivider = false, showRefreshGlyph = false,
+        markerAlpha = 0.24f, showDivider = false,
     )
     CarouselSize.Medium -> CarouselLayoutSpec(
         paddingHorizontal = 16.dp, paddingVertical = 15.dp,
         titleSp = 25f, subtitleSp = 13.5f, titleMaxLines = 3, subtitleMaxLines = 2,
-        markerAlpha = 0.22f, showDivider = false, showRefreshGlyph = true,
+        markerAlpha = 0.22f, showDivider = false,
     )
     CarouselSize.Large -> CarouselLayoutSpec(
         paddingHorizontal = 18.dp, paddingVertical = 18.dp,
         titleSp = 33f, subtitleSp = 16f, titleMaxLines = 6, subtitleMaxLines = Int.MAX_VALUE,
-        markerAlpha = 0.18f, showDivider = true, showRefreshGlyph = false,
+        markerAlpha = 0.18f, showDivider = true,
     )
 }
 

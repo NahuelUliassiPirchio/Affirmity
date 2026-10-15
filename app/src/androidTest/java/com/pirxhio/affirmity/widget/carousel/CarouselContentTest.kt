@@ -94,12 +94,12 @@ class CarouselContentTest {
     private val themed = CarouselTheme(SourceTitle.Text("Self-worth"), CarouselTheme.Default.highlight)
 
     @Test
-    fun mediumHeaderShowsTheUppercaseThemeAndRefreshGlyph() = runTest {
+    fun mediumHeaderShowsTheUppercaseThemeWithoutARefreshGlyph() = runTest {
         glanceTest(DpSize(250.dp, 110.dp)) {
             provideComposable { CarouselContent(frame(), themed, DpSize(250.dp, 110.dp)) }
 
             onNode(hasText("SELF-WORTH")).assertExists()
-            onNode(hasText("\u21BB")).assertExists()
+            onNode(hasText("\u21BB")).assertDoesNotExist()
         }
     }
 

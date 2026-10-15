@@ -36,8 +36,6 @@ class CarouselLayoutTest {
         assertEquals(18.dp, large.paddingHorizontal)
         assertTrue(large.showDivider)
         assertFalse(small.showDivider || medium.showDivider)
-        assertTrue(medium.showRefreshGlyph)
-        assertFalse(small.showRefreshGlyph || large.showRefreshGlyph)
         assertEquals(listOf(0.24f, 0.22f, 0.18f), listOf(small, medium, large).map { it.markerAlpha })
     }
 
