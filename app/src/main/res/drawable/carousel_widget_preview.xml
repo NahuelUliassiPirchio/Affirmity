@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Static picker preview: a teal rounded card with two text lines. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="20dp" />
+            <solid android:color="#FF00696F" />
+        </shape>
+    </item>
+    <item
+        android:left="28dp"
+        android:top="40dp"
+        android:right="28dp"
+        android:bottom="64dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="6dp" />
+            <solid android:color="#CCFFFFFF" />
+        </shape>
+    </item>
+    <item
+        android:left="56dp"
+        android:top="68dp"
+        android:right="56dp"
+        android:bottom="40dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="5dp" />
+            <solid android:color="#80FFFFFF" />
+        </shape>
+    </item>
+</layer-list>

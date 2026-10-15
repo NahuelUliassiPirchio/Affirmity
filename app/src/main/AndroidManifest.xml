@@ -41,6 +41,18 @@
                 android:resource="@xml/weekly_tracker_widget_info" />
         </receiver>
 
+        <receiver
+            android:name=".widget.carousel.AffirmationCarouselReceiver"
+            android:exported="false"
+            android:label="@string/carousel_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/affirmation_carousel_widget_info" />
+        </receiver>
+
         <service
             android:name=".notifications.AffirmityMessagingService"
             android:exported="false">

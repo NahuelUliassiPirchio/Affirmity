@@ -1089,5 +1089,6 @@
     <string name="carousel_notice_source_locked">That source requires Pro. Showing free affirmations.</string>
     <string name="carousel_notice_data_unavailable">Couldn\'t load your content. Showing free affirmations.</string>
     <string name="carousel_placeholder">Open the app to get started</string>
+    <string name="carousel_widget_label">Affirmation carousel</string>
     <string name="carousel_widget_description">A different affirmation every 15 minutes</string>
 </resources>

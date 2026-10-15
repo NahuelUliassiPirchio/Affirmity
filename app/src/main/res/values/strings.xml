@@ -1158,5 +1158,6 @@
     <string name="carousel_notice_source_locked">Esa fuente requiere Pro. Mostrando afirmaciones gratuitas.</string>
     <string name="carousel_notice_data_unavailable">No se pudo cargar tu contenido. Mostrando afirmaciones gratuitas.</string>
     <string name="carousel_placeholder">Abre la app para empezar</string>
+    <string name="carousel_widget_label">Carrusel de afirmaciones</string>
     <string name="carousel_widget_description">Una afirmación distinta cada 15 minutos</string>
 </resources>
