@@ -40,7 +40,6 @@ class CarouselRotationRunnerTest {
             render(store) { load(id) }
         }
 
-    // --- S2.3 ---
 
     @Test
     fun `each instance advances by one position`() = runTest {
@@ -70,7 +69,6 @@ class CarouselRotationRunnerTest {
         assertEquals(stateAt(5), store.state)
     }
 
-    // --- S10.1 ---
 
     @Test
     fun `instances advance within their own queues`() = runTest {
@@ -83,11 +81,10 @@ class CarouselRotationRunnerTest {
 
         rotate(stores) { id -> if (id == 1) poolA else poolB }
 
-        assertEquals("a2", stores.getValue(1).state.queue.current())
-        assertEquals("b2", stores.getValue(2).state.queue.current())
+        assertEquals("a2", stores.getValue(1).state.queue.currentOrNull())
+        assertEquals("b2", stores.getValue(2).state.queue.currentOrNull())
     }
 
-    // --- S10.2 ---
 
     @Test
     fun `a failing instance does not stop the others`() = runTest {
@@ -112,7 +109,7 @@ class CarouselRotationRunnerTest {
         assertTrue(thrown is CancellationException)
     }
 
-    // --- D4/W3: the pending flag is consumed before the heavy load ---
+    // --- the pending flag is consumed before the heavy load ---
 
     @Test
     fun `the flag is read and cleared before the load runs`() = runTest {
@@ -135,6 +132,44 @@ class CarouselRotationRunnerTest {
 
         runCatching { render(store) { error("firestore down") } }
 
+        assertFalse(store.state.advancePending)
+    }
+
+    // --- requestAdvance ---
+
+    @Test
+    fun `requestAdvance leaves the flag raised when the update request succeeds`() = runTest {
+        val store = InMemoryStore(stateAt(0))
+
+        requestAdvance(store) { }
+
+        assertTrue(store.state.advancePending)
+    }
+
+    @Test
+    fun `requestAdvance clears the flag when the update request fails`() = runTest {
+        val store = InMemoryStore(stateAt(0))
+
+        val outcomes = CarouselRotationRunner.runAll(listOf(1)) {
+            requestAdvance(store) { throw java.io.IOException("update failed") }
+        }
+
+        assertTrue(outcomes.getValue(1) is RotationOutcome.Failed)
+        assertFalse(store.state.advancePending)
+    }
+
+    @Test
+    fun `requestAdvance clears the flag and rethrows on cancellation`() = runTest {
+        val store = InMemoryStore(stateAt(0))
+        var cancelled = false
+
+        try {
+            requestAdvance(store) { throw CancellationException("stop") }
+        } catch (e: CancellationException) {
+            cancelled = true
+        }
+
+        assertTrue(cancelled)
         assertFalse(store.state.advancePending)
     }
 }
