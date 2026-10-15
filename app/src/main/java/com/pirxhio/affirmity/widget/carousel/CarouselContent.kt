@@ -36,28 +36,30 @@ import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import androidx.glance.color.ColorProvider as dayNightColorProvider
 import androidx.glance.unit.ColorProvider
+import com.pirxhio.affirmity.AppDestinations
+import com.pirxhio.affirmity.EXTRA_START_DESTINATION
 import com.pirxhio.affirmity.MainActivity
 import com.pirxhio.affirmity.R
-
-/** Extras understood by `MainActivity` to open on the affirmations tab (same as the tracker widget). */
-private const val EXTRA_START_DESTINATION = "start_destination"
-private const val HOME_DESTINATION = "AFIRMACIONES"
 
 /** Design 8 palette as (light, dark) pairs, resolved by the system day/night mode. */
 private object Palette {
     fun pair(light: Long, dark: Long) = dayNightColorProvider(day = Color(light), night = Color(dark))
 
-    val star = pair(0xFF2E7F86, 0xFF5BBCC3)
-    val header = pair(0xFF6A6E76, 0xFF9AA0A8)
+    private val starDay = Color(0xFF2E7F86)
+    private val starNight = Color(0xFF5BBCC3)
+
+    val star = dayNightColorProvider(day = starDay, night = starNight)
+    val divider = dayNightColorProvider(day = starDay.copy(alpha = 0.55f), night = starNight.copy(alpha = 0.55f))
+
+    /** Header label and fallback notice share one muted tone. */
+    val muted = pair(0xFF6A6E76, 0xFF9AA0A8)
     val title = pair(0xFF1B1D22, 0xFFF2F3F5)
     val subtitle = pair(0xFF50545C, 0xFFB4B9C0)
-    val divider = dayNightColorProvider(day = Color(0x8C2E7F86), night = Color(0x8C5BBCC3))
-    val notice = pair(0xFF6A6E76, 0xFF9AA0A8)
 }
 
 private const val STAR = "\u2726"
 
-/** The localized notice line for a fallback reason (R5.5). */
+/** The localized notice line for a fallback reason. */
 fun noticeStringRes(reason: FallbackReason): Int = when (reason) {
     FallbackReason.SOURCE_MISSING -> R.string.carousel_notice_source_missing
     FallbackReason.SOURCE_EMPTY -> R.string.carousel_notice_source_empty
@@ -66,8 +68,8 @@ fun noticeStringRes(reason: FallbackReason): Int = when (reason) {
 }
 
 /**
- * Pure content composable (R11.2): renders a precomputed [frame], no I/O. A `null` frame shows the
- * localized placeholder. The whole card is one tap target that opens the app (R9); there are
+ * Pure content composable: renders a precomputed [frame], no I/O. A `null` frame shows the
+ * localized placeholder. The whole card is one tap target that opens the app; there are
  * intentionally no previous/next controls. Layout (small, medium, large) follows [size], the
  * responsive size Glance is currently rendering.
  */
@@ -80,7 +82,7 @@ internal fun CarouselContent(
     val context = LocalContext.current
     val tapIntent = Intent(context, MainActivity::class.java).apply {
         setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        putExtra(EXTRA_START_DESTINATION, HOME_DESTINATION)
+        putExtra(EXTRA_START_DESTINATION, AppDestinations.AFIRMACIONES.name)
     }
     val cardSize = carouselSizeFor(size.width, size.height)
     val spec = carouselLayoutSpec(cardSize)
@@ -172,7 +174,7 @@ private fun Frame(
                 text = context.getString(noticeStringRes(it)),
                 maxLines = 2,
                 modifier = GlanceModifier.padding(top = 6.dp),
-                style = TextStyle(fontSize = 10.sp, color = Palette.notice),
+                style = TextStyle(fontSize = 10.sp, color = Palette.muted),
             )
         }
     }
@@ -185,7 +187,7 @@ private fun Header(label: String?) {
         label?.let {
             Spacer(GlanceModifier.width(6.dp))
             // Glance 1.1 has no letter spacing, so the design's 0.6px tracking is not reproduced.
-            Text(text = it, maxLines = 1, style = TextStyle(fontSize = 11.sp, color = Palette.header))
+            Text(text = it, maxLines = 1, style = TextStyle(fontSize = 11.sp, color = Palette.muted))
         }
     }
 }
