@@ -47,6 +47,15 @@ suspend fun <T> withAdvanceConsumed(store: CarouselStateStore, load: suspend (ad
 }
 
 /**
+ * The state to store once a render based on [basedOn] produced [rendered], given what is stored
+ * now ([current]). An advance raised while the render was loading is kept. If the source changed
+ * meanwhile (the configure screen saved one), the render is stale and [current] is kept untouched:
+ * the update that came with the new source renders it.
+ */
+fun mergeRendered(current: CarouselState, basedOn: CarouselState, rendered: CarouselState): CarouselState =
+    if (current.source != basedOn.source) current else rendered.copy(advancePending = current.advancePending)
+
+/**
  * Raises `advancePending` and asks for an update. If the update request fails, the flag is cleared
  * again so an unrelated later refresh does not advance the carousel unexpectedly.
  */

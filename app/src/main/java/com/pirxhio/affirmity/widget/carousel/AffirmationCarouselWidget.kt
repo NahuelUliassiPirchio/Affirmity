@@ -44,7 +44,7 @@ class AffirmationCarouselWidget : GlanceAppWidget() {
             withAdvanceConsumed(store) { advance ->
                 val state = store.read()
                 renderInstance(context, appWidgetId, state, advance).also { rendered ->
-                    persist(store, rendered)
+                    persist(store, state, rendered)
                 }
             }
         } catch (e: CancellationException) {
@@ -69,10 +69,9 @@ class AffirmationCarouselWidget : GlanceAppWidget() {
     }
 
     /** A failed write must not hide a frame that was rendered fine. */
-    private suspend fun persist(store: GlanceCarouselStateStore, rendered: RenderOutcome) {
+    private suspend fun persist(store: GlanceCarouselStateStore, basedOn: CarouselState, rendered: RenderOutcome) {
         try {
-            // Keep any advance request a worker raised while this render was loading.
-            store.update { current -> rendered.state.copy(advancePending = current.advancePending) }
+            store.update { current -> mergeRendered(current, basedOn, rendered.state) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
