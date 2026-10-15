@@ -1094,4 +1094,18 @@
     <string name="carousel_configure_title">Choose what to show</string>
     <string name="carousel_configure_section_themes">Themes</string>
     <string name="carousel_configure_cancel">Cancel</string>
+
+    <!-- Widget picker previews -->
+    <string name="widget_preview_carousel_title">I am enough exactly as I am</string>
+    <string name="widget_preview_carousel_subtitle">Take a deep breath and stay with this thought.</string>
+    <string name="widget_preview_carousel_theme">SELF-ESTEEM</string>
+    <string name="weekly_tracker_widget_description">Your week of affirmations and meditations at a glance</string>
+    <string name="widget_preview_day_1">S</string>
+    <string name="widget_preview_day_2">M</string>
+    <string name="widget_preview_day_3">T</string>
+    <string name="widget_preview_day_4">W</string>
+    <string name="widget_preview_day_5">T</string>
+    <string name="widget_preview_day_6">F</string>
+    <string name="widget_preview_day_7">S</string>
+
 </resources>

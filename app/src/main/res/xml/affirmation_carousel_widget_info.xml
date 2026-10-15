@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- No android:reconfigurable: v1 does not support changing the source after placement. -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="UnusedAttribute"
     android:configure="com.pirxhio.affirmity.widget.carousel.CarouselConfigureActivity"
     android:description="@string/carousel_widget_description"
     android:minWidth="110dp"
@@ -12,6 +14,7 @@
     android:targetCellWidth="4"
     android:targetCellHeight="2"
     android:previewImage="@drawable/carousel_widget_preview"
+    android:previewLayout="@layout/carousel_widget_preview"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
     android:updatePeriodMillis="0" />

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Picker-only backdrop: the real widget floats a translucent card over the wallpaper, which a preview doesn't have. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="20dp" />
+    <solid android:color="@color/widget_preview_tracker_backdrop" />
+</shape>

@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Static picker preview: the dark design-8 card with a teal corner marker and text lines. -->
+<!-- Static picker preview below API 31: the dark design-8 card with a teal corner marker and text lines.
+     Layers are explicitly sized and placed by gravity, so the geometry never depends on the canvas. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
+            <size android:width="250dp" android:height="130dp" />
             <corners android:radius="22dp" />
             <solid android:color="#FF0F1216" />
             <stroke
@@ -10,41 +12,35 @@
                 android:color="#12FFFFFF" />
         </shape>
     </item>
-    <item
-        android:left="120dp"
-        android:top="1dp"
-        android:right="1dp"
-        android:bottom="100dp">
+    <!-- Corner marker, inset 1dp to stay inside the stroke. -->
+    <item android:gravity="top|right" android:top="1dp" android:right="1dp" android:width="80dp" android:height="80dp">
         <shape android:shape="rectangle">
             <corners android:topRightRadius="22dp" android:bottomLeftRadius="30dp" />
             <solid android:color="#385AB3C8" />
         </shape>
     </item>
-    <item
-        android:left="20dp"
-        android:top="28dp"
-        android:right="150dp"
-        android:bottom="110dp">
+    <!-- Theme label. -->
+    <item android:gravity="top|left" android:left="20dp" android:top="24dp" android:width="56dp" android:height="8dp">
         <shape android:shape="rectangle">
             <corners android:radius="3dp" />
             <solid android:color="#995BBCC3" />
         </shape>
     </item>
-    <item
-        android:left="20dp"
-        android:top="96dp"
-        android:right="70dp"
-        android:bottom="48dp">
+    <!-- Title, two lines. -->
+    <item android:gravity="top|left" android:left="20dp" android:top="48dp" android:width="140dp" android:height="16dp">
         <shape android:shape="rectangle">
             <corners android:radius="6dp" />
             <solid android:color="#FFF2F3F5" />
         </shape>
     </item>
-    <item
-        android:left="20dp"
-        android:top="124dp"
-        android:right="110dp"
-        android:bottom="28dp">
+    <item android:gravity="top|left" android:left="20dp" android:top="70dp" android:width="110dp" android:height="16dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="6dp" />
+            <solid android:color="#FFF2F3F5" />
+        </shape>
+    </item>
+    <!-- Subtitle. -->
+    <item android:gravity="top|left" android:left="20dp" android:top="98dp" android:width="130dp" android:height="8dp">
         <shape android:shape="rectangle">
             <corners android:radius="4dp" />
             <solid android:color="#80B4B9C0" />

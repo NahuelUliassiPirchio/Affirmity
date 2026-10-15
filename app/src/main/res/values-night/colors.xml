@@ -14,4 +14,10 @@
     <color name="notif_mood_bg">#FF12312F</color>
     <color name="notif_mood_accent">#FF5BBCC3</color>
     <color name="notif_mood_text">#FFD7F0EE</color>
+
+    <color name="widget_preview_title">#FFF2F3F5</color>
+    <color name="widget_preview_subtitle">#FFB4B9C0</color>
+    <color name="widget_preview_muted">#FF9AA0A8</color>
+    <color name="widget_preview_star">#FF5BBCC3</color>
+
 </resources>

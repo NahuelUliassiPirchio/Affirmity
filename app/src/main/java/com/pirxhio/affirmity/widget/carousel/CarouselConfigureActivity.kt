@@ -6,6 +6,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import androidx.annotation.VisibleForTesting
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.clickable
@@ -153,21 +154,23 @@ private fun SectionHeader(title: String) {
     )
 }
 
+@VisibleForTesting
 @Composable
-private fun OptionRow(option: SourceOption, onPick: (CarouselSource) -> Unit) {
+internal fun OptionRow(option: SourceOption, onPick: (CarouselSource) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onPick(option.source) }
             .padding(horizontal = 16.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val title = when (val t = option.title) {
             is SourceTitle.Res -> stringResource(t.id)
             is SourceTitle.Text -> t.value
         }
-        Text(title, style = MaterialTheme.typography.bodyLarge)
+        // Weighted, so the badge is measured first at its natural width and the title wraps.
+        Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
         option.badge?.let { AffirmationGroupAccessBadge(it) }
     }
     HorizontalDivider()
