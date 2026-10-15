@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -78,6 +79,41 @@ class AffirmityAppStateFavoritesTest {
         assertEquals("affirmation-1", added.first)
         assertTrue(added.second >= before)
         assertTrue(added.second <= System.currentTimeMillis())
+    }
+
+    // --- carousel widget refresh (S8.2, S8.3, S8.4) ---
+
+    @Test
+    fun `a favorites change refreshes the carousel widget once after the debounce`() = runTest {
+        var carouselRefreshes = 0
+        val state = buildState(backgroundScope, RecordingFavoritesRepository()) { carouselRefreshes++ }
+        runCurrent()
+        advanceTimeBy(1_000)
+        val baseline = carouselRefreshes
+
+        state.toggleFavorite("affirmation-1")
+        runCurrent()
+        advanceTimeBy(499)
+        assertEquals("debounce window still open", baseline, carouselRefreshes)
+        advanceTimeBy(1)
+        runCurrent()
+
+        assertEquals(baseline + 1, carouselRefreshes)
+    }
+
+    @Test
+    fun `recording a viewed affirmation does not refresh the carousel widget`() = runTest {
+        var carouselRefreshes = 0
+        val state = buildState(backgroundScope, RecordingFavoritesRepository()) { carouselRefreshes++ }
+        runCurrent()
+        advanceTimeBy(1_000)
+        val baseline = carouselRefreshes
+
+        state.recordAffirmationViewed()
+        runCurrent()
+        advanceTimeBy(2_000)
+
+        assertEquals(baseline, carouselRefreshes)
     }
 
     @Test
@@ -319,6 +355,7 @@ private fun buildState(
     scope: CoroutineScope,
     favorites: FavoriteAffirmationRepository,
     affirmations: RecordingAffirmationRepository = RecordingAffirmationRepository(),
+    carouselWidgetUpdater: WidgetUpdater = WidgetUpdater { },
 ): AffirmityAppState {
     val trackerPreferences = mock(TrackerPreferences::class.java)
     whenever(trackerPreferences.observeAffirmationsViewedToday())
@@ -356,6 +393,7 @@ private fun buildState(
         notificationDebugLog = notificationDebugLog,
         notifier = mock(Notifier::class.java),
         widgetUpdater = WidgetUpdater { },
+        carouselWidgetUpdater = carouselWidgetUpdater,
         authRepository = SignedOutAuthRepository,
         fcmTokenRepository = mock(FcmTokenRepository::class.java),
         onboardingRepository = mock(FirestoreOnboardingRepository::class.java),

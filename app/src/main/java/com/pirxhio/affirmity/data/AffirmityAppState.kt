@@ -152,6 +152,9 @@ import com.pirxhio.affirmity.access.isUnlocked
 import com.pirxhio.affirmity.ui.myaffirmations.customAffirmationAccessDecision
 import com.pirxhio.affirmity.ui.theme.GroupHighlight
 import com.pirxhio.affirmity.widget.WeeklyTrackerWidget
+import com.pirxhio.affirmity.widget.carousel.AffirmationCarouselWidget
+import com.pirxhio.affirmity.widget.carousel.CarouselRefreshKey
+import com.pirxhio.affirmity.widget.carousel.carouselRefreshTriggers
 import androidx.glance.appwidget.updateAll
 import java.util.TimeZone
 import kotlin.random.Random
@@ -160,12 +163,14 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -495,6 +500,9 @@ class AffirmityAppState(
      * class keep compiling unchanged; every real call site injects a real instance. */
     private val notificationCanceller: NotificationCanceller? = null,
     private val widgetUpdater: WidgetUpdater,
+    /** Refreshes the affirmation carousel widget. A SECOND updater rather than an extension of
+     *  [widgetUpdater], so tracker toggles never rebuild the carousel (carousel design D8). */
+    private val carouselWidgetUpdater: WidgetUpdater = WidgetUpdater { },
     private val authRepository: AuthRepository,
     private val fcmTokenRepository: FcmTokenRepository,
     private val fcmTokenProvider: suspend () -> String = {
@@ -945,6 +953,19 @@ class AffirmityAppState(
     var timedAdUnlocks = mutableStateOf<Map<ContentKey, AdUnlockRecord>>(emptyMap())
         private set
 
+    private val carouselRefreshKey = MutableStateFlow(carouselKeyFromState())
+
+    private fun carouselKeyFromState() = CarouselRefreshKey(
+        tier = entitlementTier.value,
+        durable = durableAdUnlocks.value,
+        timed = timedAdUnlocks.value,
+        favoriteIds = favoriteOrderedIds.value,
+    )
+
+    private fun publishCarouselRefreshKey() {
+        carouselRefreshKey.value = carouselKeyFromState()
+    }
+
     /** The complete grant state fed to `groupAccessDecision`/`resolveAccess` (design §9). */
     val adUnlockState: AdUnlockState
         get() = AdUnlockState(sessionAdUnlocks.value, durableAdUnlocks.value, timedAdUnlocks.value)
@@ -1119,6 +1140,7 @@ class AffirmityAppState(
                 scope = CatalogLocaleSwitcher.processScope,
                 seeder = it,
                 applyLocales = { locales -> AppCompatDelegate.setApplicationLocales(locales) },
+                onSettled = { carouselWidgetUpdater.refresh() },
             )
         }
     }
@@ -1149,7 +1171,27 @@ class AffirmityAppState(
                 .catch { error -> Log.e(TAG, "favorites flow failed", error) }
                 .collect { ids ->
                     favoriteOrderedIds.value = ids
+                    publishCarouselRefreshKey()
                     favoriteAffirmationIds.value = ids.toSet()
+                }
+        }
+        scope.launch {
+            // Carousel widget (R8.2/R8.3): rebuild when the favorites or the access inputs change.
+            // Fed by explicit publishes from the collectors above rather than `snapshotFlow`, which
+            // needs global snapshot notifications that do not run off the UI (and in JVM tests).
+            // The initial value is dropped so a cold start does not rebuild every instance.
+            carouselRefreshKey
+                .drop(1)
+                .carouselRefreshTriggers()
+                .catch { error -> Log.e(TAG, "carousel refresh flow failed", error) }
+                .collect {
+                    try {
+                        carouselWidgetUpdater.refresh()
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (error: Exception) {
+                        Log.e(TAG, "carousel widget refresh failed", error)
+                    }
                 }
         }
         scope.launch {
@@ -1466,14 +1508,20 @@ class AffirmityAppState(
             // can never survive a sign-in/sign-out swap.
             session.flatMapLatest { it.adUnlocks.observeDurableUnlocks() }
                 .catch { error -> Log.e(TAG, "durable ad-unlock flow failed", error) }
-                .collect { records -> durableAdUnlocks.value = records.associateBy(AdUnlockRecord::key) }
+                .collect { records ->
+                    durableAdUnlocks.value = records.associateBy(AdUnlockRecord::key)
+                    publishCarouselRefreshKey()
+                }
         }
         scope.launch {
             // TIMED_REPEATABLE grants (design D16) -- same flatMapLatest-per-swap shape as the
             // durable collector above, but reading the SEPARATE `observeTimedUnlocks()` stream.
             session.flatMapLatest { it.adUnlocks.observeTimedUnlocks() }
                 .catch { error -> Log.e(TAG, "timed ad-unlock flow failed", error) }
-                .collect { records -> timedAdUnlocks.value = records.associateBy(AdUnlockRecord::key) }
+                .collect { records ->
+                    timedAdUnlocks.value = records.associateBy(AdUnlockRecord::key)
+                    publishCarouselRefreshKey()
+                }
         }
         scope.launch {
             // Same class of problem as the healer-grant collector above (design.md D8): reset the
@@ -1521,6 +1569,7 @@ class AffirmityAppState(
                     }
                     entitlementFlowInitialized = true
                     entitlementTier.value = entitlement.tier
+                    publishCarouselRefreshKey()
                     entitlementResolved.value = true
                 }
         }
@@ -2609,6 +2658,7 @@ fun rememberAffirmityAppState(userGoalsStore: UserGoalsStore): AffirmityAppState
             notifier = Notifier(context.applicationContext, notificationDebugLog),
             notificationCanceller = NotificationCanceller(context.applicationContext),
             widgetUpdater = widgetUpdater(context.applicationContext),
+            carouselWidgetUpdater = carouselWidgetUpdater(context.applicationContext),
             fcmTokenRepository = FcmTokenRepository(firestore),
             onboardingRepository = FirestoreOnboardingRepository(firestore),
             favorites = RoomFavoriteAffirmationRepository(database.favoriteAffirmationDao()),
@@ -2674,4 +2724,9 @@ fun rememberAffirmityAppState(userGoalsStore: UserGoalsStore): AffirmityAppState
 /** Pushes a Glance `updateAll` for [WeeklyTrackerWidget] (D9). */
 private fun widgetUpdater(context: android.content.Context): WidgetUpdater = WidgetUpdater {
     WeeklyTrackerWidget().updateAll(context)
+}
+
+/** Pushes a Glance `updateAll` for the affirmation carousel (kept apart from [widgetUpdater]). */
+private fun carouselWidgetUpdater(context: android.content.Context): WidgetUpdater = WidgetUpdater {
+    AffirmationCarouselWidget().updateAll(context)
 }

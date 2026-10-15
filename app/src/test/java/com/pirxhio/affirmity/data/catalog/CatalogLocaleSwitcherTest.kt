@@ -98,6 +98,7 @@ class CatalogLocaleSwitcherTest {
         applyEffect: () -> Unit = {},
         scope: CoroutineScope = this,
         seedDispatcher: CoroutineDispatcher? = null,
+        onSettled: suspend () -> Unit = {},
     ) = CatalogLocaleSwitcher(
         scope = scope,
         seeder = seeder,
@@ -106,6 +107,7 @@ class CatalogLocaleSwitcherTest {
             applyEffect()
         },
         seedDispatcher = seedDispatcher ?: StandardTestDispatcher(testScheduler),
+        onSettled = onSettled,
     )
 
     private fun TestScope.trackingSeedDispatcher(): CoroutineDispatcher {
@@ -132,6 +134,30 @@ class CatalogLocaleSwitcherTest {
 
         assertEquals(listOf("replace:en", "marker:1.0.0|en", "apply"), events)
         assertEquals("1.0.0|en", marker.value) // reconcile resolved EN -> marker matched -> no-op
+    }
+
+    @Test
+    fun `onSettled fires once after apply and the reconcile have finished`() = runTest {
+        val sw = switcher(
+            applyEffect = { effective = CatalogLocale.EN },
+            onSettled = { events += "settled" },
+        )
+
+        sw.switch(CatalogLocale.EN, locales).join()
+
+        assertEquals(listOf("replace:en", "marker:1.0.0|en", "apply", "settled"), events)
+    }
+
+    @Test
+    fun `a failing onSettled does not break the switch`() = runTest {
+        val sw = switcher(
+            applyEffect = { effective = CatalogLocale.EN },
+            onSettled = { error("widget update failed") },
+        )
+
+        sw.switch(CatalogLocale.EN, locales).join()
+
+        assertEquals("1.0.0|en", marker.value)
     }
 
     @Test

@@ -2,7 +2,9 @@ package com.pirxhio.affirmity.widget.carousel
 
 import android.content.Context
 import android.util.Log
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.glance.GlanceId
+import androidx.glance.LocalContext
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.provideContent
@@ -10,6 +12,7 @@ import androidx.glance.state.GlanceStateDefinition
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.pirxhio.affirmity.data.catalog.CatalogLocale
 import com.pirxhio.affirmity.data.local.AffirmityDatabase
 import kotlin.random.Random
 import kotlinx.coroutines.CancellationException
@@ -39,7 +42,12 @@ class AffirmationCarouselWidget : GlanceAppWidget() {
             }
         }
 
-        provideContent { CarouselContent(outcome.frame) }
+        // Strings follow the same locale the catalog text was seeded in (R8.1), whichever process
+        // path triggered the update (worker, receiver, or the app).
+        val localized = context.withCatalogLocale()
+        provideContent {
+            CompositionLocalProvider(LocalContext provides localized) { CarouselContent(outcome.frame) }
+        }
     }
 
     private suspend fun renderInstance(
@@ -67,4 +75,11 @@ class AffirmationCarouselWidget : GlanceAppWidget() {
             RenderOutcome(state, last?.let { CarouselFrame(it.text, it.subtitle, null, isFreeTier = true) })
         }
     }
+}
+
+/** A context whose resources use the effective app/catalog locale (not just the system's). */
+internal fun Context.withCatalogLocale(): Context {
+    val locale = java.util.Locale.forLanguageTag(CatalogLocale.resolve().tag)
+    val configuration = android.content.res.Configuration(resources.configuration).apply { setLocale(locale) }
+    return createConfigurationContext(configuration)
 }
