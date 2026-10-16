@@ -2,6 +2,7 @@ package com.pirxhio.affirmity.widget
 
 import android.content.Context
 import android.content.Intent
+import android.util.TypedValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -176,7 +177,7 @@ internal fun WeeklyTrackerContent(
     }
     val size = LocalSize.current
     val streakVisible = hasAny && generalStreakDays > 0
-    val layout = computeTrackerLayout(size.width.value, size.height.value, streakVisible)
+    val layout = computeTrackerLayout(size.width.value, size.height.value, streakVisible, spToDpFor(context))
     val a11y = trackerA11yStrings(context, generalStreakDays)
 
     Box(
@@ -199,7 +200,7 @@ internal fun WeeklyTrackerContent(
                 }
                 Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     if (layout.streakPlacement == StreakPlacement.LeadingRow) {
-                        Row(modifier = GlanceModifier.width(STRIP_STREAK_WIDTH_DP.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(modifier = GlanceModifier.width(layout.leadingStreakWidth.dp), verticalAlignment = Alignment.CenterVertically) {
                             StreakCounter(streak, flameSize = STRIP_STREAK_FLAME_DP.dp, numberSize = STRIP_STREAK_SP.sp)
                         }
                         Spacer(modifier = GlanceModifier.width(12.dp))
@@ -214,20 +215,33 @@ internal fun WeeklyTrackerContent(
                         healedDays = healedDays,
                         a11y = a11y,
                     )
-                    if (layout.tier != WidgetTier.Tall) {
+                    val besideStreak = layout.streakPlacement == StreakPlacement.BesideGrid
+                    if (layout.tier != WidgetTier.Tall && (layout.legendVisible || besideStreak)) {
                         Spacer(modifier = GlanceModifier.width(12.dp))
                         Column(horizontalAlignment = Alignment.Start) {
-                            if (layout.streakPlacement == StreakPlacement.BesideGrid) {
+                            if (besideStreak) {
                                 StreakCounter(streak, flameSize = 18.dp, numberSize = REGULAR_STREAK_SP.sp)
-                                Spacer(modifier = GlanceModifier.height(SIDE_COLUMN_GAP_DP.dp))
+                                if (layout.legendVisible) Spacer(modifier = GlanceModifier.height(SIDE_COLUMN_GAP_DP.dp))
                             }
-                            Legend(layout.legendSizeSp.sp, dotSize = 9.dp, gap = LEGEND_ROW_GAP_DP.dp)
+                            if (layout.legendVisible) {
+                                Legend(layout.legendSizeSp.sp, dotSize = 9.dp, gap = LEGEND_ROW_GAP_DP.dp)
+                            }
                         }
                     }
                 }
             }
         }
     }
+}
+
+/**
+ * Converts sp to dp with the context's real display metrics, so line heights and digit widths
+ * follow the user's font scale (including Android 14+ non-linear scaling). Built from the current
+ * context on every composition, never cached.
+ */
+private fun spToDpFor(context: Context): (Float) -> Float {
+    val metrics = context.resources.displayMetrics
+    return { sp -> TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, metrics) / metrics.density }
 }
 
 private data class StreakInfo(val days: Int, val isTodayDone: Boolean)
@@ -278,7 +292,7 @@ private fun EmptyState(compact: Boolean) {
 @androidx.compose.runtime.Composable
 private fun TallHeader(layout: TrackerLayout, streak: StreakInfo) {
     val context = LocalContext.current
-    Row(modifier = GlanceModifier.fillMaxWidth().height(TALL_HEADER_HEIGHT_DP.dp), verticalAlignment = Alignment.Top) {
+    Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
         Column(modifier = GlanceModifier.defaultWeight()) {
             if (layout.streakPlacement == StreakPlacement.Header) {
                 StreakCounter(streak, flameSize = 34.dp, numberSize = TALL_STREAK_SP.sp)
@@ -293,7 +307,7 @@ private fun TallHeader(layout: TrackerLayout, streak: StreakInfo) {
             }
         }
         Column(modifier = GlanceModifier.padding(top = 4.dp)) {
-            Legend(13.sp, dotSize = 10.dp, gap = 5.dp)
+            Legend(layout.legendSizeSp.sp, dotSize = 10.dp, gap = TALL_LEGEND_GAP_DP.dp)
         }
     }
 }
