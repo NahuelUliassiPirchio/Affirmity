@@ -1,13 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Outline ring drawn behind a day cell to mark "today" (D8); tinted via ColorFilter. -->
+<!-- Outline ring drawn around a day cell to mark "today" (D8); tinted via ColorFilter. The ring
+     nearly touches the viewport edge, so size the Image slightly larger than the cell it frames. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="26dp"
     android:height="26dp"
-    android:viewportWidth="26"
-    android:viewportHeight="26">
+    android:viewportWidth="100"
+    android:viewportHeight="100">
     <path
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.6"
+        android:strokeWidth="4"
         android:fillColor="#00000000"
-        android:pathData="M13,2 A11,11 0 1,1 12.99,2 Z" />
+        android:pathData="M50,2 A48,48 0 1,1 49.99,2 Z" />
 </vector>

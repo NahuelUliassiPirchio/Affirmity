@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Frosted rounded-card surface behind the whole widget (D8); no border/blur available in Glance. -->
+<!-- Rounded card surface behind the whole widget (D8): Nocturne surface #232532 at 84% with a
+     hairline border (neutral-300 #CFD3E5 at 12%). Blur is not available in Glance. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <corners android:radius="20dp" />
-    <solid android:color="#33FFFFFF" />
+    <corners android:radius="22dp" />
+    <solid android:color="#D6232532" />
+    <stroke
+        android:width="1dp"
+        android:color="#1FCFD3E5" />
 </shape>

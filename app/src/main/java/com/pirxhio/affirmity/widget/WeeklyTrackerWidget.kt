@@ -2,7 +2,10 @@ package com.pirxhio.affirmity.widget
 
 import android.content.Context
 import android.content.Intent
+import android.util.TypedValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
@@ -25,6 +28,13 @@ import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.Spacer
+import androidx.glance.layout.fillMaxWidth
+import androidx.glance.layout.height
+import androidx.glance.semantics.contentDescription
+import androidx.glance.semantics.semantics
+import java.text.DateFormatSymbols
+import java.util.Calendar
+import java.util.Locale
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
@@ -48,16 +58,25 @@ import com.pirxhio.affirmity.data.remote.FirestoreStreakHealerRepository
 import com.pirxhio.affirmity.data.repository.RoomStreakHealerRepository
 import kotlinx.coroutines.tasks.await
 
-/** Per-habit fill colors; empty color for an incomplete half. */
-private val MEDITATION_COLOR = Color(0xFF00696F)
-private val AFFIRMATION_COLOR = Color(0xFFC77B58)
-private val EMPTY_COLOR = Color(0x33FFFFFF)
-private val TODAY_RING_COLOR = Color(0xFFFFFFFF)
-private val UNLIT_STREAK_COLOR = Color(0xFF8A8A8A)
-private val CELL_SIZE = 26.dp
+/**
+ * Palette. The habit hues are the previous #C77B58 / #00696F lifted for contrast on the dark card:
+ * oklch(0.74 0.11 48) -> #E3956C, oklch(0.72 0.09 195) -> #57B6B6, flame oklch(0.80 0.14 62) ->
+ * #FDA856 (OKLab -> linear sRGB -> gamma, all in gamut). The rest are Nocturne tokens: text
+ * #E9E9ED, neutral-300/400/500, accent-300 for the healed heart.
+ */
+private val MEDITATION_COLOR = Color(0xFF57B6B6)
+private val AFFIRMATION_COLOR = Color(0xFFE3956C)
+private val EMPTY_COLOR = Color(0x38B2B6CA) // neutral-400 at 22%
+private val TEXT_COLOR = Color(0xFFE9E9ED)
+private val LETTER_COLOR = Color(0xFF9397AB) // neutral-500
+private val STREAK_PENDING_NUMBER_COLOR = Color(0xFFCFD3E5) // neutral-300
+private val STREAK_CAPTION_COLOR = Color(0xFFB2B6CA) // neutral-400
+private val FLAME_LIT_COLOR = Color(0xFFFDA856)
+private val FLAME_DIM_COLOR = Color(0xCC9397AB) // neutral-500 at 80%
+private val HEALED_HEART_COLOR = Color(0xFFD2CEFD) // accent-300
 
-/** Content-height threshold below which the day-letters row no longer fits without clipping. */
-private val LETTERS_ROW_THRESHOLD = 60.dp
+/** Space the today ring takes around a cell; mirrors the allowance in [computeTrackerLayout]. */
+private const val RING_ALLOWANCE_DP = 6
 
 /**
  * Weekly tracker home-screen widget (spec: home-widget). Reads a snapshot from Room *before*
@@ -65,10 +84,9 @@ private val LETTERS_ROW_THRESHOLD = 60.dp
  * refreshed by explicit `updateAll` calls from [com.pirxhio.affirmity.data.WidgetUpdater] and
  * [DayRolloverWorker], not by live composition.
  *
- * [SizeMode.Exact] recomposes with the real current size on every resize, so the content can drop
- * the day-letters row instead of clipping when the user drags the widget below its full height. The
- * "Afirmar"/"Meditar" legend sits beside the grid (not stacked below it), so it costs width, not
- * extra height.
+ * [SizeMode.Exact] recomposes with the real current size on every resize, so the content reflows
+ * across three height tiers (strip / regular / tall) and scales its cells to the room available;
+ * see [computeTrackerLayout].
  */
 class WeeklyTrackerWidget : GlanceAppWidget() {
 
@@ -157,158 +175,324 @@ internal fun WeeklyTrackerContent(
         setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         putExtra(EXTRA_START_DESTINATION, AppDestinations.AFIRMACIONES.name)
     }
+    val size = LocalSize.current
+    val streakVisible = hasAny && generalStreakDays > 0
+    val layout = computeTrackerLayout(size.width.value, size.height.value, streakVisible, spToDpFor(context))
+    val a11y = trackerA11yStrings(context, generalStreakDays)
 
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
             .background(ImageProvider(com.pirxhio.affirmity.R.drawable.widget_card_bg))
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-            .clickable(actionStartActivity(tapIntent)),
+            .padding(layout.padding.dp)
+            .clickable(actionStartActivity(tapIntent))
+            .semantics { contentDescription = widgetDescription(hasAny, generalStreakDays, isTodayDone, a11y) },
         contentAlignment = Alignment.Center,
     ) {
         if (!hasAny) {
-            EmptyState()
+            EmptyState(compact = size.height < 76.dp)
         } else {
-            WeekGrid(
-                rows = rows,
-                weekStart = weekStart,
-                todayIndex = todayIndex,
-                dayLetters = dayLetters,
-                healedDays = healedDays,
-            )
-        }
-        // Overlaid rather than laid out inline, so it never grows the widget's content height —
-        // this full-size Box only positions its own child, independent of the centered content above.
-        if (generalStreakDays > 0) {
-            // A tintable vector, not the 🔥 emoji: emoji are colored bitmap glyphs and ignore
-            // ColorFilter/text color, so they can't be dimmed for the "unlit" (today not done) state.
-            val streakColor = if (isTodayDone) TODAY_RING_COLOR else UNLIT_STREAK_COLOR
-            Box(modifier = GlanceModifier.fillMaxSize(), contentAlignment = Alignment.TopEnd) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(
-                        provider = ImageProvider(com.pirxhio.affirmity.R.drawable.ic_streak_flame),
-                        contentDescription = null,
-                        modifier = GlanceModifier.size(12.dp),
-                        colorFilter = androidx.glance.ColorFilter.tint(GlanceColorProvider(streakColor)),
+            val streak = StreakInfo(generalStreakDays, isTodayDone)
+            Column(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                if (layout.tier == WidgetTier.Tall) {
+                    TallHeader(layout, streak)
+                    Spacer(modifier = GlanceModifier.height(12.dp))
+                }
+                Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    if (layout.streakPlacement == StreakPlacement.LeadingRow) {
+                        Row(modifier = GlanceModifier.width(layout.leadingStreakWidth.dp), verticalAlignment = Alignment.CenterVertically) {
+                            StreakCounter(streak, flameSize = STRIP_STREAK_FLAME_DP.dp, numberSize = layout.leadingStreakSp.sp)
+                        }
+                        Spacer(modifier = GlanceModifier.width(12.dp))
+                    }
+                    WeekGrid(
+                        modifier = GlanceModifier.defaultWeight(),
+                        layout = layout,
+                        rows = rows,
+                        weekStart = weekStart,
+                        todayIndex = todayIndex,
+                        dayLetters = dayLetters,
+                        healedDays = healedDays,
+                        a11y = a11y,
                     )
-                    Text(
-                        text = "$generalStreakDays",
-                        style = TextStyle(fontSize = 10.sp, color = GlanceColorProvider(streakColor)),
-                    )
+                    val besideStreak = layout.streakPlacement == StreakPlacement.BesideGrid
+                    if (layout.tier != WidgetTier.Tall && (layout.legendVisible || besideStreak)) {
+                        Spacer(modifier = GlanceModifier.width(12.dp))
+                        Column(horizontalAlignment = Alignment.Start) {
+                            if (besideStreak) {
+                                StreakCounter(streak, flameSize = REGULAR_STREAK_FLAME_DP.dp, numberSize = REGULAR_STREAK_SP.sp)
+                                if (layout.legendVisible) Spacer(modifier = GlanceModifier.height(SIDE_COLUMN_GAP_DP.dp))
+                            }
+                            if (layout.legendVisible) {
+                                Legend(layout.legendSizeSp.sp, dotSize = 9.dp, gap = LEGEND_ROW_GAP_DP.dp)
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 }
 
+/**
+ * Converts sp to dp with the context's real display metrics, so line heights and digit widths
+ * follow the user's font scale (including Android 14+ non-linear scaling). Built from the current
+ * context on every composition, never cached.
+ */
+private fun spToDpFor(context: Context): (Float) -> Float {
+    val metrics = context.resources.displayMetrics
+    return { sp -> TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, metrics) / metrics.density }
+}
+
+private data class StreakInfo(val days: Int, val isTodayDone: Boolean)
+
+private fun trackerA11yStrings(context: Context, streakDays: Int): TrackerA11yStrings {
+    return TrackerA11yStrings(
+        bothDone = context.getString(com.pirxhio.affirmity.R.string.widget_day_both_done),
+        onlyAffirm = context.getString(com.pirxhio.affirmity.R.string.widget_day_affirm_only),
+        onlyMeditate = context.getString(com.pirxhio.affirmity.R.string.widget_day_meditate_only),
+        nothing = context.getString(com.pirxhio.affirmity.R.string.widget_day_nothing),
+        healed = context.getString(com.pirxhio.affirmity.R.string.widget_day_healed),
+        today = context.getString(com.pirxhio.affirmity.R.string.widget_day_today),
+        streakUnit = context.getString(streakUnitRes(streakDays)),
+        todayDone = context.getString(com.pirxhio.affirmity.R.string.widget_today_done),
+        todayPending = context.getString(com.pirxhio.affirmity.R.string.widget_today_pending),
+        startToday = context.getString(com.pirxhio.affirmity.R.string.widget_empty_state_label),
+    )
+}
+
+private fun streakUnitRes(days: Int): Int =
+    if (days == 1) com.pirxhio.affirmity.R.string.widget_streak_unit_one
+    else com.pirxhio.affirmity.R.string.widget_streak_unit
+
+/** Locale-aware full weekday name for [epochDay] (java.time needs API 26; minSdk is 24). */
+private fun weekdayName(context: Context, epochDay: Long): String {
+    val calendar = DayClock.calendarForEpochDay(epochDay, Calendar.getInstance())
+    val locale: Locale = context.resources.configuration.locales[0]
+    return DateFormatSymbols.getInstance(locale).weekdays[calendar.get(Calendar.DAY_OF_WEEK)]
+}
+
 @androidx.compose.runtime.Composable
-private fun EmptyState() {
+private fun EmptyState(compact: Boolean) {
     // `provideGlance` runs in the app process and hands Glance a real Context, so
     // `context.getString(...)` resolves the same `values/`/`values-en/` catalogs as the rest of
     // the app (D8). `stringResource` (Compose UI) is not usable inside a Glance composition.
     val context = LocalContext.current
     Text(
         text = context.getString(com.pirxhio.affirmity.R.string.widget_empty_state_label),
-        style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 14.sp, color = GlanceColorProvider(TODAY_RING_COLOR)),
+        style = TextStyle(
+            fontWeight = FontWeight.Medium,
+            fontSize = if (compact) 14.sp else 16.sp,
+            color = GlanceColorProvider(TEXT_COLOR),
+        ),
+    )
+}
+
+/** Tall tier: the streak (big number + caption) on the left, the legend on the right. */
+@androidx.compose.runtime.Composable
+private fun TallHeader(layout: TrackerLayout, streak: StreakInfo) {
+    val context = LocalContext.current
+    Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+        Column(modifier = GlanceModifier.defaultWeight()) {
+            if (layout.streakPlacement == StreakPlacement.Header) {
+                StreakCounter(streak, flameSize = 34.dp, numberSize = TALL_STREAK_SP.sp)
+                val status = context.getString(
+                    if (streak.isTodayDone) com.pirxhio.affirmity.R.string.widget_today_done
+                    else com.pirxhio.affirmity.R.string.widget_today_pending,
+                )
+                Text(
+                    text = "${context.getString(streakUnitRes(streak.days))} · $status",
+                    // One line only: the layout reserves a single caption line (the widget's
+                    // content description still carries the full streak and status text).
+                    maxLines = 1,
+                    style = TextStyle(fontSize = TALL_CAPTION_SP.sp, color = GlanceColorProvider(STREAK_CAPTION_COLOR)),
+                )
+            }
+        }
+        Column(modifier = GlanceModifier.padding(top = 4.dp)) {
+            Legend(layout.legendSizeSp.sp, dotSize = 10.dp, gap = TALL_LEGEND_GAP_DP.dp)
+        }
+    }
+}
+
+/**
+ * Flame + count. Lit (filled, warm, bright number) when today is done; outline and dim while
+ * today is still pending. A tintable vector, not the flame emoji: emoji are colored bitmap glyphs
+ * and ignore ColorFilter/text color, so they can't be dimmed.
+ */
+@androidx.compose.runtime.Composable
+private fun StreakCounter(streak: StreakInfo, flameSize: Dp, numberSize: TextUnit) {
+    val lit = streak.isTodayDone
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Image(
+            provider = ImageProvider(
+                if (lit) com.pirxhio.affirmity.R.drawable.ic_streak_flame
+                else com.pirxhio.affirmity.R.drawable.ic_streak_flame_outline,
+            ),
+            contentDescription = null,
+            modifier = GlanceModifier.size(flameSize),
+            colorFilter = androidx.glance.ColorFilter.tint(
+                GlanceColorProvider(if (lit) FLAME_LIT_COLOR else FLAME_DIM_COLOR),
+            ),
+        )
+        Spacer(modifier = GlanceModifier.width(STREAK_FLAME_GAP_DP.dp))
+        Text(
+            text = "${streak.days}",
+            style = TextStyle(
+                fontSize = numberSize,
+                fontWeight = FontWeight.Medium,
+                color = GlanceColorProvider(if (lit) TEXT_COLOR else STREAK_PENDING_NUMBER_COLOR),
+            ),
+        )
+    }
+}
+
+/** "Afirmar"/"Meditar" labels, each led by a dot filled on the side of the cell it stands for. */
+@androidx.compose.runtime.Composable
+private fun Legend(textSize: TextUnit, dotSize: Dp, gap: Dp) {
+    val context = LocalContext.current
+    Column(horizontalAlignment = Alignment.Start) {
+        LegendRow(
+            label = context.getString(com.pirxhio.affirmity.R.string.widget_action_affirm_label),
+            color = AFFIRMATION_COLOR,
+            leftHalfFilled = true,
+            textSize = textSize,
+            dotSize = dotSize,
+        )
+        Spacer(modifier = GlanceModifier.height(gap))
+        LegendRow(
+            label = context.getString(com.pirxhio.affirmity.R.string.widget_action_meditate_label),
+            color = MEDITATION_COLOR,
+            leftHalfFilled = false,
+            textSize = textSize,
+            dotSize = dotSize,
+        )
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun LegendRow(label: String, color: Color, leftHalfFilled: Boolean, textSize: TextUnit, dotSize: Dp) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = GlanceModifier.size(dotSize)) {
+            HalfDisc(left = true, color = if (leftHalfFilled) color else EMPTY_COLOR, size = dotSize)
+            HalfDisc(left = false, color = if (leftHalfFilled) EMPTY_COLOR else color, size = dotSize)
+        }
+        Spacer(modifier = GlanceModifier.width(6.dp))
+        Text(text = label, style = TextStyle(fontSize = textSize, color = GlanceColorProvider(color)))
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun HalfDisc(left: Boolean, color: Color, size: Dp) {
+    Image(
+        provider = ImageProvider(
+            if (left) com.pirxhio.affirmity.R.drawable.half_circle_left
+            else com.pirxhio.affirmity.R.drawable.half_circle_right,
+        ),
+        contentDescription = null,
+        modifier = GlanceModifier.size(size),
+        colorFilter = androidx.glance.ColorFilter.tint(GlanceColorProvider(color)),
     )
 }
 
 @androidx.compose.runtime.Composable
 private fun WeekGrid(
+    modifier: GlanceModifier,
+    layout: TrackerLayout,
     rows: List<DailyCompletionEntity>,
     weekStart: Long,
     todayIndex: Int,
     dayLetters: List<String>,
-    healedDays: Set<Long> = emptySet(),
+    healedDays: Set<Long>,
+    a11y: TrackerA11yStrings,
 ) {
+    val context = LocalContext.current
     val byDay = rows.associateBy { it.epochDay }
-    val availableHeight = LocalSize.current.height
-    val showLetters = availableHeight >= LETTERS_ROW_THRESHOLD
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(horizontalAlignment = Alignment.Start) {
-            Row {
-                for (offset in 0 until 7) {
-                    val day = byDay[weekStart + offset]
+    // Seven equal-weight columns share the grid width, so cells stay centred however wide it is.
+    Column(modifier = modifier) {
+        Row(modifier = GlanceModifier.fillMaxWidth()) {
+            for (offset in 0 until 7) {
+                val epochDay = weekStart + offset
+                val day = byDay[epochDay]
+                val isToday = offset == todayIndex
+                val affirmed = day?.affirmationDone ?: false
+                val meditated = day?.meditationDone ?: false
+                val healed = epochDay in healedDays
+                Box(modifier = GlanceModifier.defaultWeight(), contentAlignment = Alignment.Center) {
                     DayCell(
-                        isToday = offset == todayIndex,
-                        affirmationDone = day?.affirmationDone ?: false,
-                        meditationDone = day?.meditationDone ?: false,
-                        isHealed = (weekStart + offset) in healedDays,
+                        diameter = layout.cellDiameter.dp,
+                        isToday = isToday,
+                        affirmationDone = affirmed,
+                        meditationDone = meditated,
+                        isHealed = healed,
+                        description = cellDescription(weekdayName(context, epochDay), isToday, affirmed, meditated, healed, a11y),
                     )
                 }
             }
-            if (showLetters) {
-                Row(modifier = GlanceModifier.padding(top = 2.dp)) {
-                    for (letter in dayLetters) {
-                        Text(
-                            text = letter,
-                            modifier = GlanceModifier.width(CELL_SIZE),
-                            style = TextStyle(
-                                fontSize = 10.sp,
-                                color = GlanceColorProvider(TODAY_RING_COLOR),
-                                textAlign = TextAlign.Center,
-                            ),
-                        )
-                    }
+        }
+        if (layout.showLetters) {
+            Spacer(modifier = GlanceModifier.height(4.dp))
+            Row(modifier = GlanceModifier.fillMaxWidth()) {
+                for (offset in 0 until 7) {
+                    val isToday = offset == todayIndex
+                    Text(
+                        text = dayLetters.getOrElse(offset) { "" },
+                        modifier = GlanceModifier.defaultWeight(),
+                        style = TextStyle(
+                            fontSize = layout.letterSizeSp.sp,
+                            fontWeight = if (isToday) FontWeight.Medium else FontWeight.Normal,
+                            color = GlanceColorProvider(if (isToday) TEXT_COLOR else LETTER_COLOR),
+                            textAlign = TextAlign.Center,
+                        ),
+                    )
                 }
             }
-        }
-        Spacer(modifier = GlanceModifier.width(10.dp))
-        val context = LocalContext.current
-        Column(horizontalAlignment = Alignment.Start) {
-            Text(
-                text = context.getString(com.pirxhio.affirmity.R.string.widget_action_affirm_label),
-                style = TextStyle(fontSize = 16.sp, color = GlanceColorProvider(AFFIRMATION_COLOR)),
-            )
-            Text(
-                text = context.getString(com.pirxhio.affirmity.R.string.widget_action_meditate_label),
-                modifier = GlanceModifier.padding(top = 1.dp),
-                style = TextStyle(fontSize = 16.sp, color = GlanceColorProvider(MEDITATION_COLOR)),
-            )
         }
     }
 }
 
 @androidx.compose.runtime.Composable
-private fun DayCell(isToday: Boolean, affirmationDone: Boolean, meditationDone: Boolean, isHealed: Boolean = false) {
-    Box(modifier = GlanceModifier.size(CELL_SIZE), contentAlignment = Alignment.Center) {
+private fun DayCell(
+    diameter: Dp,
+    isToday: Boolean,
+    affirmationDone: Boolean,
+    meditationDone: Boolean,
+    isHealed: Boolean,
+    description: String,
+) {
+    // The box reserves the ring's footprint even for non-today cells, so the row height is stable.
+    val footprint = diameter + RING_ALLOWANCE_DP.dp
+    Box(
+        modifier = GlanceModifier.size(footprint).semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
         if (isToday) {
             Image(
                 provider = ImageProvider(com.pirxhio.affirmity.R.drawable.widget_cell_ring),
                 contentDescription = null,
-                modifier = GlanceModifier.size(CELL_SIZE),
-                colorFilter = androidx.glance.ColorFilter.tint(GlanceColorProvider(TODAY_RING_COLOR)),
+                modifier = GlanceModifier.size(footprint),
+                colorFilter = androidx.glance.ColorFilter.tint(GlanceColorProvider(TEXT_COLOR)),
             )
         }
         if (isHealed) {
             // A healed day had zero real activity — the mending heart replaces both halves
             // instead of showing two empty ones, to explain why the streak didn't break.
-            val context = LocalContext.current
-            Image(
-                provider = ImageProvider(com.pirxhio.affirmity.R.drawable.ic_heart_mended),
-                contentDescription = context.getString(com.pirxhio.affirmity.R.string.progress_healed_day_content_description),
-                modifier = GlanceModifier.size(20.dp),
-            )
+            Box(
+                modifier = GlanceModifier
+                    .size(diameter)
+                    .background(ImageProvider(com.pirxhio.affirmity.R.drawable.widget_healed_bg)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Image(
+                    provider = ImageProvider(com.pirxhio.affirmity.R.drawable.ic_widget_heart),
+                    contentDescription = null,
+                    modifier = GlanceModifier.size(diameter * 0.5f),
+                    colorFilter = androidx.glance.ColorFilter.tint(GlanceColorProvider(HEALED_HEART_COLOR)),
+                )
+            }
         } else {
-            Image(
-                provider = ImageProvider(com.pirxhio.affirmity.R.drawable.half_circle_left),
-                contentDescription = null,
-                modifier = GlanceModifier.size(20.dp),
-                colorFilter = androidx.glance.ColorFilter.tint(
-                    GlanceColorProvider(if (affirmationDone) AFFIRMATION_COLOR else EMPTY_COLOR),
-                ),
-            )
-            Image(
-                provider = ImageProvider(com.pirxhio.affirmity.R.drawable.half_circle_right),
-                contentDescription = null,
-                modifier = GlanceModifier.size(20.dp),
-                colorFilter = androidx.glance.ColorFilter.tint(
-                    GlanceColorProvider(if (meditationDone) MEDITATION_COLOR else EMPTY_COLOR),
-                ),
-            )
+            HalfDisc(left = true, color = if (affirmationDone) AFFIRMATION_COLOR else EMPTY_COLOR, size = diameter)
+            HalfDisc(left = false, color = if (meditationDone) MEDITATION_COLOR else EMPTY_COLOR, size = diameter)
         }
     }
 }

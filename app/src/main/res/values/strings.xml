@@ -789,6 +789,16 @@
     <string name="widget_empty_state_label">Empieza hoy</string>
     <string name="widget_action_affirm_label">Afirmar</string>
     <string name="widget_action_meditate_label">Meditar</string>
+    <string name="widget_day_both_done">afirmaste y meditaste</string>
+    <string name="widget_day_affirm_only">afirmaste</string>
+    <string name="widget_day_meditate_only">meditaste</string>
+    <string name="widget_day_nothing">sin actividad</string>
+    <string name="widget_day_healed">sin actividad, salvado por un sanador de racha</string>
+    <string name="widget_day_today">hoy</string>
+    <string name="widget_streak_unit">días de racha</string>
+    <string name="widget_streak_unit_one">día de racha</string>
+    <string name="widget_today_done">hoy completo</string>
+    <string name="widget_today_pending">hoy pendiente</string>
 
     <string name="affirmation_group_badge_premium">Premium</string>
     <string name="affirmation_group_badge_ad">Solo Pro</string>

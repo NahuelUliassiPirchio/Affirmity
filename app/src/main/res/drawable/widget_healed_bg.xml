@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Healed-day disc: Nocturne accent #9184D9 at 18% fill with a 50% hairline border. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="#2E9184D9" />
+    <stroke
+        android:width="1dp"
+        android:color="#809184D9" />
+</shape>
