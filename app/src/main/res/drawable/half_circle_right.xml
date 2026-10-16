@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Right half of a filled disc; tinted via ColorFilter at composition time (D7). -->
+<!-- Right half of a full-bleed filled disc, so the Image size is the disc diameter; tinted via
+     ColorFilter at composition time (D7). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
@@ -7,5 +8,5 @@
     android:viewportHeight="24">
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M12,2 A10,10 0 0,1 12,22 Z" />
+        android:pathData="M12,0 A12,12 0 0,1 12,24 Z" />
 </vector>

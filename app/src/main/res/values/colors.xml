@@ -34,10 +34,13 @@
     <color name="widget_preview_star">#FF2E7F86</color>
     <color name="widget_preview_marker">#385AB3C8</color>
     <!-- The tracker preview is intentionally dark in both modes: the real widget sits over the wallpaper. -->
-    <color name="widget_preview_tracker_backdrop">#E61C2428</color>
-    <color name="widget_preview_tracker_surface">#FF1C2428</color>
-    <color name="widget_preview_tracker_affirm">#FFC77B58</color>
-    <color name="widget_preview_tracker_meditate">#FF00696F</color>
-    <color name="widget_preview_tracker_empty">#33FFFFFF</color>
-    <color name="widget_preview_tracker_text">#FFFFFFFF</color>
+    <color name="widget_preview_tracker_backdrop">#D6232532</color>
+    <color name="widget_preview_tracker_surface">#FF232532</color>
+    <color name="widget_preview_tracker_affirm">#FFE3956C</color>
+    <color name="widget_preview_tracker_meditate">#FF57B6B6</color>
+    <color name="widget_preview_tracker_empty">#38B2B6CA</color>
+    <color name="widget_preview_tracker_text">#FFE9E9ED</color>
+    <color name="widget_preview_tracker_letter">#FF9397AB</color>
+    <color name="widget_preview_tracker_flame">#FFFDA856</color>
+    <color name="widget_preview_tracker_heart">#FFD2CEFD</color>
 </resources>
