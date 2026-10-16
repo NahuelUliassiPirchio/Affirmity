@@ -98,8 +98,10 @@ class WeeklyTrackerLayoutTest {
     }
 
     @Test
-    fun cell_neverDropsBelowTenDp() {
-        assertEquals(10, computeTrackerLayout(100f, 56f, streakVisible = true).cellDiameter)
+    fun cell_dropsUnderTenDpOnlyWhenTheWidthIsImpossible() {
+        // 100dp wide with a streak: nothing fits seven 16dp columns, so cells give way to 4dp.
+        assertEquals(4, computeTrackerLayout(100f, 56f, streakVisible = true).cellDiameter)
+        assertEquals(10, computeTrackerLayout(200f, 56f, streakVisible = false).cellDiameter.coerceAtMost(10))
     }
 
     @Test
@@ -126,7 +128,7 @@ class WeeklyTrackerLayoutTest {
 
     // --- clipping guards (font scale aware) -----------------------------------------------------
 
-    private val fontScales = listOf(1.0f, 1.3f, 2.0f)
+    private val fontScales = listOf(1.0f, 1.3f, 2.0f, 3.0f)
     private fun linear(scale: Float): (Float) -> Float = { it * scale }
 
     private inline fun forEachLayout(crossinline check: (scale: Float, w: Float, h: Float, TrackerLayout) -> Unit) {
@@ -217,11 +219,11 @@ class WeeklyTrackerLayoutTest {
     }
 
     @Test
-    fun regularStreak_movesToLeadTheRowWhenTheSideColumnCannotFit() {
+    fun regularStreak_neverSitsBesideAColumnThatCannotFit() {
         val roomy = computeTrackerLayout(320f, 92f, streakVisible = true, spToDp = linear(1f))
         val large = computeTrackerLayout(320f, 92f, streakVisible = true, spToDp = linear(2f))
         assertEquals(StreakPlacement.BesideGrid, roomy.streakPlacement)
-        assertEquals(StreakPlacement.LeadingRow, large.streakPlacement)
+        assertTrue(large.streakPlacement != StreakPlacement.BesideGrid || large.sideColumnHeight <= 64f)
     }
 
     @Test
@@ -236,25 +238,94 @@ class WeeklyTrackerLayoutTest {
         for (scale in fontScales) {
             val layout = computeTrackerLayout(320f, 84f, streakVisible = true, spToDp = linear(scale))
             assertEquals(StreakPlacement.LeadingRow, layout.streakPlacement)
-            assertTrue(
-                "scale=$scale needs ${stripStreakContentWidthDp(3, linear(scale))} of ${layout.leadingStreakWidth}",
-                layout.leadingStreakWidth >= stripStreakContentWidthDp(3, linear(scale)),
+            // Independent of the layout helper: flame 16 + gap 3 + three digits at ~0.6em.
+            val needed = 16f + 3f + 3 * 0.6f * layout.leadingStreakSp * scale
+            assertTrue("scale=$scale needs $needed of ${layout.leadingStreakWidth}", layout.leadingStreakWidth >= needed)
+            // And the line of that font fits the 56dp of content.
+            assertTrue(1.2f * layout.leadingStreakSp * scale <= 56f + 0.01f)
+        }
+    }
+
+    @Test
+    fun leadingStreak_reservesItsWidthAndMayCostTheLegend() {
+        val layout = computeTrackerLayout(260f, 91f, streakVisible = true)
+        assertTrue(layout.leadingStreakWidth > 0f)
+        assertTrue(horizontalSum(layout, 260f, 1f) <= 260.5f)
+    }
+
+    @Test
+    fun grid_staysAtOrAboveTheFloorUnlessTheWidthIsImpossible() {
+        forEachLayout { scale, w, h, layout ->
+            val minimum = if (horizontalSum(layout, w, scale, forceDiameter = 10) <= w + 0.5f) 10 else 4
+            assertTrue("scale=$scale w=$w h=$h dia=${layout.cellDiameter}", layout.cellDiameter >= minimum)
+        }
+    }
+
+    /** Recomputes the horizontal extent the UI draws, from the layout's output fields only. */
+    private fun horizontalSum(layout: TrackerLayout, w: Float, scale: Float, forceDiameter: Int? = null): Float {
+        val dia = forceDiameter ?: layout.cellDiameter
+        var sum = 2 * layout.padding + 7 * (dia + 6f)
+        if (layout.leadingStreakWidth > 0f) sum += layout.leadingStreakWidth + 12f
+        if (layout.tier != WidgetTier.Tall) {
+            val narrow = w < 280f
+            val nominal = when {
+                layout.tier == WidgetTier.Strip && narrow -> 11f
+                layout.tier == WidgetTier.Strip || narrow -> 12f
+                else -> 13f
+            }
+            val base = if (layout.tier == WidgetTier.Strip) (if (narrow) 60f else 78f) else (if (narrow) 70f else 86f)
+            val side = when {
+                layout.legendVisible -> base * layout.legendSizeSp * scale / nominal
+                layout.streakPlacement == StreakPlacement.BesideGrid -> 18f + 3f + 3 * 0.6f * 18f * scale
+                else -> 0f
+            }
+            if (side > 0f) sum += side + 12f
+        }
+        return sum
+    }
+
+    /** Recomputes the vertical extent the UI draws, from the layout's output fields only. */
+    private fun verticalSum(layout: TrackerLayout, scale: Float): Float {
+        val lettersLine = if (layout.showLetters) 4f + 1.2f * layout.letterSizeSp * scale else 0f
+        val cells = layout.cellDiameter + 6f + lettersLine
+        val body = when (layout.tier) {
+            WidgetTier.Tall -> layout.tallHeaderHeight + 12f + cells
+            else -> maxOf(
+                cells,
+                layout.sideColumnHeight,
+                if (layout.leadingStreakWidth > 0f) 1.2f * layout.leadingStreakSp * scale else 0f,
             )
         }
+        return 2 * layout.padding + body
     }
 
     @Test
-    fun leadingStreak_reservesItsWidthFromTheGrid() {
-        val without = computeTrackerLayout(260f, 91f, streakVisible = false).cellDiameter
-        val with = computeTrackerLayout(260f, 91f, streakVisible = true).cellDiameter
-        assertTrue("with=$with without=$without", with < without)
-    }
-
-    @Test
-    fun grid_neverGoesBelowTheFloorAtAnyFontScale() {
+    fun everythingDrawnFitsTheWidgetHorizontallyAndVertically() {
         forEachLayout { scale, w, h, layout ->
-            assertTrue("scale=$scale w=$w h=$h dia=${layout.cellDiameter}", layout.cellDiameter >= 10)
+            val horizontal = horizontalSum(layout, w, scale)
+            val vertical = verticalSum(layout, scale)
+            // The strip's two-line legend cannot fit under ~12dp-tall rows; it is hidden then.
+            assertTrue("scale=$scale w=$w h=$h streak=${layout.streakPlacement} horizontal=$horizontal", horizontal <= w + 0.5f)
+            assertTrue("scale=$scale w=$w h=$h tier=${layout.tier} vertical=$vertical", vertical <= h + 0.5f)
         }
+    }
+
+    @Test
+    fun regression_narrowRegularWithLargeFontKeepsLegendTextOrHidesIt() {
+        // 260 x 92 at 2x with a streak: leading streak + legend + seven cells used to leave the
+        // legend only its dot, with cells clamped to the floor regardless.
+        val layout = computeTrackerLayout(260f, 92f, streakVisible = true, spToDp = linear(2f))
+        assertTrue(horizontalSum(layout, 260f, 2f) <= 260.5f)
+        assertTrue(layout.cellDiameter >= 10)
+        // The streak stays; the legend gave way.
+        assertTrue(layout.streakPlacement != StreakPlacement.None)
+    }
+
+    @Test
+    fun regression_tallAt260x175With2xFontsDoesNotOverflow() {
+        val layout = computeTrackerLayout(260f, 175f, streakVisible = true, spToDp = linear(2f))
+        assertTrue(verticalSum(layout, 2f) <= 175.5f)
+        assertTrue(horizontalSum(layout, 260f, 2f) <= 260.5f)
     }
 
     @Test

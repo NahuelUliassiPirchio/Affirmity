@@ -29,6 +29,8 @@ internal data class TrackerLayout(
     val tallHeaderHeight: Float,
     /** Width reserved for a leading streak (three digits plus flame); 0 unless it leads the row. */
     val leadingStreakWidth: Float,
+    /** Font size (sp) of the leading streak; steps down from [STRIP_STREAK_SP] to fit short widgets. */
+    val leadingStreakSp: Float,
 )
 
 internal const val TALL_STREAK_SP = 36f
@@ -42,6 +44,7 @@ internal const val STREAK_FLAME_GAP_DP = 3f
 
 /** Regular tier streak row (beside the grid) and the gap that separates it from the legend. */
 internal const val REGULAR_STREAK_SP = 18f
+internal const val REGULAR_STREAK_FLAME_DP = 18f
 internal const val SIDE_COLUMN_GAP_DP = 4f
 internal const val LEGEND_ROW_GAP_DP = 3f
 
@@ -64,8 +67,11 @@ private fun lineHeight(dp: Float) = dp * LINE_HEIGHT_FACTOR
 internal fun tallHeaderContentHeightDp(spToDp: (Float) -> Float = { it }): Float =
     lineHeight(spToDp(TALL_STREAK_SP)) + lineHeight(spToDp(TALL_CAPTION_SP))
 
-internal fun stripStreakContentWidthDp(digits: Int, spToDp: (Float) -> Float = { it }): Float =
-    STRIP_STREAK_FLAME_DP + STREAK_FLAME_GAP_DP + kotlin.math.ceil(digits * DIGIT_WIDTH_EM * spToDp(STRIP_STREAK_SP))
+internal fun stripStreakContentWidthDp(
+    digits: Int,
+    spToDp: (Float) -> Float = { it },
+    sp: Float = STRIP_STREAK_SP,
+): Float = STRIP_STREAK_FLAME_DP + STREAK_FLAME_GAP_DP + kotlin.math.ceil(digits * DIGIT_WIDTH_EM * spToDp(sp))
 
 private fun legendHeightDp(sp: Int, gap: Float, spToDp: (Float) -> Float) =
     2 * lineHeight(spToDp(sp.toFloat())) + gap
@@ -76,6 +82,11 @@ private const val LETTERS_MIN_HEIGHT = 74f
 private const val COMPACT_PADDING_BELOW = 76f
 private const val NARROW_BELOW_WIDTH = 280f
 private const val MIN_CELL_DIAMETER = 10f
+private const val ABSOLUTE_MIN_CELL_DIAMETER = 4f
+private const val MIN_LEADING_STREAK_SP = 9f
+
+/** Seven cells at the minimum diameter, each with its ring allowance. */
+private const val MIN_GRID_WIDTH = 7 * (10f + 6f)
 
 /**
  * Room the today ring needs around a cell: the ring is drawn inside its own column (Glance clips
@@ -100,6 +111,10 @@ internal fun tierForHeight(heightDp: Float): WidgetTier = when {
  * to [MIN_LEGEND_SP], a regular-tier streak moves to lead the row, and a tall widget that cannot
  * fit its header falls back to the regular layout. As a last step the beside-grid legend is hidden
  * when two lines cannot fit even at the floor size, and its width and gap return to the grid.
+ * The same ladder also runs on the horizontal budget (7 minimum cells + streak + legend + gaps):
+ * if the width is short, the legend steps down, then is hidden, before cells are clamped; only
+ * when even that fails do cells go under 10dp (down to 4dp) with the streak kept. The leading
+ * streak font also steps down so its line fits short widgets.
  */
 internal fun computeTrackerLayout(
     widthDp: Float,
@@ -113,6 +128,64 @@ internal fun computeTrackerLayout(
         return buildLayout(WidgetTier.Regular, widthDp, heightDp, streakVisible, spToDp).layout
     }
     return first.layout
+}
+
+private class SidePlan(
+    val legendSize: Int,
+    val legendVisible: Boolean,
+    val legendHeight: Float,
+    val besideColumnWithStreak: Float,
+    val placement: StreakPlacement,
+    val leadingStreakWidth: Float,
+    val gridWidth: Float,
+)
+
+/** Resolves streak placement and grid width for one legend candidate (size, visible). */
+private fun planSide(
+    tier: WidgetTier,
+    widthDp: Float,
+    pad: Float,
+    contentHeight: Float,
+    legendSize: Int,
+    legendVisible: Boolean,
+    nominalLegend: Int,
+    legendBaseWidth: Float,
+    streakLine: Float,
+    leadingSp: Float,
+    streakVisible: Boolean,
+    spToDp: (Float) -> Float,
+): SidePlan {
+    val legendHeight = if (legendVisible) legendHeightDp(legendSize, LEGEND_ROW_GAP_DP, spToDp) else 0f
+    val besideColumnWithStreak = streakLine + (if (legendVisible) SIDE_COLUMN_GAP_DP + legendHeight else 0f)
+    val placement = when {
+        !streakVisible -> StreakPlacement.None
+        tier == WidgetTier.Strip -> StreakPlacement.LeadingRow
+        tier == WidgetTier.Regular ->
+            if (besideColumnWithStreak <= contentHeight) StreakPlacement.BesideGrid else StreakPlacement.LeadingRow
+        else -> StreakPlacement.Header
+    }
+    val leadingStreakWidth =
+        if (placement == StreakPlacement.LeadingRow) {
+            stripStreakContentWidthDp(STREAK_DIGITS_RESERVED, spToDp, leadingSp) + STREAK_WIDTH_SLACK_DP
+        } else {
+            0f
+        }
+    // Legend width is the design's estimate at its nominal size, scaled with the text; with the
+    // legend hidden, a beside-grid streak row is all that remains of the side column.
+    val sideColumnWidth = when {
+        legendVisible -> legendBaseWidth * spToDp(legendSize.toFloat()) / nominalLegend
+        placement == StreakPlacement.BesideGrid ->
+            REGULAR_STREAK_FLAME_DP + STREAK_FLAME_GAP_DP +
+                kotlin.math.ceil(STREAK_DIGITS_RESERVED * DIGIT_WIDTH_EM * spToDp(REGULAR_STREAK_SP))
+        else -> 0f
+    }
+    val gridWidth = if (tier == WidgetTier.Tall) {
+        widthDp - 2 * pad
+    } else {
+        widthDp - 2 * pad - (if (sideColumnWidth > 0f) sideColumnWidth + 12f else 0f) -
+            (if (leadingStreakWidth > 0f) leadingStreakWidth + 12f else 0f)
+    }
+    return SidePlan(legendSize, legendVisible, legendHeight, besideColumnWithStreak, placement, leadingStreakWidth, gridWidth)
 }
 
 private class BuiltLayout(val layout: TrackerLayout, val cellsFit: Boolean)
@@ -133,31 +206,38 @@ private fun buildLayout(
         tier == WidgetTier.Strip || narrow -> 12
         else -> 13
     }
-    // The header legend (tall) keeps its size; beside-the-grid legends step down until they fit.
-    var legendSize = nominalLegend
-    if (tier != WidgetTier.Tall) {
-        while (legendSize > MIN_LEGEND_SP && legendHeightDp(legendSize, LEGEND_ROW_GAP_DP, spToDp) > contentHeight) legendSize--
-    }
-    // Hidden (rather than clipped) when two lines cannot fit even at the floor size.
-    val legendVisible = tier == WidgetTier.Tall ||
-        legendHeightDp(legendSize, LEGEND_ROW_GAP_DP, spToDp) <= contentHeight
-    val legendHeight = if (legendVisible) legendHeightDp(legendSize, LEGEND_ROW_GAP_DP, spToDp) else 0f
     val streakLine = lineHeight(spToDp(REGULAR_STREAK_SP))
-    val besideColumnWithStreak = streakLine + (if (legendVisible) SIDE_COLUMN_GAP_DP + legendHeight else 0f)
+    val legendBaseWidth =
+        if (tier == WidgetTier.Strip) (if (narrow) 60f else 78f) else (if (narrow) 70f else 86f)
 
-    val placement = when {
-        !streakVisible -> StreakPlacement.None
-        tier == WidgetTier.Strip -> StreakPlacement.LeadingRow
-        tier == WidgetTier.Regular ->
-            if (besideColumnWithStreak <= contentHeight) StreakPlacement.BesideGrid else StreakPlacement.LeadingRow
-        else -> StreakPlacement.Header
+    // The leading streak's font steps down until its line fits the content height.
+    var leadingSp = STRIP_STREAK_SP
+    while (leadingSp > MIN_LEADING_STREAK_SP && lineHeight(spToDp(leadingSp)) > contentHeight) leadingSp--
+
+    // Beside-grid legends are tried largest first, then smaller, then hidden, until both the
+    // height and the horizontal budget (seven minimum cells plus everything else) are met. The
+    // tall header legend keeps its size: its row spans the full width.
+    val legendCandidates: List<Pair<Int, Boolean>> = if (tier == WidgetTier.Tall) {
+        listOf(nominalLegend to true)
+    } else {
+        val heightFit = (nominalLegend downTo MIN_LEGEND_SP)
+            .firstOrNull { legendHeightDp(it, LEGEND_ROW_GAP_DP, spToDp) <= contentHeight }
+        (if (heightFit != null) (heightFit downTo MIN_LEGEND_SP).map { it to true } else emptyList()) +
+            listOf(MIN_LEGEND_SP to false)
     }
-    val leadingStreakWidth =
-        if (placement == StreakPlacement.LeadingRow) {
-            stripStreakContentWidthDp(STREAK_DIGITS_RESERVED, spToDp) + STREAK_WIDTH_SLACK_DP
-        } else {
-            0f
-        }
+    val plans = legendCandidates.map { (size, visible) ->
+        planSide(tier, widthDp, pad, contentHeight, size, visible, nominalLegend, legendBaseWidth, streakLine, leadingSp, streakVisible, spToDp)
+    }
+    // Last resort when nothing fits: the hidden-legend plan, keeping the streak (cells may then
+    // drop under the usual floor, see below).
+    val plan = plans.firstOrNull { it.gridWidth >= MIN_GRID_WIDTH } ?: plans.last()
+    val legendSize = plan.legendSize
+    val legendVisible = plan.legendVisible
+    val legendHeight = plan.legendHeight
+    val besideColumnWithStreak = plan.besideColumnWithStreak
+    val placement = plan.placement
+    val leadingStreakWidth = plan.leadingStreakWidth
+    val gridWidth = plan.gridWidth
 
     val tallHeader = if (tier == WidgetTier.Tall) {
         val streakColumn = if (streakVisible) tallHeaderContentHeightDp(spToDp) else 0f
@@ -167,23 +247,6 @@ private fun buildLayout(
         0f
     }
 
-    // Legend width is the design's estimate at its nominal size, scaled with the text.
-    val legendWidth = (if (tier == WidgetTier.Strip) (if (narrow) 60f else 78f) else (if (narrow) 70f else 86f)) *
-        spToDp(legendSize.toFloat()) / nominalLegend
-    // The side column's width: the legend, or just the streak row when the legend is hidden.
-    val sideColumnWidth = when {
-        legendVisible -> legendWidth
-        placement == StreakPlacement.BesideGrid ->
-            STRIP_STREAK_FLAME_DP + STREAK_FLAME_GAP_DP +
-                kotlin.math.ceil(STREAK_DIGITS_RESERVED * DIGIT_WIDTH_EM * spToDp(REGULAR_STREAK_SP))
-        else -> 0f
-    }
-    val gridWidth = if (tier == WidgetTier.Tall) {
-        widthDp - 2 * pad
-    } else {
-        widthDp - 2 * pad - (if (sideColumnWidth > 0f) sideColumnWidth + 12f else 0f) -
-            (if (leadingStreakWidth > 0f) leadingStreakWidth + 12f else 0f)
-    }
     val cap = when (tier) {
         WidgetTier.Strip -> 34f
         WidgetTier.Regular -> 40f
@@ -201,8 +264,11 @@ private fun buildLayout(
     val availableForCells = availHeight(showLetters)
 
     val column = gridWidth / 7f
+    // The 10dp floor only applies while the columns can hold it; if the width budget fails even
+    // with the legend hidden, cells give way (down to 4dp) rather than overflow the widget.
+    val floorDiameter = if (column >= MIN_CELL_DIAMETER + RING_ALLOWANCE) MIN_CELL_DIAMETER else ABSOLUTE_MIN_CELL_DIAMETER
     val diameter = floor(
-        maxOf(MIN_CELL_DIAMETER, minOf(column * 0.8f, column - RING_ALLOWANCE, availableForCells, cap)),
+        maxOf(floorDiameter, minOf(column * 0.8f, column - RING_ALLOWANCE, availableForCells, cap)),
     ).toInt()
 
     val layout = TrackerLayout(
@@ -221,6 +287,7 @@ private fun buildLayout(
         },
         tallHeaderHeight = tallHeader,
         leadingStreakWidth = leadingStreakWidth,
+        leadingStreakSp = leadingSp,
     )
     return BuiltLayout(layout, cellsFit = availableForCells >= MIN_CELL_DIAMETER)
 }

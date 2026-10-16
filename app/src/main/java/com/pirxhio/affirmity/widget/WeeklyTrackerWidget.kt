@@ -201,7 +201,7 @@ internal fun WeeklyTrackerContent(
                 Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     if (layout.streakPlacement == StreakPlacement.LeadingRow) {
                         Row(modifier = GlanceModifier.width(layout.leadingStreakWidth.dp), verticalAlignment = Alignment.CenterVertically) {
-                            StreakCounter(streak, flameSize = STRIP_STREAK_FLAME_DP.dp, numberSize = STRIP_STREAK_SP.sp)
+                            StreakCounter(streak, flameSize = STRIP_STREAK_FLAME_DP.dp, numberSize = layout.leadingStreakSp.sp)
                         }
                         Spacer(modifier = GlanceModifier.width(12.dp))
                     }
@@ -220,7 +220,7 @@ internal fun WeeklyTrackerContent(
                         Spacer(modifier = GlanceModifier.width(12.dp))
                         Column(horizontalAlignment = Alignment.Start) {
                             if (besideStreak) {
-                                StreakCounter(streak, flameSize = 18.dp, numberSize = REGULAR_STREAK_SP.sp)
+                                StreakCounter(streak, flameSize = REGULAR_STREAK_FLAME_DP.dp, numberSize = REGULAR_STREAK_SP.sp)
                                 if (layout.legendVisible) Spacer(modifier = GlanceModifier.height(SIDE_COLUMN_GAP_DP.dp))
                             }
                             if (layout.legendVisible) {
@@ -302,6 +302,9 @@ private fun TallHeader(layout: TrackerLayout, streak: StreakInfo) {
                 )
                 Text(
                     text = "${context.getString(streakUnitRes(streak.days))} · $status",
+                    // One line only: the layout reserves a single caption line (the widget's
+                    // content description still carries the full streak and status text).
+                    maxLines = 1,
                     style = TextStyle(fontSize = TALL_CAPTION_SP.sp, color = GlanceColorProvider(STREAK_CAPTION_COLOR)),
                 )
             }
