@@ -97,6 +97,8 @@ import com.pirxhio.affirmity.ads.ConsentGatherer
 import com.pirxhio.affirmity.ads.ResumedActivityTracker
 import com.pirxhio.affirmity.ads.findActivity
 import com.pirxhio.affirmity.data.resolveGuideGate
+import com.pirxhio.affirmity.data.isStreakRescueVisible
+import com.pirxhio.affirmity.data.rescueNotificationOverride
 import com.pirxhio.affirmity.data.shouldShowStreakRescue
 import com.pirxhio.affirmity.data.resolvePreSurveyGuideGate
 import com.pirxhio.affirmity.meditation.SessionEndReason
@@ -737,7 +739,8 @@ fun AffirmityApp(
     // outlive the derivation: the Mended phase (activation flips to UsedToday the moment the healer
     // is applied, which would otherwise unmount the dialog mid-animation) and the values captured
     // at offer time.
-    var rescueFromNotification by rememberSaveable { mutableStateOf(false) }
+    var rescueNotificationEpochDay by rememberSaveable { mutableStateOf<Long?>(null) }
+    var rescueAttempted by rememberSaveable { mutableStateOf(false) }
     var rescueApplying by rememberSaveable { mutableStateOf(false) }
     var rescueMended by rememberSaveable { mutableStateOf(false) }
     var rescueStreakDays by rememberSaveable { mutableStateOf(0) }
@@ -2000,60 +2003,80 @@ fun AffirmityApp(
         emit = appState::logAnalyticsEvent,
     )
 
-    // A "healer" notification tap re-offers the rescue even after a same-day dismissal; the flag is
-    // consumed by whichever way the dialog closes.
+    // A "healer" notification tap re-offers the rescue even after a same-day dismissal. It is keyed
+    // to the tap's day so a tap that could not show the dialog never undoes a later dismissal.
     LaunchedEffect(startNotification.family, startNotification.eventKey) {
         if (startNotification.family == NotificationChannelSpec.HEALER.wireChannelKey) {
-            rescueFromNotification = true
+            rescueNotificationEpochDay = DayClock.epochDay()
         }
     }
     val healerState = appState.streakHealer.value
+    val rescueToday = DayClock.epochDay()
     val rescueOffered = appState.streakRescueDismissalResolved.value &&
         healerState.streakAtStakeDays > 0 &&
         shouldShowStreakRescue(
             activation = healerState.activation,
             healerCount = healerState.healerCount,
             dismissedEpochDay = appState.streakRescueDismissedEpochDay.value,
-            todayEpochDay = DayClock.epochDay(),
-            fromHealerNotification = rescueFromNotification,
+            todayEpochDay = rescueToday,
+            fromHealerNotification = rescueNotificationOverride(rescueNotificationEpochDay, rescueToday),
             otherGateActive = guideGateResolution != GuideGateResolution.NONE || paywallSource != null,
         )
     // Move to Mended only once the healer use is actually recorded: activateStreakHealer() silently
     // no-ops on a stale/ineligible click, and the dialog must not claim a mend that didn't happen.
-    LaunchedEffect(rescueApplying, healerState.activation) {
-        if (rescueApplying && healerState.activation is HealerActivation.UsedToday) {
+    // Keyed on rescueAttempted (not rescueApplying) so a write slower than the button timeout below
+    // still lands in Mended instead of unmounting the dialog.
+    LaunchedEffect(rescueAttempted, healerState.activation) {
+        if (rescueAttempted && healerState.activation is HealerActivation.UsedToday) {
+            rescueAttempted = false
             rescueApplying = false
             rescueMended = true
+        } else if (rescueAttempted && healerState.activation is HealerActivation.Unavailable) {
+            // The apply never landed and the offer is gone (day rolled over, healer spent
+            // elsewhere): drop the attempt so a later, unrelated use can't surface a Mended.
+            rescueAttempted = false
+            rescueApplying = false
         }
     }
+    // Only re-enables the apply button after a silent no-op; it never closes the dialog.
     LaunchedEffect(rescueApplying) {
         if (rescueApplying) {
             delay(3_000)
             rescueApplying = false
         }
     }
-    if (rescueMended || rescueApplying || rescueOffered) {
-        val holding = rescueMended || rescueApplying
+    val rescueVisible = isStreakRescueVisible(
+        mended = rescueMended,
+        attempted = rescueAttempted,
+        offered = rescueOffered,
+        activation = healerState.activation,
+    )
+    if (rescueVisible) {
+        val holding = rescueMended || rescueAttempted
         StreakRescueDialog(
             streakDays = if (holding) rescueStreakDays else healerState.streakAtStakeDays,
             healerCount = if (holding) rescueHealerCount else healerState.healerCount,
             phase = if (rescueMended) RescuePhase.Mended else RescuePhase.Offer,
             onApply = {
                 if (!rescueApplying) {
-                    rescueStreakDays = healerState.streakAtStakeDays
-                    rescueHealerCount = healerState.healerCount
-                    rescueFromNotification = false
+                    if (!rescueAttempted) {
+                        rescueStreakDays = healerState.streakAtStakeDays
+                        rescueHealerCount = healerState.healerCount
+                    }
+                    rescueNotificationEpochDay = null
+                    rescueAttempted = true
                     rescueApplying = true
                     appState.activateStreakHealer()
                 }
             },
             onDismiss = {
-                rescueFromNotification = false
+                rescueNotificationEpochDay = null
+                rescueAttempted = false
                 rescueApplying = false
                 appState.dismissStreakRescue()
             },
             onDone = {
-                rescueFromNotification = false
+                rescueNotificationEpochDay = null
                 rescueMended = false
             },
         )

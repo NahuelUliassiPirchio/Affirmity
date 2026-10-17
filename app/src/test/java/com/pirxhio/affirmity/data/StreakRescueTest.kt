@@ -125,4 +125,45 @@ class StreakRescueTest {
         assertFalse(show(otherGateActive = true, fromNotification = true))
         assertFalse(show(otherGateActive = true, dismissed = today - 5))
     }
+
+    // ---- rescueNotificationOverride ----------------------------------------------------------
+
+    @Test
+    fun `a healer notification tap overrides the dismissal only on the day it was tapped`() {
+        assertTrue(rescueNotificationOverride(notificationEpochDay = 104, todayEpochDay = 104))
+        assertFalse(rescueNotificationOverride(notificationEpochDay = 103, todayEpochDay = 104))
+        assertFalse(rescueNotificationOverride(notificationEpochDay = null, todayEpochDay = 104))
+    }
+
+    // ---- isStreakRescueVisible ---------------------------------------------------------------
+
+    @Test
+    fun `the dialog shows while offered`() {
+        assertTrue(visible(offered = true))
+        assertFalse(visible())
+    }
+
+    @Test
+    fun `the dialog stays mounted in the mended phase whatever the activation`() {
+        assertTrue(visible(mended = true, activation = HealerActivation.UsedToday(103)))
+        assertTrue(visible(mended = true, activation = HealerActivation.Unavailable))
+    }
+
+    @Test
+    fun `a slow apply keeps the dialog mounted once the use lands, so it can reach mended`() {
+        // Offer no longer derives true (activation flipped), but the user did tap apply.
+        assertTrue(visible(attempted = true, activation = HealerActivation.UsedToday(103)))
+    }
+
+    @Test
+    fun `an attempted apply that never lands does not pin the dialog open`() {
+        assertFalse(visible(attempted = true, activation = HealerActivation.Unavailable))
+    }
+
+    private fun visible(
+        mended: Boolean = false,
+        attempted: Boolean = false,
+        offered: Boolean = false,
+        activation: HealerActivation = HealerActivation.Available(103),
+    ) = isStreakRescueVisible(mended = mended, attempted = attempted, offered = offered, activation = activation)
 }
