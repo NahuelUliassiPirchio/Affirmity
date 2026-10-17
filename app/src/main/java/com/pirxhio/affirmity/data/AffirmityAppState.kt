@@ -79,6 +79,7 @@ import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.NotificationLogEntry
 import com.pirxhio.affirmity.data.local.NotificationPreferences
 import com.pirxhio.affirmity.data.local.OnboardingGuidePreferences
+import com.pirxhio.affirmity.data.local.StreakRescuePreferences
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
 import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
@@ -492,6 +493,9 @@ class AffirmityAppState(
     private val trackerPreferences: TrackerPreferences,
     private val onboardingPreferences: OnboardingPreferences,
     private val onboardingGuidePreferences: OnboardingGuidePreferences,
+    /** Persists the streak-rescue dismissal day. Nullable with a `null` default (in-memory only),
+     * matching [notificationCanceller], so existing JVM test constructions keep compiling. */
+    private val streakRescuePreferences: StreakRescuePreferences? = null,
     private val imageStore: AffirmationImageStore,
     private val notificationDebugLog: NotificationDebugLog,
     private val notifier: Notifier,
@@ -886,6 +890,28 @@ class AffirmityAppState(
     /** Dismisses [healerJustGranted] once the user has seen the grant screen. */
     fun acknowledgeHealerGrant() {
         healerJustGranted.value = false
+    }
+
+    /** Epoch day the streak-rescue dialog was last dismissed; `null` until read from
+     * [streakRescuePreferences] or if never dismissed. */
+    var streakRescueDismissedEpochDay = mutableStateOf<Long?>(null)
+        private set
+
+    /** False until the first disk read of the dismissal day lands (always true without
+     * [streakRescuePreferences]); the dialog waits on it so a dismissed rescue never flashes
+     * on a cold start. */
+    var streakRescueDismissalResolved = mutableStateOf(streakRescuePreferences == null)
+        private set
+
+    /** True when the rescue dialog was already dismissed today (device-local day). */
+    val streakRescueDismissedToday: Boolean
+        get() = streakRescueDismissedEpochDay.value == healerTodayEpochDay()
+
+    /** Records today as the dismissal day, in memory immediately and then persisted. */
+    fun dismissStreakRescue() {
+        val today = healerTodayEpochDay()
+        streakRescueDismissedEpochDay.value = today
+        scope.launch { streakRescuePreferences?.saveDismissedEpochDay(today) }
     }
 
     private var healerFlowInitialized = false
@@ -1459,6 +1485,20 @@ class AffirmityAppState(
                 .collect { (rawGuideSeen, completedOnboarding) ->
                     val resolved = resolveGuideBackfill(rawGuideSeen, completedOnboarding)
                     hasSeenOnboardingGuide.value = resolved
+                }
+        }
+        scope.launch {
+            streakRescuePreferences?.observeDismissedEpochDay()
+                ?.catch { error ->
+                    Log.e(TAG, "streak rescue preference flow failed", error)
+                    streakRescueDismissalResolved.value = true
+                }
+                ?.collect { saved ->
+                    streakRescueDismissalResolved.value = true
+                    // Never regress an in-memory dismissal made before the first disk read landed.
+                    streakRescueDismissedEpochDay.value =
+                        maxOf(saved ?: Long.MIN_VALUE, streakRescueDismissedEpochDay.value ?: Long.MIN_VALUE)
+                            .takeIf { it != Long.MIN_VALUE }
                 }
         }
         scope.launch {
@@ -2612,6 +2652,7 @@ fun rememberAffirmityAppState(userGoalsStore: UserGoalsStore): AffirmityAppState
         val trackerPreferences = TrackerPreferences(context)
         val onboardingPreferences = OnboardingPreferences(context)
         val onboardingGuidePreferences = OnboardingGuidePreferences(context)
+        val streakRescuePreferences = StreakRescuePreferences(context)
         val firestore = FirebaseFirestore.getInstance()
         val local = DataSession.Local(
             affirmations = RoomAffirmationRepository(database.affirmationDao()),
@@ -2657,6 +2698,7 @@ fun rememberAffirmityAppState(userGoalsStore: UserGoalsStore): AffirmityAppState
             trackerPreferences = trackerPreferences,
             onboardingPreferences = onboardingPreferences,
             onboardingGuidePreferences = onboardingGuidePreferences,
+            streakRescuePreferences = streakRescuePreferences,
             imageStore = AffirmationImageStore(context.applicationContext),
             notificationDebugLog = notificationDebugLog,
             notifier = Notifier(context.applicationContext, notificationDebugLog),
