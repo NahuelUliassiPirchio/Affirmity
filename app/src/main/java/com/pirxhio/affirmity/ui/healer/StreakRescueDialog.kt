@@ -400,7 +400,14 @@ private fun RescueChain(
                     )
                 }
             }
-            Row(Modifier.fillMaxWidth()) {
+            // Pinned to the canvas height and centered: Row defaults to Top, which left the 28dp
+            // mended heart hugging the top of the 48dp ring the canvas draws at height / 2.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(NodeSize),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     Box(
                         modifier = Modifier
