@@ -37,7 +37,8 @@ val SurfaceContainerLightArgb: Long = 0xFFEEEEEE
 val ErrorLight = Color(0xFFBA1A1A)
 
 // Dark theme tokens (afirmaciones.html full-bleed feed uses a near-black theme)
-val TealPrimaryDark = Color(0xFF5BBCC3)
+val TealPrimaryDarkArgb: Long = 0xFF5BBCC3
+val TealPrimaryDark = Color(TealPrimaryDarkArgb)
 val BackgroundDarkArgb: Long = 0xFF000000
 val BackgroundDark = Color(BackgroundDarkArgb)
 val SurfaceDark = Color(0xFF000000)
@@ -45,7 +46,9 @@ val SurfaceContainerLowDark = Color(0xFF111111)
 val SurfaceContainerDarkArgb: Long = 0xFF111111
 val SurfaceContainerDark = Color(SurfaceContainerDarkArgb)
 val OnSurfaceDark = Color(0xFFFFFFFF)
-val OnPrimaryDark = Color(0xFFFFFFFF)
+// Dark teal, not white: white on the light teal primary is ~2.2:1 and fails the text minimum.
+val OnPrimaryDarkArgb: Long = 0xFF00252A
+val OnPrimaryDark = Color(OnPrimaryDarkArgb)
 val SecondaryDark = Color(0xFF5E5E5E)
 val ErrorDark = Color(0xFFBA1A1A)
 

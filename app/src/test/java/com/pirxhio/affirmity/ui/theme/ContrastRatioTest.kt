@@ -79,6 +79,14 @@ class ContrastRatioTest {
         assertTrue("expected >= 4.5, was $ratio", ratio >= 4.5)
     }
 
+    /** Filled buttons draw their label in onPrimary over primary. Dark onPrimary used to be white,
+     *  ~2.2:1 on the light teal, so every dark-theme filled button failed the text minimum. */
+    @Test
+    fun `dark onPrimary clears the 4-5 to 1 text minimum against primary`() {
+        val ratio = wcagContrastRatio(OnPrimaryDarkArgb, TealPrimaryDarkArgb)
+        assertTrue("expected >= 4.5, was $ratio", ratio >= 4.5)
+    }
+
     @Test
     fun `the dark outline clears the 3 to 1 UI-component minimum against background`() {
         val ratio = wcagContrastRatio(OutlineDarkArgb, BackgroundDarkArgb)
