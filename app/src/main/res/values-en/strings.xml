@@ -1118,4 +1118,33 @@
     <string name="widget_preview_day_6">F</string>
     <string name="widget_preview_day_7">S</string>
 
+    <!-- Streak rescue dialog -->
+    <string name="streak_rescue_day_before">Day before</string>
+    <string name="streak_rescue_yesterday">Yesterday</string>
+    <string name="streak_rescue_today">Today</string>
+    <string name="streak_rescue_chain_description_offer">Day before done, yesterday without activity, today pending</string>
+    <string name="streak_rescue_chain_description_mended">Day before done, yesterday healed, today pending</string>
+    <string name="streak_rescue_offer_title">Yesterday slipped by</string>
+    <plurals name="streak_rescue_offer_body">
+        <item quantity="one">Your %1$d-day streak is still standing if you use a healer today.</item>
+        <item quantity="other">Your %1$d-day streak is still standing if you use a healer today.</item>
+    </plurals>
+    <plurals name="streak_rescue_healer_count">
+        <item quantity="one">You have %1$d saved healer</item>
+        <item quantity="other">You have %1$d saved healers</item>
+    </plurals>
+    <string name="streak_rescue_fine_print">It only covers yesterday. Today still needs its own activity.</string>
+    <string name="streak_rescue_apply">Use healer</string>
+    <string name="streak_rescue_not_now">Not now</string>
+    <string name="streak_rescue_mended_title">Streak mended</string>
+    <plurals name="streak_rescue_mended_body">
+        <item quantity="one">Your %1$d day keeps counting. Today still needs its own activity.</item>
+        <item quantity="other">Your %1$d days keep counting. Today still needs its own activity.</item>
+    </plurals>
+    <plurals name="streak_rescue_remaining">
+        <item quantity="one">%1$d healer left</item>
+        <item quantity="other">%1$d healers left</item>
+    </plurals>
+    <string name="streak_rescue_none_left">No healers left</string>
+    <string name="streak_rescue_continue">Continue</string>
 </resources>

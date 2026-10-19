@@ -27,6 +27,11 @@ data class StreakHealerState(
     val pairProgress: Int,
     val healedDays: Set<Long>,
     val activation: HealerActivation,
+    /** Days the healer would save: the streak ending the day before the break, counting healed
+     * days as done. Non-zero only while [activation] is [HealerActivation.Available] --
+     * [generalStreakDays] can't stand in because it walks back from yesterday, which is the
+     * (not-yet-healed) break day itself and so reads 0. */
+    val streakAtStakeDays: Int = 0,
 ) {
     val healerHeld: Boolean get() = healerCount > 0
 }
@@ -180,6 +185,12 @@ object StreakHealerStats {
             else -> HealerActivation.Unavailable
         }
 
+        val streakAtStakeDays = if (activation is HealerActivation.Available) {
+            streakEndingAt(activation.breakEpochDay - 1, streakStartEpochDay, ::effectiveDone)
+        } else {
+            0
+        }
+
         return StreakHealerState(
             generalStreakDays = generalStreakDays,
             isTodayDone = isTodayDone,
@@ -187,6 +198,19 @@ object StreakHealerStats {
             pairProgress = pairProgress,
             healedDays = healedDays,
             activation = activation,
+            streakAtStakeDays = streakAtStakeDays,
         )
+    }
+
+    /** Length of the run of [isDone] days ending at [endEpochDay], not reaching below
+     * [streakStartEpochDay]. */
+    fun streakEndingAt(endEpochDay: Long, streakStartEpochDay: Long, isDone: (Long) -> Boolean): Int {
+        var count = 0
+        var d = endEpochDay
+        while (d >= streakStartEpochDay && isDone(d)) {
+            count++
+            d--
+        }
+        return count
     }
 }

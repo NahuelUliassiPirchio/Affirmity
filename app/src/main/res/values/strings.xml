@@ -1187,4 +1187,34 @@
     <string name="widget_preview_day_6">V</string>
     <string name="widget_preview_day_7">S</string>
     <string name="widget_preview_streak" translatable="false">4</string>
+
+    <!-- Streak rescue dialog -->
+    <string name="streak_rescue_day_before">Anteayer</string>
+    <string name="streak_rescue_yesterday">Ayer</string>
+    <string name="streak_rescue_today">Hoy</string>
+    <string name="streak_rescue_chain_description_offer">Anteayer completado, ayer sin actividad, hoy pendiente</string>
+    <string name="streak_rescue_chain_description_mended">Anteayer completado, ayer sanado, hoy pendiente</string>
+    <string name="streak_rescue_offer_title">Ayer se te pasó un día</string>
+    <plurals name="streak_rescue_offer_body">
+        <item quantity="one">Tu racha de %1$d día sigue en pie si usas un sanador hoy.</item>
+        <item quantity="other">Tu racha de %1$d días sigue en pie si usas un sanador hoy.</item>
+    </plurals>
+    <plurals name="streak_rescue_healer_count">
+        <item quantity="one">Tienes %1$d sanador guardado</item>
+        <item quantity="other">Tienes %1$d sanadores guardados</item>
+    </plurals>
+    <string name="streak_rescue_fine_print">Solo cubre ayer. Hoy aún necesita su propia actividad.</string>
+    <string name="streak_rescue_apply">Usar sanador</string>
+    <string name="streak_rescue_not_now">Ahora no</string>
+    <string name="streak_rescue_mended_title">Racha recuperada</string>
+    <plurals name="streak_rescue_mended_body">
+        <item quantity="one">Tu %1$d día sigue contando. Hoy aún necesita su propia actividad.</item>
+        <item quantity="other">Tus %1$d días siguen contando. Hoy aún necesita su propia actividad.</item>
+    </plurals>
+    <plurals name="streak_rescue_remaining">
+        <item quantity="one">Te queda %1$d sanador</item>
+        <item quantity="other">Te quedan %1$d sanadores</item>
+    </plurals>
+    <string name="streak_rescue_none_left">No te quedan sanadores</string>
+    <string name="streak_rescue_continue">Seguir</string>
 </resources>

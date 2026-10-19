@@ -87,7 +87,9 @@ import com.pirxhio.affirmity.analytics.RoundSource
 import com.pirxhio.affirmity.analytics.provenance
 import com.pirxhio.affirmity.data.AdRequestNotice
 import com.pirxhio.affirmity.data.Affirmation
+import com.pirxhio.affirmity.data.DayClock
 import com.pirxhio.affirmity.data.GuideGateResolution
+import com.pirxhio.affirmity.data.HealerActivation
 import com.pirxhio.affirmity.data.MOOD_MAX
 import com.pirxhio.affirmity.data.PreSurveyGuideResolution
 import com.pirxhio.affirmity.data.rememberAffirmityAppState
@@ -95,6 +97,9 @@ import com.pirxhio.affirmity.ads.ConsentGatherer
 import com.pirxhio.affirmity.ads.ResumedActivityTracker
 import com.pirxhio.affirmity.ads.findActivity
 import com.pirxhio.affirmity.data.resolveGuideGate
+import com.pirxhio.affirmity.data.isStreakRescueVisible
+import com.pirxhio.affirmity.data.rescueNotificationOverride
+import com.pirxhio.affirmity.data.shouldShowStreakRescue
 import com.pirxhio.affirmity.data.resolvePreSurveyGuideGate
 import com.pirxhio.affirmity.meditation.SessionEndReason
 import com.pirxhio.affirmity.notifications.NotificationCanceller
@@ -121,7 +126,9 @@ import com.pirxhio.affirmity.ui.feed.resolveRecommendedSurfaces
 import com.pirxhio.affirmity.ui.groups.catalogThemesById
 import com.pirxhio.affirmity.ui.groups.isThemeToggleable
 import com.pirxhio.affirmity.ui.groups.themeAccessDecision
+import com.pirxhio.affirmity.ui.healer.RescuePhase
 import com.pirxhio.affirmity.ui.healer.StreakHealerGrantedScreen
+import com.pirxhio.affirmity.ui.healer.StreakRescueDialog
 import com.pirxhio.affirmity.ui.meditation.GuidedMeditationScreen
 import com.pirxhio.affirmity.ui.meditation.MeditationScreen
 import com.pirxhio.affirmity.ui.meditation.shouldShowMeditationBanner
@@ -158,6 +165,7 @@ import com.pirxhio.affirmity.ui.meditation.customization.MeditationCustomization
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import java.util.Locale
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** Extra key a launcher (e.g. the home-screen widget) sets to pick the initial [AppDestinations]. */
@@ -727,6 +735,16 @@ fun AffirmityApp(
     // D8: replaces the old showPaywall boolean -- null means hidden, and "shown without a source"
     // is unrepresentable. Every trigger surface supplies its own PaywallSource (spec §5.3).
     var paywallSource by rememberSaveable { mutableStateOf<PaywallSource?>(null) }
+    // Streak-rescue dialog host state. The offer is derived from appState; these only hold what must
+    // outlive the derivation: the Mended phase (activation flips to UsedToday the moment the healer
+    // is applied, which would otherwise unmount the dialog mid-animation) and the values captured
+    // at offer time.
+    var rescueNotificationEpochDay by rememberSaveable { mutableStateOf<Long?>(null) }
+    var rescueAttempted by rememberSaveable { mutableStateOf(false) }
+    var rescueApplying by rememberSaveable { mutableStateOf(false) }
+    var rescueMended by rememberSaveable { mutableStateOf(false) }
+    var rescueStreakDays by rememberSaveable { mutableStateOf(0) }
+    var rescueHealerCount by rememberSaveable { mutableStateOf(0) }
     val context = LocalContext.current
     // Device-local by design: goals survive account changes and never enter AffirmityAppState's
     // DataSession/Firestore swap boundary.
@@ -1984,6 +2002,85 @@ fun AffirmityApp(
         snackbarScope = snackbarScope,
         emit = appState::logAnalyticsEvent,
     )
+
+    // A "healer" notification tap re-offers the rescue even after a same-day dismissal. It is keyed
+    // to the tap's day so a tap that could not show the dialog never undoes a later dismissal.
+    LaunchedEffect(startNotification.family, startNotification.eventKey) {
+        if (startNotification.family == NotificationChannelSpec.HEALER.wireChannelKey) {
+            rescueNotificationEpochDay = DayClock.epochDay()
+        }
+    }
+    val healerState = appState.streakHealer.value
+    val rescueToday = DayClock.epochDay()
+    val rescueOffered = appState.streakRescueDismissalResolved.value &&
+        healerState.streakAtStakeDays > 0 &&
+        shouldShowStreakRescue(
+            activation = healerState.activation,
+            healerCount = healerState.healerCount,
+            dismissedEpochDay = appState.streakRescueDismissedEpochDay.value,
+            todayEpochDay = rescueToday,
+            fromHealerNotification = rescueNotificationOverride(rescueNotificationEpochDay, rescueToday),
+            otherGateActive = guideGateResolution != GuideGateResolution.NONE || paywallSource != null,
+        )
+    // Move to Mended only once the healer use is actually recorded: activateStreakHealer() silently
+    // no-ops on a stale/ineligible click, and the dialog must not claim a mend that didn't happen.
+    // Keyed on rescueAttempted (not rescueApplying) so a write slower than the button timeout below
+    // still lands in Mended instead of unmounting the dialog.
+    LaunchedEffect(rescueAttempted, healerState.activation) {
+        if (rescueAttempted && healerState.activation is HealerActivation.UsedToday) {
+            rescueAttempted = false
+            rescueApplying = false
+            rescueMended = true
+        } else if (rescueAttempted && healerState.activation is HealerActivation.Unavailable) {
+            // The apply never landed and the offer is gone (day rolled over, healer spent
+            // elsewhere): drop the attempt so a later, unrelated use can't surface a Mended.
+            rescueAttempted = false
+            rescueApplying = false
+        }
+    }
+    // Only re-enables the apply button after a silent no-op; it never closes the dialog.
+    LaunchedEffect(rescueApplying) {
+        if (rescueApplying) {
+            delay(3_000)
+            rescueApplying = false
+        }
+    }
+    val rescueVisible = isStreakRescueVisible(
+        mended = rescueMended,
+        attempted = rescueAttempted,
+        offered = rescueOffered,
+        activation = healerState.activation,
+    )
+    if (rescueVisible) {
+        val holding = rescueMended || rescueAttempted
+        StreakRescueDialog(
+            streakDays = if (holding) rescueStreakDays else healerState.streakAtStakeDays,
+            healerCount = if (holding) rescueHealerCount else healerState.healerCount,
+            phase = if (rescueMended) RescuePhase.Mended else RescuePhase.Offer,
+            onApply = {
+                if (!rescueApplying) {
+                    if (!rescueAttempted) {
+                        rescueStreakDays = healerState.streakAtStakeDays
+                        rescueHealerCount = healerState.healerCount
+                    }
+                    rescueNotificationEpochDay = null
+                    rescueAttempted = true
+                    rescueApplying = true
+                    appState.activateStreakHealer()
+                }
+            },
+            onDismiss = {
+                rescueNotificationEpochDay = null
+                rescueAttempted = false
+                rescueApplying = false
+                appState.dismissStreakRescue()
+            },
+            onDone = {
+                rescueNotificationEpochDay = null
+                rescueMended = false
+            },
+        )
+    }
 
     // Notifications V2 scope-expansion: rendered the same way PaywallHost is above -- unconditionally
     // at the top level, so a Compass notification tap opens this sheet over whatever destination is
