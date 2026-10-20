@@ -78,7 +78,7 @@ fun expectedDurationMillis(definition: MeditationDefinition, approxDurationMinut
 internal fun fixedTotalMillis(definition: MeditationDefinition): Long = nodeFixedTotalMillis(definition.root)
 
 private fun nodeFixedTotalMillis(node: MeditationNode): Long = when (node) {
-    is Phase -> (node.duration as? PhaseDuration.Fixed)?.millis ?: 0L
+    is Phase -> node.estimatedMillis ?: (node.duration as? PhaseDuration.Fixed)?.millis ?: 0L
     is MeditationSequence -> node.children.sumOf(::nodeFixedTotalMillis)
     is Repeat -> nodeFixedTotalMillis(node.child) * ((node.strategy as? FixedCountRepetition)?.times ?: 1)
 }

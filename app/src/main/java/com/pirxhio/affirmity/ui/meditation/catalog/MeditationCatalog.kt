@@ -111,8 +111,10 @@ import com.pirxhio.affirmity.meditation.visualization.visualizationMeditationDef
 import com.pirxhio.affirmity.meditation.walking.WalkingConfig
 import com.pirxhio.affirmity.meditation.walking.WalkingMeditationText
 import com.pirxhio.affirmity.meditation.walking.walkingMeditationDefinition
+import com.pirxhio.affirmity.meditation.wimhof.WimHofBreathSpeed
 import com.pirxhio.affirmity.meditation.wimhof.WimHofConfig
 import com.pirxhio.affirmity.meditation.wimhof.WimHofPhaseIds
+import com.pirxhio.affirmity.meditation.wimhof.WimHofSfx
 import com.pirxhio.affirmity.meditation.wimhof.WimHofText
 import com.pirxhio.affirmity.meditation.wimhof.wimHofMeditationDefinition
 import com.pirxhio.affirmity.meditation.yoganidra.YogaNidraConfig
@@ -212,6 +214,18 @@ private fun affirmationTextsFromConfig(config: Map<String, String>): List<String
         .toList()
 
 private val WIM_HOF_BREATHS_OPTIONS = listOf(20, WimHofConfig.DEFAULT_BREATHS_PER_ROUND, 40)
+private val WIM_HOF_SPEED_OPTIONS = WimHofBreathSpeed.entries.map { it.key }
+
+private val WIM_HOF_SFX_RESOURCES: Map<String, Int> = mapOf(
+    "whm_sfx_inhale_slow" to R.raw.whm_sfx_inhale_slow,
+    "whm_sfx_exhale_slow" to R.raw.whm_sfx_exhale_slow,
+    "whm_sfx_inhale_normal" to R.raw.whm_sfx_inhale_normal,
+    "whm_sfx_exhale_normal" to R.raw.whm_sfx_exhale_normal,
+    "whm_sfx_inhale_fast" to R.raw.whm_sfx_inhale_fast,
+    "whm_sfx_exhale_fast" to R.raw.whm_sfx_exhale_fast,
+    WimHofSfx.EXHALE_HOLD to R.raw.whm_sfx_exhale_hold,
+    WimHofSfx.INHALE_RECOVERY to R.raw.whm_sfx_inhale_recovery,
+)
 
 fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
     MeditationCatalogEntry(
@@ -2462,7 +2476,7 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
         descriptionRes = R.string.meditation_catalog_wim_hof_description,
         categoryRes = R.string.meditation_catalog_category_energia,
         icon = Icons.Filled.Bolt,
-        approxDurationMinutes = 9,
+        approxDurationMinutes = 10,
         access = ContentAccess.ProOrAdTrial,
         definition = { config ->
             wimHofMeditationDefinition(
@@ -2472,6 +2486,8 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                     breathsPerRound = config["breathsPerRound"]?.toIntOrNull()
                         ?.takeIf { it in WIM_HOF_BREATHS_OPTIONS }
                         ?: WimHofConfig.DEFAULT_BREATHS_PER_ROUND,
+                    breathSpeed = WimHofBreathSpeed.fromKey(config["breathSpeed"]),
+                    breathSound = config["breathSound"]?.toBooleanStrictOrNull() ?: true,
                 ),
             )
         },
@@ -2483,6 +2499,7 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                 WimHofText.RECOVERY_HOLD to R.string.meditation_wimhof_recovery_hold,
             ),
             audioResources = emptyMap(),
+            sfxResources = WIM_HOF_SFX_RESOURCES,
             counters = listOf(
                 MeditationCounter(
                     repeatId = "rounds",
@@ -2500,9 +2517,13 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                 ),
             ),
             // The exhale hold is only a ceiling: the practitioner releases it when they need air.
-            manualRelease = ManualRelease(
-                phaseId = WimHofPhaseIds.EXHALE_HOLD,
-                hintRes = R.string.guided_meditation_retention_hint,
+            doubleTapAdvances = true,
+            releaseVoiceAfterPlay = true,
+            manualReleases = listOf(
+                ManualRelease(
+                    phaseId = WimHofPhaseIds.EXHALE_HOLD,
+                    hintRes = R.string.guided_meditation_retention_hint,
+                ),
             ),
         ),
         customizationFields = listOf(
@@ -2525,6 +2546,24 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                         else -> R.string.meditation_customization_wimhof_breaths_30
                     }
                 },
+            ),
+            CustomizationField.Options(
+                key = "breathSpeed",
+                labelRes = R.string.meditation_customization_wimhof_breath_speed,
+                default = WimHofBreathSpeed.NORMAL.key,
+                options = WIM_HOF_SPEED_OPTIONS,
+                optionLabelRes = { option ->
+                    when (WimHofBreathSpeed.fromKey(option)) {
+                        WimHofBreathSpeed.SLOW -> R.string.meditation_customization_wimhof_speed_slow
+                        WimHofBreathSpeed.FAST -> R.string.meditation_customization_wimhof_speed_fast
+                        WimHofBreathSpeed.NORMAL -> R.string.meditation_customization_wimhof_speed_normal
+                    }
+                },
+            ),
+            CustomizationField.Toggle(
+                key = "breathSound",
+                labelRes = R.string.meditation_customization_wimhof_breath_sound,
+                default = true,
             ),
         ),
     ),

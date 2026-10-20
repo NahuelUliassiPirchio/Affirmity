@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.ui.meditation
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +37,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.onSizeChanged
@@ -161,6 +163,9 @@ fun GuidedMeditationScreen(
             timeSource = AndroidMonotonicTimeSource,
             sendEvent = { event -> engineRef.send(event) },
             isCueSoundEnabled = { latestCueSoundEnabled.value },
+            sfxPlayer = entry.presentation.sfxResources.takeIf { it.isNotEmpty() }
+                ?.let { SfxPoolPlayer(context.applicationContext, it) },
+            releaseVoiceAfterPlay = entry.presentation.releaseVoiceAfterPlay,
         )
         val clock = RealSessionClock(scope = scope, timeSource = AndroidMonotonicTimeSource)
         val timerExecutor = TimerCommandExecutor(
@@ -317,7 +322,24 @@ private fun GuidedMeditationContent(
     // D3: Column -> Box so the banner can occupy a fixed BottomCenter slot outside the scrollable
     // content, with the inner Column's bottom padding reserving exactly the banner's measured
     // height (0.dp while pending/failed, ~50.dp once loaded) instead of overlapping the controls.
-    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    val doubleTapEvent = doubleTapAdvanceEvent(state.status, entry.presentation.doubleTapAdvances)
+    val currentOnSkip by rememberUpdatedState(onSkip)
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            // Accessibility: no extra semantics -- the Skip button below stays the labelled,
+            // screen-reader-reachable way to advance; the gesture is a shortcut only.
+            .then(
+                if (doubleTapEvent != null) {
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures(onDoubleTap = { currentOnSkip() })
+                    }
+                } else {
+                    Modifier
+                },
+            ),
+    ) {
         var bannerHeight by remember { mutableStateOf(0.dp) }
         val density = LocalDensity.current
 
@@ -422,7 +444,7 @@ private fun GuidedMeditationContent(
             }
         }
 
-        val release = entry.presentation.manualRelease?.takeIf { it.phaseId == state.currentPhaseId }
+        val release = entry.presentation.manualReleases.firstOrNull { it.phaseId == state.currentPhaseId }
         if (release != null && state.status == SessionStatus.Running) {
             TextButton(onClick = onRelease, modifier = Modifier.padding(top = 16.dp)) {
                 Text(stringResource(release.hintRes))

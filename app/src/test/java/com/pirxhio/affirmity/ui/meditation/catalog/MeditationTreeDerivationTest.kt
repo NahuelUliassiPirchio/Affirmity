@@ -137,4 +137,32 @@ class MeditationTreeDerivationTest {
         // + recovery onEnter(2: cue + text) + onExit(1: RoundEnd) = 10
         assertEquals(10, commands.size)
     }
+
+    // --- estimatedMillis: typical length of a user-releasable ceiling ----------------------------------
+
+    @Test
+    fun `expectedDurationMillis counts a phase estimate instead of its Fixed ceiling`() {
+        val definition = MeditationDefinition(
+            id = "estimate",
+            root = MeditationSequence(
+                id = "root",
+                children = listOf(
+                    Phase(id = "a", duration = PhaseDuration.Fixed(10_000L)),
+                    Phase(id = "hold", duration = PhaseDuration.Fixed(250_000L), estimatedMillis = 90_000L),
+                ),
+            ),
+        )
+
+        assertEquals(100_000L, expectedDurationMillis(definition, approxDurationMinutes = 9))
+    }
+
+    @Test
+    fun `fixedPhaseDurationsById keeps the real ceiling when a phase has an estimate`() {
+        val definition = MeditationDefinition(
+            id = "estimate",
+            root = Phase(id = "hold", duration = PhaseDuration.Fixed(250_000L), estimatedMillis = 90_000L),
+        )
+
+        assertEquals(mapOf("hold" to 250_000L), fixedPhaseDurationsById(definition))
+    }
 }

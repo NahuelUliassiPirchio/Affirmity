@@ -24,9 +24,20 @@ data class MeditationPresentation(
     /** Repeat-node progress counters, rendered in order. Generalizes today's hardcoded
      * `iterationCounts["rounds"]` / `iterationCounts["breathing"]` pair. */
     val counters: List<MeditationCounter> = emptyList(),
-    /** Optional "tap to release" affordance. Generalizes today's `currentPhaseId == "retention"`
-     * gate on the release `TextButton`. `null` when no phase in this entry is user-released. */
-    val manualRelease: ManualRelease? = null,
+    /** `PlayAudio` SFX id (`whm_sfx_*`) -> `@RawRes`, for clips played through the SFX channel
+     * rather than the per-id MediaPlayer path. Empty for every entry except wim_hof. */
+    val sfxResources: Map<String, Int> = emptyMap(),
+    /** Optional "tap to release" affordances. Generalizes today's `currentPhaseId == "retention"`
+     * gate on the release `TextButton`. Empty when no phase in this entry is user-released; the
+     * first entry whose phase is active is the one shown. */
+    val manualReleases: List<ManualRelease> = emptyList(),
+    /** When true, a double tap anywhere on the running session screen advances to the next phase
+     * (same event as the Skip button, which stays for accessibility). Wim Hof only. */
+    val doubleTapAdvances: Boolean = false,
+    /** When true the audio executor releases a VOICE player when its clip completes or is
+     * stopped and re-creates it on the next play, instead of keeping one player per clip alive
+     * (avoids codec/handle exhaustion with ~50 short guide clips). Wim Hof only. */
+    val releaseVoiceAfterPlay: Boolean = false,
 )
 
 /**

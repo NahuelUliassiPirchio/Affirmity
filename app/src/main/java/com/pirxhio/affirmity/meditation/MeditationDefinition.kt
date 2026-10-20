@@ -24,6 +24,10 @@ data class Phase(
      * own). Matched by type only for now — matching by payload (e.g. a specific [MeditationEvent.
      * UserAction.actionId]) is a deliberately unbuilt extension point, see design notes. */
     val exitEvents: Set<KClass<out MeditationEvent>> = emptySet(),
+    /** Typical runtime of a [PhaseDuration.Fixed] phase the user may release early, when the Fixed
+     * value is only a ceiling. Used ONLY for duration estimates (catalog length, completion
+     * threshold); the runtime timer always uses the Fixed value. Must be <= the Fixed millis. */
+    val estimatedMillis: Long? = null,
 ) : MeditationNode
 
 /** Runs [children] in order. Advancing off the last child bubbles the advance up to this node's

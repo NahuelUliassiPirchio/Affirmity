@@ -6,6 +6,7 @@ import com.pirxhio.affirmity.meditation.MeditationEngine
 import com.pirxhio.affirmity.meditation.MeditationEvent
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.Phase
+import com.pirxhio.affirmity.meditation.PlayAudio
 import com.pirxhio.affirmity.meditation.PhaseDuration
 import com.pirxhio.affirmity.meditation.Repeat
 import com.pirxhio.affirmity.meditation.SessionStatus
@@ -82,7 +83,8 @@ class WimHofMeditationDefinitionTest {
         val config = WimHofConfig(rounds = 1, breathsPerRound = 1)
         val round = (wimHofMeditationDefinition(config).root as Repeat).child as MeditationSequence
         val hold = round.children.filterIsInstance<Phase>().first { it.id == WimHofPhaseIds.EXHALE_HOLD }
-        assertEquals(PhaseDuration.Fixed(config.exhaleHoldMillis), hold.duration)
+        assertEquals(250_000L, config.exhaleHoldMillis)
+        assertEquals(PhaseDuration.Fixed(250_000L), hold.duration)
 
         val engine = engineAtExhaleHold(config)
         engine.send(MeditationEvent.TimerCompleted(engine.state.value.timerGeneration))
@@ -132,5 +134,101 @@ class WimHofMeditationDefinitionTest {
     @Test(expected = IllegalArgumentException::class)
     fun `non-positive breaths are rejected`() {
         wimHofMeditationDefinition(WimHofConfig(breathsPerRound = 0))
+    }
+
+    // --- breath speed, breath sound, definition-authored SFX ----------------------------------------
+
+    private fun sfxIds(commands: List<MeditationCommand>): List<String> =
+        commands.filterIsInstance<PlayAudio>().map { it.audioId }.filter { it.startsWith("whm_sfx_") }
+
+    private fun breathPhases(config: WimHofConfig): List<Phase> {
+        val round = (wimHofMeditationDefinition(config).root as Repeat).child as MeditationSequence
+        val breathing = round.children.first { it.id == "breathing" } as Repeat
+        return (breathing.child as MeditationSequence).children.map { it as Phase }
+    }
+
+    @Test
+    fun `breath speed options are slow 2000-2000, normal 1700-1700 and fast 1200-1000`() {
+        assertEquals(listOf(2_000L to 2_000L), listOf(WimHofBreathSpeed.SLOW).map { it.inhaleMillis to it.exhaleMillis })
+        assertEquals(listOf(1_700L to 1_700L), listOf(WimHofBreathSpeed.NORMAL).map { it.inhaleMillis to it.exhaleMillis })
+        assertEquals(listOf(1_200L to 1_000L), listOf(WimHofBreathSpeed.FAST).map { it.inhaleMillis to it.exhaleMillis })
+    }
+
+    @Test
+    fun `speed keys resolve and off-list or missing falls back to normal`() {
+        assertEquals(WimHofBreathSpeed.SLOW, WimHofBreathSpeed.fromKey("slow"))
+        assertEquals(WimHofBreathSpeed.FAST, WimHofBreathSpeed.fromKey("fast"))
+        listOf(null, "", "turbo", "SLOW ", "1.5").forEach {
+            assertEquals("key=$it", WimHofBreathSpeed.NORMAL, WimHofBreathSpeed.fromKey(it))
+        }
+    }
+
+    @Test
+    fun `default config is normal speed with breath sound on`() {
+        val config = WimHofConfig()
+
+        assertEquals(WimHofBreathSpeed.NORMAL, config.breathSpeed)
+        assertEquals(true, config.breathSound)
+        assertEquals(1_700L, config.inhaleMillis)
+        assertEquals(1_700L, config.exhaleMillis)
+    }
+
+    @Test
+    fun `the breathing phases use the selected speed durations`() {
+        WimHofBreathSpeed.entries.forEach { speed ->
+            val (inhale, exhale) = breathPhases(WimHofConfig(breathSpeed = speed))
+
+            assertEquals(PhaseDuration.Fixed(speed.inhaleMillis), inhale.duration)
+            assertEquals(PhaseDuration.Fixed(speed.exhaleMillis), exhale.duration)
+        }
+    }
+
+    @Test
+    fun `each cycle plays the inhale then exhale sfx matching the speed`() {
+        WimHofBreathSpeed.entries.forEach { speed ->
+            val (_, commands) = run(WimHofConfig(rounds = 1, breathsPerRound = 3, breathSpeed = speed))
+
+            val expectedCycle = listOf("whm_sfx_inhale_${speed.key}", "whm_sfx_exhale_${speed.key}")
+            assertEquals(
+                expectedCycle + expectedCycle + expectedCycle + listOf("whm_sfx_exhale_hold", "whm_sfx_inhale_recovery"),
+                sfxIds(commands),
+            )
+        }
+    }
+
+    @Test
+    fun `the exhale hold starts with the total-exhale sfx and the recovery with the recovery-inhale sfx`() {
+        val round = (wimHofMeditationDefinition(WimHofConfig()).root as Repeat).child as MeditationSequence
+        val hold = round.children.first { it.id == WimHofPhaseIds.EXHALE_HOLD } as Phase
+        val recovery = round.children.first { it.id == WimHofPhaseIds.RECOVERY_HOLD } as Phase
+
+        assertTrue(hold.onEnter.contains(PlayAudio("whm_sfx_exhale_hold")))
+        assertTrue(recovery.onEnter.contains(PlayAudio("whm_sfx_inhale_recovery")))
+    }
+
+    @Test
+    fun `breathSound off authors no whm sfx playback at all`() {
+        val (_, commands) = run(WimHofConfig(rounds = 2, breathsPerRound = 3, breathSound = false))
+
+        assertEquals(emptyList<String>(), sfxIds(commands))
+        assertTrue(commands.none { it is PlayAudio })
+    }
+
+    @Test
+    fun `breath sfx are independent of the cue-sound toggle because they are PlayAudio not PlayCue`() {
+        val (_, commands) = run(WimHofConfig(rounds = 1, breathsPerRound = 1))
+
+        assertTrue(sfxIds(commands).isNotEmpty())
+        assertTrue(commands.filterIsInstance<PlayAudio>().all { it.audioId.startsWith("whm_sfx_") })
+    }
+
+    @Test
+    fun `the exhale hold estimates a typical 90 s while keeping the 250 s ceiling`() {
+        val round = (wimHofMeditationDefinition(WimHofConfig()).root as Repeat).child as MeditationSequence
+        val hold = round.children.first { it.id == WimHofPhaseIds.EXHALE_HOLD } as Phase
+
+        assertEquals(90_000L, hold.estimatedMillis)
+        assertEquals(PhaseDuration.Fixed(250_000L), hold.duration)
+        assertEquals(null, (round.children.first { it.id == WimHofPhaseIds.RECOVERY_HOLD } as Phase).estimatedMillis)
     }
 }

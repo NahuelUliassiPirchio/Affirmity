@@ -67,7 +67,8 @@ class MeditationCatalogTest {
             }
             val phase = phasesById.getValue(requireNotNull(current.currentPhaseId))
             when (val duration = phase.duration) {
-                is PhaseDuration.Fixed -> total += duration.millis
+                // A user-releasable phase counts its typical length, not its runtime ceiling.
+                is PhaseDuration.Fixed -> total += phase.estimatedMillis ?: duration.millis
                 PhaseDuration.Manual -> manual++
             }
             if (MeditationEvent.AudioCompleted::class in phase.exitEvents) gated++
@@ -268,6 +269,20 @@ class MeditationCatalogTest {
         }
     }
 
+    @Test
+    fun `8b - a phase estimate never exceeds its Fixed ceiling and only wim_hof uses one`() {
+        meditationCatalog().forEach { entry ->
+            collectPhases(entry.definition(emptyMap()).root).forEach { phase ->
+                val estimate = phase.estimatedMillis ?: return@forEach
+                assertEquals("${entry.id}: only wim_hof may declare estimates", "wim_hof", entry.id)
+                assertTrue(
+                    "${entry.id}/${phase.id}: estimate must be <= ceiling",
+                    estimate <= (phase.duration as PhaseDuration.Fixed).millis,
+                )
+            }
+        }
+    }
+
     // --- 9. DC-1 guard: command-vocabulary subset -------------------------------------------------
 
     @Test
@@ -301,9 +316,10 @@ class MeditationCatalogTest {
     // --- 11. audioResources.isEmpty() tripwire ------------------------------------------------------
 
     @Test
-    fun `11 - audioResources is empty for all entries`() {
-        meditationCatalog().forEach { entry ->
+    fun `11 - audioResources and sfxResources are empty for all entries except wim_hof`() {
+        meditationCatalog().filter { it.id != "wim_hof" }.forEach { entry ->
             assertTrue("${entry.id}: audioResources must be empty", entry.presentation.audioResources.isEmpty())
+            assertTrue("${entry.id}: sfxResources must be empty", entry.presentation.sfxResources.isEmpty())
         }
     }
 
