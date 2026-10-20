@@ -38,12 +38,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
+import com.pirxhio.affirmity.data.catalog.CatalogLocale
 import com.pirxhio.affirmity.meditation.customization.CustomizationField
 import com.pirxhio.affirmity.meditation.customization.decodeMultiSelect
 import com.pirxhio.affirmity.meditation.customization.storageKey
 import com.pirxhio.affirmity.meditation.customization.visibleFor
 import com.pirxhio.affirmity.ui.meditation.catalog.MeditationCatalogEntry
-import java.util.Locale
 import kotlin.math.roundToInt
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -71,8 +71,9 @@ fun MeditationCustomizationScreen(
     modifier: Modifier = Modifier,
 ) {
     var values by remember(entry.id) { mutableStateOf(initialValues) }
-    val language = Locale.getDefault().language
-    val visibleFields = remember(entry.id, language) { entry.customizationFields.visibleFor(language) }
+    // Same resolution as the session gate, so a fallback-to-Spanish device still sees the toggle.
+    val locale = remember { CatalogLocale.resolve() }
+    val visibleFields = remember(entry.id, locale) { entry.customizationFields.visibleFor(locale) }
 
     // Item 5 fix: this route previously had no system-Back path of its own -- only the in-content
     // Cancel button below -- so Back could fall through past this screen entirely (potentially

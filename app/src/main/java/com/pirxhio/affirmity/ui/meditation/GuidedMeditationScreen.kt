@@ -38,9 +38,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -57,23 +57,22 @@ import com.pirxhio.affirmity.meditation.CompositeCommandExecutor
 import com.pirxhio.affirmity.meditation.LapTrackerCommandExecutor
 import com.pirxhio.affirmity.meditation.MeditationEngine
 import com.pirxhio.affirmity.meditation.MeditationEvent
-import com.pirxhio.affirmity.meditation.SessionDirector
 import com.pirxhio.affirmity.meditation.MeditationRuntimeState
 import com.pirxhio.affirmity.meditation.RealSessionClock
+import com.pirxhio.affirmity.meditation.SessionDirector
 import com.pirxhio.affirmity.meditation.SessionEndReason
 import com.pirxhio.affirmity.meditation.SessionEndSummary
 import com.pirxhio.affirmity.meditation.SessionStatus
 import com.pirxhio.affirmity.meditation.SessionTracker
 import com.pirxhio.affirmity.meditation.TextDisplayCommandExecutor
 import com.pirxhio.affirmity.meditation.TimerCommandExecutor
+import com.pirxhio.affirmity.meditation.wimhof.voice.VOICE_GUIDE_KEY
 import com.pirxhio.affirmity.ui.meditation.catalog.CounterEmphasis
 import com.pirxhio.affirmity.ui.meditation.catalog.MeditationCatalogEntry
 import com.pirxhio.affirmity.ui.meditation.catalog.displayDurationMinutes
 import com.pirxhio.affirmity.ui.meditation.catalog.fixedPhaseDurationsById
 import com.pirxhio.affirmity.ui.meditation.catalog.isMeditationLocked
-import com.pirxhio.affirmity.meditation.wimhof.voice.VOICE_GUIDE_KEY
-import com.pirxhio.affirmity.meditation.wimhof.voice.resolveVoiceGuide
-import java.util.Locale
+import com.pirxhio.affirmity.ui.meditation.catalog.resolveSessionCustomization
 
 /**
  * First screen built on the guided-meditation engine (`com.pirxhio.affirmity.meditation`) — wires
@@ -148,9 +147,7 @@ fun GuidedMeditationScreen(
 
     // The voice guide is gated once, here: locale + stored toggle become one resolved value that the
     // definition and the director factory both read.
-    val resolvedCustomization = remember(customization) {
-        resolveVoiceGuide(customization, Locale.getDefault().language)
-    }
+    val resolvedCustomization = remember(entry, customization) { entry.resolveSessionCustomization(customization) }
     val definition = remember(entry, resolvedCustomization) { entry.definition(resolvedCustomization) }
     val textExecutor = remember(definition) { TextDisplayCommandExecutor() }
     val phaseDurations = remember(definition) { fixedPhaseDurationsById(definition) }

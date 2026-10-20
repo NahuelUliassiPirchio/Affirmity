@@ -12,6 +12,7 @@ import com.pirxhio.affirmity.meditation.authoring.withEntryCue
 import com.pirxhio.affirmity.meditation.Repeat
 import com.pirxhio.affirmity.meditation.authoring.breathingBlock
 import com.pirxhio.affirmity.meditation.authoring.cuedPhase
+import com.pirxhio.affirmity.meditation.wimhof.voice.WhmVoicePolicy
 
 /**
  * Wim Hof style guided rounds: [breathsPerRound] deep, unforced breaths, then an exhale hold
@@ -28,8 +29,17 @@ data class WimHofConfig(
     /** When false the definition authors no `whm_sfx_*` [PlayAudio] at all. */
     val breathSound: Boolean = true,
     val exhaleHoldMillis: Long = DEFAULT_EXHALE_HOLD_MILLIS,
-    val recoveryHoldMillis: Long = 15_000L,
+    /** Explicit recovery length; when null it follows [voiceGuide] (the voice clips need more room). */
+    private val recoveryHoldOverrideMillis: Long? = null,
+    /**
+     * Resolved voice-guide switch (see `resolveVoiceGuide`). Adds the skippable intro and a round
+     * intro per round, drops the breathing entry cue (the bowl replaces it) and lengthens recovery.
+     */
+    val voiceGuide: Boolean = false,
 ) {
+    val recoveryHoldMillis: Long
+        get() = recoveryHoldOverrideMillis ?: if (voiceGuide) WimHofTiming.RECOVERY_VOICE_MILLIS else WimHofTiming.RECOVERY_MILLIS
+
     val inhaleMillis: Long get() = breathSpeed.inhaleMillis
     val exhaleMillis: Long get() = breathSpeed.exhaleMillis
 
@@ -74,11 +84,37 @@ object WimHofSfx {
 object WimHofText {
     const val EXHALE_HOLD = "meditation.wimhof.exhale_hold"
     const val RECOVERY_HOLD = "meditation.wimhof.recovery_hold"
+    const val INTRO = "meditation.wimhof.intro"
+    const val ROUND_INTRO = "meditation.wimhof.round_intro"
+    const val CLOSING = "meditation.wimhof.closing"
 }
 
+/** Phase and repeat ids shared by the definition and the voice director. */
 object WimHofPhaseIds {
+    const val INTRO = "intro"
+    const val ROUND_INTRO = "round_intro"
+    const val CLOSING = "closing"
+    const val INHALE = "inhale"
     const val EXHALE_HOLD = "exhale_hold"
     const val RECOVERY_HOLD = "recovery_hold"
+
+    /** Repeat ids (their iteration counts live in the runtime state). */
+    const val ROUNDS = "rounds"
+    const val BREATHING = "breathing"
+}
+
+/** Definition variable names shared by the definition and the voice director. */
+object WimHofVariables {
+    const val ROUNDS = "rounds"
+    const val BREATHS_PER_ROUND = "breathsPerRound"
+}
+
+/** Phase lengths that the voice guide's clip layout is measured against. */
+object WimHofTiming {
+    const val INTRO_MILLIS = 25_500L
+    const val ROUND_INTRO_MILLIS = 8_800L
+    const val RECOVERY_MILLIS = 15_000L
+    const val RECOVERY_VOICE_MILLIS = 16_400L
 }
 
 fun wimHofMeditationDefinition(config: WimHofConfig = WimHofConfig()): MeditationDefinition {
@@ -87,13 +123,22 @@ fun wimHofMeditationDefinition(config: WimHofConfig = WimHofConfig()): Meditatio
 
     val round = MeditationSequence(
         id = "round",
-        children = listOf(
+        children = listOfNotNull(
+            if (config.voiceGuide) {
+                cuedPhase(
+                    id = WimHofPhaseIds.ROUND_INTRO,
+                    duration = PhaseDuration.Fixed(WimHofTiming.ROUND_INTRO_MILLIS),
+                    cueTextId = WimHofText.ROUND_INTRO,
+                ).withEntryCue(MeditationCue.BreathworkBowl)
+            } else {
+                null
+            },
             breathingBlock(
-                id = "breathing",
+                id = WimHofPhaseIds.BREATHING,
                 breaths = config.breathsPerRound,
                 inhaleMillis = config.inhaleMillis,
                 exhaleMillis = config.exhaleMillis,
-                entryCue = MeditationCue.RoundStart,
+                entryCue = if (config.voiceGuide) null else MeditationCue.RoundStart,
                 inhaleCommands = sfx(config.breathSound, config.breathSpeed.inhaleSfxId),
                 exhaleCommands = sfx(config.breathSound, config.breathSpeed.exhaleSfxId),
             ),
@@ -114,16 +159,39 @@ fun wimHofMeditationDefinition(config: WimHofConfig = WimHofConfig()): Meditatio
         ),
     )
 
+    val rounds = Repeat(
+        id = WimHofPhaseIds.ROUNDS,
+        child = round,
+        strategy = FixedCountRepetition(config.rounds),
+    )
+
     return MeditationDefinition(
         id = "wimhof",
-        variables = mapOf("rounds" to config.rounds, "breathsPerRound" to config.breathsPerRound),
-        root = Repeat(
-            id = "rounds",
-            child = round,
-            strategy = FixedCountRepetition(config.rounds),
+        variables = mapOf(
+            WimHofVariables.ROUNDS to config.rounds,
+            WimHofVariables.BREATHS_PER_ROUND to config.breathsPerRound,
         ),
+        root = if (config.voiceGuide) {
+            MeditationSequence(id = "wimhof", children = listOf(intro(), rounds, closing()))
+        } else {
+            rounds
+        },
     )
 }
+
+private fun closing(): Phase = cuedPhase(
+    id = WimHofPhaseIds.CLOSING,
+    duration = PhaseDuration.Fixed(WhmVoicePolicy.closingMillis()),
+    cueTextId = WimHofText.CLOSING,
+    skippable = true,
+)
+
+private fun intro(): Phase = cuedPhase(
+    id = WimHofPhaseIds.INTRO,
+    duration = PhaseDuration.Fixed(WimHofTiming.INTRO_MILLIS),
+    cueTextId = WimHofText.INTRO,
+    skippable = true,
+)
 
 private fun sfx(enabled: Boolean, id: String): List<PlayAudio> = if (enabled) listOf(PlayAudio(id)) else emptyList()
 

@@ -120,5 +120,8 @@ fun localeMatches(localeTags: Set<String>, languageTag: String?): Boolean {
 }
 
 /** The fields to render for [languageTag]: those without locale tags plus those tagged for it. */
+fun List<CustomizationField>.visibleFor(locale: com.pirxhio.affirmity.data.catalog.CatalogLocale): List<CustomizationField> =
+    visibleFor(locale.tag)
+
 fun List<CustomizationField>.visibleFor(languageTag: String?): List<CustomizationField> =
     filter { localeMatches(it.localeTags, languageTag) }

@@ -263,6 +263,7 @@
     <string name="guided_meditation_exhale">Breathe out</string>
     <string name="guided_meditation_retention">Hold your breath</string>
     <string name="guided_meditation_retention_hint">Tap when you want to release</string>
+    <string name="guided_meditation_intro_skip_hint">Tap to skip the introduction</string>
     <string name="guided_meditation_recovery">Recovery</string>
     <string name="guided_meditation_completed">Session complete</string>
     <string name="guided_meditation_done">Done</string>
@@ -995,6 +996,9 @@
     <string name="meditation_catalog_wim_hof_title">Wim Hof breathing</string>
     <string name="meditation_catalog_wim_hof_description">Guided rounds of deep breaths, each followed by an exhale hold and a recovery inhale hold. Safety: never practice it in water or while driving, and stop if you feel dizzy.</string>
     <string name="meditation_wimhof_exhale_hold">Breathe out and hold with empty lungs. Tap when you need to breathe.</string>
+    <string name="meditation_wimhof_intro">Sit comfortably and listen to the introduction.</string>
+    <string name="meditation_wimhof_round_intro">Get ready for the round.</string>
+    <string name="meditation_wimhof_closing">Breathe calmly and come back slowly.</string>
     <string name="meditation_wimhof_recovery_hold">Breathe in deeply and hold.</string>
     <string name="meditation_customization_wimhof_rounds">Rounds</string>
     <string name="meditation_customization_wimhof_breaths_per_round">Breaths per round</string>

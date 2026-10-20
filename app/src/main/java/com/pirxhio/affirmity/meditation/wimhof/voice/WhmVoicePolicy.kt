@@ -1,6 +1,8 @@
 package com.pirxhio.affirmity.meditation.wimhof.voice
 
+import com.pirxhio.affirmity.data.catalog.CatalogLocale
 import com.pirxhio.affirmity.meditation.customization.localeMatches
+import com.pirxhio.affirmity.meditation.wimhof.WimHofTiming
 import kotlin.random.Random
 
 /** Customization key injected by [resolveVoiceGuide] and read when building the session. */
@@ -19,6 +21,10 @@ fun resolveVoiceGuide(customization: Map<String, String>, languageTag: String?):
         (customization[VOICE_GUIDE_KEY]?.toBooleanStrictOrNull() ?: true)
     return customization + (VOICE_GUIDE_KEY to enabled.toString())
 }
+
+/** Same gate, driven by the language the app shows (in-app locale, else device, else Spanish). */
+fun resolveVoiceGuide(customization: Map<String, String>, locale: CatalogLocale): Map<String, String> =
+    resolveVoiceGuide(customization, locale.tag)
 
 /** Pure scheduling rules of the voice guide. */
 object WhmVoicePolicy {
@@ -58,6 +64,43 @@ object WhmVoicePolicy {
     fun respClipId(n: Int): String = "whm_vo_resp_%02d".format(n)
 
     fun retClipId(n: Int): String = "whm_vo_ret_%02d".format(n)
+
+    /** Pause between chained intro clips. */
+    const val CHAIN_GAP_MILLIS = 600L
+
+    val INTRO_CLIPS: List<String> = listOf("whm_vo_intro_1", "whm_vo_intro_2", "whm_vo_intro_3")
+    val CLOSING_CLIPS: List<String> =
+        listOf("whm_vo_cierre_1", "whm_vo_cierre_2", "whm_vo_cierre_3", "whm_vo_cierre_4")
+
+    /** Silence kept after the last CIERRE clip before the session ends. */
+    const val CLOSING_TAIL_MILLIS = 1_000L
+
+    private const val CLOSING_ROUNDING_MILLIS = 500L
+
+    /** Closing phase length: the four clips, the gaps between them and a tail, rounded up to 0.5 s. */
+    fun closingMillis(): Long {
+        val needed = CLOSING_CLIPS.sumOf { WhmClips.durationMillis(it) ?: 0L } +
+            (CLOSING_CLIPS.size - 1) * CHAIN_GAP_MILLIS + CLOSING_TAIL_MILLIS
+        return (needed + CLOSING_ROUNDING_MILLIS - 1) / CLOSING_ROUNDING_MILLIS * CLOSING_ROUNDING_MILLIS
+    }
+
+    const val ENTRE_CLIP_COUNT = 3
+
+    /** ENTRE starts just after the bowl has been struck. */
+    const val ENTRE_AT_MILLIS = 800L
+
+    /** RONDA_* ends this long before the round intro does. */
+    const val RONDA_TAIL_MILLIS = 300L
+
+    fun entreClipId(n: Int): String = "whm_vo_entre_$n"
+
+    /** [roundIndex] is 0-based; the last round says "final" instead of its number. */
+    fun rondaClipId(roundIndex: Int, rounds: Int): String =
+        if (roundIndex >= rounds - 1) "whm_vo_ronda_final" else "whm_vo_ronda_${roundIndex + 1}"
+
+    /** Start (inside the round intro) that makes the RONDA clip end [RONDA_TAIL_MILLIS] before the phase ends. */
+    fun rondaStartMillis(rondaClipId: String): Long =
+        WimHofTiming.ROUND_INTRO_MILLIS - RONDA_TAIL_MILLIS - (WhmClips.durationMillis(rondaClipId) ?: 0L)
 
     const val RET_INICIO = "whm_vo_ret_inicio"
     const val REC_INICIO = "whm_vo_rec_inicio"

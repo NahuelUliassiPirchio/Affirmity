@@ -3,21 +3,21 @@ package com.pirxhio.affirmity.ui.meditation.catalog
 import com.pirxhio.affirmity.meditation.MeditationCommandExecutor
 import com.pirxhio.affirmity.meditation.MeditationNode
 import com.pirxhio.affirmity.meditation.MeditationRuntimeState
-import com.pirxhio.affirmity.meditation.wimhof.voice.WhmClips
-import com.pirxhio.affirmity.meditation.wimhof.voice.WhmVoiceDirector
-import com.pirxhio.affirmity.meditation.PlayAudio
-import com.pirxhio.affirmity.meditation.PhaseDuration
-import com.pirxhio.affirmity.meditation.customization.CustomizationField
-import com.pirxhio.affirmity.meditation.customization.defaultValues
-import org.junit.Assert.assertTrue
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.Phase
+import com.pirxhio.affirmity.meditation.PhaseDuration
+import com.pirxhio.affirmity.meditation.PlayAudio
 import com.pirxhio.affirmity.meditation.Repeat
 import com.pirxhio.affirmity.meditation.ShowText
+import com.pirxhio.affirmity.meditation.customization.CustomizationField
+import com.pirxhio.affirmity.meditation.customization.defaultValues
 import com.pirxhio.affirmity.meditation.customization.resolvedValues
 import com.pirxhio.affirmity.meditation.wimhof.WimHofBreathSpeed
 import com.pirxhio.affirmity.meditation.wimhof.WimHofPhaseIds
+import com.pirxhio.affirmity.meditation.wimhof.voice.WhmClips
+import com.pirxhio.affirmity.meditation.wimhof.voice.WhmVoiceDirector
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WimHofCatalogEntryTest {
@@ -40,7 +40,9 @@ class WimHofCatalogEntryTest {
 
     @Test
     fun `every ShowText id in the tree has a textResources entry`() {
-        val textIds = walk(entry.definition(emptyMap()).root)
+        // Voice off and voice on: the intro texts only exist in the second tree.
+        val textIds = listOf(emptyMap(), mapOf("voiceGuide" to "true"))
+            .flatMap { walk(entry.definition(it).root) }
             .filterIsInstance<Phase>()
             .flatMap { it.onEnter }
             .filterIsInstance<ShowText>()
@@ -51,8 +53,11 @@ class WimHofCatalogEntryTest {
     }
 
     @Test
-    fun `manual releases target the exhale hold phase`() {
-        assertEquals(listOf(WimHofPhaseIds.EXHALE_HOLD), entry.presentation.manualReleases.map { it.phaseId })
+    fun `manual releases target the intro skip and the exhale hold`() {
+        assertEquals(
+            listOf(WimHofPhaseIds.INTRO, WimHofPhaseIds.EXHALE_HOLD),
+            entry.presentation.manualReleases.map { it.phaseId },
+        )
     }
 
     @Test
@@ -190,5 +195,26 @@ class WimHofCatalogEntryTest {
         meditationCatalog().filter { it.id != "wim_hof" }.forEach {
             assertEquals("${it.id}: no director", null, it.presentation.sessionDirectorFactory)
         }
+    }
+
+    @Test
+    fun `the resolved voiceGuide switch adds the intro and round intro to the definition`() {
+        val on = walk(entry.definition(mapOf("voiceGuide" to "true")).root).filterIsInstance<Phase>().map { it.id }
+        val off = walk(entry.definition(mapOf("voiceGuide" to "false")).root).filterIsInstance<Phase>().map { it.id }
+
+        assertTrue(WimHofPhaseIds.INTRO in on && WimHofPhaseIds.ROUND_INTRO in on)
+        assertTrue(WimHofPhaseIds.INTRO !in off && WimHofPhaseIds.ROUND_INTRO !in off)
+    }
+
+    @Test
+    fun `with the voice guide every ShowText id still has a textResources entry`() {
+        val textIds = walk(entry.definition(mapOf("voiceGuide" to "true")).root)
+            .filterIsInstance<Phase>()
+            .flatMap { it.onEnter }
+            .filterIsInstance<ShowText>()
+            .map { it.textId }
+            .toSet()
+
+        assertTrue(entry.presentation.textResources.keys.containsAll(textIds))
     }
 }

@@ -2490,6 +2490,8 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                         ?: WimHofConfig.DEFAULT_BREATHS_PER_ROUND,
                     breathSpeed = WimHofBreathSpeed.fromKey(config["breathSpeed"]),
                     breathSound = config["breathSound"]?.toBooleanStrictOrNull() ?: true,
+                    // Injected by resolveVoiceGuide (locale + stored toggle); absent means off.
+                    voiceGuide = config[VOICE_GUIDE_KEY]?.toBooleanStrictOrNull() ?: false,
                 ),
             )
         },
@@ -2499,6 +2501,9 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                 BreathingText.EXHALE to R.string.guided_meditation_exhale,
                 WimHofText.EXHALE_HOLD to R.string.meditation_wimhof_exhale_hold,
                 WimHofText.RECOVERY_HOLD to R.string.meditation_wimhof_recovery_hold,
+                WimHofText.INTRO to R.string.meditation_wimhof_intro,
+                WimHofText.ROUND_INTRO to R.string.meditation_wimhof_round_intro,
+                WimHofText.CLOSING to R.string.meditation_wimhof_closing,
             ),
             audioResources = WIM_HOF_VOICE_RESOURCES,
             sfxResources = WIM_HOF_SFX_RESOURCES,
@@ -2523,6 +2528,10 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
             releaseVoiceAfterPlay = true,
             sessionDirectorFactory = WIM_HOF_DIRECTOR_FACTORY,
             manualReleases = listOf(
+                ManualRelease(
+                    phaseId = WimHofPhaseIds.INTRO,
+                    hintRes = R.string.guided_meditation_intro_skip_hint,
+                ),
                 ManualRelease(
                     phaseId = WimHofPhaseIds.EXHALE_HOLD,
                     hintRes = R.string.guided_meditation_retention_hint,
