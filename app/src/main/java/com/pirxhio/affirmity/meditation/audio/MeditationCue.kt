@@ -28,4 +28,7 @@ enum class MeditationCue {
 
     /** Interval bell during silent zazen. */
     ZazenBell,
+
+    /** Singing-bowl chime that opens a breathwork round (Wim Hof). */
+    BreathworkBowl,
 }

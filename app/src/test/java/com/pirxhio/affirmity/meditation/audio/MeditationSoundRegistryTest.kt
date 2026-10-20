@@ -24,4 +24,9 @@ class MeditationSoundRegistryTest {
         assertEquals(CueSound(R.raw.aff_zazen_bell, 0.95f), MeditationSoundRegistry.soundFor(MeditationCue.ZazenBell))
         assertEquals(CueSound(R.raw.aff_chime_transition, 0.75f), MeditationSoundRegistry.soundFor(MeditationCue.SectionTransition))
     }
+
+    @Test
+    fun `the breathwork bowl maps to the whm bowl clip`() {
+        assertEquals(CueSound(R.raw.whm_sfx_bowl, 1.00f), MeditationSoundRegistry.soundFor(MeditationCue.BreathworkBowl))
+    }
 }

@@ -25,8 +25,12 @@ import com.pirxhio.affirmity.meditation.StopAudio
 import com.pirxhio.affirmity.meditation.audio.CuePlaybackGuard
 import com.pirxhio.affirmity.meditation.audio.MeditationCue
 import com.pirxhio.affirmity.meditation.audio.MeditationSoundRegistry
+import com.pirxhio.affirmity.meditation.audio.PlayAudioRoute
+import com.pirxhio.affirmity.meditation.audio.SfxChannel
+import com.pirxhio.affirmity.meditation.audio.SfxPlayer
 import com.pirxhio.affirmity.meditation.audio.TerminalAudioAction
 import com.pirxhio.affirmity.meditation.audio.TerminalAudioPolicy
+import com.pirxhio.affirmity.meditation.audio.VoicePlayerLifecycle
 import com.pirxhio.affirmity.meditation.audio.VolumeRamp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -59,8 +63,14 @@ class GuidedMeditationAudioExecutor(
      * mid-session takes effect on the very next phase transition. Only gates the one-shot `SOUND`
      * channel ([playSound]) -- [PlayVoice] guidance and the [StartAmbient] bed are unaffected. */
     private val isCueSoundEnabled: () -> Boolean = { true },
+    /** Backend for `whm_sfx_*` clips; null for meditations without SFX. */
+    sfxPlayer: SfxPlayer? = null,
+    /** See `MeditationPresentation.releaseVoiceAfterPlay`. */
+    private val releaseVoiceAfterPlay: Boolean = false,
 ) : MeditationCommandExecutor {
     private val players = mutableMapOf<String, MediaPlayer>()
+
+    private val sfx: SfxChannel? = sfxPlayer?.let { SfxChannel(it) }
 
     /** id -> which mixing role it plays on (design §3.3). [AudioChannel.AMBIENT] is a singleton
      * slot: at most one id may be assigned to it at a time. */
@@ -98,7 +108,11 @@ class GuidedMeditationAudioExecutor(
 
     override fun execute(command: MeditationCommand) {
         when (command) {
-            is PlayAudio -> playSound(command.audioId)
+            is PlayAudio -> when (SfxChannel.route(command.audioId, isCueSoundEnabled())) {
+                PlayAudioRoute.Sfx -> sfx?.play(command.audioId)
+                PlayAudioRoute.Sound -> playSound(command.audioId)
+                PlayAudioRoute.Drop -> Unit
+            }
             is PlayCue -> playCue(command)
             is PlayVoice -> playVoice(command)
             is StartAmbient -> startAmbient(command)
@@ -114,8 +128,8 @@ class GuidedMeditationAudioExecutor(
 
     // --- One-shot sound (unchanged behaviour from the original executor, now channel-tagged) ----
 
+    /** The cue-sound preference is applied by [SfxChannel.route] before this is reached. */
     private fun playSound(audioId: String) {
-        if (!isCueSoundEnabled()) return
         val player = resolvePlayer(audioId) ?: return
         channelOf[audioId] = AudioChannel.SOUND
         player.seekTo(0)
@@ -170,6 +184,7 @@ class GuidedMeditationAudioExecutor(
             return
         }
         channelOf[audioId] = AudioChannel.VOICE
+        sfx?.voiceStarted(audioId)
 
         val bedId = channelOf.entries.firstOrNull { it.value == AudioChannel.AMBIENT }?.key
         if (command.duckAmbientTo != null && bedId != null) {
@@ -186,7 +201,11 @@ class GuidedMeditationAudioExecutor(
         }
 
         player.setOnCompletionListener {
+            sfx?.voiceEnded(audioId)
             restoreDuck(audioId)
+            // Free the player before reporting completion: the next clip (possibly this same id)
+            // is started synchronously from the event and must find a fresh slot.
+            releaseVoicePlayerIfConfigured(audioId)
             sendEvent(MeditationEvent.AudioCompleted(audioId))
         }
         player.seekTo(0)
@@ -296,6 +315,9 @@ class GuidedMeditationAudioExecutor(
     private fun hardStop(audioId: String) {
         ramps.remove(audioId)?.job?.cancel()
         players[audioId]?.let { player -> if (player.isPlaying) player.pause() }
+        val wasVoice = channelOf[audioId] == AudioChannel.VOICE
+        if (wasVoice) sfx?.voiceEnded(audioId)
+        if (wasVoice) releaseVoicePlayerIfConfigured(audioId)
         channelOf.remove(audioId)
         currentVolume.remove(audioId)
         pausedIds = pausedIds - audioId
@@ -305,7 +327,27 @@ class GuidedMeditationAudioExecutor(
         if (duckHeldBy == audioId) restoreDuck(audioId)
     }
 
+    /** Releases a VOICE player that has finished or been stopped, when the presentation asks for
+     * it. [resolvePlayer] lazily re-creates it on the next play. Must run while the id is still
+     * assigned to [AudioChannel.VOICE]. */
+    private fun releaseVoicePlayerIfConfigured(audioId: String) {
+        if (!VoicePlayerLifecycle.shouldRelease(releaseVoiceAfterPlay, channelOf[audioId])) return
+        ramps.remove(audioId)?.job?.cancel()
+        players.remove(audioId)?.let { player ->
+            try {
+                player.release()
+            } catch (e: Exception) {
+                debugWarn("Voice player release failed: $e")
+            }
+        }
+        channelOf.remove(audioId)
+        currentVolume.remove(audioId)
+        nominalVolume.remove(audioId)
+        pausedIds = pausedIds - audioId
+    }
+
     private fun hardStopAll() {
+        sfx?.stopAll()
         val ids = players.keys.toList()
         ids.forEach { hardStop(it) }
         duckHeldBy = null
@@ -327,9 +369,11 @@ class GuidedMeditationAudioExecutor(
         val playing = players.filterValues { it.isPlaying }.keys.toSet()
         playing.forEach { players[it]?.pause() }
         pausedIds = playing
+        sfx?.pause()
     }
 
     private fun resumeAll() {
+        sfx?.resume()
         pausedIds.forEach { players[it]?.start() }
         pausedIds = emptySet()
         val toResume = frozenRamps.toMap()
@@ -342,6 +386,7 @@ class GuidedMeditationAudioExecutor(
     private fun endSession(reason: SessionEndReason) {
         cueGuard.reset()
         endedCompleted = reason == SessionEndReason.Completed
+        if (!endedCompleted) sfx?.stopAll()
         val playing = players.filterValues { it.isPlaying }.keys
         val rampingToSilence = ramps.filterValues { it.ramp.toVolume == 0f }.keys
         val ringOut = playing.filterTo(mutableSetOf()) { it.startsWith(CUE_PLAYER_PREFIX) }
@@ -392,16 +437,28 @@ class GuidedMeditationAudioExecutor(
      * coroutine that ticks once after `MediaPlayer.release()` calls `setVolume` on an already-
      * released native player, which throws `IllegalStateException`. */
     fun release() {
-        ramps.values.forEach { it.job.cancel() }
-        ramps.clear()
-        frozenRamps.clear()
-        players.forEach { (id, player) ->
-            // The closing gong (a cue player, started after EndSession(Completed)) must ring out.
-            if (endedCompleted && id.startsWith(CUE_PLAYER_PREFIX)) {
-                releaseAfterPlayback(player.asReleasablePlayer())
-            } else {
-                player.release()
+        val cancelRamps = {
+            ramps.values.forEach { it.job.cancel() }
+            ramps.clear()
+            frozenRamps.clear()
+        }
+        val releaseMediaPlayers = {
+            players.forEach { (id, player) ->
+                // The closing gong (a cue player, started after EndSession(Completed)) must ring out.
+                if (endedCompleted && id.startsWith(CUE_PLAYER_PREFIX)) {
+                    releaseAfterPlayback(player.asReleasablePlayer())
+                } else {
+                    player.release()
+                }
             }
+        }
+        // Mandatory order: ramps cancelled -> SoundPool released -> MediaPlayers released.
+        val channel = sfx
+        if (channel != null) {
+            channel.releaseInOrder(cancelRamps, releaseMediaPlayers)
+        } else {
+            cancelRamps()
+            releaseMediaPlayers()
         }
         players.clear()
         channelOf.clear()
