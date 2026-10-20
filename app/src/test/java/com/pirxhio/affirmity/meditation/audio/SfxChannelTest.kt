@@ -150,4 +150,44 @@ class SfxChannelTest {
             assertFalse("channel=$it", VoicePlayerLifecycle.shouldRelease(releaseVoiceAfterPlay = true, channel = it))
         }
     }
+
+    // --- ramp finished (voice faded to silence) ------------------------------------------------
+
+    @Test
+    fun `a voice ramp reaching silence ends the voice duck and releases the player when configured`() {
+        val plan = VoicePlayerLifecycle.onRampFinished(toVolume = 0f, channel = AudioChannel.VOICE, releaseVoiceAfterPlay = true)
+
+        assertTrue(plan.silenced)
+        assertTrue(plan.endVoice)
+        assertTrue(plan.releasePlayer)
+    }
+
+    @Test
+    fun `a voice ramp reaching silence keeps the player when the presentation does not release voices`() {
+        val plan = VoicePlayerLifecycle.onRampFinished(toVolume = 0f, channel = AudioChannel.VOICE, releaseVoiceAfterPlay = false)
+
+        assertTrue(plan.silenced)
+        assertTrue(plan.endVoice)
+        assertFalse(plan.releasePlayer)
+    }
+
+    @Test
+    fun `a non-voice ramp reaching silence never ends a voice or releases the player`() {
+        listOf(AudioChannel.SOUND, AudioChannel.AMBIENT, null).forEach {
+            val plan = VoicePlayerLifecycle.onRampFinished(toVolume = 0f, channel = it, releaseVoiceAfterPlay = true)
+
+            assertTrue("channel=$it", plan.silenced)
+            assertFalse("channel=$it", plan.endVoice)
+            assertFalse("channel=$it", plan.releasePlayer)
+        }
+    }
+
+    @Test
+    fun `a ramp that does not reach silence does nothing`() {
+        val plan = VoicePlayerLifecycle.onRampFinished(toVolume = 0.25f, channel = AudioChannel.VOICE, releaseVoiceAfterPlay = true)
+
+        assertFalse(plan.silenced)
+        assertFalse(plan.endVoice)
+        assertFalse(plan.releasePlayer)
+    }
 }

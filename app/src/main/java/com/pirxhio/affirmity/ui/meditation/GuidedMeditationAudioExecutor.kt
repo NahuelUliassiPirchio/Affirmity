@@ -109,7 +109,9 @@ class GuidedMeditationAudioExecutor(
     override fun execute(command: MeditationCommand) {
         when (command) {
             is PlayAudio -> when (SfxChannel.route(command.audioId, isCueSoundEnabled())) {
-                PlayAudioRoute.Sfx -> sfx?.play(command.audioId)
+                PlayAudioRoute.Sfx -> if (sfx?.play(command.audioId) == false) {
+                    debugWarn("SFX ${command.audioId} requested before SoundPool finished loading; skipped")
+                }
                 PlayAudioRoute.Sound -> playSound(command.audioId)
                 PlayAudioRoute.Drop -> Unit
             }
@@ -304,8 +306,16 @@ class GuidedMeditationAudioExecutor(
      * untouched. */
     private fun onRampFinished(audioId: String, ramp: VolumeRamp) {
         ramps.remove(audioId)
-        if (ramp.toVolume != 0f) return
+        val plan = VoicePlayerLifecycle.onRampFinished(ramp.toVolume, channelOf[audioId], releaseVoiceAfterPlay)
+        if (!plan.silenced) return
         players[audioId]?.let { player -> if (player.isPlaying) player.pause() }
+        // A voice faded to silence never reports completion: un-duck the SFX and free the player
+        // here, while the id is still on the VOICE channel.
+        if (plan.endVoice) {
+            sfx?.voiceEnded(audioId)
+            restoreDuck(audioId)
+        }
+        if (plan.releasePlayer) releaseVoicePlayerIfConfigured(audioId)
         channelOf.remove(audioId)
         pausedIds = pausedIds - audioId
     }

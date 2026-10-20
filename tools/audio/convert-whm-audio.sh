@@ -41,6 +41,19 @@ OVERRIDES=()
 
 die() { echo "error: $*" >&2; exit 1; }
 
+# Fails up front, with the install hint, when a required tool is missing. $FFMPEG/$FFPROBE may be
+# a bare command or a path (they default to the Homebrew locations).
+require_tools() {
+  local tool
+  for tool in "$@"; do
+    case "$tool" in
+      ffmpeg) command -v "$FFMPEG" >/dev/null 2>&1 || die "ffmpeg not found (looked for '$FFMPEG'); install it with 'brew install ffmpeg' or set FFMPEG=<path>" ;;
+      ffprobe) command -v "$FFPROBE" >/dev/null 2>&1 || die "ffprobe not found (looked for '$FFPROBE'); it ships with ffmpeg ('brew install ffmpeg') or set FFPROBE=<path>" ;;
+      *) command -v "$tool" >/dev/null 2>&1 || die "$tool not found; install it with 'brew install $tool'" ;;
+    esac
+  done
+}
+
 # Prints the raw resource name (without extension) for a voice stem, or fails.
 voice_name() {
   local stem="$1"
@@ -231,6 +244,7 @@ main() {
     (( $# == 4 )) || die "usage: $0 <voces.zip> <sfx-dir> <raw-res-dir> <WhmClips.kt-path>"
   fi
   local zip="$1" sfx_dir="$2"
+  if (( dry )); then require_tools unzip; else require_tools unzip ffmpeg ffprobe jq; fi
   [[ -f "$zip" ]] || die "zip not found: $zip"
   [[ -d "$sfx_dir" ]] || die "sfx dir not found: $sfx_dir"
 

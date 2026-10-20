@@ -1075,6 +1075,7 @@
     <string name="meditation_customization_wimhof_speed_normal">Normal</string>
     <string name="meditation_customization_wimhof_speed_fast">Rápida</string>
     <string name="meditation_customization_wimhof_breath_sound">Sonido de respiración</string>
+    <string name="meditation_customization_wimhof_voice_guide">Guía de voz</string>
     <!-- Catalog theme labels (one per theme id; keep in sync with catalogThemeTitleRes). -->
     <string name="catalog_theme_body_energy_wellbeing_body_acceptance">Aceptar mi cuerpo</string>
     <string name="catalog_theme_body_energy_wellbeing_body_care">Cuidar mi cuerpo</string>

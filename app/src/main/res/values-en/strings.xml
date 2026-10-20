@@ -1006,6 +1006,7 @@
     <string name="meditation_customization_wimhof_speed_normal">Normal</string>
     <string name="meditation_customization_wimhof_speed_fast">Fast</string>
     <string name="meditation_customization_wimhof_breath_sound">Breath sound</string>
+    <string name="meditation_customization_wimhof_voice_guide">Voice guide</string>
     <!-- Catalog theme labels (one per theme id; keep in sync with catalogThemeTitleRes). -->
     <string name="catalog_theme_body_energy_wellbeing_body_acceptance">Body acceptance</string>
     <string name="catalog_theme_body_energy_wellbeing_body_care">Body care</string>

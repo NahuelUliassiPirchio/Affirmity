@@ -57,6 +57,7 @@ import com.pirxhio.affirmity.meditation.CompositeCommandExecutor
 import com.pirxhio.affirmity.meditation.LapTrackerCommandExecutor
 import com.pirxhio.affirmity.meditation.MeditationEngine
 import com.pirxhio.affirmity.meditation.MeditationEvent
+import com.pirxhio.affirmity.meditation.SessionDirector
 import com.pirxhio.affirmity.meditation.MeditationRuntimeState
 import com.pirxhio.affirmity.meditation.RealSessionClock
 import com.pirxhio.affirmity.meditation.SessionEndReason
@@ -70,6 +71,9 @@ import com.pirxhio.affirmity.ui.meditation.catalog.MeditationCatalogEntry
 import com.pirxhio.affirmity.ui.meditation.catalog.displayDurationMinutes
 import com.pirxhio.affirmity.ui.meditation.catalog.fixedPhaseDurationsById
 import com.pirxhio.affirmity.ui.meditation.catalog.isMeditationLocked
+import com.pirxhio.affirmity.meditation.wimhof.voice.VOICE_GUIDE_KEY
+import com.pirxhio.affirmity.meditation.wimhof.voice.resolveVoiceGuide
+import java.util.Locale
 
 /**
  * First screen built on the guided-meditation engine (`com.pirxhio.affirmity.meditation`) — wires
@@ -142,7 +146,12 @@ fun GuidedMeditationScreen(
         SessionTracker(monotonicTimeSource = AndroidMonotonicTimeSource, wallClockMillis = System::currentTimeMillis)
     }
 
-    val definition = remember(entry, customization) { entry.definition(customization) }
+    // The voice guide is gated once, here: locale + stored toggle become one resolved value that the
+    // definition and the director factory both read.
+    val resolvedCustomization = remember(customization) {
+        resolveVoiceGuide(customization, Locale.getDefault().language)
+    }
+    val definition = remember(entry, resolvedCustomization) { entry.definition(resolvedCustomization) }
     val textExecutor = remember(definition) { TextDisplayCommandExecutor() }
     val phaseDurations = remember(definition) { fixedPhaseDurationsById(definition) }
     val idleDurationMinutes = remember(definition, entry.approxDurationMinutes) {
@@ -156,12 +165,19 @@ fun GuidedMeditationScreen(
     // executors are therefore built inside this single remember block, alongside the engine.
     val (audioExecutor, engine) = remember(definition) {
         lateinit var engineRef: MeditationEngine
+        var director: SessionDirector? = null
+        // Events reach the director first (it mirrors the engine's own stale-event filtering),
+        // then the engine.
+        val sendEvent: (MeditationEvent) -> Unit = { event ->
+            director?.onEvent(event)
+            engineRef.send(event)
+        }
         val audio = GuidedMeditationAudioExecutor(
             context = context.applicationContext,
             resourcesByAudioId = entry.presentation.audioResources,
             scope = scope,
             timeSource = AndroidMonotonicTimeSource,
-            sendEvent = { event -> engineRef.send(event) },
+            sendEvent = sendEvent,
             isCueSoundEnabled = { latestCueSoundEnabled.value },
             sfxPlayer = entry.presentation.sfxResources.takeIf { it.isNotEmpty() }
                 ?.let { SfxPoolPlayer(context.applicationContext, it) },
@@ -170,11 +186,15 @@ fun GuidedMeditationScreen(
         val clock = RealSessionClock(scope = scope, timeSource = AndroidMonotonicTimeSource)
         val timerExecutor = TimerCommandExecutor(
             clock = clock,
-            sendEvent = { event -> engineRef.send(event) },
+            sendEvent = sendEvent,
             scope = scope,
         )
+        if (resolvedCustomization[VOICE_GUIDE_KEY] == "true") {
+            director = entry.presentation.sessionDirectorFactory?.invoke(audio) { engineRef.state.value }
+        }
+        // The director goes last so a phase's own SFX commands are issued before its voice.
         val commandExecutor = CompositeCommandExecutor(
-            listOf(timerExecutor, textExecutor, LapTrackerCommandExecutor(AndroidMonotonicTimeSource), audio),
+            listOfNotNull(timerExecutor, textExecutor, LapTrackerCommandExecutor(AndroidMonotonicTimeSource), audio, director),
         )
         engineRef = MeditationEngine(definition, commandExecutor)
         audio to engineRef

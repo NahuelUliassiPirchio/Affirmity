@@ -116,6 +116,8 @@ import com.pirxhio.affirmity.meditation.wimhof.WimHofConfig
 import com.pirxhio.affirmity.meditation.wimhof.WimHofPhaseIds
 import com.pirxhio.affirmity.meditation.wimhof.WimHofSfx
 import com.pirxhio.affirmity.meditation.wimhof.WimHofText
+import com.pirxhio.affirmity.meditation.wimhof.voice.VOICE_GUIDE_KEY
+import com.pirxhio.affirmity.meditation.wimhof.voice.VOICE_GUIDE_LOCALES
 import com.pirxhio.affirmity.meditation.wimhof.wimHofMeditationDefinition
 import com.pirxhio.affirmity.meditation.yoganidra.YogaNidraConfig
 import com.pirxhio.affirmity.meditation.yoganidra.YogaNidraText
@@ -2498,7 +2500,7 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                 WimHofText.EXHALE_HOLD to R.string.meditation_wimhof_exhale_hold,
                 WimHofText.RECOVERY_HOLD to R.string.meditation_wimhof_recovery_hold,
             ),
-            audioResources = emptyMap(),
+            audioResources = WIM_HOF_VOICE_RESOURCES,
             sfxResources = WIM_HOF_SFX_RESOURCES,
             counters = listOf(
                 MeditationCounter(
@@ -2519,6 +2521,7 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
             // The exhale hold is only a ceiling: the practitioner releases it when they need air.
             doubleTapAdvances = true,
             releaseVoiceAfterPlay = true,
+            sessionDirectorFactory = WIM_HOF_DIRECTOR_FACTORY,
             manualReleases = listOf(
                 ManualRelease(
                     phaseId = WimHofPhaseIds.EXHALE_HOLD,
@@ -2564,6 +2567,13 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                 key = "breathSound",
                 labelRes = R.string.meditation_customization_wimhof_breath_sound,
                 default = true,
+            ),
+            // Spanish-only: the clips are recorded in Spanish. Gated again by resolveVoiceGuide.
+            CustomizationField.Toggle(
+                key = VOICE_GUIDE_KEY,
+                labelRes = R.string.meditation_customization_wimhof_voice_guide,
+                default = true,
+                localeTags = VOICE_GUIDE_LOCALES,
             ),
         ),
     ),

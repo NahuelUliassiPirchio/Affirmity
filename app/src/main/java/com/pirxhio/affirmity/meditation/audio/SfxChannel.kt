@@ -5,10 +5,33 @@ import com.pirxhio.affirmity.meditation.AudioChannel
 /** Where a `PlayAudio` command goes. */
 enum class PlayAudioRoute { Sfx, Sound, Drop }
 
+/** What the executor must do when a volume ramp finishes (see [VoicePlayerLifecycle.onRampFinished]). */
+data class RampFinishPlan(
+    /** The ramp reached exactly 0: pause the player and drop its channel assignment. */
+    val silenced: Boolean,
+    /** A voice went silent: end its SFX duck and restore any bed it was ducking. */
+    val endVoice: Boolean,
+    /** Release the voice player (must run while the id is still on the VOICE channel). */
+    val releasePlayer: Boolean,
+)
+
 /** When a per-play voice player should be released instead of kept for reuse. */
 object VoicePlayerLifecycle {
     fun shouldRelease(releaseVoiceAfterPlay: Boolean, channel: AudioChannel?): Boolean =
         releaseVoiceAfterPlay && channel == AudioChannel.VOICE
+
+    /**
+     * A ramp reaching silence on a VOICE channel is a voice ending without a completion callback:
+     * SFX must un-duck and the player must not leak, same as natural completion or a hard stop.
+     */
+    fun onRampFinished(toVolume: Float, channel: AudioChannel?, releaseVoiceAfterPlay: Boolean): RampFinishPlan {
+        if (toVolume != 0f) return RampFinishPlan(silenced = false, endVoice = false, releasePlayer = false)
+        return RampFinishPlan(
+            silenced = true,
+            endVoice = channel == AudioChannel.VOICE,
+            releasePlayer = shouldRelease(releaseVoiceAfterPlay, channel),
+        )
+    }
 }
 
 /**

@@ -1,6 +1,10 @@
 package com.pirxhio.affirmity.ui.meditation.catalog
 
+import com.pirxhio.affirmity.meditation.MeditationCommandExecutor
 import com.pirxhio.affirmity.meditation.MeditationNode
+import com.pirxhio.affirmity.meditation.MeditationRuntimeState
+import com.pirxhio.affirmity.meditation.wimhof.voice.WhmClips
+import com.pirxhio.affirmity.meditation.wimhof.voice.WhmVoiceDirector
 import com.pirxhio.affirmity.meditation.PlayAudio
 import com.pirxhio.affirmity.meditation.PhaseDuration
 import com.pirxhio.affirmity.meditation.customization.CustomizationField
@@ -160,6 +164,31 @@ class WimHofCatalogEntryTest {
         assertTrue(entry.presentation.releaseVoiceAfterPlay)
         meditationCatalog().filter { it.id != "wim_hof" }.forEach {
             assertEquals("${it.id}: releaseVoiceAfterPlay must be off", false, it.presentation.releaseVoiceAfterPlay)
+        }
+    }
+
+    @Test
+    fun `every voice clip has a raw resource mapped under its own id`() {
+        assertEquals(WhmClips.voiceMillis.keys, entry.presentation.audioResources.keys)
+    }
+
+    @Test
+    fun `voice guide is a Spanish-only toggle that defaults on`() {
+        val toggle = entry.customizationFields.filterIsInstance<CustomizationField.Toggle>().single { it.key == "voiceGuide" }
+
+        assertEquals(true, toggle.default)
+        assertEquals(setOf("es"), toggle.localeTags)
+        assertEquals("true", defaultValues(entry.customizationFields)["voiceGuide"])
+    }
+
+    @Test
+    fun `only wim_hof provides a session director`() {
+        val sink = object : MeditationCommandExecutor {
+            override fun execute(command: com.pirxhio.affirmity.meditation.MeditationCommand) = Unit
+        }
+        assertTrue(entry.presentation.sessionDirectorFactory!!(sink) { MeditationRuntimeState() } is WhmVoiceDirector)
+        meditationCatalog().filter { it.id != "wim_hof" }.forEach {
+            assertEquals("${it.id}: no director", null, it.presentation.sessionDirectorFactory)
         }
     }
 }

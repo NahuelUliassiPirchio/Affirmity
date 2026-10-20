@@ -1,6 +1,7 @@
 package com.pirxhio.affirmity.ui.meditation.catalog
 
 import androidx.annotation.StringRes
+import com.pirxhio.affirmity.meditation.SessionDirectorFactory
 
 /**
  * Per-entry rendering data for the generic
@@ -38,6 +39,10 @@ data class MeditationPresentation(
      * stopped and re-creates it on the next play, instead of keeping one player per clip alive
      * (avoids codec/handle exhaustion with ~50 short guide clips). Wim Hof only. */
     val releaseVoiceAfterPlay: Boolean = false,
+    /** Builds the event-aware voice director for entries that have one (Wim Hof). The screen
+     * only calls it when the resolved `voiceGuide` is on. Must be a non-capturing value so entries
+     * stay structurally equal across `meditationCatalog()` calls. */
+    val sessionDirectorFactory: SessionDirectorFactory? = null,
 )
 
 /**

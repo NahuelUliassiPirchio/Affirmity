@@ -41,7 +41,9 @@ import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.meditation.customization.CustomizationField
 import com.pirxhio.affirmity.meditation.customization.decodeMultiSelect
 import com.pirxhio.affirmity.meditation.customization.storageKey
+import com.pirxhio.affirmity.meditation.customization.visibleFor
 import com.pirxhio.affirmity.ui.meditation.catalog.MeditationCatalogEntry
+import java.util.Locale
 import kotlin.math.roundToInt
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -69,6 +71,8 @@ fun MeditationCustomizationScreen(
     modifier: Modifier = Modifier,
 ) {
     var values by remember(entry.id) { mutableStateOf(initialValues) }
+    val language = Locale.getDefault().language
+    val visibleFields = remember(entry.id, language) { entry.customizationFields.visibleFor(language) }
 
     // Item 5 fix: this route previously had no system-Back path of its own -- only the in-content
     // Cancel button below -- so Back could fall through past this screen entirely (potentially
@@ -103,7 +107,7 @@ fun MeditationCustomizationScreen(
             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(entry.customizationFields, key = { it.key }) { field ->
+            items(visibleFields, key = { it.key }) { field ->
                 CustomizationFieldCard(
                     field = field,
                     values = values,
