@@ -132,6 +132,9 @@ android {
     }
     androidResources {
         localeFilters += listOf("es", "en")
+        // Wim Hof guide clips are played through openRawResourceFd (SoundPool/MediaPlayer),
+        // which needs the APK entries Stored, not deflated.
+        noCompress += "webm"
     }
     sourceSets {
         getByName("androidTest").assets.srcDirs("$projectDir/schemas")
