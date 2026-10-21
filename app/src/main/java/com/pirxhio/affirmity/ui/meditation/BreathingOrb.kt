@@ -7,9 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -29,8 +27,8 @@ import kotlinx.coroutines.withContext
  *
  * Timing: a LINEAR progress `p` runs from its current value to 1 over the REMAINING phase time and
  * is mapped through [breathScale] inside the draw lambda only, so the animation never recomposes
- * per frame. The animation restarts on [generation] (a phase change); pause and resume are
- * handled by [running] alone and continue from the current value, never re-snapping from a tick.
+ * per frame. The Animatable is recreated on [generation] (a phase change) at the matching fraction; pause and
+ * resume are handled by [running] alone and continue from the current value, never re-snapping.
  */
 @Composable
 fun BreathingOrb(
@@ -41,16 +39,12 @@ fun BreathingOrb(
     running: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val progress = remember { Animatable(0f) }
-    val latestElapsed by rememberUpdatedState(elapsedMillis)
-    // Only mutated inside the effect below, to tell a phase change from a pause/resume.
-    val snappedGeneration = remember { intArrayOf(NO_GENERATION) }
+    // Keyed on the generation DURING composition, so the role and the progress change in the same
+    // frame. Snapping later in an effect would draw one frame of the new role at the old progress
+    // (e.g. a full-size flash when an exhale hands over to an inhale).
+    val progress = remember(generation) { Animatable(fractionOf(elapsedMillis, phaseMillis)) }
 
-    LaunchedEffect(generation, running) {
-        if (snappedGeneration[0] != generation) {
-            snappedGeneration[0] = generation
-            progress.snapTo(fractionOf(latestElapsed, phaseMillis))
-        }
+    LaunchedEffect(progress, running) {
         // Holds never change size; animating would only invalidate the draw every frame.
         if (isHoldRole(role) || !running || progress.value >= 1f) return@LaunchedEffect
 
@@ -89,8 +83,6 @@ fun BreathingOrb(
 }
 
 private fun isHoldRole(role: BreathRole) = role == BreathRole.HOLD_FULL || role == BreathRole.HOLD_EMPTY
-
-private const val NO_GENERATION = Int.MIN_VALUE
 
 private fun fractionOf(elapsedMillis: Long, phaseMillis: Long): Float =
     if (phaseMillis <= 0L) 1f else (elapsedMillis.toFloat() / phaseMillis).coerceIn(0f, 1f)

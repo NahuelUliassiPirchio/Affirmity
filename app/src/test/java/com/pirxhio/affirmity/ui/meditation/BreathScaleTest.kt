@@ -46,4 +46,10 @@ class BreathScaleTest {
         val samples = (0..20).map { breathScale(BreathRole.INHALE, it / 20f) }
         assertTrue(samples.zipWithNext().all { (a, b) -> b >= a })
     }
+
+    @Test
+    fun `a phase start matches the previous phase end so the orb never jumps`() {
+        assertEquals(breathScale(BreathRole.EXHALE, 1f), breathScale(BreathRole.INHALE, 0f), delta)
+        assertEquals(breathScale(BreathRole.INHALE, 1f), breathScale(BreathRole.EXHALE, 0f), delta)
+    }
 }

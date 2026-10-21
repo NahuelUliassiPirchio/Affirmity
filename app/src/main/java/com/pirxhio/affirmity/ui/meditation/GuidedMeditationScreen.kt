@@ -74,6 +74,7 @@ import com.pirxhio.affirmity.ui.meditation.catalog.breathRolesById
 import com.pirxhio.affirmity.ui.meditation.catalog.displayDurationMinutes
 import com.pirxhio.affirmity.ui.meditation.catalog.fixedPhaseDurationsById
 import com.pirxhio.affirmity.ui.meditation.catalog.isMeditationLocked
+import com.pirxhio.affirmity.ui.meditation.catalog.openEndedPhaseIds
 import com.pirxhio.affirmity.ui.meditation.catalog.resolveSessionCustomization
 
 /**
@@ -154,6 +155,7 @@ fun GuidedMeditationScreen(
     val textExecutor = remember(definition) { TextDisplayCommandExecutor() }
     val phaseDurations = remember(definition) { fixedPhaseDurationsById(definition) }
     val breathRoles = remember(definition) { breathRolesById(definition) }
+    val openEndedPhases = remember(definition) { openEndedPhaseIds(definition) }
     val idleDurationMinutes = remember(definition, entry.approxDurationMinutes) {
         displayDurationMinutes(definition, entry.approxDurationMinutes)
     }
@@ -266,6 +268,7 @@ fun GuidedMeditationScreen(
         customization = customization,
         phaseDurations = phaseDurations,
         breathRoles = breathRoles,
+        openEndedPhases = openEndedPhases,
         idleDurationMinutes = idleDurationMinutes,
         showBannerAd = showBannerAd,
         cueSoundEnabled = cueSoundEnabled,
@@ -330,6 +333,7 @@ private fun GuidedMeditationContent(
     customization: Map<String, String>,
     phaseDurations: Map<String, Long>,
     breathRoles: Map<String, BreathRole> = emptyMap(),
+    openEndedPhases: Set<String> = emptySet(),
     idleDurationMinutes: Int,
     showBannerAd: Boolean,
     cueSoundEnabled: Boolean,
@@ -402,6 +406,8 @@ private fun GuidedMeditationContent(
         // known Fixed length shows the breathing shape.
         val breathRole = breathRoles[state.currentPhaseId]
         val showsOrb = breathRole != null && (phaseDurations[state.currentPhaseId] ?: 0L) > 0L
+        // User-released phase: elapsed time and a bare track, never a countdown toward the ceiling.
+        val isOpenEnded = state.currentPhaseId in openEndedPhases
         Box(
             modifier = Modifier
                 .padding(top = 32.dp)
@@ -415,7 +421,7 @@ private fun GuidedMeditationContent(
                 IdleBreathingBackdrop(modifier = Modifier.fillMaxSize())
             } else if (state.status == SessionStatus.Running || state.status == SessionStatus.Paused) {
                 val totalMillis = phaseDurations[state.currentPhaseId]
-                val progress = if (totalMillis != null && totalMillis > 0) {
+                val progress = if (!isOpenEnded && totalMillis != null && totalMillis > 0) {
                     (state.elapsedInPhaseMillis.toFloat() / totalMillis).coerceIn(0f, 1f)
                 } else {
                     0f
@@ -468,12 +474,17 @@ private fun GuidedMeditationContent(
                         textAlign = TextAlign.Center,
                     )
                     val remainingSeconds = state.remainingInPhaseMillis?.let { (it / 1000L).toInt() + 1 }
-                    val showsRemaining = remainingSeconds != null &&
-                        !showsOrb &&
-                        (state.status == SessionStatus.Running || state.status == SessionStatus.Paused)
+                    val isTicking = state.status == SessionStatus.Running || state.status == SessionStatus.Paused
+                    val timerText = when {
+                        !isTicking || showsOrb -> null
+                        isOpenEnded -> formatElapsed(state.elapsedInPhaseMillis)
+                        remainingSeconds != null -> "${remainingSeconds}s"
+                        else -> null
+                    }
+                    val showsRemaining = timerText != null
                     if (showsRemaining) {
                         Text(
-                            text = "${remainingSeconds}s",
+                            text = timerText.orEmpty(),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp),

@@ -55,6 +55,18 @@ fun breathRolesById(definition: MeditationDefinition): Map<String, BreathRole> =
             roles.first()
         }
 
+/**
+ * Ids of the phases the user ends themselves, where the Fixed duration is only a safety ceiling
+ * (e.g. the Wim Hof exhale hold). The session screen shows ELAPSED time and an empty ring for
+ * these, since a countdown or fill toward a ceiling the user is not aiming for is meaningless.
+ *
+ * Derived from [Phase.estimatedMillis] rather than a hand-maintained list: that field already
+ * means exactly "typical length of a user-releasable ceiling", so a new open-ended phase is
+ * picked up automatically and the list can never drift from the definition tree.
+ */
+fun openEndedPhaseIds(definition: MeditationDefinition): Set<String> =
+    collectPhases(definition.root).filter { it.estimatedMillis != null }.mapTo(mutableSetOf()) { it.id }
+
 private const val MILLIS_PER_MINUTE = 60_000L
 private const val HALF_MINUTE_MILLIS = MILLIS_PER_MINUTE / 2
 
