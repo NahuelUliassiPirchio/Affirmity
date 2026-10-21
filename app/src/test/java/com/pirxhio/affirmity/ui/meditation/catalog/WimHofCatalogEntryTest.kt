@@ -15,6 +15,7 @@ import com.pirxhio.affirmity.meditation.customization.resolvedValues
 import com.pirxhio.affirmity.meditation.wimhof.WimHofBreathSpeed
 import com.pirxhio.affirmity.meditation.wimhof.WimHofPhaseIds
 import com.pirxhio.affirmity.meditation.wimhof.voice.WhmClips
+import com.pirxhio.affirmity.meditation.wimhof.voice.WhmClipsEn
 import com.pirxhio.affirmity.meditation.wimhof.voice.WhmVoiceDirector
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -41,7 +42,7 @@ class WimHofCatalogEntryTest {
     @Test
     fun `every ShowText id in the tree has a textResources entry`() {
         // Voice off and voice on: the intro texts only exist in the second tree.
-        val textIds = listOf(emptyMap(), mapOf("voiceGuide" to "true"))
+        val textIds = listOf(emptyMap(), mapOf("voiceGuide" to "true", "voiceLocale" to "es"))
             .flatMap { walk(entry.definition(it).root) }
             .filterIsInstance<Phase>()
             .flatMap { it.onEnter }
@@ -174,15 +175,19 @@ class WimHofCatalogEntryTest {
 
     @Test
     fun `every voice clip has a raw resource mapped under its own id`() {
-        assertEquals(WhmClips.voiceMillis.keys, entry.presentation.audioResources.keys)
+        assertEquals(
+            WhmClips.voiceMillis.keys + WhmClipsEn.voiceMillis.keys,
+            entry.presentation.audioResources.keys,
+        )
+        assertEquals(104, entry.presentation.audioResources.values.toSet().size)
     }
 
     @Test
-    fun `voice guide is a Spanish-only toggle that defaults on`() {
+    fun `voice guide is a Spanish and English toggle that defaults on`() {
         val toggle = entry.customizationFields.filterIsInstance<CustomizationField.Toggle>().single { it.key == "voiceGuide" }
 
         assertEquals(true, toggle.default)
-        assertEquals(setOf("es"), toggle.localeTags)
+        assertEquals(setOf("es", "en"), toggle.localeTags)
         assertEquals("true", defaultValues(entry.customizationFields)["voiceGuide"])
     }
 
@@ -199,7 +204,7 @@ class WimHofCatalogEntryTest {
 
     @Test
     fun `the resolved voiceGuide switch adds the intro and round intro to the definition`() {
-        val on = walk(entry.definition(mapOf("voiceGuide" to "true")).root).filterIsInstance<Phase>().map { it.id }
+        val on = walk(entry.definition(mapOf("voiceGuide" to "true", "voiceLocale" to "es")).root).filterIsInstance<Phase>().map { it.id }
         val off = walk(entry.definition(mapOf("voiceGuide" to "false")).root).filterIsInstance<Phase>().map { it.id }
 
         assertTrue(WimHofPhaseIds.INTRO in on && WimHofPhaseIds.ROUND_INTRO in on)
@@ -208,7 +213,7 @@ class WimHofCatalogEntryTest {
 
     @Test
     fun `with the voice guide every ShowText id still has a textResources entry`() {
-        val textIds = walk(entry.definition(mapOf("voiceGuide" to "true")).root)
+        val textIds = walk(entry.definition(mapOf("voiceGuide" to "true", "voiceLocale" to "es")).root)
             .filterIsInstance<Phase>()
             .flatMap { it.onEnter }
             .filterIsInstance<ShowText>()
@@ -216,5 +221,21 @@ class WimHofCatalogEntryTest {
             .toSet()
 
         assertTrue(entry.presentation.textResources.keys.containsAll(textIds))
+    }
+
+    @Test
+    fun `a voice guide without a known clip locale behaves exactly like voice off`() {
+        fun phases(config: Map<String, String>) =
+            walk(entry.definition(config).root).filterIsInstance<Phase>().map { it.id to it.duration }
+
+        val off = phases(mapOf("voiceGuide" to "false"))
+        assertEquals(off, phases(mapOf("voiceGuide" to "true")))
+        assertEquals(off, phases(mapOf("voiceGuide" to "true", "voiceLocale" to "fr")))
+        assertEquals(off, phases(emptyMap()))
+        assertTrue(phases(mapOf("voiceGuide" to "true", "voiceLocale" to "en")) != off)
+        assertEquals(
+            expectedDurationMillis(entry.definition(mapOf("voiceGuide" to "false")), entry.approxDurationMinutes),
+            expectedDurationMillis(entry.definition(mapOf("voiceGuide" to "true", "voiceLocale" to "fr")), entry.approxDurationMinutes),
+        )
     }
 }

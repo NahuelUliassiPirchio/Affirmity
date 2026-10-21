@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.meditation.wimhof
 
+import com.pirxhio.affirmity.data.catalog.CatalogLocale
 import com.pirxhio.affirmity.meditation.FixedCountRepetition
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationSequence
@@ -13,6 +14,7 @@ import com.pirxhio.affirmity.meditation.Repeat
 import com.pirxhio.affirmity.meditation.StopAudio
 import com.pirxhio.affirmity.meditation.authoring.breathingBlock
 import com.pirxhio.affirmity.meditation.authoring.cuedPhase
+import com.pirxhio.affirmity.meditation.wimhof.voice.WhmVoiceClips
 import com.pirxhio.affirmity.meditation.wimhof.voice.WhmVoicePolicy
 
 /**
@@ -37,9 +39,18 @@ data class WimHofConfig(
      * intro per round, drops the breathing entry cue (the bowl replaces it) and lengthens recovery.
      */
     val voiceGuide: Boolean = false,
+    /**
+     * Locale whose clips the voice guide plays. Every clip-derived length (intro, round intro,
+     * recovery, closing) is measured from that locale's clips; ignored while [voiceGuide] is off.
+     */
+    val voiceLocale: CatalogLocale = CatalogLocale.ES,
 ) {
+    /** The voice guide really plays: asked for, and [voiceLocale] ships clips. Otherwise it is exactly voice off. */
+    val voiceActive: Boolean get() = voiceGuide && WhmVoiceClips.of(voiceLocale).isAvailable
+
     val recoveryHoldMillis: Long
-        get() = recoveryHoldOverrideMillis ?: if (voiceGuide) WimHofTiming.RECOVERY_VOICE_MILLIS else WimHofTiming.RECOVERY_MILLIS
+        get() = recoveryHoldOverrideMillis
+            ?: if (voiceActive) WhmVoicePolicy.recoveryVoiceMillis(voiceLocale) else WimHofTiming.RECOVERY_MILLIS
 
     val inhaleMillis: Long get() = breathSpeed.inhaleMillis
     val exhaleMillis: Long get() = breathSpeed.exhaleMillis
@@ -108,14 +119,14 @@ object WimHofPhaseIds {
 object WimHofVariables {
     const val ROUNDS = "rounds"
     const val BREATHS_PER_ROUND = "breathsPerRound"
+
+    /** Tag (`es` / `en`) of the clip set the voice director plays; absent means Spanish. */
+    const val VOICE_LOCALE = "voiceLocale"
 }
 
-/** Phase lengths that the voice guide's clip layout is measured against. */
+/** Phase lengths that do not depend on the voice clips (those come from `WhmVoicePolicy`, per locale). */
 object WimHofTiming {
-    const val INTRO_MILLIS = 25_500L
-    const val ROUND_INTRO_MILLIS = 8_800L
     const val RECOVERY_MILLIS = 15_000L
-    const val RECOVERY_VOICE_MILLIS = 16_400L
 }
 
 fun wimHofMeditationDefinition(config: WimHofConfig = WimHofConfig()): MeditationDefinition {
@@ -125,10 +136,10 @@ fun wimHofMeditationDefinition(config: WimHofConfig = WimHofConfig()): Meditatio
     val round = MeditationSequence(
         id = "round",
         children = listOfNotNull(
-            if (config.voiceGuide) {
+            if (config.voiceActive) {
                 cuedPhase(
                     id = WimHofPhaseIds.ROUND_INTRO,
-                    duration = PhaseDuration.Fixed(WimHofTiming.ROUND_INTRO_MILLIS),
+                    duration = PhaseDuration.Fixed(WhmVoicePolicy.roundIntroMillis(config.voiceLocale)),
                     cueTextId = WimHofText.ROUND_INTRO,
                 ).withEntryCue(MeditationCue.BreathworkBowl)
             } else {
@@ -139,7 +150,7 @@ fun wimHofMeditationDefinition(config: WimHofConfig = WimHofConfig()): Meditatio
                 breaths = config.breathsPerRound,
                 inhaleMillis = config.inhaleMillis,
                 exhaleMillis = config.exhaleMillis,
-                entryCue = if (config.voiceGuide) null else MeditationCue.RoundStart,
+                entryCue = if (config.voiceActive) null else MeditationCue.RoundStart,
                 inhaleCommands = sfx(config.breathSound, config.breathSpeed.inhaleSfxId),
                 exhaleCommands = sfx(config.breathSound, config.breathSpeed.exhaleSfxId),
                 skippableAsBlock = true,
@@ -174,25 +185,25 @@ fun wimHofMeditationDefinition(config: WimHofConfig = WimHofConfig()): Meditatio
         variables = mapOf(
             WimHofVariables.ROUNDS to config.rounds,
             WimHofVariables.BREATHS_PER_ROUND to config.breathsPerRound,
-        ),
-        root = if (config.voiceGuide) {
-            MeditationSequence(id = "wimhof", children = listOf(intro(), rounds, closing()))
+        ) + if (config.voiceActive) mapOf(WimHofVariables.VOICE_LOCALE to config.voiceLocale.tag) else emptyMap(),
+        root = if (config.voiceActive) {
+            MeditationSequence(id = "wimhof", children = listOf(intro(config.voiceLocale), rounds, closing(config.voiceLocale)))
         } else {
             rounds
         },
     )
 }
 
-private fun closing(): Phase = cuedPhase(
+private fun closing(locale: CatalogLocale): Phase = cuedPhase(
     id = WimHofPhaseIds.CLOSING,
-    duration = PhaseDuration.Fixed(WhmVoicePolicy.closingMillis()),
+    duration = PhaseDuration.Fixed(WhmVoicePolicy.closingMillis(locale)),
     cueTextId = WimHofText.CLOSING,
     skippable = true,
 )
 
-private fun intro(): Phase = cuedPhase(
+private fun intro(locale: CatalogLocale): Phase = cuedPhase(
     id = WimHofPhaseIds.INTRO,
-    duration = PhaseDuration.Fixed(WimHofTiming.INTRO_MILLIS),
+    duration = PhaseDuration.Fixed(WhmVoicePolicy.introMillis(locale)),
     cueTextId = WimHofText.INTRO,
     skippable = true,
 )

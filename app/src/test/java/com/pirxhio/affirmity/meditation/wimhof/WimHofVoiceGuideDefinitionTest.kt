@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.meditation.wimhof
 
+import com.pirxhio.affirmity.data.catalog.CatalogLocale
 import com.pirxhio.affirmity.meditation.MeditationEvent
 import com.pirxhio.affirmity.meditation.MeditationNode
 import com.pirxhio.affirmity.meditation.MeditationSequence
@@ -97,7 +98,7 @@ class WimHofVoiceGuideDefinitionTest {
     fun `shared ids are what the definition really uses`() {
         val definition = wimHofMeditationDefinition(voice)
         assertEquals(
-            setOf(WimHofVariables.ROUNDS, WimHofVariables.BREATHS_PER_ROUND),
+            setOf(WimHofVariables.ROUNDS, WimHofVariables.BREATHS_PER_ROUND, WimHofVariables.VOICE_LOCALE),
             definition.variables.keys,
         )
         val repeats = walk(definition.root).filterIsInstance<Repeat>().map { it.id }
@@ -136,7 +137,7 @@ class WimHofVoiceGuideDefinitionTest {
 
     @Test
     fun `the recovery fits REC_CUENTA and the hold fits TIEMPO_400`() {
-        assertTrue(WhmVoicePolicy.REC_CUENTA_AT_MILLIS + ms(WhmVoicePolicy.REC_CUENTA) <= fixed(phase(voice, WimHofPhaseIds.RECOVERY_HOLD)))
+        assertTrue(WhmVoicePolicy.REC_CUENTA_AT_MILLIS + ms(WhmVoicePolicy.recCuenta(CatalogLocale.ES)) <= fixed(phase(voice, WimHofPhaseIds.RECOVERY_HOLD)))
         assertTrue(240_000L + ms("whm_vo_tiempo_400") < fixed(phase(voice, WimHofPhaseIds.EXHALE_HOLD)))
     }
 
@@ -144,5 +145,41 @@ class WimHofVoiceGuideDefinitionTest {
     fun `the closing chain is made of the four CIERRE clips`() {
         assertEquals(4, WhmVoicePolicy.CLOSING_CLIPS.size)
         assertTrue(WhmVoicePolicy.CLOSING_CLIPS.all { WhmClips.durationMillis(it) != null })
+    }
+
+    // --- English guide: every clip-derived length comes from the English clips -----------------
+
+    private val english = WimHofConfig(voiceGuide = true, voiceLocale = CatalogLocale.EN)
+
+    @Test
+    fun `the definition records which locale's clips the director must play`() {
+        assertEquals("es", wimHofMeditationDefinition(voice).variables[WimHofVariables.VOICE_LOCALE])
+        assertEquals("en", wimHofMeditationDefinition(english).variables[WimHofVariables.VOICE_LOCALE])
+    }
+
+    @Test
+    fun `English phases are sized from the English clips and Spanish stays as it was`() {
+        val root = wimHofMeditationDefinition(english).root as MeditationSequence
+
+        assertEquals(WhmVoicePolicy.introMillis(CatalogLocale.EN), fixed(root.children.first() as Phase))
+        assertEquals(24_500L, fixed(root.children.first() as Phase))
+        assertEquals(WhmVoicePolicy.closingMillis(CatalogLocale.EN), fixed(root.children.last() as Phase))
+        assertEquals(18_500L, fixed(root.children.last() as Phase))
+        assertEquals(WhmVoicePolicy.roundIntroMillis(CatalogLocale.EN), fixed(phase(english, WimHofPhaseIds.ROUND_INTRO)))
+        assertEquals(WhmVoicePolicy.recoveryVoiceMillis(CatalogLocale.EN), fixed(phase(english, WimHofPhaseIds.RECOVERY_HOLD)))
+        assertEquals(16_400L, fixed(phase(english, WimHofPhaseIds.RECOVERY_HOLD)))
+
+        // Spanish is unchanged.
+        assertEquals(25_500L, fixed((wimHofMeditationDefinition(voice).root as MeditationSequence).children.first() as Phase))
+        assertEquals(20_000L, fixed((wimHofMeditationDefinition(voice).root as MeditationSequence).children.last() as Phase))
+        assertEquals(16_400L, fixed(phase(voice, WimHofPhaseIds.RECOVERY_HOLD)))
+    }
+
+    @Test
+    fun `English intro fits its chained clips and the English hold fits TIEMPO_400`() {
+        val en = com.pirxhio.affirmity.meditation.wimhof.voice.WhmVoiceClips.of(CatalogLocale.EN)
+        val needed = WhmVoicePolicy.introClips(CatalogLocale.EN).sumOf { en.durationMillis(it)!! } + 2 * WhmVoicePolicy.CHAIN_GAP_MILLIS
+        assertTrue(needed < fixed(phase(english, WimHofPhaseIds.INTRO)))
+        assertTrue(240_000L + en.durationMillis("whm_vo_en_tiempo_400")!! < fixed(phase(english, WimHofPhaseIds.EXHALE_HOLD)))
     }
 }

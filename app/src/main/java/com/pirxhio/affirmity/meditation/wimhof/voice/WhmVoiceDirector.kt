@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.meditation.wimhof.voice
 
+import com.pirxhio.affirmity.data.catalog.CatalogLocale
 import com.pirxhio.affirmity.meditation.EndSession
 import com.pirxhio.affirmity.meditation.MeditationCommand
 import com.pirxhio.affirmity.meditation.MeditationCommandExecutor
@@ -17,7 +18,10 @@ import com.pirxhio.affirmity.meditation.wimhof.WimHofVariables
 import kotlin.random.Random
 
 /**
- * Spanish voice guide of the Wim Hof session. No Android dependency: it watches the engine's
+ * Voice guide of the Wim Hof session (Spanish or English; the scheduling is identical). The clip
+ * set is the one the definition names in [WimHofVariables.VOICE_LOCALE], read on every phase
+ * entry, so a session plays only its own language. A session that names no known locale stays
+ * silent (no Spanish fallback). No Android dependency: it watches the engine's
  * commands (a [StartTimer] is a phase entry) and the raw event stream (ticks, audio completions)
  * and emits [PlayVoice]/[StopAudio] into [sink].
  *
@@ -82,8 +86,10 @@ class WhmVoiceDirector(
     /** Elapsed millis of the last accepted tick in the current phase. */
     private var lastElapsed = 0L
 
-    private val tiempoMarks: List<Pair<Long, String>> =
-        WhmClips.tiempoBySeconds.toSortedMap().map { (seconds, id) -> seconds * 1_000L to id }
+    /** Clips of the session's locale; set from the definition on each phase entry. */
+    private var voice: WhmVoiceClips = WhmVoiceClips.of(CatalogLocale.ES)
+    private val locale: CatalogLocale get() = voice.locale
+    private val tiempoMarks: List<Pair<Long, String>> get() = voice.tiempoMarks
 
     override fun execute(command: MeditationCommand) {
         when (command) {
@@ -149,16 +155,24 @@ class WhmVoiceDirector(
         paused = false
         schedule = Schedule.None
         lastElapsed = 0L
+        val sessionLocale = sessionLocale(state)
+        if (sessionLocale == null || !WhmVoiceClips.of(sessionLocale).isAvailable) {
+            stopVoice()
+            return
+        }
+        voice = WhmVoiceClips.of(sessionLocale)
         when (state.currentPhaseId) {
             WimHofPhaseIds.INTRO -> {
                 stopVoice()
-                schedule = Schedule.Chain(WhmVoicePolicy.INTRO_CLIPS)
-                playRequired(WhmVoicePolicy.INTRO_CLIPS.first())
+                val clips = WhmVoicePolicy.introClips(locale)
+                schedule = Schedule.Chain(clips)
+                playRequired(clips.first())
             }
             WimHofPhaseIds.CLOSING -> {
                 stopVoice()
-                schedule = Schedule.Chain(WhmVoicePolicy.CLOSING_CLIPS)
-                playRequired(WhmVoicePolicy.CLOSING_CLIPS.first())
+                val clips = WhmVoicePolicy.closingClips(locale)
+                schedule = Schedule.Chain(clips)
+                playRequired(clips.first())
             }
             WimHofPhaseIds.ROUND_INTRO -> {
                 stopVoice()
@@ -168,12 +182,12 @@ class WhmVoiceDirector(
             WimHofPhaseIds.EXHALE_HOLD -> {
                 stopVoice()
                 schedule = Schedule.Hold(nextTiempo = 0, nextRetAtMillis = WhmVoicePolicy.retGapMillis(random))
-                playRequired(WhmVoicePolicy.RET_INICIO)
+                playRequired(WhmVoicePolicy.retInicio(locale))
             }
             WimHofPhaseIds.RECOVERY_HOLD -> {
                 stopVoice()
                 schedule = Schedule.Recovery(cuentaPlayed = false)
-                playRequired(WhmVoicePolicy.REC_INICIO)
+                playRequired(WhmVoicePolicy.recInicio(locale))
             }
         }
     }
@@ -186,10 +200,10 @@ class WhmVoiceDirector(
         if (round > 0) {
             val clip = pickClip(WhmVoicePolicy.ENTRE_CLIP_COUNT, lastEntre)
             lastEntre = clip
-            marks += WhmVoicePolicy.ENTRE_AT_MILLIS to WhmVoicePolicy.entreClipId(clip)
+            marks += WhmVoicePolicy.ENTRE_AT_MILLIS to WhmVoicePolicy.entreClipId(clip, locale)
         }
-        val ronda = WhmVoicePolicy.rondaClipId(round, rounds)
-        marks += WhmVoicePolicy.rondaStartMillis(ronda) to ronda
+        val ronda = WhmVoicePolicy.rondaClipId(round, rounds, locale)
+        marks += WhmVoicePolicy.rondaStartMillis(ronda, locale) to ronda
         return marks
     }
 
@@ -204,21 +218,21 @@ class WhmVoiceDirector(
         // breath cannot leave the schedule stuck on a breath that has already passed.
         val respDue = breath == nextRespBreath
         if (respDue) nextRespBreath = breath + WhmVoicePolicy.respGapCycles(random)
-        val countdown = WhmVoicePolicy.countdownClip(breath, breaths)
+        val countdown = WhmVoicePolicy.countdownClip(breath, breaths, locale)
         if (countdown != null) {
             playRequired(countdown)
             lastVoiceBreath = breath
             return
         }
         if (!respDue) return
-        val clip = pickClip(WhmVoicePolicy.RESP_CLIP_COUNT, lastResp)
+        val clip = pickClip(voice.respCount, lastResp)
         val eligible = WhmVoicePolicy.respAllowed(breath, breaths) &&
             !slot.isBusy &&
             breath - lastVoiceBreath >= WhmVoicePolicy.RESP_MIN_GAP_CYCLES
         if (!eligible) return
         lastResp = clip
         lastVoiceBreath = breath
-        play(WhmVoicePolicy.respClipId(clip))
+        play(WhmVoicePolicy.respClipId(clip, locale))
     }
 
     // --- Ticks -----------------------------------------------------------------------------------
@@ -255,10 +269,10 @@ class WhmVoiceDirector(
             hold.nextTiempo++
         }
         if (elapsed < hold.nextRetAtMillis) return
-        val clip = pickClip(WhmVoicePolicy.RET_CLIP_COUNT, lastRet)
-        val id = WhmVoicePolicy.retClipId(clip)
+        val clip = pickClip(voice.retCount, lastRet)
+        val id = WhmVoicePolicy.retClipId(clip, locale)
         val nextMark = tiempoMarks.getOrNull(hold.nextTiempo)?.first
-        val clipMillis = WhmClips.durationMillis(id) ?: 0L
+        val clipMillis = voice.durationMillis(id) ?: 0L
         if (!slot.isBusy && WhmVoicePolicy.fitsBefore(elapsed, clipMillis, nextMark)) {
             lastRet = clip
             play(id)
@@ -267,9 +281,9 @@ class WhmVoiceDirector(
     }
 
     private fun onRecoveryTick(recovery: Schedule.Recovery, elapsed: Long) {
-        if (recovery.cuentaPlayed || elapsed < WhmVoicePolicy.REC_CUENTA_AT_MILLIS) return
+        if (recovery.cuentaPlayed || elapsed < WhmVoicePolicy.recCuentaAtMillis(locale)) return
         recovery.cuentaPlayed = true
-        playRequired(WhmVoicePolicy.REC_CUENTA)
+        playRequired(WhmVoicePolicy.recCuenta(locale))
     }
 
     // --- Slot ---------------------------------------------------------------------------------------
@@ -297,6 +311,11 @@ class WhmVoiceDirector(
     private fun stopVoice() {
         slot.release()?.let { sink.execute(StopAudio(it)) }
     }
+
+    /** The locale the definition recorded for this session, or null when it names none we know. */
+    private fun sessionLocale(state: MeditationRuntimeState): CatalogLocale? =
+        (state.variables[WimHofVariables.VOICE_LOCALE] as? String)
+            ?.let { tag -> CatalogLocale.entries.firstOrNull { it.tag == tag } }
 
     private companion object {
         const val NO_GENERATION = -1

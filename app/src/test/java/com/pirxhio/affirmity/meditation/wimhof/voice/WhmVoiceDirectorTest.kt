@@ -410,4 +410,24 @@ class WhmVoiceDirectorTest {
         assertTrue(h.commands.contains(PlayAudio("whm_sfx_exhale_hold")))
         assertTrue(h.commands.contains(PlayAudio("whm_sfx_inhale_normal")))
     }
+
+    @Test
+    fun `a session that names no known clip locale stays silent and never falls back to Spanish`() {
+        listOf(emptyMap<String, Any?>(), mapOf<String, Any?>("voiceLocale" to "fr")).forEach { variables ->
+            val played = mutableListOf<MeditationCommand>()
+            val sink = object : com.pirxhio.affirmity.meditation.MeditationCommandExecutor {
+                override fun execute(command: MeditationCommand) { played += command }
+            }
+            val state = com.pirxhio.affirmity.meditation.MeditationRuntimeState(
+                status = SessionStatus.Running,
+                activePath = listOf(WimHofPhaseIds.INTRO),
+                variables = variables,
+            )
+            val director = WhmVoiceDirector(sink, { state })
+            director.execute(com.pirxhio.affirmity.meditation.StartTimer(25_500L, 1))
+            director.onEvent(com.pirxhio.affirmity.meditation.MeditationEvent.TimerTick(1, 1_000L, null))
+
+            assertTrue("$variables: $played", played.none { it is PlayVoice })
+        }
+    }
 }

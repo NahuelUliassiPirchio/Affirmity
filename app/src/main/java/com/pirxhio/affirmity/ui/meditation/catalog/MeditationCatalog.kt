@@ -116,8 +116,10 @@ import com.pirxhio.affirmity.meditation.wimhof.WimHofConfig
 import com.pirxhio.affirmity.meditation.wimhof.WimHofPhaseIds
 import com.pirxhio.affirmity.meditation.wimhof.WimHofSfx
 import com.pirxhio.affirmity.meditation.wimhof.WimHofText
+import com.pirxhio.affirmity.data.catalog.CatalogLocale
 import com.pirxhio.affirmity.meditation.wimhof.voice.VOICE_GUIDE_KEY
 import com.pirxhio.affirmity.meditation.wimhof.voice.VOICE_GUIDE_LOCALES
+import com.pirxhio.affirmity.meditation.wimhof.voice.VOICE_LOCALE_KEY
 import com.pirxhio.affirmity.meditation.wimhof.wimHofMeditationDefinition
 import com.pirxhio.affirmity.meditation.yoganidra.YogaNidraConfig
 import com.pirxhio.affirmity.meditation.yoganidra.YogaNidraText
@@ -2481,6 +2483,7 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
         approxDurationMinutes = 10,
         access = ContentAccess.ProOrAdTrial,
         definition = { config ->
+            val voiceLocale = config[VOICE_LOCALE_KEY]?.let { tag -> CatalogLocale.entries.firstOrNull { it.tag == tag } }
             wimHofMeditationDefinition(
                 WimHofConfig(
                     rounds = config["rounds"]?.toIntOrNull() ?: WimHofConfig.DEFAULT_ROUNDS,
@@ -2492,7 +2495,10 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                     breathSound = config["breathSound"]?.toBooleanStrictOrNull() ?: true,
                     // Injected by resolveVoiceGuide (locale + stored toggle). Absent means the caller did not
                     // resolve it (e.g. a bare definition(emptyMap())), which stays voice-free.
-                    voiceGuide = config[VOICE_GUIDE_KEY]?.toBooleanStrictOrNull() ?: false,
+                    // A missing or unknown clip locale means voice off: never a silent Spanish fallback.
+                    voiceGuide = (config[VOICE_GUIDE_KEY]?.toBooleanStrictOrNull() ?: false) && voiceLocale != null,
+                    // The clip set to play, also injected by resolveVoiceGuide.
+                    voiceLocale = voiceLocale ?: CatalogLocale.ES,
                 ),
             )
         },
@@ -2578,7 +2584,7 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                 labelRes = R.string.meditation_customization_wimhof_breath_sound,
                 default = true,
             ),
-            // Spanish-only: the clips are recorded in Spanish. Gated again by resolveVoiceGuide.
+            // Shown for the locales that ship clips (Spanish and English). Gated again by resolveVoiceGuide.
             CustomizationField.Toggle(
                 key = VOICE_GUIDE_KEY,
                 labelRes = R.string.meditation_customization_wimhof_voice_guide,

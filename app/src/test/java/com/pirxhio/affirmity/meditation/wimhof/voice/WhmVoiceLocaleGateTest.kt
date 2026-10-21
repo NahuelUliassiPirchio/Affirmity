@@ -16,8 +16,8 @@ class WhmVoiceLocaleGateTest {
     }
 
     @Test
-    fun `an in-app English locale mutes voice even on a Spanish device`() {
-        assertEquals("false", voice(appTag = "en", device = "es"))
+    fun `an in-app English locale plays the English guide even on a Spanish device`() {
+        assertEquals("true", voice(appTag = "en", device = "es"))
     }
 
     @Test
@@ -32,9 +32,28 @@ class WhmVoiceLocaleGateTest {
     }
 
     @Test
-    fun `an English device with no in-app locale has no voice`() {
-        assertEquals("false", voice(appTag = null, device = "en"))
-        assertEquals("false", voice(appTag = null, device = "en-GB"))
+    fun `an English device with no in-app locale plays the English guide`() {
+        assertEquals("true", voice(appTag = null, device = "en"))
+        assertEquals("true", voice(appTag = null, device = "en-GB"))
+    }
+
+    @Test
+    fun `each locale selects only its own clips and never the other language`() {
+        fun locale(appTag: String?, device: String?) =
+            resolveVoiceGuide(emptyMap(), CatalogLocale.resolve(appTag) { device })[VOICE_LOCALE_KEY]
+
+        assertEquals("en", locale(appTag = "en", device = "es"))
+        assertEquals("es", locale(appTag = "es", device = "en"))
+        assertEquals("es", locale(appTag = "de", device = "en"))
+        assertEquals("en", locale(appTag = null, device = "en"))
+    }
+
+    @Test
+    fun `the stored toggle is one preference shared by both locales`() {
+        listOf("es", "en").forEach { tag ->
+            assertEquals(tag, "false", voice(tag, tag, mapOf(VOICE_GUIDE_KEY to "false")))
+            assertEquals(tag, "true", voice(tag, tag, mapOf(VOICE_GUIDE_KEY to "true")))
+        }
     }
 
     @Test

@@ -60,8 +60,20 @@ class WhmSessionHarness(
         }
     }
 
+    private val clips = WhmVoiceClips.of(config.voiceLocale)
+
+    /** A voice-off tree names no clip locale; the director under test still needs one, as a resolved session has. */
+    private val locale = config.voiceLocale
+
+    private fun withVoiceLocale(state: com.pirxhio.affirmity.meditation.MeditationRuntimeState) =
+        if (com.pirxhio.affirmity.meditation.wimhof.WimHofVariables.VOICE_LOCALE in state.variables) {
+            state
+        } else {
+            state.copy(variables = state.variables + (com.pirxhio.affirmity.meditation.wimhof.WimHofVariables.VOICE_LOCALE to locale.tag))
+        }
+
     private lateinit var engine: MeditationEngine
-    val director: WhmVoiceDirector? = if (voice) WhmVoiceDirector(sink, { engine.state.value }, random) else null
+    val director: WhmVoiceDirector? = if (voice) WhmVoiceDirector(sink, { withVoiceLocale(engine.state.value) }, random) else null
 
     init {
         engine = MeditationEngine(
@@ -136,7 +148,7 @@ class WhmSessionHarness(
             nowMs = e
             if (autoFinish) {
                 playing?.let { id ->
-                    if (e >= playStartMs + (WhmClips.durationMillis(id) ?: 0L)) audioCompleted(id)
+                    if (e >= playStartMs + (clips.durationMillis(id) ?: 0L)) audioCompleted(id)
                 }
             }
             tick(e)

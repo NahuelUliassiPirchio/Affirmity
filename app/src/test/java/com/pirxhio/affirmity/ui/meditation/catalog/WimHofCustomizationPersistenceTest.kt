@@ -133,13 +133,13 @@ class WimHofCustomizationPersistenceTest {
     }
 
     @Test
-    fun `a stored voice guide of true is still off where the clips are not shipped`() = runTest {
+    fun `a stored voice guide of true plays the English clips in English and is off where no clips ship`() = runTest {
         repository.saveValues(entry.id, mapOf("voiceGuide" to "true"))
-        val resolved = entry.resolveSessionCustomization(
-            resolvedValues(entry.customizationFields, repository.getValues(entry.id)),
-            CatalogLocale.EN,
-        )
+        val stored = resolvedValues(entry.customizationFields, repository.getValues(entry.id))
+        val english = entry.resolveSessionCustomization(stored, CatalogLocale.EN)
 
-        assertEquals("false", resolved["voiceGuide"])
+        assertEquals("true", english["voiceGuide"])
+        assertEquals("en", english["voiceLocale"])
+        assertEquals("false", com.pirxhio.affirmity.meditation.wimhof.voice.resolveVoiceGuide(stored, "fr")["voiceGuide"])
     }
 }

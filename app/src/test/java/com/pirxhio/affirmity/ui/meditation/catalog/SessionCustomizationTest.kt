@@ -22,7 +22,13 @@ class SessionCustomizationTest {
     @Test
     fun `wim_hof resolves the voice guide from the shown locale`() {
         assertEquals("true", wim.resolveSessionCustomization(emptyMap(), CatalogLocale.ES)["voiceGuide"])
-        assertEquals("false", wim.resolveSessionCustomization(emptyMap(), CatalogLocale.EN)["voiceGuide"])
+        assertEquals("true", wim.resolveSessionCustomization(emptyMap(), CatalogLocale.EN)["voiceGuide"])
+        assertEquals("en", wim.resolveSessionCustomization(emptyMap(), CatalogLocale.EN)["voiceLocale"])
+        assertEquals("es", wim.resolveSessionCustomization(emptyMap(), CatalogLocale.ES)["voiceLocale"])
+        assertEquals(
+            "false",
+            wim.resolveSessionCustomization(mapOf("voiceGuide" to "false"), CatalogLocale.EN)["voiceGuide"],
+        )
         assertEquals(
             "false",
             wim.resolveSessionCustomization(mapOf("voiceGuide" to "false"), CatalogLocale.ES)["voiceGuide"],
@@ -37,7 +43,12 @@ class SessionCustomizationTest {
         val esMillis = expectedDurationMillis(wim.definition(es), wim.approxDurationMinutes)
         val enMillis = expectedDurationMillis(wim.definition(en), wim.approxDurationMinutes)
 
-        assertTrue("voice adds intro, round intros and closing", esMillis > enMillis)
+        val enOff = wim.resolveSessionCustomization(mapOf("voiceGuide" to "false"), CatalogLocale.EN)
+        val offMillis = expectedDurationMillis(wim.definition(enOff), wim.approxDurationMinutes)
+
+        assertTrue("voice adds intro, round intros and closing", enMillis > offMillis)
+        // English intro (24.5 s) and closing (18.5 s) are shorter than the Spanish ones (25.5 s / 20 s).
+        assertEquals(2_500L, esMillis - enMillis)
         assertEquals(
             displayDurationMinutes(wim.definition(es), wim.approxDurationMinutes),
             wim.displayMinutes(emptyMap(), CatalogLocale.ES),
@@ -54,7 +65,7 @@ class SessionCustomizationTest {
             wim.customizationFields.visibleFor(locale).any { it.key == "voiceGuide" }
 
         assertTrue(visible(CatalogLocale.ES))
-        assertTrue(!visible(CatalogLocale.EN))
+        assertTrue(visible(CatalogLocale.EN))
         // A French device with no in-app locale resolves to Spanish, so the toggle must show.
         assertTrue(visible(CatalogLocale.resolve(null) { "fr" }))
     }

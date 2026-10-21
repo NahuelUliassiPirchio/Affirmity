@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.meditation.wimhof.voice
 
+import com.pirxhio.affirmity.data.catalog.CatalogLocale
 import com.pirxhio.affirmity.meditation.EndSession
 import com.pirxhio.affirmity.meditation.PlayVoice
 import com.pirxhio.affirmity.meditation.SessionStatus
@@ -234,5 +235,40 @@ class WhmVoiceGuideSessionTest {
 
         // Draws: breath 0, then the due breaths 5, 10 and 15. Breath 15 is also CUENTA_5.
         assertEquals(4, respGapDraws)
+    }
+
+    // --- English guide -----------------------------------------------------------------------------
+
+    @Test
+    fun `an English session plays only English clips, with the same scheduling, from intro to closing`() {
+        val en = CatalogLocale.EN
+        val h = WhmSessionHarness(
+            WimHofConfig(rounds = 2, breathsPerRound = 20, voiceGuide = true, voiceLocale = en),
+            random = Random(3),
+        )
+        h.start()
+        h.tickTo(WhmVoicePolicy.introMillis(en) - 100)
+        assertEquals(WimHofPhaseIds.INTRO, h.phaseId)
+        h.completePhase()
+        playRound(h, 20)
+        h.completePhase()
+        playRound(h, 20)
+        h.completePhase()
+        assertEquals(WimHofPhaseIds.CLOSING, h.phaseId)
+        h.tickTo(WhmVoicePolicy.closingMillis(en) - 100)
+
+        val ids = h.voiceIds
+        assertTrue(ids.isNotEmpty())
+        assertTrue("only English clips: $ids", ids.all { it.startsWith("whm_vo_en_") })
+        assertTrue(ids.all { it in WhmClipsEn.voiceMillis })
+        assertEquals(WhmVoicePolicy.introClips(en), ids.filter { it.startsWith("whm_vo_en_intro_") })
+        assertEquals(WhmVoicePolicy.closingClips(en), ids.filter { it.startsWith("whm_vo_en_cierre_") })
+        listOf(
+            "whm_vo_en_ronda_1", "whm_vo_en_ronda_final", "whm_vo_en_cuenta_5", "whm_vo_en_cuenta_ultima",
+            "whm_vo_en_ret_inicio", "whm_vo_en_tiempo_030", "whm_vo_en_rec_inicio", "whm_vo_en_rec_cuenta",
+        ).forEach { assertTrue("$it is missing from $ids", it in ids) }
+        assertTrue(ids.any { it.startsWith("whm_vo_en_entre_") })
+        assertTrue(ids.any { it.startsWith("whm_vo_en_resp_") })
+        assertTrue(h.overlaps.isEmpty())
     }
 }

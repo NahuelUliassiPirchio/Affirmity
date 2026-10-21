@@ -214,7 +214,7 @@ class MeditationCatalogTest {
         // runtime-fetched, never a textResources-mapped id, so it's outside this assertion's scope.
         "breathing_affirmations" to listOf(mapOf("breathingTechnique" to "box_breathing")),
         // wim_hof: the intro / round-intro texts only exist when the resolved voiceGuide is on.
-        "wim_hof" to listOf(mapOf("voiceGuide" to "true")),
+        "wim_hof" to listOf(mapOf("voiceGuide" to "true", "voiceLocale" to "es")),
     )
 
     @Test
