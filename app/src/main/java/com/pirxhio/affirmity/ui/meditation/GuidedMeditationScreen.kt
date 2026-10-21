@@ -366,6 +366,17 @@ private fun GuidedMeditationContent(
                 },
             ),
     ) {
+        // Beneath everything, above only the base background. A hold (counted or user-released)
+        // warms the field toward blush.
+        val breathRoleNow = breathRoles[state.currentPhaseId]
+        AuroraBackdrop(
+            running = state.status == SessionStatus.Running,
+            warm = breathRoleNow == BreathRole.HOLD_FULL ||
+                breathRoleNow == BreathRole.HOLD_EMPTY ||
+                state.currentPhaseId in openEndedPhases,
+            modifier = Modifier.fillMaxSize(),
+        )
+
         var bannerHeight by remember { mutableStateOf(0.dp) }
         val density = LocalDensity.current
 
@@ -473,18 +484,15 @@ private fun GuidedMeditationContent(
                         color = MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.Center,
                     )
-                    val remainingSeconds = state.remainingInPhaseMillis?.let { (it / 1000L).toInt() + 1 }
                     val isTicking = state.status == SessionStatus.Running || state.status == SessionStatus.Paused
                     val timerText = when {
                         !isTicking || showsOrb -> null
                         isOpenEnded -> formatElapsed(state.elapsedInPhaseMillis)
-                        remainingSeconds != null -> "${remainingSeconds}s"
-                        else -> null
+                        else -> state.remainingInPhaseMillis?.let { "${(it / 1000L).toInt() + 1}s" }
                     }
-                    val showsRemaining = timerText != null
-                    if (showsRemaining) {
+                    timerText?.let {
                         Text(
-                            text = timerText.orEmpty(),
+                            text = it,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp),

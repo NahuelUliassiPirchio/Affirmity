@@ -98,3 +98,15 @@ val GroupCoverOnGround = Color(0xFFF2F3F5)
 // the dark ground in both themes. The glyph is the near-black teal used on the dark-theme containers.
 val GroupPlayAccent = Color(0xFF5BBCC3)
 val GroupPlayOnAccent = Color(0xFF00252A)
+
+// Meditation "drifting aurora" backdrop: three soft colour fields drawn behind the breathing orb.
+// Each tone is paired with its own alpha in ui/meditation/AuroraBackdrop.kt; the pairs are
+// contrast-checked against on-surface / on-surface-variant text in AuroraContrastTest, stacked
+// worst case. Light tones are the bright brand teal, a sea-green and a blush; dark tones are
+// slightly deeper so the glow reads as light on black rather than a wash.
+val AuroraTealLightArgb: Long = 0xFF5BBCC3
+val AuroraSeaLightArgb: Long = 0xFF3FA796
+val AuroraBlushLightArgb: Long = 0xFFE8A9A0
+val AuroraTealDarkArgb: Long = 0xFF3AA5AD
+val AuroraSeaDarkArgb: Long = 0xFF2E8B7A
+val AuroraBlushDarkArgb: Long = 0xFFC98A8F
