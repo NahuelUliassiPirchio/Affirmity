@@ -44,6 +44,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.pirxhio.affirmity.BuildConfig
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.AccessDecision
@@ -207,11 +209,33 @@ fun GuidedMeditationScreen(
     val currentLiteralText by textExecutor.currentLiteralText.collectAsState()
     var exitHandled by remember { mutableStateOf(false) }
 
+    // Outside interruptions (another app taking audio focus, the app leaving the foreground) pause
+    // the session exactly like the pause button. Never resumed here: the user does that.
+    val pauseForInterruption = {
+        SessionInterruptionPolicy.pauseEventFor(engine.state.value.status)?.let { pauseEvent ->
+            sessionTracker.pause()
+            engine.send(pauseEvent)
+        }
+    }
+    val currentPauseForInterruption = rememberUpdatedState(pauseForInterruption)
+    val audioFocus = remember {
+        SessionAudioFocus(context.applicationContext) { currentPauseForInterruption.value() }
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (SessionInterruptionPolicy.shouldPauseFor(event)) currentPauseForInterruption.value()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     // Site A (REQ-5.2): extends the existing status-driven effect in place, fires exactly on
     // reaching Completed.
     LaunchedEffect(state.status) {
         if (state.status == SessionStatus.Completed) {
             onSessionEnded(SessionEndReason.Completed, sessionTracker.summary())
+            audioFocus.abandon()
         }
     }
 
@@ -247,6 +271,7 @@ fun GuidedMeditationScreen(
             try {
                 currentRequestExit.value()
             } finally {
+                audioFocus.abandon()
                 audioExecutor.release()
             }
         }
@@ -279,6 +304,7 @@ fun GuidedMeditationScreen(
                 onAccessBlocked()
             } else {
                 sessionTracker.start()
+                audioFocus.request()
                 onEvent(AnalyticsEvent.MeditationStarted(AnalyticsId.of(entry), currentAccess.provenance()))
                 onSessionStarted()
                 engine.send(MeditationEvent.Start)
@@ -290,6 +316,7 @@ fun GuidedMeditationScreen(
         },
         onResume = {
             sessionTracker.resume()
+            audioFocus.request()
             engine.send(MeditationEvent.Resume)
         },
         onSkip = { engine.send(MeditationEvent.Skip) },
@@ -488,7 +515,7 @@ private fun GuidedMeditationContent(
                     val timerText = when {
                         !isTicking || showsOrb -> null
                         isOpenEnded -> formatElapsed(state.elapsedInPhaseMillis)
-                        else -> state.remainingInPhaseMillis?.let { "${(it / 1000L).toInt() + 1}s" }
+                        else -> state.remainingInPhaseMillis?.let(::formatRemainingSeconds)
                     }
                     timerText?.let {
                         Text(

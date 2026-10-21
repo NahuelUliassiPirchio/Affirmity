@@ -17,4 +17,23 @@ class FormatElapsedTest {
     fun `a negative value is treated as zero`() {
         assertEquals("0:00", formatElapsed(-5L))
     }
+
+    @Test
+    fun `remaining time shows the whole second being counted down`() {
+        assertEquals("1s", formatRemainingSeconds(999L))
+        assertEquals("30s", formatRemainingSeconds(29_001L))
+        assertEquals("30s", formatRemainingSeconds(29_999L))
+    }
+
+    @Test
+    fun `remaining time moves to the next second exactly on the boundary`() {
+        assertEquals("1s", formatRemainingSeconds(0L))
+        assertEquals("2s", formatRemainingSeconds(1_000L))
+        assertEquals("31s", formatRemainingSeconds(30_000L))
+    }
+
+    @Test
+    fun `a negative remaining time is treated as zero`() {
+        assertEquals("1s", formatRemainingSeconds(-5L))
+    }
 }

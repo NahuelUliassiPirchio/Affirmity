@@ -206,16 +206,42 @@ class GuidedMeditationAudioExecutor(
             )
         }
 
-        player.setOnCompletionListener {
-            sfx?.voiceEnded(audioId)
-            restoreDuck(audioId)
-            // Free the player before reporting completion: the next clip (possibly this same id)
-            // is started synchronously from the event and must find a fresh slot.
-            releaseVoicePlayerIfConfigured(audioId)
-            sendEvent(MeditationEvent.AudioCompleted(audioId))
+        player.setOnCompletionListener { finishVoice(audioId) }
+        player.setOnErrorListener { _, what, extra ->
+            debugWarn("Voice $audioId failed (what=$what, extra=$extra)")
+            finishVoice(audioId, discardPlayer = true)
+            true
         }
         player.seekTo(0)
         player.start()
+    }
+
+    /** A voice clip ended, by finishing or by failing: frees its channel, un-ducks, and reports
+     * completion so a Manual/ceiling-gated phase or a director chain keeps going. A failed player
+     * is unusable ([discardPlayer]), so it is released even when the presentation keeps voice
+     * players for reuse. */
+    private fun finishVoice(audioId: String, discardPlayer: Boolean = false) {
+        sfx?.voiceEnded(audioId)
+        restoreDuck(audioId)
+        // Free the player before reporting completion: the next clip (possibly this same id)
+        // is started synchronously from the event and must find a fresh slot.
+        releaseVoicePlayerIfConfigured(audioId)
+        if (discardPlayer) releaseFailedPlayer(audioId)
+        sendEvent(MeditationEvent.AudioCompleted(audioId))
+    }
+
+    private fun releaseFailedPlayer(audioId: String) {
+        ramps.remove(audioId)?.job?.cancel()
+        players.remove(audioId)?.let { player ->
+            try {
+                player.release()
+            } catch (e: Exception) {
+                debugWarn("Voice player release failed: $e")
+            }
+        }
+        channelOf.remove(audioId)
+        currentVolume.remove(audioId)
+        pausedIds = pausedIds - audioId
     }
 
     /** Ramps the ambient bed back to its nominal volume — runs whenever the ducking voice stops
