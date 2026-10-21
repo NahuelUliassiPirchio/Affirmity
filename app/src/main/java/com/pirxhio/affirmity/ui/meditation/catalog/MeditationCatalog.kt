@@ -2490,7 +2490,8 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                         ?: WimHofConfig.DEFAULT_BREATHS_PER_ROUND,
                     breathSpeed = WimHofBreathSpeed.fromKey(config["breathSpeed"]),
                     breathSound = config["breathSound"]?.toBooleanStrictOrNull() ?: true,
-                    // Injected by resolveVoiceGuide (locale + stored toggle); absent means off.
+                    // Injected by resolveVoiceGuide (locale + stored toggle). Absent means the caller did not
+                    // resolve it (e.g. a bare definition(emptyMap())), which stays voice-free.
                     voiceGuide = config[VOICE_GUIDE_KEY]?.toBooleanStrictOrNull() ?: false,
                 ),
             )

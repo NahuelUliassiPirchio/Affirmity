@@ -41,8 +41,9 @@ object WhmVoicePolicy {
     /** REC_CUENTA starts here inside the recovery hold. */
     const val REC_CUENTA_AT_MILLIS = 12_720L
 
-    const val RESP_CLIP_COUNT = 12
-    const val RET_CLIP_COUNT = 11
+    /** Numbered clips in the generated table, so a re-recorded set never drifts from the policy. */
+    val RESP_CLIP_COUNT: Int = WhmClips.voiceMillis.keys.count { it.matches(Regex("whm_vo_resp_\\d+")) }
+    val RET_CLIP_COUNT: Int = WhmClips.voiceMillis.keys.count { it.matches(Regex("whm_vo_ret_\\d+")) }
 
     fun respGapCycles(random: Random): Int = random.nextInt(RESP_MIN_GAP_CYCLES, RESP_MAX_GAP_CYCLES + 1)
 

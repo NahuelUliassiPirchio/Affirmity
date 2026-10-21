@@ -259,6 +259,29 @@ class WimHofMeditationDefinitionTest {
     }
 
     @Test
+    fun `Skip on the very last breath of the block lands on the exhale hold without advancing twice`() {
+        listOf(0, 1).forEach { phasesIntoLastBreath ->
+            val executor = RecordingCommandExecutor()
+            val engine = MeditationEngine(wimHofMeditationDefinition(WimHofConfig(rounds = 2, breathsPerRound = 30)), executor)
+            engine.send(MeditationEvent.Start)
+            repeat(29 * 2 + phasesIntoLastBreath) { engine.send(MeditationEvent.Next) }
+            assertEquals(29, engine.state.value.iterationCounts["breathing"])
+            val inhalesBefore = executor.commands.count { it == PlayAudio("whm_sfx_inhale_normal") }
+
+            engine.send(MeditationEvent.Skip)
+
+            assertEquals("phase $phasesIntoLastBreath", WimHofPhaseIds.EXHALE_HOLD, engine.state.value.currentPhaseId)
+            assertEquals(null, engine.state.value.iterationCounts["breathing"])
+            assertEquals(0, engine.state.value.iterationCounts["rounds"])
+            assertEquals(inhalesBefore, executor.commands.count { it == PlayAudio("whm_sfx_inhale_normal") })
+
+            // The hold is a single step: the next advance goes to recovery, not past it.
+            engine.send(MeditationEvent.Next)
+            assertEquals(WimHofPhaseIds.RECOVERY_HOLD, engine.state.value.currentPhaseId)
+        }
+    }
+
+    @Test
     fun `the exhale hold first stops any in-flight breath sfx, then plays the total-exhale sfx`() {
         val round = (wimHofMeditationDefinition(WimHofConfig()).root as Repeat).child as MeditationSequence
         val hold = round.children.first { it.id == WimHofPhaseIds.EXHALE_HOLD } as Phase

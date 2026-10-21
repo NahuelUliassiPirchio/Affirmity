@@ -48,8 +48,17 @@ private val FIELD_RADIUS_OF_LARGER_SIDE = listOf(0.75f, 0.65f, 0.85f)
 private val FIELD_PHASES = listOf(0.0, 2.1, 4.2)
 
 private const val ENTRY_MILLIS = 1200
+
+/** Fast start, long settle: the field appears at once and then eases into place. */
+private val ENTRY_EASING = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
 private const val WARM_MILLIS = 2500
 private const val WARM_FIELD_INDEX = 1
+
+/** Radial falloff stops (fraction of the radius) and the share of peak alpha left at each. */
+private const val FALLOFF_MID_STOP = 0.45f
+private const val FALLOFF_MID_ALPHA = 0.45f
+private const val FALLOFF_TAIL_STOP = 0.75f
+private const val FALLOFF_TAIL_ALPHA = 0.12f
 
 /** One drifting colour field: an opaque tone and the peak alpha it is drawn with at its centre. */
 internal class AuroraField(val argb: Long, val alpha: Float) {
@@ -125,7 +134,7 @@ fun AuroraBackdrop(running: Boolean, warm: Boolean, modifier: Modifier = Modifie
     LaunchedEffect(Unit) {
         if (entered) return@LaunchedEffect
         entered = true
-        entry.animateTo(1f, tween(ENTRY_MILLIS, easing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)))
+        entry.animateTo(1f, tween(ENTRY_MILLIS, easing = ENTRY_EASING))
     }
     LaunchedEffect(warm) {
         warmth.animateTo(if (warm) 1f else 0f, tween(WARM_MILLIS, easing = FastOutSlowInEasing))
@@ -158,8 +167,8 @@ fun AuroraBackdrop(running: Boolean, warm: Boolean, modifier: Modifier = Modifie
                 brush = Brush.radialGradient(
                     // Eased falloff: a straight two-stop ramp shows a visible rim at the edge.
                     0f to color.copy(alpha = peak),
-                    0.45f to color.copy(alpha = peak * 0.45f),
-                    0.75f to color.copy(alpha = peak * 0.12f),
+                    FALLOFF_MID_STOP to color.copy(alpha = peak * FALLOFF_MID_ALPHA),
+                    FALLOFF_TAIL_STOP to color.copy(alpha = peak * FALLOFF_TAIL_ALPHA),
                     1f to color.copy(alpha = 0f),
                     center = center,
                     radius = radius,

@@ -349,6 +349,30 @@ class WhmVoiceDirectorTest {
     }
 
     @Test
+    fun `Skip on the very last breath cuts CUENTA_ULTIMA and the hold cues start normally`() {
+        val h = WhmSessionHarness(config(breaths = 20, rounds = 2), random = Random(3))
+        h.start()
+        h.completeBreaths(18)
+        h.completeBreaths(1, completeVoices = false) // breath 20 inhale: CUENTA_ULTIMA playing
+        assertEquals("whm_vo_cuenta_ultima", h.playing)
+
+        h.next()
+
+        assertEquals(WimHofPhaseIds.EXHALE_HOLD, h.phaseId)
+        assertEquals(
+            listOf(StopAudio("whm_vo_cuenta_ultima"), PlayVoice("whm_vo_ret_inicio", duckAmbientTo = null)),
+            audioCommands(h).filter { it is StopAudio || it is PlayVoice }.takeLast(2),
+        )
+        assertEquals(1, h.voiceIds.count { it == "whm_vo_cuenta_ultima" })
+        assertEquals("whm_vo_ret_inicio", h.playing)
+
+        h.audioCompleted("whm_vo_ret_inicio")
+        h.tickTo(30_000)
+        assertTrue(h.voiceIds.any { it.startsWith("whm_vo_tiempo_") })
+        assertTrue(h.overlaps.isEmpty())
+    }
+
+    @Test
     fun `after a skipped block the next round counts down from a clean state`() {
         val h = WhmSessionHarness(config(breaths = 20, rounds = 2), random = Random(3))
         h.start()

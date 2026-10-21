@@ -86,4 +86,14 @@ class WhmVoicePolicyTest {
             assertTrue(WhmVoicePolicy.retGapMillis(random) in 20_000..30_000)
         }
     }
+
+    @Test
+    fun `RESP and RET clip counts cover exactly the numbered clips in the generated table`() {
+        assertEquals(12, WhmVoicePolicy.RESP_CLIP_COUNT)
+        assertEquals(11, WhmVoicePolicy.RET_CLIP_COUNT)
+        (1..WhmVoicePolicy.RESP_CLIP_COUNT).forEach { assertTrue(WhmVoicePolicy.respClipId(it) in WhmClips.voiceMillis) }
+        (1..WhmVoicePolicy.RET_CLIP_COUNT).forEach { assertTrue(WhmVoicePolicy.retClipId(it) in WhmClips.voiceMillis) }
+        assertFalse(WhmVoicePolicy.respClipId(WhmVoicePolicy.RESP_CLIP_COUNT + 1) in WhmClips.voiceMillis)
+        assertFalse(WhmVoicePolicy.retClipId(WhmVoicePolicy.RET_CLIP_COUNT + 1) in WhmClips.voiceMillis)
+    }
 }

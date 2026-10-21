@@ -19,6 +19,11 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 
+private const val FULL_GUIDE_RING_ALPHA = 0.05f
+private const val EMPTY_GUIDE_RING_ALPHA = 0.09f
+private const val ORB_FILL_ALPHA = 0.16f
+private const val ORB_RIM_ALPHA = 0.55f
+
 /**
  * The breathing shape drawn for a counted breath phase instead of the progress ring and seconds
  * countdown, in the idle backdrop's ring language: two static guide rings mark "full" (1.0) and
@@ -68,12 +73,12 @@ fun BreathingOrb(
             val strokeWidth = (if (isHold) 3.dp else 2.dp).toPx()
             // Inset by half the rim so the stroke never overhangs the box.
             val maxRadius = size.minDimension / 2f - strokeWidth / 2f
-            drawCircle(primary.copy(alpha = 0.05f), maxRadius * BREATH_SCALE_MAX, center)
-            drawCircle(primary.copy(alpha = 0.09f), maxRadius * BREATH_SCALE_MIN, center)
+            drawCircle(primary.copy(alpha = FULL_GUIDE_RING_ALPHA), maxRadius * BREATH_SCALE_MAX, center)
+            drawCircle(primary.copy(alpha = EMPTY_GUIDE_RING_ALPHA), maxRadius * BREATH_SCALE_MIN, center)
             val radius = maxRadius * breathScale(role, progress.value)
-            drawCircle(primary.copy(alpha = 0.16f), radius, center)
+            drawCircle(primary.copy(alpha = ORB_FILL_ALPHA), radius, center)
             drawCircle(
-                color = primary.copy(alpha = 0.55f),
+                color = primary.copy(alpha = ORB_RIM_ALPHA),
                 radius = radius,
                 center = center,
                 style = Stroke(width = strokeWidth),
