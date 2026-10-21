@@ -53,6 +53,7 @@ import com.pirxhio.affirmity.analytics.AnalyticsEvent
 import com.pirxhio.affirmity.analytics.AnalyticsId
 import com.pirxhio.affirmity.analytics.provenance
 import com.pirxhio.affirmity.data.DayClock
+import com.pirxhio.affirmity.meditation.BreathRole
 import com.pirxhio.affirmity.meditation.CompositeCommandExecutor
 import com.pirxhio.affirmity.meditation.LapTrackerCommandExecutor
 import com.pirxhio.affirmity.meditation.MeditationEngine
@@ -69,6 +70,7 @@ import com.pirxhio.affirmity.meditation.TimerCommandExecutor
 import com.pirxhio.affirmity.meditation.wimhof.voice.VOICE_GUIDE_KEY
 import com.pirxhio.affirmity.ui.meditation.catalog.CounterEmphasis
 import com.pirxhio.affirmity.ui.meditation.catalog.MeditationCatalogEntry
+import com.pirxhio.affirmity.ui.meditation.catalog.breathRolesById
 import com.pirxhio.affirmity.ui.meditation.catalog.displayDurationMinutes
 import com.pirxhio.affirmity.ui.meditation.catalog.fixedPhaseDurationsById
 import com.pirxhio.affirmity.ui.meditation.catalog.isMeditationLocked
@@ -151,6 +153,7 @@ fun GuidedMeditationScreen(
     val definition = remember(entry, resolvedCustomization) { entry.definition(resolvedCustomization) }
     val textExecutor = remember(definition) { TextDisplayCommandExecutor() }
     val phaseDurations = remember(definition) { fixedPhaseDurationsById(definition) }
+    val breathRoles = remember(definition) { breathRolesById(definition) }
     val idleDurationMinutes = remember(definition, entry.approxDurationMinutes) {
         displayDurationMinutes(definition, entry.approxDurationMinutes)
     }
@@ -262,6 +265,7 @@ fun GuidedMeditationScreen(
         entry = entry,
         customization = customization,
         phaseDurations = phaseDurations,
+        breathRoles = breathRoles,
         idleDurationMinutes = idleDurationMinutes,
         showBannerAd = showBannerAd,
         cueSoundEnabled = cueSoundEnabled,
@@ -325,6 +329,7 @@ private fun GuidedMeditationContent(
     entry: MeditationCatalogEntry,
     customization: Map<String, String>,
     phaseDurations: Map<String, Long>,
+    breathRoles: Map<String, BreathRole> = emptyMap(),
     idleDurationMinutes: Int,
     showBannerAd: Boolean,
     cueSoundEnabled: Boolean,
@@ -393,6 +398,10 @@ private fun GuidedMeditationContent(
             }
         }
 
+        // One decision for the orb vs. ring branches and the hidden seconds: a role'd phase with a
+        // known Fixed length shows the breathing shape.
+        val breathRole = breathRoles[state.currentPhaseId]
+        val showsOrb = breathRole != null && (phaseDurations[state.currentPhaseId] ?: 0L) > 0L
         Box(
             modifier = Modifier
                 .padding(top = 32.dp)
@@ -411,13 +420,25 @@ private fun GuidedMeditationContent(
                 } else {
                     0f
                 }
-                CircularProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    strokeWidth = 4.dp,
-                )
+                if (showsOrb && breathRole != null && totalMillis != null) {
+                    // Counted breath phase: a breathing shape replaces the ring and the seconds.
+                    BreathingOrb(
+                        role = breathRole,
+                        phaseMillis = totalMillis,
+                        elapsedMillis = state.elapsedInPhaseMillis,
+                        generation = state.timerGeneration,
+                        running = state.status == SessionStatus.Running,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    CircularProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        strokeWidth = 4.dp,
+                    )
+                }
             }
 
             if (state.status == SessionStatus.Idle) {
@@ -448,6 +469,7 @@ private fun GuidedMeditationContent(
                     )
                     val remainingSeconds = state.remainingInPhaseMillis?.let { (it / 1000L).toInt() + 1 }
                     val showsRemaining = remainingSeconds != null &&
+                        !showsOrb &&
                         (state.status == SessionStatus.Running || state.status == SessionStatus.Paused)
                     if (showsRemaining) {
                         Text(
