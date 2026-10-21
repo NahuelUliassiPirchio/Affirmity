@@ -61,6 +61,9 @@ fun chantPhase(
  * loop rather than discrete timed inhale/exhale phases. Unlike [RestKind.AMBIENT], this phase owns
  * its bed's lifecycle end-to-end: it starts [ambientAudioId] on enter and stops it on exit, so it
  * never depends on a preceding `StartAmbient` elsewhere in the tree.
+ *
+ * Deliberately has no [com.pirxhio.affirmity.meditation.BreathRole]: it is one long, non-metronomic
+ * phase with no per-breath boundaries to animate, so it keeps the progress ring.
  */
 fun rapidBreathCyclePhase(
     id: String,

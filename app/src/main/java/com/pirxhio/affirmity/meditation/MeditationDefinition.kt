@@ -28,7 +28,15 @@ data class Phase(
      * value is only a ceiling. Used ONLY for duration estimates (catalog length, completion
      * threshold); the runtime timer always uses the Fixed value. Must be <= the Fixed millis. */
     val estimatedMillis: Long? = null,
+    /** What the user's breath does during this phase, so the UI can draw a breathing shape
+     * instead of a countdown ring. The engine ignores it (like [estimatedMillis]). Null for any
+     * phase that is not a single, timed breath movement. */
+    val breathRole: BreathRole? = null,
 ) : MeditationNode
+
+/** The part of a breath a [Phase] represents: the shape grows on [INHALE], shrinks on [EXHALE],
+ * and stays full ([HOLD_FULL], after an inhale) or empty ([HOLD_EMPTY], after an exhale). */
+enum class BreathRole { INHALE, EXHALE, HOLD_FULL, HOLD_EMPTY }
 
 /** Runs [children] in order. Advancing off the last child bubbles the advance up to this node's
  * parent — there is no separate "transition target" primitive; order in the tree *is* the flow. */

@@ -15,6 +15,10 @@ import com.pirxhio.affirmity.meditation.authoring.restPhase
  * describes the active span as [breathsPerRound] breaths rather than a duration; this engine's
  * phases are duration-based, so the active phase's length is derived at ~2 breaths/second
  * (500ms/breath) — a judgment call, not a claim about the traditional pace.
+ *
+ * Deliberate exception to the app-wide breathing shape: although the breaths are counted, there is
+ * no per-breath phase (a breath lasts ~0.5 s), so the active phase carries no
+ * [com.pirxhio.affirmity.meditation.BreathRole] and keeps the progress ring.
  */
 data class KapalabhatiConfig(
     val rounds: Int = 3,

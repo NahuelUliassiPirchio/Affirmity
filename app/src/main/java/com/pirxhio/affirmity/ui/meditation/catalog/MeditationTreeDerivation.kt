@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.ui.meditation.catalog
 
+import com.pirxhio.affirmity.meditation.BreathRole
 import com.pirxhio.affirmity.meditation.FixedCountRepetition
 import com.pirxhio.affirmity.meditation.MeditationCommand
 import com.pirxhio.affirmity.meditation.MeditationDefinition
@@ -39,6 +40,20 @@ fun fixedPhaseDurationsById(definition: MeditationDefinition): Map<String, Long>
     collectPhases(definition.root)
         .mapNotNull { phase -> (phase.duration as? PhaseDuration.Fixed)?.let { phase.id to it.millis } }
         .toMap()
+
+/**
+ * `phaseId -> BreathRole` for every phase that declares one. The session screen draws a breathing
+ * shape (instead of the ring and countdown) exactly for these ids. Same-id phases must agree on
+ * their role, otherwise the lookup would be ambiguous.
+ */
+fun breathRolesById(definition: MeditationDefinition): Map<String, BreathRole> =
+    collectPhases(definition.root)
+        .mapNotNull { phase -> phase.breathRole?.let { phase.id to it } }
+        .groupBy({ it.first }, { it.second })
+        .mapValues { (id, roles) ->
+            check(roles.distinct().size == 1) { "Phase id '$id' maps to several breath roles: $roles" }
+            roles.first()
+        }
 
 private const val MILLIS_PER_MINUTE = 60_000L
 private const val HALF_MINUTE_MILLIS = MILLIS_PER_MINUTE / 2

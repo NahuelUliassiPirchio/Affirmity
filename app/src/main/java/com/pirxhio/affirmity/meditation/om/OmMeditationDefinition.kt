@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.meditation.om
 
+import com.pirxhio.affirmity.meditation.BreathRole
 import com.pirxhio.affirmity.meditation.FixedCountRepetition
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationSequence
@@ -40,13 +41,15 @@ fun omMeditationDefinition(
                 id = "inhale",
                 duration = PhaseDuration.Fixed(config.inhaleMillis),
                 onEnter = listOf(ShowText(BreathingText.INHALE)),
+                breathRole = BreathRole.INHALE,
             ),
+            // The chant IS the exhale, so the breathing shape shrinks across it.
             chantPhase(
                 id = "om",
                 duration = PhaseDuration.Fixed(config.chantMillis),
                 audioId = OmMeditationAudio.CHANT,
                 cueTextId = OmMeditationText.CHANT,
-            ),
+            ).copy(breathRole = BreathRole.EXHALE),
         ),
     )
 
