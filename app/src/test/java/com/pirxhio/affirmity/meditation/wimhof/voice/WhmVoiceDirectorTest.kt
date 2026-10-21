@@ -324,6 +324,56 @@ class WhmVoiceDirectorTest {
         }
     }
 
+    // --- Skip the breathing block ------------------------------------------------------------
+
+    @Test
+    fun `Skip mid-block cuts the playing cue, starts the hold voice and never counts down`() {
+        val h = WhmSessionHarness(config(breaths = 20, rounds = 2), random = Random(3))
+        h.start()
+        h.completeBreaths(14)
+        h.completePhase()
+        h.finishVoices()
+        h.completePhase() // breath 15 inhale: CUENTA_5
+        assertEquals("whm_vo_cuenta_5", h.playing)
+
+        h.next()
+
+        assertEquals(WimHofPhaseIds.EXHALE_HOLD, h.phaseId)
+        assertEquals(
+            listOf(StopAudio("whm_vo_cuenta_5"), PlayVoice("whm_vo_ret_inicio", duckAmbientTo = null)),
+            audioCommands(h).filter { it is StopAudio || it is PlayVoice }.takeLast(2),
+        )
+        assertEquals("whm_vo_ret_inicio", h.playing)
+        assertFalse(h.voiceIds.contains("whm_vo_cuenta_ultima"))
+        assertTrue(h.overlaps.isEmpty())
+    }
+
+    @Test
+    fun `after a skipped block the next round counts down from a clean state`() {
+        val h = WhmSessionHarness(config(breaths = 20, rounds = 2), random = Random(3))
+        h.start()
+        h.completeBreaths(14)
+        h.completePhase()
+        h.finishVoices()
+        h.completePhase()
+        h.next() // skip the block at breath 15
+        h.tickTo(5_000)
+        h.next() // hold -> recovery
+        h.tickTo(14_900)
+        h.completePhase() // recovery -> round 2 intro
+        h.tickTo(8_800)
+        h.completePhase()
+        assertEquals(0, h.breathingIndex)
+        val before = h.voicePlays.size
+
+        h.completeBreaths(19)
+
+        val round2 = h.voicePlays.drop(before)
+        assertEquals(listOf(15), round2.filter { it.id == "whm_vo_cuenta_5" }.map { it.breathIndex })
+        assertEquals(listOf(19), round2.filter { it.id == "whm_vo_cuenta_ultima" }.map { it.breathIndex })
+        assertTrue(h.overlaps.isEmpty())
+    }
+
     // --- Voice off ---------------------------------------------------------------------------
 
     @Test

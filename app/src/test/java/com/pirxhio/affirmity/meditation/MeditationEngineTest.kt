@@ -510,6 +510,100 @@ class MeditationEngineTest {
         assertEquals(listOf(MeditationCue.RoundEnd), cuesOf(exec.commands))
     }
 
+    // --- Skip leaves a marked block ----------------------------------------------------------
+
+    /** rounds x [ breathing(breaths x [inhale, exhale]) -> hold ]; the breathing Repeat is marked
+     * (or not) with [skipExitsBlock]. onExit commands make the dispatched exits observable. */
+    private fun blockDefinition(skipExitsBlock: Boolean, rounds: Int = 2, breaths: Int = 3) = MeditationDefinition(
+        id = "block",
+        root = Repeat(
+            id = "rounds",
+            strategy = FixedCountRepetition(rounds),
+            child = MeditationSequence(
+                id = "round",
+                children = listOf(
+                    Repeat(
+                        id = "breathing",
+                        strategy = FixedCountRepetition(breaths),
+                        skipExitsBlock = skipExitsBlock,
+                        child = MeditationSequence(
+                            id = "breath",
+                            children = listOf(
+                                Phase("inhale", PhaseDuration.Fixed(1_000), onExit = listOf(StopAudio("inhale_exit"))),
+                                Phase("exhale", PhaseDuration.Fixed(1_000), onExit = listOf(StopAudio("exhale_exit"))),
+                            ),
+                        ),
+                    ),
+                    Phase("hold", PhaseDuration.Fixed(5_000), onExit = listOf(StopAudio("hold_exit"))),
+                ),
+            ),
+        ),
+    )
+
+    private fun skipEngine(definition: MeditationDefinition): Pair<MeditationEngine, RecordingCommandExecutor> {
+        val exec = RecordingCommandExecutor()
+        return MeditationEngine(definition, exec).also { it.send(MeditationEvent.Start) } to exec
+    }
+
+    @Test
+    fun `Skip inside a marked block lands on its next sibling and drops the block counter`() {
+        val (e, exec) = skipEngine(blockDefinition(skipExitsBlock = true))
+        e.send(MeditationEvent.TimerCompleted(lastGenOf(exec))) // inhale -> exhale
+        e.send(MeditationEvent.TimerCompleted(lastGenOf(exec))) // exhale -> next breath
+        assertEquals(1, e.state.value.iterationCounts["breathing"])
+        exec.commands.clear()
+
+        e.send(MeditationEvent.Skip)
+
+        assertEquals(listOf("rounds", "round", "hold"), e.state.value.activePath)
+        assertEquals(mapOf("rounds" to 0), e.state.value.iterationCounts)
+        // Only the phase being left runs its onExit; the remaining iterations never do.
+        assertEquals(listOf<MeditationCommand>(StopAudio("inhale_exit")), exec.commands.filterIsInstance<StopAudio>())
+    }
+
+    @Test
+    fun `Skip without a marked block behaves exactly like Next`() {
+        val (skipped, skipExec) = skipEngine(blockDefinition(skipExitsBlock = false))
+        val (nexted, nextExec) = skipEngine(blockDefinition(skipExitsBlock = false))
+
+        skipped.send(MeditationEvent.Skip)
+        nexted.send(MeditationEvent.Next)
+
+        assertEquals(nexted.state.value, skipped.state.value)
+        assertEquals(nextExec.commands, skipExec.commands)
+        assertEquals(listOf("rounds", "round", "breathing", "breath", "exhale"), skipped.state.value.activePath)
+    }
+
+    @Test
+    fun `Skip outside the marked block advances one phase`() {
+        val (e, exec) = skipEngine(blockDefinition(skipExitsBlock = true))
+        e.send(MeditationEvent.Skip)
+        assertEquals("hold", e.state.value.currentPhaseId)
+
+        e.send(MeditationEvent.Skip)
+
+        assertEquals(listOf("rounds", "round", "breathing", "breath", "inhale"), e.state.value.activePath)
+        assertEquals(mapOf("rounds" to 1, "breathing" to 0), e.state.value.iterationCounts)
+        assertEquals(SessionStatus.Running, e.state.value.status)
+        assertTrue(exec.commands.isNotEmpty())
+    }
+
+    @Test
+    fun `Skip in a block that ends the session completes it`() {
+        val block = Repeat(
+            id = "breathing",
+            strategy = FixedCountRepetition(3),
+            skipExitsBlock = true,
+            child = Phase("inhale", PhaseDuration.Fixed(1_000)),
+        )
+        val (e, exec) = skipEngine(MeditationDefinition(id = "tail", root = block))
+
+        e.send(MeditationEvent.Skip)
+
+        assertEquals(SessionStatus.Completed, e.state.value.status)
+        assertTrue(exec.commands.contains(EndSession(SessionEndReason.Completed)))
+    }
+
     private class RecordingCommandExecutor : MeditationCommandExecutor {
         val commands: MutableList<MeditationCommand> = mutableListOf()
         override fun execute(command: MeditationCommand) {

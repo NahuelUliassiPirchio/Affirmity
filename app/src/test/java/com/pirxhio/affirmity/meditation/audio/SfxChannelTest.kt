@@ -122,6 +122,22 @@ class SfxChannelTest {
         assertEquals(listOf("stop:1", "stop:2"), player.log)
     }
 
+    @Test
+    fun `stop ends only the live streams of that clip`() {
+        val (channel, player) = channel()
+        channel.play(clip)
+        channel.play("whm_sfx_bowl")
+        channel.play(clip)
+        player.log.clear()
+
+        channel.stop(clip)
+
+        assertEquals(listOf("stop:1", "stop:3"), player.log)
+        player.log.clear()
+        channel.stopAll()
+        assertEquals(listOf("stop:2"), player.log)
+    }
+
     // --- routing ------------------------------------------------------------------------------
 
     @Test

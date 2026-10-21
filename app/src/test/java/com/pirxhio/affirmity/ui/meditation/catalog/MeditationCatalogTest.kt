@@ -17,6 +17,7 @@ import com.pirxhio.affirmity.meditation.SessionStatus
 import com.pirxhio.affirmity.meditation.ShowText
 import com.pirxhio.affirmity.meditation.StartAmbient
 import com.pirxhio.affirmity.meditation.StopAmbient
+import com.pirxhio.affirmity.meditation.StopAudio
 import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -293,7 +294,9 @@ class MeditationCatalogTest {
             setOf(ShowText::class, PlayVoice::class, StartAmbient::class, StopAmbient::class, PlayAudio::class, PlayCue::class)
         meditationCatalog().forEach { entry ->
             collectCommands(entry.definition(emptyMap()).root).forEach { command ->
-                assertTrue("${entry.id}: unexpected command ${command::class}", command::class in whitelist)
+                // wim_hof alone may stop its in-flight breath SFX when the breathing block is skipped.
+                val allowed = command::class in whitelist || (entry.id == "wim_hof" && command is StopAudio)
+                assertTrue("${entry.id}: unexpected command ${command::class}", allowed)
             }
         }
     }

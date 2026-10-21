@@ -9,8 +9,8 @@ import org.junit.Test
 class DoubleTapAdvanceTest {
 
     @Test
-    fun `a running session with the flag on advances to the next phase`() {
-        assertEquals(MeditationEvent.Next, doubleTapAdvanceEvent(SessionStatus.Running, doubleTapAdvances = true))
+    fun `a running session with the flag on sends Skip`() {
+        assertEquals(MeditationEvent.Skip, doubleTapAdvanceEvent(SessionStatus.Running, doubleTapAdvances = true))
     }
 
     @Test

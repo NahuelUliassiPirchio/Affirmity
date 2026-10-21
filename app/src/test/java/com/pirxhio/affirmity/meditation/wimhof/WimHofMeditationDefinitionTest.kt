@@ -11,6 +11,7 @@ import com.pirxhio.affirmity.meditation.PhaseDuration
 import com.pirxhio.affirmity.meditation.Repeat
 import com.pirxhio.affirmity.meditation.SessionStatus
 import com.pirxhio.affirmity.meditation.ShowText
+import com.pirxhio.affirmity.meditation.StopAudio
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -230,5 +231,54 @@ class WimHofMeditationDefinitionTest {
         assertEquals(90_000L, hold.estimatedMillis)
         assertEquals(PhaseDuration.Fixed(250_000L), hold.duration)
         assertEquals(null, (round.children.first { it.id == WimHofPhaseIds.RECOVERY_HOLD } as Phase).estimatedMillis)
+    }
+
+    // --- Skip leaves the whole breathing block --------------------------------------------------
+
+    @Test
+    fun `the breathing repeat is marked so Skip exits the whole block`() {
+        val round = (wimHofMeditationDefinition(WimHofConfig()).root as Repeat).child as MeditationSequence
+        val breathing = round.children.first { it.id == "breathing" } as Repeat
+
+        assertTrue(breathing.skipExitsBlock)
+    }
+
+    @Test
+    fun `Skip at breath 7 of 30 lands on the exhale hold and no further inhale sfx plays`() {
+        val executor = RecordingCommandExecutor()
+        val engine = MeditationEngine(wimHofMeditationDefinition(WimHofConfig(rounds = 1, breathsPerRound = 30)), executor)
+        engine.send(MeditationEvent.Start)
+        repeat(6 * 2) { engine.send(MeditationEvent.Next) }
+        assertEquals(6, engine.state.value.iterationCounts["breathing"])
+        val inhalesBefore = executor.commands.count { it == PlayAudio("whm_sfx_inhale_normal") }
+
+        engine.send(MeditationEvent.Skip)
+
+        assertEquals(WimHofPhaseIds.EXHALE_HOLD, engine.state.value.currentPhaseId)
+        assertEquals(inhalesBefore, executor.commands.count { it == PlayAudio("whm_sfx_inhale_normal") })
+    }
+
+    @Test
+    fun `the exhale hold first stops any in-flight breath sfx, then plays the total-exhale sfx`() {
+        val round = (wimHofMeditationDefinition(WimHofConfig()).root as Repeat).child as MeditationSequence
+        val hold = round.children.first { it.id == WimHofPhaseIds.EXHALE_HOLD } as Phase
+
+        val audio = hold.onEnter.filter { it is StopAudio || it is PlayAudio }
+        assertEquals(
+            listOf(
+                StopAudio("whm_sfx_inhale_normal"),
+                StopAudio("whm_sfx_exhale_normal"),
+                PlayAudio("whm_sfx_exhale_hold"),
+            ),
+            audio,
+        )
+    }
+
+    @Test
+    fun `breathSound off authors no sfx stop either`() {
+        val round = (wimHofMeditationDefinition(WimHofConfig(breathSound = false)).root as Repeat).child as MeditationSequence
+        val hold = round.children.first { it.id == WimHofPhaseIds.EXHALE_HOLD } as Phase
+
+        assertTrue(hold.onEnter.none { it is StopAudio || it is PlayAudio })
     }
 }

@@ -41,7 +41,9 @@ object VoicePlayerLifecycle {
 class SfxChannel(
     private val player: SfxPlayer,
 ) {
-    private val liveStreams = ArrayDeque<Int>()
+    private class LiveStream(val streamId: Int, val clipId: String)
+
+    private val liveStreams = ArrayDeque<LiveStream>()
     private val voicesPlaying = mutableSetOf<String>()
 
     private val ducked: Boolean get() = voicesPlaying.isNotEmpty()
@@ -50,7 +52,7 @@ class SfxChannel(
     fun play(clipId: String): Boolean {
         if (!player.isLoaded(clipId)) return false
         val stream = player.play(clipId, SfxDuckPolicy.gain(ducked)) ?: return true
-        liveStreams.addLast(stream)
+        liveStreams.addLast(LiveStream(stream, clipId))
         while (liveStreams.size > MAX_TRACKED_STREAMS) liveStreams.removeFirst()
         return true
     }
@@ -70,8 +72,14 @@ class SfxChannel(
 
     fun resume() = player.autoResume()
 
+    /** Ends every live stream of [clipId], leaving other clips playing. */
+    fun stop(clipId: String) {
+        liveStreams.filter { it.clipId == clipId }.forEach { player.stop(it.streamId) }
+        liveStreams.removeAll { it.clipId == clipId }
+    }
+
     fun stopAll() {
-        liveStreams.forEach { player.stop(it) }
+        liveStreams.forEach { player.stop(it.streamId) }
         liveStreams.clear()
     }
 
@@ -89,12 +97,14 @@ class SfxChannel(
 
     private fun applyGainToLiveStreams() {
         val gain = SfxDuckPolicy.gain(ducked)
-        liveStreams.forEach { player.setVolume(it, gain) }
+        liveStreams.forEach { player.setVolume(it.streamId, gain) }
     }
 
     companion object {
         const val SFX_ID_PREFIX = "whm_sfx_"
         private const val MAX_TRACKED_STREAMS = 8
+
+        fun isSfxId(audioId: String): Boolean = audioId.startsWith(SFX_ID_PREFIX)
 
         /** SFX bypass the cue-sound preference (they have their own breath-sound toggle in the
          * definition); every other `PlayAudio` stays gated by it. */

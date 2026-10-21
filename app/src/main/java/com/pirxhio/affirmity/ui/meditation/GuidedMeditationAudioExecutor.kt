@@ -119,7 +119,11 @@ class GuidedMeditationAudioExecutor(
             is PlayVoice -> playVoice(command)
             is StartAmbient -> startAmbient(command)
             is StopAmbient -> execute(Fade(FadeTarget.Channel(AudioChannel.AMBIENT), 0f, command.fadeOutMillis))
-            is StopAudio -> if (command.audioId != null) hardStop(command.audioId) else hardStopAll()
+            is StopAudio -> when {
+                command.audioId == null -> hardStopAll()
+                SfxChannel.isSfxId(command.audioId) -> sfx?.stop(command.audioId)
+                else -> hardStop(command.audioId)
+            }
             is Fade -> fade(command)
             is PauseTimer -> pauseAll()
             is ResumeTimer -> resumeAll()

@@ -48,6 +48,10 @@ data class Repeat(
     override val id: String,
     val child: MeditationNode,
     val strategy: RepetitionStrategy,
+    /** When true, [MeditationEvent.Skip] anywhere inside this block leaves the WHOLE block (not
+     * just the current phase) and enters its next sibling. Only the current phase's onExit runs;
+     * the remaining iterations never do. Default false: Skip then behaves exactly like Next. */
+    val skipExitsBlock: Boolean = false,
 ) : MeditationNode
 
 sealed interface PhaseDuration {

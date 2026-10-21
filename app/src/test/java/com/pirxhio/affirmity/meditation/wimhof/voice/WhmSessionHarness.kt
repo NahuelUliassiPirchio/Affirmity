@@ -96,7 +96,7 @@ class WhmSessionHarness(
     /** The double tap / Skip path. */
     fun next() {
         nowMs = 0
-        send(MeditationEvent.Next)
+        send(MeditationEvent.Skip)
     }
 
     fun pause() = send(MeditationEvent.Pause)

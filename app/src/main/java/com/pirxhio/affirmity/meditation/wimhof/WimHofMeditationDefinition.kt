@@ -10,6 +10,7 @@ import com.pirxhio.affirmity.meditation.PlayCue
 import com.pirxhio.affirmity.meditation.audio.MeditationCue
 import com.pirxhio.affirmity.meditation.authoring.withEntryCue
 import com.pirxhio.affirmity.meditation.Repeat
+import com.pirxhio.affirmity.meditation.StopAudio
 import com.pirxhio.affirmity.meditation.authoring.breathingBlock
 import com.pirxhio.affirmity.meditation.authoring.cuedPhase
 import com.pirxhio.affirmity.meditation.wimhof.voice.WhmVoicePolicy
@@ -141,13 +142,16 @@ fun wimHofMeditationDefinition(config: WimHofConfig = WimHofConfig()): Meditatio
                 entryCue = if (config.voiceGuide) null else MeditationCue.RoundStart,
                 inhaleCommands = sfx(config.breathSound, config.breathSpeed.inhaleSfxId),
                 exhaleCommands = sfx(config.breathSound, config.breathSpeed.exhaleSfxId),
+                skippableAsBlock = true,
             ),
             cuedPhase(
                 id = WimHofPhaseIds.EXHALE_HOLD,
                 duration = PhaseDuration.Fixed(config.exhaleHoldMillis),
                 cueTextId = WimHofText.EXHALE_HOLD,
                 skippable = true,
-            ).withEntryCue(MeditationCue.ImportantTransition).withSfx(config.breathSound, WimHofSfx.EXHALE_HOLD)
+            ).withEntryCue(MeditationCue.ImportantTransition)
+                .withBreathSfxStopped(config)
+                .withSfx(config.breathSound, WimHofSfx.EXHALE_HOLD)
                 .copy(estimatedMillis = minOf(WimHofConfig.TYPICAL_EXHALE_HOLD_MILLIS, config.exhaleHoldMillis)),
             cuedPhase(
                 id = WimHofPhaseIds.RECOVERY_HOLD,
@@ -194,5 +198,20 @@ private fun intro(): Phase = cuedPhase(
 )
 
 private fun sfx(enabled: Boolean, id: String): List<PlayAudio> = if (enabled) listOf(PlayAudio(id)) else emptyList()
+
+/** Skipping the breathing block can leave an inhale/exhale clip in flight; cut it so it never
+ * overlaps the total-exhale SFX. At a natural entry the clips have already ended (each is no
+ * longer than its phase), so this is a no-op there. */
+private fun Phase.withBreathSfxStopped(config: WimHofConfig): Phase =
+    if (config.breathSound) {
+        copy(
+            onEnter = onEnter + listOf(
+                StopAudio(config.breathSpeed.inhaleSfxId),
+                StopAudio(config.breathSpeed.exhaleSfxId),
+            ),
+        )
+    } else {
+        this
+    }
 
 private fun Phase.withSfx(enabled: Boolean, id: String): Phase = copy(onEnter = onEnter + sfx(enabled, id))

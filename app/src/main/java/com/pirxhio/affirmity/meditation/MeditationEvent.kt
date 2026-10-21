@@ -13,9 +13,9 @@ sealed interface MeditationEvent {
     /** Manually ends the current phase regardless of its timer/exit conditions. */
     data object Next : MeditationEvent
 
-    /** Distinct from [Next] so a future definition can give it different semantics (e.g. skip to
-     * the end of the enclosing sequence) without changing the engine's event vocabulary — for now
-     * the engine treats both identically. */
+    /** Like [Next], except inside a [Repeat] marked with [Repeat.skipExitsBlock]: there it leaves
+     * the entire block and enters the block's next sibling. Without such a block it is identical
+     * to [Next]. */
     data object Skip : MeditationEvent
 
     /** Ends the session early, from any non-terminal status. */

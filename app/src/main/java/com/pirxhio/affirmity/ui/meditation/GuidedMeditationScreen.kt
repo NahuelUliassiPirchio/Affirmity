@@ -285,7 +285,7 @@ fun GuidedMeditationScreen(
             sessionTracker.resume()
             engine.send(MeditationEvent.Resume)
         },
-        onSkip = { engine.send(MeditationEvent.Next) },
+        onSkip = { engine.send(MeditationEvent.Skip) },
         onRelease = { engine.send(MeditationEvent.UserAction()) },
         // Item 13: session-complete had no visible exit affordance -- wired to the same single
         // exit path (`requestExit`) the BackHandler above and MainActivity's top-bar back icon

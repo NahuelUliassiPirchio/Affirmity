@@ -46,6 +46,8 @@ fun breathingBlock(
     inhaleCommands: List<MeditationCommand> = emptyList(),
     /** Extra commands run on every exhale entry, after the text. */
     exhaleCommands: List<MeditationCommand> = emptyList(),
+    /** Marks the block so a Skip leaves all remaining breaths at once (see [Repeat.skipExitsBlock]). */
+    skippableAsBlock: Boolean = false,
 ): Repeat {
     val children = buildList {
         add(
@@ -91,5 +93,6 @@ fun breathingBlock(
         id = id,
         child = breath,
         strategy = FixedCountRepetition(breaths),
+        skipExitsBlock = skippableAsBlock,
     )
 }
