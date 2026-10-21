@@ -126,6 +126,9 @@ self_check() {
   expect_eq "$(sfx_name 'Firefly_audio_Short_loose_human_exhale,_letting_the_air_go_witho_variation3.wav')" "whm_sfx_exhale_normal"
   expect_eq "$(sfx_name 'Firefly_audio_Soft_single_singing_bowl_chime,_warm,_short_decay_variation2.wav')" "whm_sfx_bowl"
   sfx_name 'Firefly_audio_Unknown_variation1.wav' >/dev/null 2>&1 && { echo "FAIL: unmapped accepted" >&2; failures=$((failures + 1)); }
+  require_measurement mi "-23.5" || { echo "FAIL: valid measurement rejected" >&2; failures=$((failures + 1)); }
+  require_measurement mi "null" && { echo "FAIL: null measurement accepted" >&2; failures=$((failures + 1)); }
+  require_measurement mi "" && { echo "FAIL: empty measurement accepted" >&2; failures=$((failures + 1)); }
   if (( failures > 0 )); then echo "self-check: $failures failure(s)" >&2; exit 1; fi
   echo "self-check: ok"
 }
@@ -133,6 +136,12 @@ self_check() {
 # Extracts the *.wav members of the zip (flattened) into $2 (must be a fresh, empty directory).
 extract_zip() {
   unzip -q -j -o "$1" '*.wav' -d "$2"
+}
+
+# Aborts when a loudnorm measurement is missing: jq prints "null" (or nothing) for an absent key,
+# and feeding that to pass 2 would silently skip the normalisation. $1 label, $2 value.
+require_measurement() {
+  [[ -n "$2" && "$2" != "null" ]] || return 1
 }
 
 # Pass 1 measures, pass 2 applies. $1 in-file, $2 out-file, $3 bitrate.
@@ -149,6 +158,11 @@ convert_one() {
   mlra="$(jq -r '.input_lra' <<<"$stats")"
   mthresh="$(jq -r '.input_thresh' <<<"$stats")"
   offset="$(jq -r '.target_offset' <<<"$stats")"
+  local name value
+  for name in mi mtp mlra mthresh offset; do
+    value="${!name}"
+    require_measurement "$name" "$value" || die "loudnorm measurement '$name' missing for $in (got '${value}')"
+  done
   "$FFMPEG" -hide_banner -nostdin -loglevel error -y -i "$in" -map_metadata -1 -ac 1 \
     -af "${trim},${norm}:measured_I=${mi}:measured_TP=${mtp}:measured_LRA=${mlra}:measured_thresh=${mthresh}:offset=${offset}:linear=true,areverse,afade=t=in:d=0.05,areverse" \
     -ar 48000 -c:a libopus -b:a "$bitrate" -vbr on -application audio -f webm "$out"
