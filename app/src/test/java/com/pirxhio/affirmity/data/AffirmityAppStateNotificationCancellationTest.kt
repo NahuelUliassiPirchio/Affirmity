@@ -157,6 +157,7 @@ class AffirmityAppStateNotificationCancellationTest {
         scope: CoroutineScope,
     ): AffirmityAppState {
         val local = DataSession.Local(
+        activity = com.pirxhio.affirmity.data.testActivitySession(),
             affirmations = NoopAffirmationRepository3(),
             completions = completions,
             moods = FakeDailyMoodRepository3(),
@@ -184,6 +185,7 @@ class AffirmityAppStateNotificationCancellationTest {
             local = local,
             remoteSessionFactory = { uid ->
                 DataSession.Remote(
+        activity = com.pirxhio.affirmity.data.testActivitySession("account:$uid"),
                     uid = uid,
                     affirmations = NoopAffirmationRepository3(),
                     completions = completions,

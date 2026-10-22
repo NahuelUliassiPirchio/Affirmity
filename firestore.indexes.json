@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "activityCoverage",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "fromEpochDay", "order": "ASCENDING" },
+        { "fieldPath": "toEpochDay", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

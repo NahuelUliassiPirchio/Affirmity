@@ -42,6 +42,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
+import com.pirxhio.affirmity.data.ActivityMonthState
 import com.pirxhio.affirmity.data.CompletionHistorySlice
 import com.pirxhio.affirmity.data.HealerActivation
 import com.pirxhio.affirmity.data.StreakHealerState
@@ -55,6 +56,9 @@ fun ProgressScreen(
     meditationStreak: WeeklyStreak,
     streakHealer: StreakHealerState,
     onActivateHealer: () -> Unit,
+    observeActivityMonth: ((Long, Long) -> Flow<ActivityMonthState>)? = null,
+    activitySaveError: Throwable? = null,
+    onRetryActivity: () -> Unit = {},
     observeEarliestCompletionEpochDay: () -> Flow<Long?> = { flowOf(null) },
     observeCompletionHistory: (from: Long, to: Long) -> Flow<CompletionHistorySlice> =
         { _, _ -> flowOf(CompletionHistorySlice(emptyList(), emptySet())) },
@@ -78,6 +82,10 @@ fun ProgressScreen(
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(top = 16.dp),
             )
+        }
+
+        if (observeActivityMonth != null) item {
+            ActivityCalendar(observeActivityMonth, activitySaveError, onRetryActivity)
         }
 
         item {

@@ -1187,4 +1187,31 @@
     <string name="widget_preview_day_6">V</string>
     <string name="widget_preview_day_7">S</string>
     <string name="widget_preview_streak" translatable="false">4</string>
+    <string name="activity_free_timer">Temporizador libre</string>
+    <string name="activity_title">Actividad diaria</string>
+    <string name="activity_previous_month">Mes anterior</string>
+    <string name="activity_next_month">Mes siguiente</string>
+    <string name="activity_scroll_hint">Desplaza el calendario para ver todos los días.</string>
+    <string name="activity_scroll_start">Ver inicio</string>
+    <string name="activity_scroll_end">Ver final</string>
+    <string name="activity_loading">Cargando actividad…</string>
+    <string name="activity_load_error">No se pudo cargar la actividad de este mes.</string>
+    <string name="activity_retry">Reintentar</string>
+    <string name="activity_save_error">No se pudo guardar una actividad. El historial puede estar incompleto.</string>
+    <string name="activity_pending">Guardado en este dispositivo; sincronización pendiente.</string>
+    <string name="activity_today">Hoy</string>
+    <string name="activity_selected">Seleccionado</string>
+    <string name="activity_mood_value">Ánimo: %1$d de 5</string>
+    <string name="activity_has_records">Tiene registros</string>
+    <string name="activity_no_mood">Sin registro de ánimo</string>
+    <string name="activity_healed">Día sanado; no añade actividad registrada.</string>
+    <string name="activity_legacy_meditation">Meditación completada; detalles no disponibles.</string>
+    <string name="activity_legacy_affirmations">Objetivo de afirmaciones completado; recuento no disponible.</string>
+    <string name="activity_unknown">Sin actividad registrada; el historial completo no está disponible.</string>
+    <string name="activity_partial">Historial parcial: se muestra solo la actividad registrada.</string>
+    <string name="activity_empty">Sin actividad en este día registrado.</string>
+    <string name="activity_viewed_count">Afirmaciones vistas: %1$d</string>
+    <string name="activity_total_duration">Tiempo activo registrado: %1$s</string>
+    <string name="activity_session_detail">%1$s · %2$s</string>
+    <string name="activity_duration_format">%1$d min %2$d s</string>
 </resources>

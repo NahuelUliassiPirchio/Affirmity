@@ -16,7 +16,14 @@ import kotlinx.coroutines.flow.map
 private val Context.trackerDataStore by preferencesDataStore(name = "tracker_prefs")
 
 /** Which day the user last viewed affirmations, and how many they'd viewed by then. */
-data class DailyViewCount(val epochDay: Long, val count: Int)
+data class DailyViewCount(val epochDay: Long, val count: Int, val owner: String? = null)
+
+/** An old unowned counter is not evidence for a newly established identity. */
+fun advanceOwnedDailyViews(previous: DailyViewCount, owner: String, epochDay: Long): DailyViewCount {
+    require(owner.isNotBlank())
+    val count = if (previous.owner == owner && previous.epochDay == epochDay) previous.count + 1 else 1
+    return DailyViewCount(epochDay, count, owner)
+}
 
 /**
  * The optional sources the main affirmation feed can draw from, on top of the theme selection.
@@ -53,6 +60,7 @@ class TrackerPreferences(private val context: Context) {
             DailyViewCount(
                 epochDay = it[AFFIRMATIONS_VIEWED_EPOCH_DAY] ?: -1L,
                 count = it[AFFIRMATIONS_VIEWED_COUNT] ?: 0,
+                owner = it[AFFIRMATIONS_VIEWED_OWNER],
             )
         }
 
@@ -60,6 +68,8 @@ class TrackerPreferences(private val context: Context) {
         context.trackerDataStore.edit {
             it[AFFIRMATIONS_VIEWED_EPOCH_DAY] = viewed.epochDay
             it[AFFIRMATIONS_VIEWED_COUNT] = viewed.count
+            if (viewed.owner == null) it.remove(AFFIRMATIONS_VIEWED_OWNER)
+            else it[AFFIRMATIONS_VIEWED_OWNER] = viewed.owner
         }
     }
 
@@ -153,6 +163,7 @@ class TrackerPreferences(private val context: Context) {
     private companion object {
         val AFFIRMATIONS_VIEWED_EPOCH_DAY = longPreferencesKey("affirmations_viewed_epoch_day")
         val AFFIRMATIONS_VIEWED_COUNT = intPreferencesKey("affirmations_viewed_count")
+        val AFFIRMATIONS_VIEWED_OWNER = androidx.datastore.preferences.core.stringPreferencesKey("affirmations_viewed_owner")
         val MEDITATION_DURATION_SECONDS = intPreferencesKey("meditation_duration_seconds")
         val FEED_INCLUDE_FAVORITES = booleanPreferencesKey("feed_include_favorites")
         val FEED_INCLUDE_OWN = booleanPreferencesKey("feed_include_own")

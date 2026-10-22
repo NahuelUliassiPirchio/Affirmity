@@ -7,8 +7,121 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
-import { afterAll, beforeAll, describe, it } from 'vitest';
+import { collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, setDoc, where } from 'firebase/firestore';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+describe('firestore.rules: activity journal', () => {
+  let testEnv: RulesTestEnvironment;
+  const event = {
+    eventId: 'session', kind: 'guided', epochDay: 20000, occurredAtMillis: 1000,
+    startMillis: 0, endMillis: 1000, zoneId: 'UTC', meditationId: 'breathing',
+    nameSnapshot: 'Breathing', activeSeconds: 120, sourceId: 'device',
+  };
+  beforeAll(async () => {
+    testEnv = await initializeTestEnvironment({
+      projectId: 'demo-affirmity-rules-test',
+      firestore: { rules: readFileSync(resolve(__dirname, '../../firestore.rules'), 'utf8'), host: '127.0.0.1', port: 8080 },
+    });
+  });
+  afterAll(async () => { await testEnv?.cleanup(); });
+  it('owner persists an event and may retry the identical payload', async () => {
+    const ref = doc(testEnv.authenticatedContext('activity-owner').firestore(), 'users/activity-owner/activityEvents/session');
+    await assertSucceeds(setDoc(ref, event));
+    await assertSucceeds(setDoc(ref, event));
+  });
+  it('rejects event mutation and deletion but allows owner reads', async () => {
+    const ref = doc(testEnv.authenticatedContext('activity-owner').firestore(), 'users/activity-owner/activityEvents/session');
+    await assertSucceeds(setDoc(ref, event));
+    await assertSucceeds(getDoc(ref));
+    await assertFails(setDoc(ref, { ...event, activeSeconds: 121 }));
+    await assertFails(deleteDoc(ref));
+  });
+  it('denies foreign and unauthenticated reads and writes', async () => {
+    for (const context of [testEnv.authenticatedContext('other'), testEnv.unauthenticatedContext()]) {
+      const ref = doc(context.firestore(), 'users/activity-owner/activityEvents/session');
+      await assertFails(getDoc(ref));
+      await assertFails(setDoc(ref, event));
+    }
+  });
+  it('rejects malformed event identities, types, metrics and extra fields', async () => {
+    const db = testEnv.authenticatedContext('activity-owner').firestore();
+    const invalid = [
+      { eventId: 'different' }, { extra: true },
+      { kind: 'abandoned' }, { activeSeconds: -1 },
+      { activeSeconds: '120' }, { endMillis: -1 },
+      { nameSnapshot: '' }, { sourceId: '' }, { kind: 'view' },
+    ];
+    for (const [index, payload] of invalid.entries()) {
+      const id = `invalid-${index}`;
+      await assertFails(setDoc(doc(db, `users/activity-owner/activityEvents/${id}`), { ...event, eventId: id, ...payload }));
+    }
+  });
+  it('accepts views and free sessions without conflating their shape', async () => {
+    const db = testEnv.authenticatedContext('activity-owner').firestore();
+    await assertSucceeds(setDoc(doc(db, 'users/activity-owner/activityEvents/view'),
+      { ...event, eventId: 'view', kind: 'view', nameSnapshot: null, meditationId: null, activeSeconds: 0 }));
+    await assertSucceeds(setDoc(doc(db, 'users/activity-owner/activityEvents/free'),
+      { ...event, eventId: 'free', kind: 'free', nameSnapshot: 'Free timer', meditationId: null }));
+  });
+  const coverageId = 'a'.repeat(64);
+  const coverage = { sourceId: 'device', recordingSchema: 1, fromEpochDay: 20000, toEpochDay: 20001, uncertain: false };
+  it('owner persists immutable scalar coverage intervals with identical retry', async () => {
+    const ref = doc(testEnv.authenticatedContext('activity-owner').firestore(), `users/activity-owner/activityCoverage/${coverageId}`);
+    await assertSucceeds(setDoc(ref, coverage));
+    await assertSucceeds(setDoc(ref, coverage));
+  });
+  it('rejects coverage mutation and deletion but allows owner reads', async () => {
+    const ref = doc(testEnv.authenticatedContext('activity-owner').firestore(), `users/activity-owner/activityCoverage/${coverageId}`);
+    await assertSucceeds(setDoc(ref, coverage));
+    await assertSucceeds(getDoc(ref));
+    await assertFails(setDoc(ref, { ...coverage, toEpochDay: 20002 }));
+    await assertFails(deleteDoc(ref));
+  });
+  it('denies foreign and unauthenticated access to coverage', async () => {
+    for (const context of [testEnv.authenticatedContext('other'), testEnv.unauthenticatedContext()]) {
+      const ref = doc(context.firestore(), `users/activity-owner/activityCoverage/${coverageId}`);
+      await assertFails(getDoc(ref));
+      await assertFails(setDoc(ref, coverage));
+    }
+  });
+  it('rejects malformed scalar coverage on creation, not just conflicting updates', async () => {
+    const db = testEnv.authenticatedContext('activity-owner').firestore();
+    const invalid = [
+      { extra: [] }, { sourceId: '' }, { sourceId: 'x'.repeat(129) }, { sourceId: 'bad/source' },
+      { recordingSchema: 0 }, { recordingSchema: 1.5 }, { recordingSchema: '1' },
+      { fromEpochDay: 20002 }, { toEpochDay: '20001' }, { uncertain: 0 }, { uncertain: null },
+    ];
+    for (const [index, payload] of invalid.entries()) {
+      const id = index.toString(16).padStart(64, '0');
+      await assertFails(setDoc(doc(db, `users/activity-owner/activityCoverage/${id}`), { ...coverage, ...payload }));
+    }
+    await assertFails(setDoc(doc(db, 'users/activity-owner/activityCoverage/not-a-hash'), coverage));
+    const { uncertain: _omit, ...missing } = coverage;
+    await assertFails(setDoc(doc(db, `users/activity-owner/activityCoverage/${'b'.repeat(64)}`), missing));
+  });
+  it('queries only overlapping scalar intervals for the requested month', async () => {
+    const db = testEnv.authenticatedContext('overlap-owner').firestore();
+    const ranges = [[19900, 19999], [19999, 20002], [20020, 20040], [20032, 20040]];
+    for (const [index, range] of ranges.entries()) {
+      await assertSucceeds(setDoc(doc(db, `users/overlap-owner/activityCoverage/${index.toString(16).repeat(64)}`),
+        { ...coverage, fromEpochDay: range[0], toEpochDay: range[1] }));
+    }
+    const result = await assertSucceeds(getDocs(query(collection(db, 'users/overlap-owner/activityCoverage'),
+      where('fromEpochDay', '<=', 20031), where('toEpochDay', '>=', 20000),
+      orderBy('fromEpochDay'), orderBy('toEpochDay'))));
+    expect(result.docs.map((snapshot) => snapshot.id)).toEqual(['1'.repeat(64), '2'.repeat(64)]);
+  });
+  it('declares and wires the production interval-overlap composite index', () => {
+    const indexes: unknown = JSON.parse(readFileSync(resolve(__dirname, '../../firestore.indexes.json'), 'utf8'));
+    expect(indexes).toMatchObject({ indexes: expect.arrayContaining([{
+      collectionGroup: 'activityCoverage', queryScope: 'COLLECTION', fields: [
+        { fieldPath: 'fromEpochDay', order: 'ASCENDING' }, { fieldPath: 'toEpochDay', order: 'ASCENDING' },
+      ],
+    }]) });
+    const firebase: unknown = JSON.parse(readFileSync(resolve(__dirname, '../../firebase.json'), 'utf8'));
+    expect(firebase).toMatchObject({ firestore: { indexes: 'firestore.indexes.json' } });
+  });
+});
 
 // Spec: "Server-write-only entitlement persistence" -- owner-read, deny-all-write on
 // users/{uid}/entitlements/{doc} (design.md D4). Requires the Firestore emulator (see

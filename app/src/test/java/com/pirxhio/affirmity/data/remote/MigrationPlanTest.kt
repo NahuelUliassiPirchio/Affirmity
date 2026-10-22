@@ -34,6 +34,22 @@ private fun snapshotWith(
 
 class MigrationPlanTest {
 
+    @Test fun `daily imports preserve destination mood and healer and only OR completion flags`() {
+        val writes = MigrationPlan.build(snapshotWith(
+            moods = listOf(DailyMoodEntity(10, 2, "old")),
+            completions = listOf(DailyCompletionEntity(10, false, true)),
+            healerUses = listOf(StreakHealerUseEntity(10, 100)),
+        )).flatten()
+        val mood = writes.single { it.path.contains("/dailyMoods/") }
+        val healer = writes.single { it.path.contains("/streakHealerUses/") }
+        val completion = writes.single { it.path.contains("/dailyCompletions/") }
+        assertEquals(null, resolveMigrationWrite(mood, mapOf("moodValue" to 5)))
+        assertEquals(mood.fields, resolveMigrationWrite(mood, null))
+        assertEquals(null, resolveMigrationWrite(healer, mapOf("activatedAtMillis" to 200L)))
+        assertEquals(mapOf("epochDay" to 10L, "meditationDone" to true, "affirmationDone" to true),
+            resolveMigrationWrite(completion, mapOf("epochDay" to 10L, "meditationDone" to true)))
+    }
+
     @Test
     fun `plan covers every affirmation, completion and the preferences doc exactly once, marker last`() {
         val affirmations = (1..3).map { AffirmationEntity(id = "aff-$it", title = "t$it", subtitle = "s$it", backgroundType = "color", backgroundValue = "#000000") }

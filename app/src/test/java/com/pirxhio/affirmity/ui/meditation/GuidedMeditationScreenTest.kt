@@ -29,6 +29,31 @@ class GuidedMeditationScreenTest {
     private fun newEngine(): MeditationEngine =
         MeditationEngine(breathingMeditationDefinition(BreathingConfig()), noOpExecutor)
 
+    @Test fun `final skip and user release synchronously freeze completion before recomposition`() {
+        for (event in listOf(MeditationEvent.Skip, MeditationEvent.UserAction())) {
+            var monotonic = 0L
+            var wall = 1_000L
+            var zone = "UTC"
+            val tracker = com.pirxhio.affirmity.meditation.SessionTracker(
+                com.pirxhio.affirmity.meditation.MonotonicTimeSource { monotonic }, { wall }, { zone })
+            val definition = com.pirxhio.affirmity.meditation.MeditationDefinition(id = "one", root =
+                com.pirxhio.affirmity.meditation.Phase("last", exitEvents = setOf(MeditationEvent.UserAction::class)))
+            val engine = MeditationEngine(definition, noOpExecutor)
+            tracker.start()
+            dispatchTrackedMeditationEvent(engine, tracker, MeditationEvent.Start)
+            monotonic = 2_000
+            wall = 3_000
+            dispatchTrackedMeditationEvent(engine, tracker, event)
+            assertEquals(SessionStatus.Completed, engine.state.value.status)
+            monotonic = 100_000
+            wall = 999_000
+            zone = "Asia/Tokyo"
+            assertEquals(2L, tracker.summary().activeElapsedSeconds)
+            assertEquals(3_000L, tracker.summary().endWallMillis)
+            assertEquals("UTC", tracker.summary().endZoneId)
+        }
+    }
+
     @Test
     fun `exiting while Running synchronously cancels the engine and reports Cancelled before onExit`() {
         val engine = newEngine()

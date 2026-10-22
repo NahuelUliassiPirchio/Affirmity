@@ -48,7 +48,7 @@ class TimerCommandExecutor(
                 when (event) {
                     is ClockEvent.Tick ->
                         sendEvent(MeditationEvent.TimerTick(currentGeneration, event.elapsedMillis, event.remainingMillis))
-                    ClockEvent.Completed ->
+                    is ClockEvent.Completed ->
                         sendEvent(MeditationEvent.TimerCompleted(currentGeneration))
                 }
             }

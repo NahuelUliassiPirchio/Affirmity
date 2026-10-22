@@ -9,6 +9,8 @@ data class SessionEndSummary(
     val wallElapsedSeconds: Long,
     val activeElapsedSeconds: Long,
     val startWallMillis: Long,
+    val endWallMillis: Long? = null,
+    val endZoneId: String? = null,
 )
 
 /**
@@ -19,13 +21,16 @@ data class SessionEndSummary(
 class SessionTracker(
     private val monotonicTimeSource: MonotonicTimeSource,
     private val wallClockMillis: () -> Long,
+    private val zoneId: () -> String = { java.util.TimeZone.getDefault().id },
 ) {
     private val activeTimer = ActiveElapsedTimer(monotonicTimeSource)
     private var startedMonotonicMillis: Long? = null
     private var startedWallMillis: Long? = null
+    private var finished: SessionEndSummary? = null
 
     /** Begins (or restarts) the session, resetting both elapsed clocks. */
     fun start() {
+        finished = null
         startedMonotonicMillis = monotonicTimeSource.nowMillis()
         startedWallMillis = wallClockMillis()
         activeTimer.start()
@@ -37,6 +42,7 @@ class SessionTracker(
 
     /** Before [start] this is zero elapsed stamped with the current wall time. */
     fun summary(): SessionEndSummary {
+        finished?.let { return it }
         val startMonotonic = startedMonotonicMillis
         val wallElapsedMillis = if (startMonotonic == null) 0L else monotonicTimeSource.nowMillis() - startMonotonic
         return SessionEndSummary(
@@ -44,6 +50,12 @@ class SessionTracker(
             activeElapsedSeconds = activeTimer.elapsedMillis() / MILLIS_PER_SECOND,
             startWallMillis = startedWallMillis ?: wallClockMillis(),
         )
+    }
+
+    fun finish(): SessionEndSummary {
+        finished?.let { return it }
+        activeTimer.pause()
+        return summary().copy(endWallMillis = wallClockMillis(), endZoneId = zoneId()).also { finished = it }
     }
 
     private companion object {

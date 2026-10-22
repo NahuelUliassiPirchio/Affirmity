@@ -495,8 +495,10 @@ internal fun handleGuidedMeditationSessionEnded(
     consumePlaybackUnlock: (String, SessionEndReason) -> Unit,
     recordMeditationCompleted: () -> Unit,
     emit: (AnalyticsEvent) -> Unit = {},
+    recordActivityCompleted: () -> Unit = {},
 ) {
     consumePlaybackUnlock(entryId, reason)
+    if (reason == SessionEndReason.Completed) recordActivityCompleted()
     val entry = findMeditationCatalogEntry(entryId)
     // Anti-skip-abuse gate (audit item #6): a session that never ran at least half its expected
     // duration doesn't credit the streak, even though it still reached SessionCompleted -- Next/
@@ -728,6 +730,10 @@ fun AffirmityApp(
     // is unrepresentable. Every trigger surface supplies its own PaywallSource (spec §5.3).
     var paywallSource by rememberSaveable { mutableStateOf<PaywallSource?>(null) }
     val context = LocalContext.current
+    var guidedStreakRecorder by remember { mutableStateOf<((Long, Long) -> Unit)?>(null) }
+    var freeStreakRecorder by remember { mutableStateOf<((Long, Long) -> Unit)?>(null) }
+    var freeActivityCapture by remember { mutableStateOf<com.pirxhio.affirmity.data.MeditationActivityCapture?>(null) }
+    var guidedActivityCapture by remember { mutableStateOf<com.pirxhio.affirmity.data.MeditationActivityCapture?>(null) }
     // Device-local by design: goals survive account changes and never enter AffirmityAppState's
     // DataSession/Firestore swap boundary.
     val userGoalsStore = remember(context) { UserGoalsPreferences(context.applicationContext) }
@@ -1406,7 +1412,9 @@ fun AffirmityApp(
                                         System.currentTimeMillis(),
                                     ),
                                     consumePlaybackUnlock = appState::consumeMeditationPlaybackUnlock,
-                                    recordMeditationCompleted = { appState.recordMeditationCompleted(summary.startWallMillis) },
+                                    recordMeditationCompleted = { guidedStreakRecorder?.invoke(summary.startWallMillis, summary.endWallMillis ?: System.currentTimeMillis()) },
+                                    recordActivityCompleted = { appState.completeMeditationActivity(guidedActivityCapture, summary.activeElapsedSeconds,
+                                        summary.endWallMillis ?: System.currentTimeMillis(), summary.endZoneId ?: java.util.TimeZone.getDefault().id) },
                                     emit = appState::logAnalyticsEvent,
                                 )
                             },
@@ -1420,7 +1428,11 @@ fun AffirmityApp(
                                     meditationTrackerPreferences.saveMeditationCueSoundEnabled(newValue)
                                 }
                             },
-                            onSessionStarted = {
+                            onSessionStarted = { startMillis ->
+                                guidedStreakRecorder = appState.captureMeditationCompletionRecorder()
+                                guidedActivityCapture = appState.startMeditationActivity(
+                                    com.pirxhio.affirmity.data.ActivityKind.GUIDED, selectedMeditationEntry.id,
+                                    context.getString(selectedMeditationEntry.titleRes), startMillis)
                                 snackbarScope.launch {
                                     meditationTrackerPreferences.recordRecentMeditation(selectedMeditationEntry.id)
                                 }
@@ -1907,8 +1919,16 @@ fun AffirmityApp(
                     showBannerAd = shouldShowMeditationBanner(appState.entitlementTier.value),
                     initialDurationSeconds = appState.meditationDurationSeconds.value ?: (15 * 60),
                     onDurationSelected = { seconds -> appState.recordMeditationDurationSelected(seconds) },
-                    onSessionCompleted = { durationSeconds, startWallMillis ->
-                        appState.recordMeditationCompleted(startWallMillis)
+                    onSessionStarted = { startMillis ->
+                        freeStreakRecorder = appState.captureMeditationCompletionRecorder()
+                        freeActivityCapture = appState.startMeditationActivity(com.pirxhio.affirmity.data.ActivityKind.FREE,
+                            null, context.getString(R.string.activity_free_timer), startMillis)
+                    },
+                    onActivityCompleted = { seconds, start, end, zone ->
+                        appState.completeMeditationActivity(freeActivityCapture, seconds, end, zone)
+                        freeStreakRecorder?.invoke(start, end)
+                    },
+                    onSessionCompleted = { durationSeconds, _ ->
                         appState.logAnalyticsEvent(AnalyticsEvent.FreeTimerCompleted(durationSeconds))
                     },
                     entries = meditationCatalog(),
@@ -1934,6 +1954,9 @@ fun AffirmityApp(
                 )
 
                 AppDestinations.PROGRESO -> ProgressScreen(
+                    observeActivityMonth = { from, to -> appState.observeActivityMonth(from, to) },
+                    activitySaveError = appState.activitySaveError.value,
+                    onRetryActivity = appState::retryActivityLoading,
                     affirmationsStreak = appState.affirmationsStreak.value,
                     meditationStreak = appState.meditationStreak.value,
                     streakHealer = appState.streakHealer.value,

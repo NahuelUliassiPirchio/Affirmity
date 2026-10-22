@@ -129,6 +129,7 @@ private fun buildAdCtaTestState(
     adUnlockSource: AdUnlockSource,
 ): AffirmityAppState {
     val local = DataSession.Local(
+        activity = com.pirxhio.affirmity.data.testActivitySession(),
         affirmations = NoopAffirmationRepositoryForAdCta(),
         completions = NoopDailyCompletionRepositoryForAdCta(),
         moods = NoopDailyMoodRepositoryForAdCta(),
@@ -156,6 +157,7 @@ private fun buildAdCtaTestState(
         local = local,
         remoteSessionFactory = { uid ->
             DataSession.Remote(
+        activity = com.pirxhio.affirmity.data.testActivitySession("account:$uid"),
                 uid = uid,
                 affirmations = NoopAffirmationRepositoryForAdCta(),
                 completions = NoopDailyCompletionRepositoryForAdCta(),

@@ -128,6 +128,7 @@ internal fun buildAnalyticsState(
     roundInterstitial: com.pirxhio.affirmity.ads.RoundInterstitialCoordinator? = null,
 ): AffirmityAppState {
     val local = DataSession.Local(
+        activity = com.pirxhio.affirmity.data.testActivitySession(),
         affirmations = NoopAffirmationRepository2(),
         completions = NoopDailyCompletionRepository2(),
         moods = NoopDailyMoodRepository2(),
@@ -155,6 +156,7 @@ internal fun buildAnalyticsState(
         local = local,
         remoteSessionFactory = { uid ->
             DataSession.Remote(
+        activity = com.pirxhio.affirmity.data.testActivitySession("account:$uid"),
                 uid = uid,
                 affirmations = NoopAffirmationRepository2(),
                 completions = NoopDailyCompletionRepository2(),

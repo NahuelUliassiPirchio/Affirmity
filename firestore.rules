@@ -17,6 +17,55 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
+    // One immutable scalar interval per document; overlapping uncertainty wins in the reader.
+    match /users/{uid}/activityCoverage/{coverageId} {
+      function validCoverage() {
+        let data = request.resource.data;
+        return coverageId.matches('^[a-f0-9]{64}$')
+          && data.keys().hasOnly(['sourceId', 'recordingSchema', 'fromEpochDay', 'toEpochDay', 'uncertain'])
+          && data.keys().hasAll(['sourceId', 'recordingSchema', 'fromEpochDay', 'toEpochDay', 'uncertain'])
+          && data.sourceId is string && data.sourceId.matches('^[A-Za-z0-9_-]{1,128}$')
+          && data.recordingSchema is int && data.recordingSchema > 0
+          && data.fromEpochDay is int && data.toEpochDay is int && data.fromEpochDay <= data.toEpochDay
+          && data.uncertain is bool;
+      }
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null && request.auth.uid == uid && validCoverage();
+      allow update: if request.auth != null && request.auth.uid == uid
+        && validCoverage() && request.resource.data == resource.data;
+      allow delete: if false;
+    }
+
+    // Immutable journal facts: retrying the same durable payload is safe, editing history is not.
+    match /users/{uid}/activityEvents/{eventId} {
+      function validEvent() {
+        let data = request.resource.data;
+        return data.keys().hasOnly(['eventId', 'kind', 'epochDay', 'occurredAtMillis',
+            'startMillis', 'endMillis', 'zoneId', 'meditationId', 'nameSnapshot', 'activeSeconds', 'sourceId'])
+          && data.keys().hasAll(['eventId', 'kind', 'epochDay', 'occurredAtMillis',
+            'startMillis', 'endMillis', 'zoneId', 'meditationId', 'nameSnapshot', 'activeSeconds', 'sourceId'])
+          && data.eventId == eventId && eventId.size() > 0 && eventId.size() <= 128
+          && data.kind in ['view', 'guided', 'free']
+          && data.epochDay is int && data.epochDay >= 0
+          && data.occurredAtMillis is int && data.occurredAtMillis >= 0
+          && data.startMillis is int && data.startMillis >= 0
+          && data.endMillis is int && data.endMillis >= data.startMillis
+          && data.activeSeconds is int && data.activeSeconds >= 0
+          && data.zoneId is string && data.zoneId.size() > 0 && data.zoneId.size() <= 128
+          && data.sourceId is string && data.sourceId.size() > 0 && data.sourceId.size() <= 256
+          && ((data.kind == 'view' && data.activeSeconds == 0
+              && data.meditationId == null && data.nameSnapshot == null)
+            || (data.kind in ['guided', 'free'] && data.nameSnapshot is string
+              && data.nameSnapshot.size() > 0 && data.nameSnapshot.size() <= 1024
+              && (data.meditationId == null || data.meditationId is string)));
+      }
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null && request.auth.uid == uid && validEvent();
+      allow update: if request.auth != null && request.auth.uid == uid
+        && validEvent() && request.resource.data == resource.data;
+      allow delete: if false;
+    }
+
     match /users/{uid}/streakHealerUses/{epochDay} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }

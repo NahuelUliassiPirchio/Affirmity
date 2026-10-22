@@ -1118,4 +1118,31 @@
     <string name="widget_preview_day_6">F</string>
     <string name="widget_preview_day_7">S</string>
 
+    <string name="activity_free_timer">Free timer</string>
+    <string name="activity_title">Daily activity</string>
+    <string name="activity_previous_month">Previous month</string>
+    <string name="activity_next_month">Next month</string>
+    <string name="activity_scroll_hint">Scroll the calendar to see every day.</string>
+    <string name="activity_scroll_start">Show start</string>
+    <string name="activity_scroll_end">Show end</string>
+    <string name="activity_loading">Loading activity…</string>
+    <string name="activity_load_error">This month’s activity could not be loaded.</string>
+    <string name="activity_retry">Retry</string>
+    <string name="activity_save_error">An activity could not be saved. History may be incomplete.</string>
+    <string name="activity_pending">Saved on this device; sync pending.</string>
+    <string name="activity_today">Today</string>
+    <string name="activity_selected">Selected</string>
+    <string name="activity_mood_value">Mood: %1$d of 5</string>
+    <string name="activity_has_records">Has records</string>
+    <string name="activity_no_mood">No mood recorded</string>
+    <string name="activity_healed">Healed day; no recorded activity is added.</string>
+    <string name="activity_legacy_meditation">Meditation completed; details unavailable.</string>
+    <string name="activity_legacy_affirmations">Affirmation goal completed; viewed count unavailable.</string>
+    <string name="activity_unknown">No recorded activity; complete history unavailable.</string>
+    <string name="activity_partial">Partial history: only recorded activity is shown.</string>
+    <string name="activity_empty">No activity on this fully tracked day.</string>
+    <string name="activity_viewed_count">Affirmations viewed: %1$d</string>
+    <string name="activity_total_duration">Recorded active time: %1$s</string>
+    <string name="activity_session_detail">%1$s · %2$s</string>
+    <string name="activity_duration_format">%1$d min %2$d sec</string>
 </resources>
