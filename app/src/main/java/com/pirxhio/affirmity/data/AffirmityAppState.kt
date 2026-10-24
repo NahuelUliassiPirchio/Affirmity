@@ -5,6 +5,7 @@ import com.pirxhio.affirmity.data.repository.ActivityIdentityHandle
 import com.pirxhio.affirmity.data.repository.ActivityIdentity
 import com.pirxhio.affirmity.data.repository.RoomActivitySession
 import com.pirxhio.affirmity.data.local.ActivityOwnerEntity
+import com.pirxhio.affirmity.data.local.AnonymousGenerationClaimedException
 import com.pirxhio.affirmity.data.remote.FirestoreActivityRepository
 import com.pirxhio.affirmity.data.remote.FirebaseActivityClient
 import com.pirxhio.affirmity.data.remote.ActivityHistoryImporter
@@ -2350,6 +2351,14 @@ class AffirmityAppState(
         } }
     }
 
+    /** Launches a daily-fact write; sign-in claiming the anonymous owner mid-suspension rejects it,
+     *  and the write is dropped rather than crashing or being redirected to another owner. */
+    private fun launchDailyFactWrite(block: suspend () -> Unit) {
+        scope.launch {
+            try { block() } catch (_: AnonymousGenerationClaimedException) { }
+        }
+    }
+
     /** Call once per affirmation the user settles on while swiping the feed. */
     fun recordAffirmationViewed() {
         val captured = capturedDataSession()
@@ -2357,7 +2366,7 @@ class AffirmityAppState(
         val zone = java.util.TimeZone.getDefault()
         val recorder = ActivityRecorder(captured.activity)
         saveActivity { recorder.view(occurredAtMillis, zone) }
-        scope.launch {
+        launchDailyFactWrite {
             viewEligibilityMutex.withLock {
             val today = DayClock.epochDay()
             val viewed = affirmationsViewedToday
@@ -2460,7 +2469,7 @@ class AffirmityAppState(
         recordMeditationCompletedFor(capturedDataSession(), startMillis, endMillis)
 
     private fun recordMeditationCompletedFor(captured: DataSession, startMillis: Long, endMillis: Long) {
-        scope.launch {
+        launchDailyFactWrite {
             val day = DayClock.attributedEpochDay(startMillis, endMillis)
             captured.completions.markMeditation(day)
             widgetUpdater.refresh()
@@ -2488,7 +2497,7 @@ class AffirmityAppState(
     /** Call from the day-detail sheet, for today or any past day the user is backfilling. */
     fun recordMood(epochDay: Long, moodValue: Int, note: String?) {
         val captured = capturedDataSession()
-        scope.launch {
+        launchDailyFactWrite {
             captured.moods.upsert(epochDay, moodValue, note?.trim()?.ifBlank { null })
             // Task 4.7: cancel-on-completion for Mood (design §6/"mood-checkin-sheet" capability's
             // "Saving cancels the pending notification" scenario). Scoped to *today* only -- this
@@ -2509,13 +2518,13 @@ class AffirmityAppState(
      * the same class of bug as the previously recorded UTC-vs-zone one).
      */
     fun activateStreakHealer() {
-        scope.launch {
+        launchDailyFactWrite {
             val today = healerTodayEpochDay()
             val start = healerStartEpochDay(today)
             val activeSession = ready()
             val rows = activeSession.completions.getRange(start, today)
             val uses = activeSession.healerUses.getRange(start, today)
-            if (session.value !== activeSession || healerTodayEpochDay() != today) return@launch
+            if (session.value !== activeSession || healerTodayEpochDay() != today) return@launchDailyFactWrite
             val activation = StreakHealerStats.evaluate(rows, uses, todayEpochDay = today, startEpochDay = start).activation
             if (activation is HealerActivation.Available) {
                 activeSession.healerUses.recordUse(activation.breakEpochDay)

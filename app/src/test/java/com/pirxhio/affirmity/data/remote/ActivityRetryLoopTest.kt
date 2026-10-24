@@ -5,6 +5,7 @@ import com.pirxhio.affirmity.data.ActivityRangeState
 import com.pirxhio.affirmity.data.ActivitySaveState
 import com.pirxhio.affirmity.data.repository.ActivityRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -64,6 +65,66 @@ class ActivityRetryLoopTest {
         advanceTimeBy(7_000)
         runCurrent()
         assertEquals(listOf(0L, 1_000L, 3_000L, 7_000L), attempts)
+    }
+
+    @Test fun `signal retry timeout is reported while later signals and periodic retries keep running`() = runTest {
+        val signals = kotlinx.coroutines.flow.MutableSharedFlow<Unit>()
+        val attempts = mutableListOf<Long>()
+        val failures = mutableListOf<String?>()
+        val repository = RetryRepository {
+            attempts += testScheduler.currentTime
+            if (attempts.size == 2) kotlinx.coroutines.withTimeout(5) { kotlinx.coroutines.delay(10) }
+        }
+        val job = backgroundScope.launch {
+            runActivityRetrySession(repository, "account:A", { "account:A" }, signals) { failures += it?.javaClass?.simpleName }
+        }
+        runCurrent()
+        signals.emit(Unit)
+        advanceTimeBy(5)
+        runCurrent()
+        assertEquals(listOf(null, "TimeoutCancellationException"), failures)
+        signals.emit(Unit)
+        runCurrent()
+        assertEquals(listOf(0L, 0L, 5L), attempts)
+        advanceTimeBy(60_000)
+        runCurrent()
+        assertEquals(listOf(0L, 0L, 5L, 60_000L), attempts)
+        assertEquals(true, job.isActive)
+        job.cancel()
+    }
+
+    @Test fun `outer timeout during a signal retry is not reported as a retry failure`() = runTest {
+        val signals = kotlinx.coroutines.flow.MutableSharedFlow<Unit>()
+        var attempts = 0
+        val failures = mutableListOf<String?>()
+        val repository = RetryRepository { if (++attempts == 2) kotlinx.coroutines.delay(10_000) }
+        val session = backgroundScope.async {
+            kotlinx.coroutines.withTimeout(100) {
+                runActivityRetrySession(repository, "account:A", { "account:A" }, signals) { failures += it?.javaClass?.simpleName }
+            }
+        }
+        runCurrent()
+        signals.emit(Unit)
+        advanceTimeBy(101)
+        runCurrent()
+        assertEquals(2, attempts)
+        assertEquals(true, session.isCancelled)
+        assertEquals(listOf<String?>(null), failures)
+    }
+
+    @Test fun `outer timeout during the periodic retry is not reported as a retry failure`() = runTest {
+        val failures = mutableListOf<String?>()
+        val repository = RetryRepository { kotlinx.coroutines.delay(10_000) }
+        val loop = backgroundScope.async {
+            kotlinx.coroutines.withTimeout(100) {
+                runActivityRetryLoop(repository, "account:A", { "account:A" }) { failures += it?.javaClass?.simpleName }
+            }
+        }
+        runCurrent()
+        advanceTimeBy(101)
+        runCurrent()
+        assertEquals(true, loop.isCancelled)
+        assertEquals(emptyList<String?>(), failures)
     }
 
     private class RetryRepository(private val retry: suspend () -> Unit) : ActivityRepository {

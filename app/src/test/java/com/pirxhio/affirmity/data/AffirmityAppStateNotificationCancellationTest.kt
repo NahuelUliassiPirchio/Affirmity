@@ -48,7 +48,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
+import com.pirxhio.affirmity.analytics.AnalyticsEvent
+import com.pirxhio.affirmity.analytics.FakeAnalyticsLogger
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlinx.coroutines.isActive
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
@@ -67,6 +75,8 @@ private class NoopAffirmationRepository3 : AffirmationRepository {
  * meaningfully. */
 private class CancellationFakeDailyCompletionRepository : DailyCompletionRepository {
     private val rows = mutableMapOf<Long, DailyCompletionEntity>()
+    var writeFailure: Throwable? = null
+    var rejectedWrites = 0
 
     fun seed(epochDay: Long, meditationDone: Boolean = false, affirmationDone: Boolean = false) {
         rows[epochDay] = DailyCompletionEntity(epochDay, meditationDone, affirmationDone)
@@ -79,11 +89,13 @@ private class CancellationFakeDailyCompletionRepository : DailyCompletionReposit
         (from..to).mapNotNull { rows[it] }
 
     override suspend fun markMeditation(epochDay: Long) {
+        writeFailure?.let { rejectedWrites++; throw it }
         val existing = rows[epochDay] ?: DailyCompletionEntity(epochDay)
         rows[epochDay] = existing.copy(meditationDone = true)
     }
 
     override suspend fun markAffirmation(epochDay: Long) {
+        writeFailure?.let { rejectedWrites++; throw it }
         val existing = rows[epochDay] ?: DailyCompletionEntity(epochDay)
         rows[epochDay] = existing.copy(affirmationDone = true)
     }
@@ -92,17 +104,24 @@ private class CancellationFakeDailyCompletionRepository : DailyCompletionReposit
 }
 
 private class FakeDailyMoodRepository3 : DailyMoodRepository {
+    var writeFailure: Throwable? = null
+    var upserts = 0
     override fun observeRange(from: Long, to: Long): Flow<List<DailyMoodEntity>> = flowOf(emptyList())
     override suspend fun getRange(from: Long, to: Long): List<DailyMoodEntity> = emptyList()
-    override suspend fun upsert(epochDay: Long, moodValue: Int, note: String?) = Unit
+    override suspend fun upsert(epochDay: Long, moodValue: Int, note: String?) {
+        writeFailure?.let { throw it }
+        upserts++
+    }
 }
 
 private class CancellationFakeStreakHealerRepository : StreakHealerRepository {
     private val uses = mutableListOf<StreakHealerUseEntity>()
+    var writeFailure: Throwable? = null
     override fun observeRange(from: Long, to: Long): Flow<List<StreakHealerUseEntity>> = flowOf(uses.toList())
     override suspend fun getRange(from: Long, to: Long): List<StreakHealerUseEntity> =
         uses.filter { it.healedEpochDay in from..to }
     override suspend fun recordUse(healedEpochDay: Long) {
+        writeFailure?.let { throw it }
         uses.add(StreakHealerUseEntity(healedEpochDay, System.currentTimeMillis()))
     }
 }
@@ -155,12 +174,15 @@ class AffirmityAppStateNotificationCancellationTest {
         healerUses: CancellationFakeStreakHealerRepository,
         notificationCanceller: NotificationCanceller,
         scope: CoroutineScope,
+        moods: FakeDailyMoodRepository3 = FakeDailyMoodRepository3(),
+        analytics: com.pirxhio.affirmity.analytics.AnalyticsLogger = NoOpAnalyticsLogger,
+        widgetUpdater: WidgetUpdater = WidgetUpdater { },
     ): AffirmityAppState {
         val local = DataSession.Local(
         activity = com.pirxhio.affirmity.data.testActivitySession(),
             affirmations = NoopAffirmationRepository3(),
             completions = completions,
-            moods = FakeDailyMoodRepository3(),
+            moods = moods,
             healerUses = healerUses,
             meditation = NoopMeditationPreferencesRepository3(),
             notifications = NoopNotificationSettingsRepository3(),
@@ -189,7 +211,7 @@ class AffirmityAppStateNotificationCancellationTest {
                     uid = uid,
                     affirmations = NoopAffirmationRepository3(),
                     completions = completions,
-                    moods = FakeDailyMoodRepository3(),
+                    moods = moods,
                     healerUses = healerUses,
                     meditation = NoopMeditationPreferencesRepository3(),
                     notifications = NoopNotificationSettingsRepository3(),
@@ -203,7 +225,7 @@ class AffirmityAppStateNotificationCancellationTest {
             notificationDebugLog = notificationDebugLog,
             notifier = mock(Notifier::class.java),
             notificationCanceller = notificationCanceller,
-            widgetUpdater = WidgetUpdater { },
+            widgetUpdater = widgetUpdater,
             authRepository = AlwaysSignedOutAuthRepository3(),
             fcmTokenRepository = mock(FcmTokenRepository::class.java),
             onboardingRepository = mock(FirestoreOnboardingRepository::class.java),
@@ -212,7 +234,7 @@ class AffirmityAppStateNotificationCancellationTest {
             deviceTimeZoneId = { "UTC" },
             knownGroupIds = setOf("personalizadas", "fuerza_de_voluntad"),
             adUnlockSource = FixedOutcomeAdUnlockSource3(AdUnlockOutcome.Unavailable),
-            analytics = NoOpAnalyticsLogger,
+            analytics = analytics,
         )
     }
 
@@ -342,5 +364,100 @@ class AffirmityAppStateNotificationCancellationTest {
 
         verify(canceller, never()).cancelFamily(NotificationChannelSpec.HEALER)
         scope.cancel()
+    }
+
+    private val claimed get() = com.pirxhio.affirmity.data.local.AnonymousGenerationClaimedException()
+
+    @Test
+    fun `affirmation goal crossing against a claimed anonymous owner skips every completion side effect`() = runTest {
+        val canceller = mock(NotificationCanceller::class.java)
+        val completions = CancellationFakeDailyCompletionRepository().apply { writeFailure = claimed }
+        val analytics = FakeAnalyticsLogger()
+        var widgetRefreshes = 0
+        val state = buildState(completions, CancellationFakeStreakHealerRepository(), canceller, backgroundScope,
+            analytics = analytics, widgetUpdater = WidgetUpdater { widgetRefreshes++ })
+        runCurrent()
+
+        repeat(5) { state.recordAffirmationViewed(); runCurrent() }
+
+        assertTrue("scope must survive the rejected write", backgroundScope.isActive)
+        assertTrue("the goal crossing must have reached the rejected write", completions.rejectedWrites > 0)
+        assertEquals(0, widgetRefreshes)
+        assertTrue(analytics.recorded.none { it is AnalyticsEvent.DailyGoalReached })
+        verify(canceller, never()).cancelFamily(NotificationChannelSpec.STREAK)
+        completions.writeFailure = null
+        state.recordMeditationCompleted(System.currentTimeMillis())
+        runCurrent()
+        verify(canceller).cancelFamily(NotificationChannelSpec.MEDITATION_RETURN)
+        assertEquals(1, widgetRefreshes)
+    }
+
+    @Test
+    fun `meditation completion against a claimed anonymous owner is dropped without crashing`() = runTest {
+        val canceller = mock(NotificationCanceller::class.java)
+        val completions = CancellationFakeDailyCompletionRepository().apply { writeFailure = claimed }
+        val state = buildState(completions, CancellationFakeStreakHealerRepository(), canceller, backgroundScope)
+        runCurrent()
+
+        state.recordMeditationCompleted(System.currentTimeMillis())
+        runCurrent()
+
+        assertTrue(backgroundScope.isActive)
+        verify(canceller, never()).cancelFamily(NotificationChannelSpec.MEDITATION_RETURN)
+    }
+
+    @Test
+    fun `mood save against a claimed anonymous owner is dropped without crashing`() = runTest {
+        val canceller = mock(NotificationCanceller::class.java)
+        val moods = FakeDailyMoodRepository3().apply { writeFailure = claimed }
+        val state = buildState(CancellationFakeDailyCompletionRepository(), CancellationFakeStreakHealerRepository(),
+            canceller, backgroundScope, moods)
+        runCurrent()
+        val today = DayClock.epochDay()
+
+        state.recordMood(today, moodValue = 3, note = null)
+        runCurrent()
+
+        assertTrue(backgroundScope.isActive)
+        verify(canceller, never()).cancelFamily(NotificationChannelSpec.MOOD)
+        moods.writeFailure = null
+        state.recordMood(today, moodValue = 4, note = null)
+        runCurrent()
+        assertEquals(1, moods.upserts)
+    }
+
+    @Test
+    fun `healer activation against a claimed anonymous owner is dropped without crashing`() = runTest {
+        val canceller = mock(NotificationCanceller::class.java)
+        val completions = CancellationFakeDailyCompletionRepository()
+        val today = DayClock.epochDay()
+        completions.seed(today - 3, meditationDone = true, affirmationDone = true)
+        completions.seed(today - 2, meditationDone = true, affirmationDone = true)
+        val healers = CancellationFakeStreakHealerRepository().apply { writeFailure = claimed }
+        val state = buildState(completions, healers, canceller, backgroundScope)
+        runCurrent()
+
+        state.activateStreakHealer()
+        runCurrent()
+
+        assertTrue(backgroundScope.isActive)
+        verify(canceller, never()).cancelFamily(NotificationChannelSpec.HEALER)
+    }
+
+    @Test
+    fun `an unrelated failure in a daily-fact write is not swallowed`() = runTest {
+        val completions = CancellationFakeDailyCompletionRepository().apply { writeFailure = IllegalStateException("disk") }
+        val caught = java.util.concurrent.atomic.AtomicReference<Throwable?>()
+        val handlerScope = CoroutineScope(
+            StandardTestDispatcher(testScheduler) + kotlinx.coroutines.CoroutineExceptionHandler { _, e -> caught.set(e) },
+        )
+        val state = buildState(completions, CancellationFakeStreakHealerRepository(), mock(NotificationCanceller::class.java), handlerScope)
+        runCurrent()
+
+        state.recordMeditationCompleted(System.currentTimeMillis())
+        runCurrent()
+
+        assertEquals("disk", caught.get()?.message)
+        handlerScope.cancel()
     }
 }

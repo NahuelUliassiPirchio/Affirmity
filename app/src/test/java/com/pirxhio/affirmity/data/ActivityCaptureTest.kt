@@ -30,4 +30,28 @@ class ActivityCaptureTest {
         assertTrue(events.all { it.owner == "local:G" && it.zoneId == "UTC" })
         assertTrue(events.none { it.kind == ActivityKind.FREE })
     }
+
+    @Test fun `wall clock moving backward during a session still records a valid completion`() = runTest {
+        val events = mutableListOf<ActivityEvent>()
+        val repository = object : ActivityRepository {
+            override suspend fun record(command: ActivityEvent): ActivitySaveState { events += command; return ActivitySaveState.LOCAL }
+            override fun observeRange(owner: String, fromEpochDay: Long, toEpochDay: Long) = error("Unused")
+            override suspend fun retryPending(owner: String) = Unit
+        }
+        val binding = ActivitySessionBinding(ActivityIdentityHandle { ActivityIdentity("local:G", "device") }, repository)
+        val utc = TimeZone.getTimeZone("UTC")
+        val day = 86_400_000L
+        // Started 00:10 on day 2, clock then stepped back to 23:50 on day 1 after 120 active seconds.
+        val capture = ActivityRecorder(binding).startSession(ActivityKind.GUIDED, "breathing", "Name", 2 * day + 600_000)
+        capture.complete(120, 2 * day - 600_000, utc)
+        val event = events.single()
+        assertEquals(2 * day - 600_000 - 120_000, event.startMillis)
+        assertEquals(2 * day - 600_000, event.endMillis)
+        assertEquals(1L, event.epochDay)
+        // A session near the epoch cannot derive a negative start (Firestore rules require >= 0).
+        val early = ActivityRecorder(binding).startSession(ActivityKind.FREE, null, "Free", 9_000)
+        early.complete(600, 5_000, utc)
+        assertEquals(0L, events.last().startMillis)
+        assertEquals(5_000L, events.last().endMillis)
+    }
 }

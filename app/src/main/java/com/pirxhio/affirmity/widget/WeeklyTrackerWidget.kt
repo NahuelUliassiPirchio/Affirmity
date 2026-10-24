@@ -40,12 +40,12 @@ import com.pirxhio.affirmity.EXTRA_START_DESTINATION
 import com.pirxhio.affirmity.MainActivity
 import com.pirxhio.affirmity.data.DayClock
 import com.pirxhio.affirmity.data.StreakHealerStats
+import com.pirxhio.affirmity.data.local.ActivityOwnerEntity
 import com.pirxhio.affirmity.data.local.AffirmityDatabase
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.remote.FirestoreDailyCompletionRepository
 import com.pirxhio.affirmity.data.remote.FirestorePaths
 import com.pirxhio.affirmity.data.remote.FirestoreStreakHealerRepository
-import com.pirxhio.affirmity.data.repository.RoomStreakHealerRepository
 import kotlinx.coroutines.tasks.await
 
 /** Per-habit fill colors; empty color for an incomplete half. */
@@ -110,11 +110,17 @@ class WeeklyTrackerWidget : GlanceAppWidget() {
             isTodayDone = streakHealer.isTodayDone
             healedDays = streakHealer.healedDays
         } else {
+            // Anonymous completions/healers live in the owner-scoped daily facts; the active
+            // generation resolves exactly as the app resolves it (reused, never a legacy-table read).
             val database = AffirmityDatabase.getInstance(context)
-            val dao = database.dailyCompletionDao()
-            hasAny = dao.hasAny()
-            allRows = dao.getRange(streakRangeStart, today)
-            val healerUses = RoomStreakHealerRepository(database.streakHealerUseDao()).getRange(healerStart, today)
+            val owner = database.initializeAnonymousActivityOwner(ActivityOwnerEntity(
+                "local:${java.util.UUID.randomUUID()}", java.util.UUID.randomUUID().toString(), null, true))
+            val facts = loadAnonymousWidgetFacts(
+                database.activityDailyFactDao(), owner.owner, streakRangeStart, healerStart, today,
+            )
+            hasAny = facts.hasAny
+            allRows = facts.completions
+            val healerUses = facts.healerUses
             val streakHealer = StreakHealerStats.evaluate(
                 allRows, healerUses, today, healerStart, streakStartEpochDay = rawStreakStart,
             )

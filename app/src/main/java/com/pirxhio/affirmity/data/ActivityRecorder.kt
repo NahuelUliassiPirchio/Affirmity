@@ -33,9 +33,13 @@ class MeditationActivityCapture internal constructor(
 
     suspend fun complete(activeSeconds: Long, endMillis: Long, zone: TimeZone): ActivitySaveState = mutex.withLock {
         val event = completed ?: binding.identity.await().let { identity ->
+            // A wall clock stepped backward mid-session leaves end < start; keep the completion by
+            // deriving the start from the active duration instead of tripping ActivityEvent's check.
+            val start = if (endMillis >= startMillis) startMillis
+                else (endMillis - activeSeconds * 1_000).coerceIn(0L, endMillis)
             ActivityEvent(identity.owner, eventId,
-                DayClock.attributedEpochDay(startMillis, endMillis, Calendar.getInstance(zone)), kind,
-                endMillis, startMillis, endMillis, zone.id, meditationId, name, activeSeconds, identity.sourceId)
+                DayClock.attributedEpochDay(start, endMillis, Calendar.getInstance(zone)), kind,
+                endMillis, start, endMillis, zone.id, meditationId, name, activeSeconds, identity.sourceId)
         }.also { completed = it }
         binding.repository.record(event)
     }

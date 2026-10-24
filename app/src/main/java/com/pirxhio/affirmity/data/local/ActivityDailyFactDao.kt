@@ -7,6 +7,9 @@ import androidx.room.Query
 import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
+/** Thrown when a daily-fact write targets an anonymous generation that sign-in already claimed. */
+class AnonymousGenerationClaimedException : IllegalArgumentException("Anonymous generation already claimed")
+
 @Dao
 abstract class ActivityDailyFactDao {
     @Query("SELECT * FROM activity_daily_fact WHERE owner = :owner AND epochDay BETWEEN :from AND :to ORDER BY epochDay")
@@ -64,7 +67,7 @@ abstract class ActivityDailyFactDao {
     @Transaction
     open suspend fun mutate(owner: String, epochDay: Long, change: DailyFactChange) {
         val state = requireNotNull(ownerState(owner))
-        require(state.active && state.claimedUid == null && state.legacyAdoptionComplete) { "Anonymous generation already claimed" }
+        if (!(state.active && state.claimedUid == null && state.legacyAdoptionComplete)) throw AnonymousGenerationClaimedException()
         val existing = getRange(owner, epochDay, epochDay).singleOrNull() ?: ActivityDailyFactEntity(owner, epochDay)
         write(applyDailyFactChange(existing, change))
     }

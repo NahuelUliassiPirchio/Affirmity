@@ -16,7 +16,9 @@ import com.pirxhio.affirmity.data.repository.ActivityRepository
 import java.security.MessageDigest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.catch
@@ -146,6 +148,7 @@ suspend fun runActivityRetryLoop(
             60_000L
         } catch (failure: Exception) {
             if (failure is CancellationException && failure !is TimeoutCancellationException) throw failure
+            currentCoroutineContext().ensureActive() // an outer timeout/cancel is not a retry failure
             if (currentOwner() != owner) return
             onFailure(failure)
             val backoff = (1_000L shl failures.coerceAtMost(6)).coerceAtMost(60_000L)
@@ -164,7 +167,8 @@ suspend fun runActivityRetrySession(repository: ActivityRepository, owner: Strin
         if (currentOwner() == owner) {
             try { repository.retryPending(owner); if (currentOwner() == owner) onFailure(null) }
             catch (failure: Exception) {
-                if (failure is CancellationException) throw failure
+                if (failure is CancellationException && failure !is TimeoutCancellationException) throw failure
+                currentCoroutineContext().ensureActive() // an outer timeout/cancel is not a retry failure
                 if (currentOwner() == owner) onFailure(failure)
             }
         }
