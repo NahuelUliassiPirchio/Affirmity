@@ -17,6 +17,7 @@ import com.pirxhio.affirmity.meditation.SessionStatus
 import com.pirxhio.affirmity.meditation.ShowText
 import com.pirxhio.affirmity.meditation.StartAmbient
 import com.pirxhio.affirmity.meditation.StopAmbient
+import com.pirxhio.affirmity.meditation.StopAudio
 import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -67,7 +68,8 @@ class MeditationCatalogTest {
             }
             val phase = phasesById.getValue(requireNotNull(current.currentPhaseId))
             when (val duration = phase.duration) {
-                is PhaseDuration.Fixed -> total += duration.millis
+                // A user-releasable phase counts its typical length, not its runtime ceiling.
+                is PhaseDuration.Fixed -> total += phase.estimatedMillis ?: duration.millis
                 PhaseDuration.Manual -> manual++
             }
             if (MeditationEvent.AudioCompleted::class in phase.exitEvents) gated++
@@ -211,6 +213,8 @@ class MeditationCatalogTest {
         // static check can ever exercise -- the real per-affirmation ShowLiteralText content is
         // runtime-fetched, never a textResources-mapped id, so it's outside this assertion's scope.
         "breathing_affirmations" to listOf(mapOf("breathingTechnique" to "box_breathing")),
+        // wim_hof: the intro / round-intro texts only exist when the resolved voiceGuide is on.
+        "wim_hof" to listOf(mapOf("voiceGuide" to "true", "voiceLocale" to "es")),
     )
 
     @Test
@@ -268,6 +272,20 @@ class MeditationCatalogTest {
         }
     }
 
+    @Test
+    fun `8b - a phase estimate never exceeds its Fixed ceiling and only wim_hof uses one`() {
+        meditationCatalog().forEach { entry ->
+            collectPhases(entry.definition(emptyMap()).root).forEach { phase ->
+                val estimate = phase.estimatedMillis ?: return@forEach
+                assertEquals("${entry.id}: only wim_hof may declare estimates", "wim_hof", entry.id)
+                assertTrue(
+                    "${entry.id}/${phase.id}: estimate must be <= ceiling",
+                    estimate <= (phase.duration as PhaseDuration.Fixed).millis,
+                )
+            }
+        }
+    }
+
     // --- 9. DC-1 guard: command-vocabulary subset -------------------------------------------------
 
     @Test
@@ -276,7 +294,9 @@ class MeditationCatalogTest {
             setOf(ShowText::class, PlayVoice::class, StartAmbient::class, StopAmbient::class, PlayAudio::class, PlayCue::class)
         meditationCatalog().forEach { entry ->
             collectCommands(entry.definition(emptyMap()).root).forEach { command ->
-                assertTrue("${entry.id}: unexpected command ${command::class}", command::class in whitelist)
+                // wim_hof alone may stop its in-flight breath SFX when the breathing block is skipped.
+                val allowed = command::class in whitelist || (entry.id == "wim_hof" && command is StopAudio)
+                assertTrue("${entry.id}: unexpected command ${command::class}", allowed)
             }
         }
     }
@@ -301,9 +321,10 @@ class MeditationCatalogTest {
     // --- 11. audioResources.isEmpty() tripwire ------------------------------------------------------
 
     @Test
-    fun `11 - audioResources is empty for all entries`() {
-        meditationCatalog().forEach { entry ->
+    fun `11 - audioResources and sfxResources are empty for all entries except wim_hof`() {
+        meditationCatalog().filter { it.id != "wim_hof" }.forEach { entry ->
             assertTrue("${entry.id}: audioResources must be empty", entry.presentation.audioResources.isEmpty())
+            assertTrue("${entry.id}: sfxResources must be empty", entry.presentation.sfxResources.isEmpty())
         }
     }
 

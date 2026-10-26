@@ -1,13 +1,24 @@
 package com.pirxhio.affirmity.ui.meditation.catalog
 
+import com.pirxhio.affirmity.meditation.MeditationCommandExecutor
 import com.pirxhio.affirmity.meditation.MeditationNode
+import com.pirxhio.affirmity.meditation.MeditationRuntimeState
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.Phase
+import com.pirxhio.affirmity.meditation.PhaseDuration
+import com.pirxhio.affirmity.meditation.PlayAudio
 import com.pirxhio.affirmity.meditation.Repeat
 import com.pirxhio.affirmity.meditation.ShowText
+import com.pirxhio.affirmity.meditation.customization.CustomizationField
+import com.pirxhio.affirmity.meditation.customization.defaultValues
 import com.pirxhio.affirmity.meditation.customization.resolvedValues
+import com.pirxhio.affirmity.meditation.wimhof.WimHofBreathSpeed
 import com.pirxhio.affirmity.meditation.wimhof.WimHofPhaseIds
+import com.pirxhio.affirmity.meditation.wimhof.voice.WhmClips
+import com.pirxhio.affirmity.meditation.wimhof.voice.WhmClipsEn
+import com.pirxhio.affirmity.meditation.wimhof.voice.WhmVoiceDirector
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WimHofCatalogEntryTest {
@@ -30,7 +41,9 @@ class WimHofCatalogEntryTest {
 
     @Test
     fun `every ShowText id in the tree has a textResources entry`() {
-        val textIds = walk(entry.definition(emptyMap()).root)
+        // Voice off and voice on: the intro texts only exist in the second tree.
+        val textIds = listOf(emptyMap(), mapOf("voiceGuide" to "true", "voiceLocale" to "es"))
+            .flatMap { walk(entry.definition(it).root) }
             .filterIsInstance<Phase>()
             .flatMap { it.onEnter }
             .filterIsInstance<ShowText>()
@@ -41,8 +54,11 @@ class WimHofCatalogEntryTest {
     }
 
     @Test
-    fun `manual release targets the exhale hold phase`() {
-        assertEquals(WimHofPhaseIds.EXHALE_HOLD, entry.presentation.manualRelease?.phaseId)
+    fun `manual releases target the intro skip and the exhale hold`() {
+        assertEquals(
+            listOf(WimHofPhaseIds.INTRO, WimHofPhaseIds.EXHALE_HOLD),
+            entry.presentation.manualReleases.map { it.phaseId },
+        )
     }
 
     @Test
@@ -54,5 +70,172 @@ class WimHofCatalogEntryTest {
             val definition = entry.definition(resolved)
             assertEquals(com.pirxhio.affirmity.meditation.wimhof.WimHofConfig.DEFAULT_BREATHS_PER_ROUND, definition.variables["breathsPerRound"])
         }
+    }
+
+    // --- breath speed + breath sound ----------------------------------------------------------------
+
+    private fun breathDurations(config: Map<String, String>): Pair<Long, Long> {
+        val phases = walk(entry.definition(config).root).filterIsInstance<Phase>()
+        fun fixed(id: String) = (phases.first { it.id == id }.duration as PhaseDuration.Fixed).millis
+        return fixed("inhale") to fixed("exhale")
+    }
+
+    private fun sfxIdsIn(config: Map<String, String>): List<String> =
+        walk(entry.definition(config).root).filterIsInstance<Phase>()
+            .flatMap { it.onEnter }.filterIsInstance<PlayAudio>().map { it.audioId }
+
+    @Test
+    fun `breathSpeed is a slow-normal-fast option defaulting to normal`() {
+        val field = entry.customizationFields.filterIsInstance<CustomizationField.Options<*>>().first { it.key == "breathSpeed" }
+
+        assertEquals(listOf("slow", "normal", "fast"), field.options)
+        assertEquals("normal", field.default)
+        assertEquals("normal", defaultValues(entry.customizationFields)["breathSpeed"])
+    }
+
+    @Test
+    fun `breathSound is a toggle defaulting to on`() {
+        val field = entry.customizationFields.filterIsInstance<CustomizationField.Toggle>().first { it.key == "breathSound" }
+
+        assertEquals(true, field.default)
+        assertEquals("true", defaultValues(entry.customizationFields)["breathSound"])
+    }
+
+    @Test
+    fun `the selected speed drives the phase durations`() {
+        assertEquals(2_000L to 2_000L, breathDurations(mapOf("breathSpeed" to "slow")))
+        assertEquals(1_700L to 1_700L, breathDurations(mapOf("breathSpeed" to "normal")))
+        assertEquals(1_200L to 1_000L, breathDurations(mapOf("breathSpeed" to "fast")))
+    }
+
+    @Test
+    fun `missing or off-list persisted speed falls back to normal`() {
+        listOf(emptyMap(), mapOf("breathSpeed" to "turbo"), mapOf("breathSpeed" to "")).forEach {
+            assertEquals(1_700L to 1_700L, breathDurations(it))
+        }
+    }
+
+    @Test
+    fun `speed and breath sound persist in the same config map as rounds`() {
+        val resolved = resolvedValues(
+            entry.customizationFields,
+            mapOf("rounds" to "2", "breathSpeed" to "slow", "breathSound" to "false"),
+        )
+
+        assertEquals("2", resolved["rounds"])
+        assertEquals("slow", resolved["breathSpeed"])
+        assertEquals("false", resolved["breathSound"])
+    }
+
+    @Test
+    fun `breathSound off removes every sfx and the default keeps them`() {
+        assertTrue(sfxIdsIn(emptyMap()).isNotEmpty())
+        assertEquals(emptyList<String>(), sfxIdsIn(mapOf("breathSound" to "false")))
+    }
+
+    @Test
+    fun `every sfx id in the tree has a sfxResources entry and nothing else is mapped`() {
+        val used = WimHofBreathSpeed.entries.flatMap {
+            sfxIdsIn(mapOf("breathSpeed" to it.key))
+        }.toSet()
+
+        assertEquals(used, entry.presentation.sfxResources.keys)
+    }
+
+    @Test
+    fun `the exhale hold ceiling is 250 seconds`() {
+        val hold = walk(entry.definition(emptyMap()).root).filterIsInstance<Phase>().first { it.id == WimHofPhaseIds.EXHALE_HOLD }
+
+        assertEquals(PhaseDuration.Fixed(250_000L), hold.duration)
+    }
+
+    @Test
+    fun `double tap advances only on wim_hof`() {
+        assertTrue(entry.presentation.doubleTapAdvances)
+        meditationCatalog().filter { it.id != "wim_hof" }.forEach {
+            assertEquals("${it.id}: doubleTapAdvances must be off", false, it.presentation.doubleTapAdvances)
+        }
+    }
+
+    @Test
+    fun `the typical hold estimate yields a ten minute declared length`() {
+        assertEquals(10, entry.approxDurationMinutes)
+        val expected = expectedDurationMillis(entry.definition(emptyMap()), entry.approxDurationMinutes)
+        // 3 rounds x (30 breaths x 3.4 s + 90 s typical hold + 15 s recovery)
+        assertEquals(3 * (102_000L + 90_000L + 15_000L), expected)
+    }
+
+    @Test
+    fun `only wim_hof releases voice players after play`() {
+        assertTrue(entry.presentation.releaseVoiceAfterPlay)
+        meditationCatalog().filter { it.id != "wim_hof" }.forEach {
+            assertEquals("${it.id}: releaseVoiceAfterPlay must be off", false, it.presentation.releaseVoiceAfterPlay)
+        }
+    }
+
+    @Test
+    fun `every voice clip has a raw resource mapped under its own id`() {
+        assertEquals(
+            WhmClips.voiceMillis.keys + WhmClipsEn.voiceMillis.keys,
+            entry.presentation.audioResources.keys,
+        )
+        assertEquals(104, entry.presentation.audioResources.values.toSet().size)
+    }
+
+    @Test
+    fun `voice guide is a Spanish and English toggle that defaults on`() {
+        val toggle = entry.customizationFields.filterIsInstance<CustomizationField.Toggle>().single { it.key == "voiceGuide" }
+
+        assertEquals(true, toggle.default)
+        assertEquals(setOf("es", "en"), toggle.localeTags)
+        assertEquals("true", defaultValues(entry.customizationFields)["voiceGuide"])
+    }
+
+    @Test
+    fun `only wim_hof provides a session director`() {
+        val sink = object : MeditationCommandExecutor {
+            override fun execute(command: com.pirxhio.affirmity.meditation.MeditationCommand) = Unit
+        }
+        assertTrue(entry.presentation.sessionDirectorFactory!!(sink) { MeditationRuntimeState() } is WhmVoiceDirector)
+        meditationCatalog().filter { it.id != "wim_hof" }.forEach {
+            assertEquals("${it.id}: no director", null, it.presentation.sessionDirectorFactory)
+        }
+    }
+
+    @Test
+    fun `the resolved voiceGuide switch adds the intro and round intro to the definition`() {
+        val on = walk(entry.definition(mapOf("voiceGuide" to "true", "voiceLocale" to "es")).root).filterIsInstance<Phase>().map { it.id }
+        val off = walk(entry.definition(mapOf("voiceGuide" to "false")).root).filterIsInstance<Phase>().map { it.id }
+
+        assertTrue(WimHofPhaseIds.INTRO in on && WimHofPhaseIds.ROUND_INTRO in on)
+        assertTrue(WimHofPhaseIds.INTRO !in off && WimHofPhaseIds.ROUND_INTRO !in off)
+    }
+
+    @Test
+    fun `with the voice guide every ShowText id still has a textResources entry`() {
+        val textIds = walk(entry.definition(mapOf("voiceGuide" to "true", "voiceLocale" to "es")).root)
+            .filterIsInstance<Phase>()
+            .flatMap { it.onEnter }
+            .filterIsInstance<ShowText>()
+            .map { it.textId }
+            .toSet()
+
+        assertTrue(entry.presentation.textResources.keys.containsAll(textIds))
+    }
+
+    @Test
+    fun `a voice guide without a known clip locale behaves exactly like voice off`() {
+        fun phases(config: Map<String, String>) =
+            walk(entry.definition(config).root).filterIsInstance<Phase>().map { it.id to it.duration }
+
+        val off = phases(mapOf("voiceGuide" to "false"))
+        assertEquals(off, phases(mapOf("voiceGuide" to "true")))
+        assertEquals(off, phases(mapOf("voiceGuide" to "true", "voiceLocale" to "fr")))
+        assertEquals(off, phases(emptyMap()))
+        assertTrue(phases(mapOf("voiceGuide" to "true", "voiceLocale" to "en")) != off)
+        assertEquals(
+            expectedDurationMillis(entry.definition(mapOf("voiceGuide" to "false")), entry.approxDurationMinutes),
+            expectedDurationMillis(entry.definition(mapOf("voiceGuide" to "true", "voiceLocale" to "fr")), entry.approxDurationMinutes),
+        )
     }
 }

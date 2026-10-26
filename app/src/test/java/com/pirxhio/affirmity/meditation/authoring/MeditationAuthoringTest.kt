@@ -2,6 +2,7 @@ package com.pirxhio.affirmity.meditation.authoring
 
 import com.pirxhio.affirmity.meditation.MeditationEvent
 import com.pirxhio.affirmity.meditation.PhaseDuration
+import com.pirxhio.affirmity.meditation.PlayAudio
 import com.pirxhio.affirmity.meditation.PlayVoice
 import com.pirxhio.affirmity.meditation.ShowText
 import org.junit.Assert.assertEquals
@@ -104,6 +105,29 @@ class MeditationAuthoringTest {
         assertEquals(2, breath.children.size)
         assertEquals("inhale", breath.children[0].id)
         assertEquals("exhale", breath.children[1].id)
+    }
+
+    @Test
+    fun `breathingBlock appends inhale and exhale commands after the text and adds none by default`() {
+        val plain = breathingBlock(breaths = 3, inhaleMillis = 1_000L, exhaleMillis = 1_000L)
+        val plainBreath = plain.child as com.pirxhio.affirmity.meditation.MeditationSequence
+        val plainInhale = plainBreath.children[0] as com.pirxhio.affirmity.meditation.Phase
+        assertTrue(plainInhale.onEnter.none { it is PlayAudio })
+
+        val block = breathingBlock(
+            breaths = 3,
+            inhaleMillis = 1_000L,
+            exhaleMillis = 1_000L,
+            inhaleCommands = listOf(PlayAudio("in_sfx")),
+            exhaleCommands = listOf(PlayAudio("out_sfx")),
+        )
+        val breath = block.child as com.pirxhio.affirmity.meditation.MeditationSequence
+        val inhale = breath.children[0] as com.pirxhio.affirmity.meditation.Phase
+        val exhale = breath.children[1] as com.pirxhio.affirmity.meditation.Phase
+
+        assertTrue(inhale.onEnter.first() is ShowText)
+        assertEquals(PlayAudio("in_sfx"), inhale.onEnter.last())
+        assertEquals(PlayAudio("out_sfx"), exhale.onEnter.last())
     }
 
     @Test

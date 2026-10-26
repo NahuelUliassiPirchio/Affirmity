@@ -73,9 +73,19 @@ class MeditationEngine(
                 _state.value = current.copy(status = SessionStatus.Running)
             }
 
-            MeditationEvent.Next, MeditationEvent.Skip -> {
-                if (current.status != SessionStatus.Running && current.status != SessionStatus.Paused) return
+            // Manual advances are Running-only: entering a phase while Paused would dispatch its
+            // onEnter commands (voice, SFX) and start its timer under a UI that says "paused".
+            MeditationEvent.Next -> {
+                if (current.status != SessionStatus.Running) return
                 exitCurrentPhaseAndAdvance()
+            }
+
+            MeditationEvent.Skip -> {
+                if (current.status != SessionStatus.Running) return
+                // Leaves the innermost enclosing block that opted in (see [Repeat.skipExitsBlock]);
+                // with none, it is exactly [MeditationEvent.Next].
+                val blockIndex = frames.indexOfLast { it is Frame.InRepeat && it.node.skipExitsBlock }
+                exitCurrentPhaseAndAdvance(advanceFrom = if (blockIndex >= 0) frames.take(blockIndex) else frames)
             }
 
             MeditationEvent.Cancel -> {
@@ -135,10 +145,10 @@ class MeditationEngine(
         enterPhase(leaf, baseState, isSessionStart = true)
     }
 
-    private fun exitCurrentPhaseAndAdvance() {
+    private fun exitCurrentPhaseAndAdvance(advanceFrom: List<Frame> = frames) {
         val phase = currentPhase ?: return
         val exitingGeneration = _state.value.timerGeneration
-        val result = advance(frames, _state.value)
+        val result = advance(advanceFrom, _state.value)
         // The global end cue takes priority at the completion boundary: the final phase's own
         // cues (e.g. a last-round RoundEnd) are dropped so only SessionEnd rings.
         val dropCues = result is AdvanceResult.SessionCompleted && definition.sessionCues

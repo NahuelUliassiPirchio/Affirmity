@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.ui.meditation.catalog
 
+import com.pirxhio.affirmity.meditation.BreathRole
 import com.pirxhio.affirmity.meditation.FixedCountRepetition
 import com.pirxhio.affirmity.meditation.MeditationCommand
 import com.pirxhio.affirmity.meditation.MeditationDefinition
@@ -40,6 +41,32 @@ fun fixedPhaseDurationsById(definition: MeditationDefinition): Map<String, Long>
         .mapNotNull { phase -> (phase.duration as? PhaseDuration.Fixed)?.let { phase.id to it.millis } }
         .toMap()
 
+/**
+ * `phaseId -> BreathRole` for every phase that declares one. The session screen draws a breathing
+ * shape (instead of the ring and countdown) exactly for these ids. Same-id phases must agree on
+ * their role, otherwise the lookup would be ambiguous.
+ */
+fun breathRolesById(definition: MeditationDefinition): Map<String, BreathRole> =
+    collectPhases(definition.root)
+        .mapNotNull { phase -> phase.breathRole?.let { phase.id to it } }
+        .groupBy({ it.first }, { it.second })
+        .mapValues { (id, roles) ->
+            check(roles.distinct().size == 1) { "Phase id '$id' maps to several breath roles: $roles" }
+            roles.first()
+        }
+
+/**
+ * Ids of the phases the user ends themselves, where the Fixed duration is only a safety ceiling
+ * (e.g. the Wim Hof exhale hold). The session screen shows ELAPSED time and an empty ring for
+ * these, since a countdown or fill toward a ceiling the user is not aiming for is meaningless.
+ *
+ * Derived from [Phase.estimatedMillis] rather than a hand-maintained list: that field already
+ * means exactly "typical length of a user-releasable ceiling", so a new open-ended phase is
+ * picked up automatically and the list can never drift from the definition tree.
+ */
+fun openEndedPhaseIds(definition: MeditationDefinition): Set<String> =
+    collectPhases(definition.root).filter { it.estimatedMillis != null }.mapTo(mutableSetOf()) { it.id }
+
 private const val MILLIS_PER_MINUTE = 60_000L
 private const val HALF_MINUTE_MILLIS = MILLIS_PER_MINUTE / 2
 
@@ -78,7 +105,7 @@ fun expectedDurationMillis(definition: MeditationDefinition, approxDurationMinut
 internal fun fixedTotalMillis(definition: MeditationDefinition): Long = nodeFixedTotalMillis(definition.root)
 
 private fun nodeFixedTotalMillis(node: MeditationNode): Long = when (node) {
-    is Phase -> (node.duration as? PhaseDuration.Fixed)?.millis ?: 0L
+    is Phase -> node.estimatedMillis ?: (node.duration as? PhaseDuration.Fixed)?.millis ?: 0L
     is MeditationSequence -> node.children.sumOf(::nodeFixedTotalMillis)
     is Repeat -> nodeFixedTotalMillis(node.child) * ((node.strategy as? FixedCountRepetition)?.times ?: 1)
 }

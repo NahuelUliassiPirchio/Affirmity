@@ -125,7 +125,7 @@ import com.pirxhio.affirmity.ui.healer.StreakHealerGrantedScreen
 import com.pirxhio.affirmity.ui.meditation.GuidedMeditationScreen
 import com.pirxhio.affirmity.ui.meditation.MeditationScreen
 import com.pirxhio.affirmity.ui.meditation.shouldShowMeditationBanner
-import com.pirxhio.affirmity.ui.meditation.catalog.expectedDurationMillis
+import com.pirxhio.affirmity.ui.meditation.catalog.expectedMillis
 import com.pirxhio.affirmity.ui.meditation.catalog.findMeditationCatalogEntry
 import com.pirxhio.affirmity.ui.meditation.catalog.isMeditationLocked
 import com.pirxhio.affirmity.ui.meditation.catalog.meditationAccessDecision
@@ -1398,10 +1398,7 @@ fun AffirmityApp(
                                     reason = reason,
                                     wallElapsedSeconds = summary.wallElapsedSeconds,
                                     activeElapsedSeconds = summary.activeElapsedSeconds,
-                                    expectedDurationMillis = expectedDurationMillis(
-                                        selectedMeditationEntry.definition(sessionCustomization),
-                                        selectedMeditationEntry.approxDurationMinutes,
-                                    ),
+                                    expectedDurationMillis = selectedMeditationEntry.expectedMillis(sessionCustomization),
                                     accessDecision = meditationAccessDecision(
                                         selectedMeditationEntry,
                                         appState.entitlementTier.value,

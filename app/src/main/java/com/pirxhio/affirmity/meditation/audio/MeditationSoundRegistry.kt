@@ -22,6 +22,7 @@ object MeditationSoundRegistry {
         MeditationCue.ImportantTransition to CueSound(R.raw.aff_gong_deep, 0.85f),
         MeditationCue.ZazenBell to CueSound(R.raw.aff_zazen_bell, 0.95f),
         MeditationCue.SectionTransition to CueSound(R.raw.aff_chime_transition, 0.75f),
+        MeditationCue.BreathworkBowl to CueSound(R.raw.whm_sfx_bowl, 1.00f),
     )
 
     fun soundFor(cue: MeditationCue): CueSound? = sounds[cue]

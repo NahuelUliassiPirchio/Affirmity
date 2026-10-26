@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.meditation.nadishodhana
 
+import com.pirxhio.affirmity.meditation.BreathRole
 import com.pirxhio.affirmity.meditation.FixedCountRepetition
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.MeditationSequence
@@ -36,25 +37,27 @@ fun nadiShodhanaMeditationDefinition(
 ): MeditationDefinition {
     require(config.rounds > 0) { "rounds must be > 0, got ${config.rounds}" }
 
-    fun breathPhase(id: String, textId: String) = Phase(
+    fun breathPhase(id: String, textId: String, role: BreathRole) = Phase(
         id = id,
         duration = PhaseDuration.Fixed(config.breathMillis),
         onEnter = listOf(ShowText(textId)),
+        breathRole = role,
     )
 
     fun holdPhase(id: String) = Phase(
         id = id,
         duration = PhaseDuration.Fixed(config.retentionMillis),
         onEnter = listOf(ShowText(NadiShodhanaText.HOLD)),
+        breathRole = BreathRole.HOLD_FULL,
     )
 
     val children = buildList {
-        add(breathPhase("inhale_left", NadiShodhanaText.INHALE_LEFT))
+        add(breathPhase("inhale_left", NadiShodhanaText.INHALE_LEFT, BreathRole.INHALE))
         if (config.retention) add(holdPhase("hold_left"))
-        add(breathPhase("exhale_right", NadiShodhanaText.EXHALE_RIGHT))
-        add(breathPhase("inhale_right", NadiShodhanaText.INHALE_RIGHT))
+        add(breathPhase("exhale_right", NadiShodhanaText.EXHALE_RIGHT, BreathRole.EXHALE))
+        add(breathPhase("inhale_right", NadiShodhanaText.INHALE_RIGHT, BreathRole.INHALE))
         if (config.retention) add(holdPhase("hold_right"))
-        add(breathPhase("exhale_left", NadiShodhanaText.EXHALE_LEFT))
+        add(breathPhase("exhale_left", NadiShodhanaText.EXHALE_LEFT, BreathRole.EXHALE))
     }
 
     val cycle = MeditationSequence(id = "cycle", children = children)

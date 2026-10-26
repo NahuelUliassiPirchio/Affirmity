@@ -263,6 +263,7 @@
     <string name="guided_meditation_exhale">Breathe out</string>
     <string name="guided_meditation_retention">Hold your breath</string>
     <string name="guided_meditation_retention_hint">Tap when you want to release</string>
+    <string name="guided_meditation_intro_skip_hint">Tap to skip the introduction</string>
     <string name="guided_meditation_recovery">Recovery</string>
     <string name="guided_meditation_completed">Session complete</string>
     <string name="guided_meditation_done">Done</string>
@@ -530,8 +531,8 @@
     <string name="meditation_primer_lectio_divina_expect_3">No need to analyze the text, just notice what stands out</string>
 
     <!-- Guided session cue-sound toggle. -->
-    <string name="guided_meditation_cue_sound_mute_content_description">Mute transition sound</string>
-    <string name="guided_meditation_cue_sound_unmute_content_description">Unmute transition sound</string>
+    <string name="guided_meditation_cue_sound_mute_content_description">Mute sound effects</string>
+    <string name="guided_meditation_cue_sound_unmute_content_description">Unmute sound effects</string>
 
     <!-- Affirmation long-press actions, unfavorite undo, and the hidden-affirmations screen. -->
     <string name="affirmation_hide_content_description">Hide affirmation</string>
@@ -1005,12 +1006,21 @@
     <string name="meditation_catalog_wim_hof_title">Wim Hof breathing</string>
     <string name="meditation_catalog_wim_hof_description">Guided rounds of deep breaths, each followed by an exhale hold and a recovery inhale hold. Safety: never practice it in water or while driving, and stop if you feel dizzy.</string>
     <string name="meditation_wimhof_exhale_hold">Breathe out and hold with empty lungs. Tap when you need to breathe.</string>
+    <string name="meditation_wimhof_intro">Sit comfortably and listen to the introduction.</string>
+    <string name="meditation_wimhof_round_intro">Get ready for the round.</string>
+    <string name="meditation_wimhof_closing">Breathe calmly and come back slowly.</string>
     <string name="meditation_wimhof_recovery_hold">Breathe in deeply and hold.</string>
     <string name="meditation_customization_wimhof_rounds">Rounds</string>
     <string name="meditation_customization_wimhof_breaths_per_round">Breaths per round</string>
     <string name="meditation_customization_wimhof_breaths_20">20</string>
     <string name="meditation_customization_wimhof_breaths_30">30</string>
     <string name="meditation_customization_wimhof_breaths_40">40</string>
+    <string name="meditation_customization_wimhof_breath_speed">Breathing speed</string>
+    <string name="meditation_customization_wimhof_speed_slow">Slow</string>
+    <string name="meditation_customization_wimhof_speed_normal">Normal</string>
+    <string name="meditation_customization_wimhof_speed_fast">Fast</string>
+    <string name="meditation_customization_wimhof_breath_sound">Breath sound</string>
+    <string name="meditation_customization_wimhof_voice_guide">Voice guide</string>
     <!-- Catalog theme labels (one per theme id; keep in sync with catalogThemeTitleRes). -->
     <string name="catalog_theme_body_energy_wellbeing_body_acceptance">Body acceptance</string>
     <string name="catalog_theme_body_energy_wellbeing_body_care">Body care</string>

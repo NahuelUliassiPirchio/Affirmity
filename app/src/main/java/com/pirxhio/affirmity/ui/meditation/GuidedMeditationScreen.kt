@@ -3,6 +3,7 @@ package com.pirxhio.affirmity.ui.meditation
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,12 +37,15 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.pirxhio.affirmity.BuildConfig
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.AccessDecision
@@ -51,23 +55,29 @@ import com.pirxhio.affirmity.analytics.AnalyticsEvent
 import com.pirxhio.affirmity.analytics.AnalyticsId
 import com.pirxhio.affirmity.analytics.provenance
 import com.pirxhio.affirmity.data.DayClock
+import com.pirxhio.affirmity.meditation.BreathRole
 import com.pirxhio.affirmity.meditation.CompositeCommandExecutor
 import com.pirxhio.affirmity.meditation.LapTrackerCommandExecutor
 import com.pirxhio.affirmity.meditation.MeditationEngine
 import com.pirxhio.affirmity.meditation.MeditationEvent
 import com.pirxhio.affirmity.meditation.MeditationRuntimeState
 import com.pirxhio.affirmity.meditation.RealSessionClock
+import com.pirxhio.affirmity.meditation.SessionDirector
 import com.pirxhio.affirmity.meditation.SessionEndReason
 import com.pirxhio.affirmity.meditation.SessionEndSummary
 import com.pirxhio.affirmity.meditation.SessionStatus
 import com.pirxhio.affirmity.meditation.SessionTracker
 import com.pirxhio.affirmity.meditation.TextDisplayCommandExecutor
 import com.pirxhio.affirmity.meditation.TimerCommandExecutor
+import com.pirxhio.affirmity.meditation.wimhof.voice.VOICE_GUIDE_KEY
 import com.pirxhio.affirmity.ui.meditation.catalog.CounterEmphasis
 import com.pirxhio.affirmity.ui.meditation.catalog.MeditationCatalogEntry
+import com.pirxhio.affirmity.ui.meditation.catalog.breathRolesById
 import com.pirxhio.affirmity.ui.meditation.catalog.displayDurationMinutes
 import com.pirxhio.affirmity.ui.meditation.catalog.fixedPhaseDurationsById
 import com.pirxhio.affirmity.ui.meditation.catalog.isMeditationLocked
+import com.pirxhio.affirmity.ui.meditation.catalog.openEndedPhaseIds
+import com.pirxhio.affirmity.ui.meditation.catalog.resolveSessionCustomization
 
 /**
  * First screen built on the guided-meditation engine (`com.pirxhio.affirmity.meditation`) — wires
@@ -140,9 +150,14 @@ fun GuidedMeditationScreen(
         SessionTracker(monotonicTimeSource = AndroidMonotonicTimeSource, wallClockMillis = System::currentTimeMillis)
     }
 
-    val definition = remember(entry, customization) { entry.definition(customization) }
+    // The voice guide is gated once, here: locale + stored toggle become one resolved value that the
+    // definition and the director factory both read.
+    val resolvedCustomization = remember(entry, customization) { entry.resolveSessionCustomization(customization) }
+    val definition = remember(entry, resolvedCustomization) { entry.definition(resolvedCustomization) }
     val textExecutor = remember(definition) { TextDisplayCommandExecutor() }
     val phaseDurations = remember(definition) { fixedPhaseDurationsById(definition) }
+    val breathRoles = remember(definition) { breathRolesById(definition) }
+    val openEndedPhases = remember(definition) { openEndedPhaseIds(definition) }
     val idleDurationMinutes = remember(definition, entry.approxDurationMinutes) {
         displayDurationMinutes(definition, entry.approxDurationMinutes)
     }
@@ -154,22 +169,36 @@ fun GuidedMeditationScreen(
     // executors are therefore built inside this single remember block, alongside the engine.
     val (audioExecutor, engine) = remember(definition) {
         lateinit var engineRef: MeditationEngine
+        var director: SessionDirector? = null
+        // Events reach the director first (it mirrors the engine's own stale-event filtering),
+        // then the engine.
+        val sendEvent: (MeditationEvent) -> Unit = { event ->
+            director?.onEvent(event)
+            engineRef.send(event)
+        }
         val audio = GuidedMeditationAudioExecutor(
             context = context.applicationContext,
             resourcesByAudioId = entry.presentation.audioResources,
             scope = scope,
             timeSource = AndroidMonotonicTimeSource,
-            sendEvent = { event -> engineRef.send(event) },
+            sendEvent = sendEvent,
             isCueSoundEnabled = { latestCueSoundEnabled.value },
+            sfxPlayer = entry.presentation.sfxResources.takeIf { it.isNotEmpty() }
+                ?.let { SfxPoolPlayer(context.applicationContext, it) },
+            releaseVoiceAfterPlay = entry.presentation.releaseVoiceAfterPlay,
         )
         val clock = RealSessionClock(scope = scope, timeSource = AndroidMonotonicTimeSource)
         val timerExecutor = TimerCommandExecutor(
             clock = clock,
-            sendEvent = { event -> engineRef.send(event) },
+            sendEvent = sendEvent,
             scope = scope,
         )
+        if (resolvedCustomization[VOICE_GUIDE_KEY] == "true") {
+            director = entry.presentation.sessionDirectorFactory?.invoke(audio) { engineRef.state.value }
+        }
+        // The director goes last so a phase's own SFX commands are issued before its voice.
         val commandExecutor = CompositeCommandExecutor(
-            listOf(timerExecutor, textExecutor, LapTrackerCommandExecutor(AndroidMonotonicTimeSource), audio),
+            listOfNotNull(timerExecutor, textExecutor, LapTrackerCommandExecutor(AndroidMonotonicTimeSource), audio, director),
         )
         engineRef = MeditationEngine(definition, commandExecutor)
         audio to engineRef
@@ -180,11 +209,42 @@ fun GuidedMeditationScreen(
     val currentLiteralText by textExecutor.currentLiteralText.collectAsState()
     var exitHandled by remember { mutableStateOf(false) }
 
+    // Outside interruptions (another app taking audio focus, the app leaving the foreground) pause
+    // the session exactly like the pause button. Never resumed here: the user does that.
+    // The focus callback and the pause handler need each other (a pause gives focus up), so the
+    // callback reaches the handler through this holder, assigned right below.
+    val interruptionHandler = remember { arrayOf<() -> Unit>({}) }
+    val audioFocus = remember {
+        SessionAudioFocus(context.applicationContext) { interruptionHandler[0]() }
+    }
+    val pauseForInterruption = {
+        SessionInterruptionPolicy.pauseEventFor(engine.state.value.status)?.let { pauseEvent ->
+            performGuidedSessionPause(
+                pause = {
+                    sessionTracker.pause()
+                    engine.send(pauseEvent)
+                },
+                abandonFocus = { audioFocus.abandon() },
+            )
+        }
+    }
+    val currentPauseForInterruption = rememberUpdatedState(pauseForInterruption)
+    interruptionHandler[0] = { currentPauseForInterruption.value() }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (SessionInterruptionPolicy.shouldPauseFor(event)) currentPauseForInterruption.value()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     // Site A (REQ-5.2): extends the existing status-driven effect in place, fires exactly on
     // reaching Completed.
     LaunchedEffect(state.status) {
         if (state.status == SessionStatus.Completed) {
             onSessionEnded(SessionEndReason.Completed, sessionTracker.summary())
+            audioFocus.abandon()
         }
     }
 
@@ -220,6 +280,7 @@ fun GuidedMeditationScreen(
             try {
                 currentRequestExit.value()
             } finally {
+                audioFocus.abandon()
                 audioExecutor.release()
             }
         }
@@ -240,6 +301,8 @@ fun GuidedMeditationScreen(
         entry = entry,
         customization = customization,
         phaseDurations = phaseDurations,
+        breathRoles = breathRoles,
+        openEndedPhases = openEndedPhases,
         idleDurationMinutes = idleDurationMinutes,
         showBannerAd = showBannerAd,
         cueSoundEnabled = cueSoundEnabled,
@@ -250,26 +313,50 @@ fun GuidedMeditationScreen(
                 onAccessBlocked()
             } else {
                 sessionTracker.start()
+                audioFocus.request()
                 onEvent(AnalyticsEvent.MeditationStarted(AnalyticsId.of(entry), currentAccess.provenance()))
                 onSessionStarted()
                 engine.send(MeditationEvent.Start)
             }
         },
         onPause = {
-            sessionTracker.pause()
-            engine.send(MeditationEvent.Pause)
+            performGuidedSessionPause(
+                pause = {
+                    sessionTracker.pause()
+                    engine.send(MeditationEvent.Pause)
+                },
+                abandonFocus = { audioFocus.abandon() },
+            )
         },
         onResume = {
-            sessionTracker.resume()
-            engine.send(MeditationEvent.Resume)
+            performGuidedSessionResume(
+                requestFocus = { audioFocus.request() },
+                resume = {
+                    sessionTracker.resume()
+                    engine.send(MeditationEvent.Resume)
+                },
+            )
         },
-        onSkip = { engine.send(MeditationEvent.Next) },
+        onSkip = { engine.send(MeditationEvent.Skip) },
         onRelease = { engine.send(MeditationEvent.UserAction()) },
         // Item 13: session-complete had no visible exit affordance -- wired to the same single
         // exit path (`requestExit`) the BackHandler above and MainActivity's top-bar back icon
         // already dispatch through, so there is still exactly one exit implementation.
         onDone = requestExit,
     )
+}
+
+/** Resumes only if focus is granted again; a refusal (e.g. a call is live) keeps the session paused. */
+internal fun performGuidedSessionResume(requestFocus: () -> Boolean, resume: () -> Unit): Boolean {
+    if (!requestFocus()) return false
+    resume()
+    return true
+}
+
+/** A paused session must not keep audio focus: other apps may play while it waits. */
+internal fun performGuidedSessionPause(pause: () -> Unit, abandonFocus: () -> Unit) {
+    pause()
+    abandonFocus()
 }
 
 /**
@@ -303,6 +390,8 @@ private fun GuidedMeditationContent(
     entry: MeditationCatalogEntry,
     customization: Map<String, String>,
     phaseDurations: Map<String, Long>,
+    breathRoles: Map<String, BreathRole> = emptyMap(),
+    openEndedPhases: Set<String> = emptySet(),
     idleDurationMinutes: Int,
     showBannerAd: Boolean,
     cueSoundEnabled: Boolean,
@@ -317,7 +406,35 @@ private fun GuidedMeditationContent(
     // D3: Column -> Box so the banner can occupy a fixed BottomCenter slot outside the scrollable
     // content, with the inner Column's bottom padding reserving exactly the banner's measured
     // height (0.dp while pending/failed, ~50.dp once loaded) instead of overlapping the controls.
-    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    val doubleTapEvent = doubleTapAdvanceEvent(state.status, entry.presentation.doubleTapAdvances)
+    val currentOnSkip by rememberUpdatedState(onSkip)
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            // Accessibility: no extra semantics -- the Skip button below stays the labelled,
+            // screen-reader-reachable way to advance; the gesture is a shortcut only.
+            .then(
+                if (doubleTapEvent != null) {
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures(onDoubleTap = { currentOnSkip() })
+                    }
+                } else {
+                    Modifier
+                },
+            ),
+    ) {
+        // Beneath everything, above only the base background. A hold (counted or user-released)
+        // warms the field toward blush.
+        val breathRoleNow = breathRoles[state.currentPhaseId]
+        AuroraBackdrop(
+            running = state.status == SessionStatus.Running,
+            warm = breathRoleNow == BreathRole.HOLD_FULL ||
+                breathRoleNow == BreathRole.HOLD_EMPTY ||
+                state.currentPhaseId in openEndedPhases,
+            modifier = Modifier.fillMaxSize(),
+        )
+
         var bannerHeight by remember { mutableStateOf(0.dp) }
         val density = LocalDensity.current
 
@@ -354,6 +471,12 @@ private fun GuidedMeditationContent(
             }
         }
 
+        // One decision for the orb vs. ring branches and the hidden seconds: a role'd phase with a
+        // known Fixed length shows the breathing shape.
+        val breathRole = breathRoles[state.currentPhaseId]
+        val showsOrb = breathRole != null && (phaseDurations[state.currentPhaseId] ?: 0L) > 0L
+        // User-released phase: elapsed time and a bare track, never a countdown toward the ceiling.
+        val isOpenEnded = state.currentPhaseId in openEndedPhases
         Box(
             modifier = Modifier
                 .padding(top = 32.dp)
@@ -367,18 +490,30 @@ private fun GuidedMeditationContent(
                 IdleBreathingBackdrop(modifier = Modifier.fillMaxSize())
             } else if (state.status == SessionStatus.Running || state.status == SessionStatus.Paused) {
                 val totalMillis = phaseDurations[state.currentPhaseId]
-                val progress = if (totalMillis != null && totalMillis > 0) {
+                val progress = if (!isOpenEnded && totalMillis != null && totalMillis > 0) {
                     (state.elapsedInPhaseMillis.toFloat() / totalMillis).coerceIn(0f, 1f)
                 } else {
                     0f
                 }
-                CircularProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    strokeWidth = 4.dp,
-                )
+                if (showsOrb && breathRole != null && totalMillis != null) {
+                    // Counted breath phase: a breathing shape replaces the ring and the seconds.
+                    BreathingOrb(
+                        role = breathRole,
+                        phaseMillis = totalMillis,
+                        elapsedMillis = state.elapsedInPhaseMillis,
+                        generation = state.timerGeneration,
+                        running = state.status == SessionStatus.Running,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    CircularProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        strokeWidth = 4.dp,
+                    )
+                }
             }
 
             if (state.status == SessionStatus.Idle) {
@@ -407,12 +542,15 @@ private fun GuidedMeditationContent(
                         color = MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.Center,
                     )
-                    val remainingSeconds = state.remainingInPhaseMillis?.let { (it / 1000L).toInt() + 1 }
-                    val showsRemaining = remainingSeconds != null &&
-                        (state.status == SessionStatus.Running || state.status == SessionStatus.Paused)
-                    if (showsRemaining) {
+                    val isTicking = state.status == SessionStatus.Running || state.status == SessionStatus.Paused
+                    val timerText = when {
+                        !isTicking || showsOrb -> null
+                        isOpenEnded -> formatElapsed(state.elapsedInPhaseMillis)
+                        else -> state.remainingInPhaseMillis?.let(::formatRemainingSeconds)
+                    }
+                    timerText?.let {
                         Text(
-                            text = "${remainingSeconds}s",
+                            text = it,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp),
@@ -422,7 +560,7 @@ private fun GuidedMeditationContent(
             }
         }
 
-        val release = entry.presentation.manualRelease?.takeIf { it.phaseId == state.currentPhaseId }
+        val release = entry.presentation.manualReleases.firstOrNull { it.phaseId == state.currentPhaseId }
         if (release != null && state.status == SessionStatus.Running) {
             TextButton(onClick = onRelease, modifier = Modifier.padding(top = 16.dp)) {
                 Text(stringResource(release.hintRes))
@@ -460,11 +598,6 @@ private fun GuidedMeditationContent(
                         onClick = onResume,
                         icon = Icons.Filled.PlayArrow,
                         contentDescription = stringResource(R.string.guided_meditation_resume_content_description),
-                    )
-                    RoundIconButton(
-                        onClick = onSkip,
-                        icon = Icons.Filled.SkipNext,
-                        contentDescription = stringResource(R.string.guided_meditation_skip_content_description),
                     )
                 }
 

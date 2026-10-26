@@ -79,7 +79,7 @@ import com.pirxhio.affirmity.meditation.RealSessionClock
 import com.pirxhio.affirmity.ui.groups.GroupBadge
 import com.pirxhio.affirmity.ui.meditation.catalog.MeditationCatalogEntry
 import com.pirxhio.affirmity.ui.meditation.catalog.deriveMeditationBadge
-import com.pirxhio.affirmity.ui.meditation.catalog.displayDurationMinutes
+import com.pirxhio.affirmity.ui.meditation.catalog.displayMinutes
 import com.pirxhio.affirmity.ui.meditation.catalog.isMeditationLocked
 import com.pirxhio.affirmity.ui.theme.OnPremiumContainerDark
 import com.pirxhio.affirmity.ui.theme.OnPremiumContainerLight
@@ -998,4 +998,4 @@ private fun formatTime(totalSeconds: Int): String {
 
 /** List-row duration from the entry's default (uncustomized) definition, matching the detail screen. */
 private fun listDurationMinutes(entry: MeditationCatalogEntry): Int =
-    displayDurationMinutes(entry.definition(emptyMap()), entry.approxDurationMinutes)
+    entry.displayMinutes(emptyMap())

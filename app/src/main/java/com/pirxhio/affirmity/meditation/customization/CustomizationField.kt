@@ -28,6 +28,9 @@ sealed interface CustomizationField {
     val key: String
     @get:StringRes val labelRes: Int
 
+    /** Languages (ISO 639-1, lowercase) this field is shown for; empty = every locale. */
+    val localeTags: Set<String> get() = emptySet()
+
     data class IntSlider(
         override val key: String,
         @StringRes override val labelRes: Int,
@@ -63,6 +66,7 @@ sealed interface CustomizationField {
         override val key: String,
         @StringRes override val labelRes: Int,
         val default: Boolean,
+        override val localeTags: Set<String> = emptySet(),
     ) : CustomizationField
 
     data class FreeText(
@@ -107,3 +111,17 @@ sealed interface CustomizationField {
 /** Effective storage key for a field that may be nested inside a [CustomizationField.Group]. */
 fun CustomizationField.storageKey(parentKey: String? = null): String =
     if (parentKey == null) key else "$parentKey.$key"
+
+/** True when [localeTags] is empty (all locales) or contains [languageTag]'s language ("es-AR" -> "es"). */
+fun localeMatches(localeTags: Set<String>, languageTag: String?): Boolean {
+    if (localeTags.isEmpty()) return true
+    val language = languageTag?.split('-', '_')?.firstOrNull()?.lowercase().orEmpty()
+    return language in localeTags
+}
+
+/** The fields to render for [languageTag]: those without locale tags plus those tagged for it. */
+fun List<CustomizationField>.visibleFor(locale: com.pirxhio.affirmity.data.catalog.CatalogLocale): List<CustomizationField> =
+    visibleFor(locale.tag)
+
+fun List<CustomizationField>.visibleFor(languageTag: String?): List<CustomizationField> =
+    filter { localeMatches(it.localeTags, languageTag) }

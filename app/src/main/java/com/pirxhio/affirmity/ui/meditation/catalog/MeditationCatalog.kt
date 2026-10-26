@@ -111,9 +111,15 @@ import com.pirxhio.affirmity.meditation.visualization.visualizationMeditationDef
 import com.pirxhio.affirmity.meditation.walking.WalkingConfig
 import com.pirxhio.affirmity.meditation.walking.WalkingMeditationText
 import com.pirxhio.affirmity.meditation.walking.walkingMeditationDefinition
+import com.pirxhio.affirmity.meditation.wimhof.WimHofBreathSpeed
 import com.pirxhio.affirmity.meditation.wimhof.WimHofConfig
 import com.pirxhio.affirmity.meditation.wimhof.WimHofPhaseIds
+import com.pirxhio.affirmity.meditation.wimhof.WimHofSfx
 import com.pirxhio.affirmity.meditation.wimhof.WimHofText
+import com.pirxhio.affirmity.data.catalog.CatalogLocale
+import com.pirxhio.affirmity.meditation.wimhof.voice.VOICE_GUIDE_KEY
+import com.pirxhio.affirmity.meditation.wimhof.voice.VOICE_GUIDE_LOCALES
+import com.pirxhio.affirmity.meditation.wimhof.voice.VOICE_LOCALE_KEY
 import com.pirxhio.affirmity.meditation.wimhof.wimHofMeditationDefinition
 import com.pirxhio.affirmity.meditation.yoganidra.YogaNidraConfig
 import com.pirxhio.affirmity.meditation.yoganidra.YogaNidraText
@@ -212,6 +218,18 @@ private fun affirmationTextsFromConfig(config: Map<String, String>): List<String
         .toList()
 
 private val WIM_HOF_BREATHS_OPTIONS = listOf(20, WimHofConfig.DEFAULT_BREATHS_PER_ROUND, 40)
+private val WIM_HOF_SPEED_OPTIONS = WimHofBreathSpeed.entries.map { it.key }
+
+private val WIM_HOF_SFX_RESOURCES: Map<String, Int> = mapOf(
+    "whm_sfx_inhale_slow" to R.raw.whm_sfx_inhale_slow,
+    "whm_sfx_exhale_slow" to R.raw.whm_sfx_exhale_slow,
+    "whm_sfx_inhale_normal" to R.raw.whm_sfx_inhale_normal,
+    "whm_sfx_exhale_normal" to R.raw.whm_sfx_exhale_normal,
+    "whm_sfx_inhale_fast" to R.raw.whm_sfx_inhale_fast,
+    "whm_sfx_exhale_fast" to R.raw.whm_sfx_exhale_fast,
+    WimHofSfx.EXHALE_HOLD to R.raw.whm_sfx_exhale_hold,
+    WimHofSfx.INHALE_RECOVERY to R.raw.whm_sfx_inhale_recovery,
+)
 
 fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
     MeditationCatalogEntry(
@@ -2462,9 +2480,10 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
         descriptionRes = R.string.meditation_catalog_wim_hof_description,
         categoryRes = R.string.meditation_catalog_category_energia,
         icon = Icons.Filled.Bolt,
-        approxDurationMinutes = 9,
+        approxDurationMinutes = 10,
         access = ContentAccess.ProOrAdTrial,
         definition = { config ->
+            val voiceLocale = config[VOICE_LOCALE_KEY]?.let { tag -> CatalogLocale.entries.firstOrNull { it.tag == tag } }
             wimHofMeditationDefinition(
                 WimHofConfig(
                     rounds = config["rounds"]?.toIntOrNull() ?: WimHofConfig.DEFAULT_ROUNDS,
@@ -2472,6 +2491,14 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                     breathsPerRound = config["breathsPerRound"]?.toIntOrNull()
                         ?.takeIf { it in WIM_HOF_BREATHS_OPTIONS }
                         ?: WimHofConfig.DEFAULT_BREATHS_PER_ROUND,
+                    breathSpeed = WimHofBreathSpeed.fromKey(config["breathSpeed"]),
+                    breathSound = config["breathSound"]?.toBooleanStrictOrNull() ?: true,
+                    // Injected by resolveVoiceGuide (locale + stored toggle). Absent means the caller did not
+                    // resolve it (e.g. a bare definition(emptyMap())), which stays voice-free.
+                    // A missing or unknown clip locale means voice off: never a silent Spanish fallback.
+                    voiceGuide = (config[VOICE_GUIDE_KEY]?.toBooleanStrictOrNull() ?: false) && voiceLocale != null,
+                    // The clip set to play, also injected by resolveVoiceGuide.
+                    voiceLocale = voiceLocale ?: CatalogLocale.ES,
                 ),
             )
         },
@@ -2481,8 +2508,12 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                 BreathingText.EXHALE to R.string.guided_meditation_exhale,
                 WimHofText.EXHALE_HOLD to R.string.meditation_wimhof_exhale_hold,
                 WimHofText.RECOVERY_HOLD to R.string.meditation_wimhof_recovery_hold,
+                WimHofText.INTRO to R.string.meditation_wimhof_intro,
+                WimHofText.ROUND_INTRO to R.string.meditation_wimhof_round_intro,
+                WimHofText.CLOSING to R.string.meditation_wimhof_closing,
             ),
-            audioResources = emptyMap(),
+            audioResources = WIM_HOF_VOICE_RESOURCES,
+            sfxResources = WIM_HOF_SFX_RESOURCES,
             counters = listOf(
                 MeditationCounter(
                     repeatId = "rounds",
@@ -2500,9 +2531,18 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                 ),
             ),
             // The exhale hold is only a ceiling: the practitioner releases it when they need air.
-            manualRelease = ManualRelease(
-                phaseId = WimHofPhaseIds.EXHALE_HOLD,
-                hintRes = R.string.guided_meditation_retention_hint,
+            doubleTapAdvances = true,
+            releaseVoiceAfterPlay = true,
+            sessionDirectorFactory = WIM_HOF_DIRECTOR_FACTORY,
+            manualReleases = listOf(
+                ManualRelease(
+                    phaseId = WimHofPhaseIds.INTRO,
+                    hintRes = R.string.guided_meditation_intro_skip_hint,
+                ),
+                ManualRelease(
+                    phaseId = WimHofPhaseIds.EXHALE_HOLD,
+                    hintRes = R.string.guided_meditation_retention_hint,
+                ),
             ),
         ),
         customizationFields = listOf(
@@ -2525,6 +2565,31 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
                         else -> R.string.meditation_customization_wimhof_breaths_30
                     }
                 },
+            ),
+            CustomizationField.Options(
+                key = "breathSpeed",
+                labelRes = R.string.meditation_customization_wimhof_breath_speed,
+                default = WimHofBreathSpeed.NORMAL.key,
+                options = WIM_HOF_SPEED_OPTIONS,
+                optionLabelRes = { option ->
+                    when (WimHofBreathSpeed.fromKey(option)) {
+                        WimHofBreathSpeed.SLOW -> R.string.meditation_customization_wimhof_speed_slow
+                        WimHofBreathSpeed.FAST -> R.string.meditation_customization_wimhof_speed_fast
+                        WimHofBreathSpeed.NORMAL -> R.string.meditation_customization_wimhof_speed_normal
+                    }
+                },
+            ),
+            CustomizationField.Toggle(
+                key = "breathSound",
+                labelRes = R.string.meditation_customization_wimhof_breath_sound,
+                default = true,
+            ),
+            // Shown for the locales that ship clips (Spanish and English). Gated again by resolveVoiceGuide.
+            CustomizationField.Toggle(
+                key = VOICE_GUIDE_KEY,
+                labelRes = R.string.meditation_customization_wimhof_voice_guide,
+                default = true,
+                localeTags = VOICE_GUIDE_LOCALES,
             ),
         ),
     ),

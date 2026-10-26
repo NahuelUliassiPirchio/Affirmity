@@ -270,6 +270,7 @@
     <string name="guided_meditation_exhale">Exhala</string>
     <string name="guided_meditation_retention">Sostén la respiración</string>
     <string name="guided_meditation_retention_hint">Toca cuando quieras soltar</string>
+    <string name="guided_meditation_intro_skip_hint">Toca para saltar la introducción</string>
     <string name="guided_meditation_recovery">Recuperación</string>
     <string name="guided_meditation_completed">Sesión completa</string>
     <string name="guided_meditation_done">Listo</string>
@@ -369,8 +370,8 @@
     <string name="meditation_primer_lectio_divina_expect_2">Los primeros tres pasos tienen guía hablada, el último es silencio</string>
     <string name="meditation_primer_lectio_divina_expect_3">No hace falta analizar el texto, solo notar qué resuena</string>
 
-    <string name="guided_meditation_cue_sound_mute_content_description">Silenciar sonido de transición</string>
-    <string name="guided_meditation_cue_sound_unmute_content_description">Activar sonido de transición</string>
+    <string name="guided_meditation_cue_sound_mute_content_description">Silenciar efectos de sonido</string>
+    <string name="guided_meditation_cue_sound_unmute_content_description">Activar efectos de sonido</string>
 
     <!-- Meditation catalog (Spec 3, REQ-4.6/4.11) — titles, descriptions, categories for the 7
          shipping entries, and every ShowText cue id their definitions reference. Copy is an
@@ -1074,12 +1075,21 @@
     <string name="meditation_catalog_wim_hof_title">Respiración Wim Hof</string>
     <string name="meditation_catalog_wim_hof_description">Rondas guiadas de respiraciones profundas, seguidas de una retención con los pulmones vacíos y una inhalación de recuperación. Seguridad: nunca la practiques en el agua ni mientras conduces, y detente si te mareas.</string>
     <string name="meditation_wimhof_exhale_hold">Exhala y sostén con los pulmones vacíos. Toca cuando necesites respirar.</string>
+    <string name="meditation_wimhof_intro">Siéntate cómodo y escucha la introducción.</string>
+    <string name="meditation_wimhof_round_intro">Prepárate para la ronda.</string>
+    <string name="meditation_wimhof_closing">Respira con calma y vuelve poco a poco.</string>
     <string name="meditation_wimhof_recovery_hold">Inhala profundo y sostén.</string>
     <string name="meditation_customization_wimhof_rounds">Rondas</string>
     <string name="meditation_customization_wimhof_breaths_per_round">Respiraciones por ronda</string>
     <string name="meditation_customization_wimhof_breaths_20">20</string>
     <string name="meditation_customization_wimhof_breaths_30">30</string>
     <string name="meditation_customization_wimhof_breaths_40">40</string>
+    <string name="meditation_customization_wimhof_breath_speed">Velocidad de respiración</string>
+    <string name="meditation_customization_wimhof_speed_slow">Lenta</string>
+    <string name="meditation_customization_wimhof_speed_normal">Normal</string>
+    <string name="meditation_customization_wimhof_speed_fast">Rápida</string>
+    <string name="meditation_customization_wimhof_breath_sound">Sonido de respiración</string>
+    <string name="meditation_customization_wimhof_voice_guide">Guía de voz</string>
     <!-- Catalog theme labels (one per theme id; keep in sync with catalogThemeTitleRes). -->
     <string name="catalog_theme_body_energy_wellbeing_body_acceptance">Aceptar mi cuerpo</string>
     <string name="catalog_theme_body_energy_wellbeing_body_care">Cuidar mi cuerpo</string>

@@ -1,6 +1,8 @@
 package com.pirxhio.affirmity.meditation.authoring
 
+import com.pirxhio.affirmity.meditation.BreathRole
 import com.pirxhio.affirmity.meditation.FixedCountRepetition
+import com.pirxhio.affirmity.meditation.MeditationCommand
 import com.pirxhio.affirmity.meditation.MeditationSequence
 import com.pirxhio.affirmity.meditation.Phase
 import com.pirxhio.affirmity.meditation.PhaseDuration
@@ -23,6 +25,9 @@ import com.pirxhio.affirmity.meditation.breathing.BreathingText
  * Hold phases ([holdAfterInhaleMillis]/[holdAfterExhaleMillis]) are omitted from the produced
  * sequence entirely when their millis are `0L`, so the default output is structurally identical
  * to a plain inhale/exhale block.
+ *
+ * Every produced phase carries a [BreathRole] so the session screen can draw a breathing shape
+ * for it (inhale/exhale/hold-after-inhale/hold-after-exhale).
  */
 fun breathingBlock(
     id: String = "breathing",
@@ -41,6 +46,12 @@ fun breathingBlock(
     holdAfterExhaleId: String = "hold_out",
     /** Rung once, on the first inhale of the block (e.g. [MeditationCue.RoundStart]) -- never per breath. */
     entryCue: MeditationCue? = null,
+    /** Extra commands run on every inhale entry, after the text (e.g. a per-breath SFX). */
+    inhaleCommands: List<MeditationCommand> = emptyList(),
+    /** Extra commands run on every exhale entry, after the text. */
+    exhaleCommands: List<MeditationCommand> = emptyList(),
+    /** Marks the block so a Skip leaves all remaining breaths at once (see [Repeat.skipExitsBlock]). */
+    skippableAsBlock: Boolean = false,
 ): Repeat {
     val children = buildList {
         add(
@@ -50,7 +61,8 @@ fun breathingBlock(
                 onEnter = listOfNotNull(
                     entryCue?.let { PlayCue(it, onlyAtFirstIterationOf = id) },
                     ShowText(inhaleTextId),
-                ),
+                ) + inhaleCommands,
+                breathRole = BreathRole.INHALE,
             ),
         )
         if (holdAfterInhaleMillis > 0L) {
@@ -59,6 +71,7 @@ fun breathingBlock(
                     id = holdAfterInhaleId,
                     duration = PhaseDuration.Fixed(holdAfterInhaleMillis),
                     onEnter = holdTextId?.let { listOf(ShowText(it)) } ?: emptyList(),
+                    breathRole = BreathRole.HOLD_FULL,
                 ),
             )
         }
@@ -66,7 +79,8 @@ fun breathingBlock(
             Phase(
                 id = exhaleId,
                 duration = PhaseDuration.Fixed(exhaleMillis),
-                onEnter = listOf(ShowText(exhaleTextId)),
+                onEnter = listOf(ShowText(exhaleTextId)) + exhaleCommands,
+                breathRole = BreathRole.EXHALE,
             ),
         )
         if (holdAfterExhaleMillis > 0L) {
@@ -75,6 +89,7 @@ fun breathingBlock(
                     id = holdAfterExhaleId,
                     duration = PhaseDuration.Fixed(holdAfterExhaleMillis),
                     onEnter = holdTextId?.let { listOf(ShowText(it)) } ?: emptyList(),
+                    breathRole = BreathRole.HOLD_EMPTY,
                 ),
             )
         }
@@ -86,5 +101,6 @@ fun breathingBlock(
         id = id,
         child = breath,
         strategy = FixedCountRepetition(breaths),
+        skipExitsBlock = skippableAsBlock,
     )
 }
