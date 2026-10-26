@@ -7,8 +7,13 @@ import androidx.room.Query
 import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
-/** Thrown when a daily-fact write targets an anonymous generation that sign-in already claimed. */
-class AnonymousGenerationClaimedException : IllegalArgumentException("Anonymous generation already claimed")
+/**
+ * Thrown when a daily-fact write targets an anonymous generation that is not writable: already claimed by
+ * sign-in, no longer the active generation, or not yet through legacy adoption. The name is kept for
+ * call-site stability; callers treat every case as a stale write to be dropped.
+ */
+class AnonymousGenerationClaimedException :
+    IllegalArgumentException("Anonymous generation not writable (claimed, inactive, or not yet adopted)")
 
 @Dao
 abstract class ActivityDailyFactDao {
