@@ -21,6 +21,13 @@ object SessionInterruptionPolicy {
         else -> false
     }
 
+    /**
+     * Only an immediate grant lets playback resume. A refusal (a call is live) keeps the session
+     * paused; a delayed grant is not requested by [SessionAudioFocus] and is treated as not granted.
+     */
+    fun isFocusGranted(requestResult: Int): Boolean =
+        requestResult == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+
     /** App backgrounded or screen locked. */
     fun shouldPauseFor(event: Lifecycle.Event): Boolean = event == Lifecycle.Event.ON_STOP
 

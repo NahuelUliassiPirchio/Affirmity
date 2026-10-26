@@ -37,15 +37,16 @@ class SessionAudioFocus(
             null
         }
 
-    /** Asking again while already holding focus is harmless. A refusal is ignored: the session
-     * still plays, it just won't hear about later interruptions from that owner. */
-    fun request() {
-        if (request != null) {
+    /** Asking again while already holding focus is harmless. Returns whether focus was granted
+     * (see [SessionInterruptionPolicy.isFocusGranted]); the caller decides what a refusal means. */
+    fun request(): Boolean {
+        val result = if (request != null) {
             audioManager.requestAudioFocus(request)
         } else {
             @Suppress("DEPRECATION")
             audioManager.requestAudioFocus(listener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
         }
+        return SessionInterruptionPolicy.isFocusGranted(result)
     }
 
     fun abandon() {

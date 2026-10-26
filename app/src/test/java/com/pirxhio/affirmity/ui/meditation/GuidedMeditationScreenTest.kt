@@ -110,4 +110,39 @@ class GuidedMeditationScreenTest {
         assertTrue(!cancelCalled)
         assertEquals(listOf("onExit"), calls)
     }
+
+    @Test
+    fun `resume re-requests focus and resumes only when it is granted`() {
+        val calls = mutableListOf<String>()
+        val resumed = performGuidedSessionResume(
+            requestFocus = { calls.add("request"); true },
+            resume = { calls.add("resume") },
+        )
+
+        assertTrue(resumed)
+        assertEquals(listOf("request", "resume"), calls)
+    }
+
+    @Test
+    fun `resume stays paused when focus is refused`() {
+        val calls = mutableListOf<String>()
+        val resumed = performGuidedSessionResume(
+            requestFocus = { calls.add("request"); false },
+            resume = { calls.add("resume") },
+        )
+
+        assertEquals(false, resumed)
+        assertEquals(listOf("request"), calls)
+    }
+
+    @Test
+    fun `pausing pauses the session then gives up audio focus`() {
+        val calls = mutableListOf<String>()
+        performGuidedSessionPause(
+            pause = { calls.add("pause") },
+            abandonFocus = { calls.add("abandon") },
+        )
+
+        assertEquals(listOf("pause", "abandon"), calls)
+    }
 }

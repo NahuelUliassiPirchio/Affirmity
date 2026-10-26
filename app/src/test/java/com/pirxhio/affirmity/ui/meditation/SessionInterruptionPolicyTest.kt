@@ -45,4 +45,11 @@ class SessionInterruptionPolicyTest {
             assertNull("$it", SessionInterruptionPolicy.pauseEventFor(it))
         }
     }
+
+    @Test
+    fun `only a granted focus request allows playback`() {
+        assertTrue(SessionInterruptionPolicy.isFocusGranted(AudioManager.AUDIOFOCUS_REQUEST_GRANTED))
+        assertFalse(SessionInterruptionPolicy.isFocusGranted(AudioManager.AUDIOFOCUS_REQUEST_FAILED))
+        assertFalse(SessionInterruptionPolicy.isFocusGranted(AudioManager.AUDIOFOCUS_REQUEST_DELAYED))
+    }
 }

@@ -211,16 +211,25 @@ fun GuidedMeditationScreen(
 
     // Outside interruptions (another app taking audio focus, the app leaving the foreground) pause
     // the session exactly like the pause button. Never resumed here: the user does that.
+    // The focus callback and the pause handler need each other (a pause gives focus up), so the
+    // callback reaches the handler through this holder, assigned right below.
+    val interruptionHandler = remember { arrayOf<() -> Unit>({}) }
+    val audioFocus = remember {
+        SessionAudioFocus(context.applicationContext) { interruptionHandler[0]() }
+    }
     val pauseForInterruption = {
         SessionInterruptionPolicy.pauseEventFor(engine.state.value.status)?.let { pauseEvent ->
-            sessionTracker.pause()
-            dispatchTrackedMeditationEvent(engine, sessionTracker, pauseEvent)
+            performGuidedSessionPause(
+                pause = {
+                    sessionTracker.pause()
+                    dispatchTrackedMeditationEvent(engine, sessionTracker, pauseEvent)
+                },
+                abandonFocus = { audioFocus.abandon() },
+            )
         }
     }
     val currentPauseForInterruption = rememberUpdatedState(pauseForInterruption)
-    val audioFocus = remember {
-        SessionAudioFocus(context.applicationContext) { currentPauseForInterruption.value() }
-    }
+    interruptionHandler[0] = { currentPauseForInterruption.value() }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -311,13 +320,22 @@ fun GuidedMeditationScreen(
             }
         },
         onPause = {
-            sessionTracker.pause()
-            dispatchTrackedMeditationEvent(engine, sessionTracker, MeditationEvent.Pause)
+            performGuidedSessionPause(
+                pause = {
+                    sessionTracker.pause()
+                    dispatchTrackedMeditationEvent(engine, sessionTracker, MeditationEvent.Pause)
+                },
+                abandonFocus = { audioFocus.abandon() },
+            )
         },
         onResume = {
-            sessionTracker.resume()
-            audioFocus.request()
-            dispatchTrackedMeditationEvent(engine, sessionTracker, MeditationEvent.Resume)
+            performGuidedSessionResume(
+                requestFocus = { audioFocus.request() },
+                resume = {
+                    sessionTracker.resume()
+                    dispatchTrackedMeditationEvent(engine, sessionTracker, MeditationEvent.Resume)
+                },
+            )
         },
         onSkip = { dispatchTrackedMeditationEvent(engine, sessionTracker, MeditationEvent.Skip) },
         onRelease = { dispatchTrackedMeditationEvent(engine, sessionTracker, MeditationEvent.UserAction()) },
@@ -326,6 +344,19 @@ fun GuidedMeditationScreen(
         // already dispatch through, so there is still exactly one exit implementation.
         onDone = requestExit,
     )
+}
+
+/** Resumes only if focus is granted again; a refusal (e.g. a call is live) keeps the session paused. */
+internal fun performGuidedSessionResume(requestFocus: () -> Boolean, resume: () -> Unit): Boolean {
+    if (!requestFocus()) return false
+    resume()
+    return true
+}
+
+/** A paused session must not keep audio focus: other apps may play while it waits. */
+internal fun performGuidedSessionPause(pause: () -> Unit, abandonFocus: () -> Unit) {
+    pause()
+    abandonFocus()
 }
 
 /**
@@ -567,11 +598,6 @@ private fun GuidedMeditationContent(
                         onClick = onResume,
                         icon = Icons.Filled.PlayArrow,
                         contentDescription = stringResource(R.string.guided_meditation_resume_content_description),
-                    )
-                    RoundIconButton(
-                        onClick = onSkip,
-                        icon = Icons.Filled.SkipNext,
-                        contentDescription = stringResource(R.string.guided_meditation_skip_content_description),
                     )
                 }
 
