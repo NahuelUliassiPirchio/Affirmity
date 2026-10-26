@@ -141,9 +141,13 @@ class SfxChannelTest {
     // --- routing ------------------------------------------------------------------------------
 
     @Test
-    fun `sfx ids route to the sfx channel even when cue sounds are off`() {
-        assertEquals(PlayAudioRoute.Sfx, SfxChannel.route("whm_sfx_inhale_fast", cueSoundEnabled = false))
+    fun `sfx ids route to the sfx channel while sounds are on`() {
         assertEquals(PlayAudioRoute.Sfx, SfxChannel.route("whm_sfx_inhale_fast", cueSoundEnabled = true))
+    }
+
+    @Test
+    fun `sfx ids are dropped when the in-session mute is on`() {
+        assertEquals(PlayAudioRoute.Drop, SfxChannel.route("whm_sfx_inhale_fast", cueSoundEnabled = false))
     }
 
     @Test

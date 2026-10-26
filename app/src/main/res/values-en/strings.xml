@@ -521,8 +521,8 @@
     <string name="meditation_primer_lectio_divina_expect_3">No need to analyze the text, just notice what stands out</string>
 
     <!-- Guided session cue-sound toggle. -->
-    <string name="guided_meditation_cue_sound_mute_content_description">Mute transition sound</string>
-    <string name="guided_meditation_cue_sound_unmute_content_description">Unmute transition sound</string>
+    <string name="guided_meditation_cue_sound_mute_content_description">Mute sound effects</string>
+    <string name="guided_meditation_cue_sound_unmute_content_description">Unmute sound effects</string>
 
     <!-- Affirmation long-press actions, unfavorite undo, and the hidden-affirmations screen. -->
     <string name="affirmation_hide_content_description">Hide affirmation</string>

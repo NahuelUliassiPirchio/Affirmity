@@ -73,13 +73,15 @@ class MeditationEngine(
                 _state.value = current.copy(status = SessionStatus.Running)
             }
 
+            // Manual advances are Running-only: entering a phase while Paused would dispatch its
+            // onEnter commands (voice, SFX) and start its timer under a UI that says "paused".
             MeditationEvent.Next -> {
-                if (current.status != SessionStatus.Running && current.status != SessionStatus.Paused) return
+                if (current.status != SessionStatus.Running) return
                 exitCurrentPhaseAndAdvance()
             }
 
             MeditationEvent.Skip -> {
-                if (current.status != SessionStatus.Running && current.status != SessionStatus.Paused) return
+                if (current.status != SessionStatus.Running) return
                 // Leaves the innermost enclosing block that opted in (see [Repeat.skipExitsBlock]);
                 // with none, it is exactly [MeditationEvent.Next].
                 val blockIndex = frames.indexOfLast { it is Frame.InRepeat && it.node.skipExitsBlock }

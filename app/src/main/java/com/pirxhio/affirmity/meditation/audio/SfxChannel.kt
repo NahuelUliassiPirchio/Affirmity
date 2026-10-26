@@ -106,12 +106,13 @@ class SfxChannel(
 
         fun isSfxId(audioId: String): Boolean = audioId.startsWith(SFX_ID_PREFIX)
 
-        /** SFX bypass the cue-sound preference (they have their own breath-sound toggle in the
-         * definition); every other `PlayAudio` stays gated by it. */
+        /** Every `PlayAudio` is gated by the cue-sound preference (the in-session mute), SFX
+         * included. SFX also have their own breath-sound toggle in the definition, applied before
+         * the session starts. */
         fun route(audioId: String, cueSoundEnabled: Boolean): PlayAudioRoute = when {
+            !cueSoundEnabled -> PlayAudioRoute.Drop
             audioId.startsWith(SFX_ID_PREFIX) -> PlayAudioRoute.Sfx
-            cueSoundEnabled -> PlayAudioRoute.Sound
-            else -> PlayAudioRoute.Drop
+            else -> PlayAudioRoute.Sound
         }
     }
 }

@@ -185,6 +185,34 @@ class MeditationEngineTest {
     }
 
     @Test
+    fun `next and skip are ignored while paused so no phase audio starts under a paused UI`() {
+        engine.send(MeditationEvent.Start)
+        engine.send(MeditationEvent.Pause)
+        val paused = state
+        executor.commands.clear()
+
+        engine.send(MeditationEvent.Next)
+        engine.send(MeditationEvent.Skip)
+
+        assertEquals(SessionStatus.Paused, state.status)
+        assertEquals(paused, state)
+        assertTrue(executor.commands.isEmpty())
+    }
+
+    @Test
+    fun `next and skip advance again once resumed`() {
+        engine.send(MeditationEvent.Start)
+        engine.send(MeditationEvent.Pause)
+        engine.send(MeditationEvent.Next)
+        engine.send(MeditationEvent.Resume)
+
+        engine.send(MeditationEvent.Next)
+        assertEquals("exhale", state.currentPhaseId)
+        engine.send(MeditationEvent.Skip)
+        assertEquals("inhale", state.currentPhaseId)
+    }
+
+    @Test
     fun `a timer completion for a phase already left by a manual advance is ignored`() {
         engine.send(MeditationEvent.Start)
         val staleGeneration = lastTimerGeneration()

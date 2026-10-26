@@ -370,8 +370,8 @@
     <string name="meditation_primer_lectio_divina_expect_2">Los primeros tres pasos tienen guía hablada, el último es silencio</string>
     <string name="meditation_primer_lectio_divina_expect_3">No hace falta analizar el texto, solo notar qué resuena</string>
 
-    <string name="guided_meditation_cue_sound_mute_content_description">Silenciar sonido de transición</string>
-    <string name="guided_meditation_cue_sound_unmute_content_description">Activar sonido de transición</string>
+    <string name="guided_meditation_cue_sound_mute_content_description">Silenciar efectos de sonido</string>
+    <string name="guided_meditation_cue_sound_unmute_content_description">Activar efectos de sonido</string>
 
     <!-- Meditation catalog (Spec 3, REQ-4.6/4.11) — titles, descriptions, categories for the 7
          shipping entries, and every ShowText cue id their definitions reference. Copy is an
