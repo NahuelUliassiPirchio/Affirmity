@@ -41,4 +41,5 @@ class RoomActivityRepository(private val dao: ActivityDao, private val owner: St
     }
 
     override suspend fun retryPending(owner: String) { require(owner == this.owner) }
+    override suspend fun rearmFailed(owner: String) { require(owner == this.owner) }
 }

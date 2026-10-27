@@ -13,6 +13,8 @@ import com.pirxhio.affirmity.data.local.ActivityCoverageEntity
 import com.pirxhio.affirmity.data.local.domain
 import com.pirxhio.affirmity.data.local.stored
 import com.pirxhio.affirmity.data.repository.ActivityRepository
+import android.util.Log
+import com.google.firebase.firestore.FirebaseFirestoreException
 import java.security.MessageDigest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
@@ -48,6 +50,30 @@ fun interface ActivityUploader {
     suspend fun upload(uid: String, event: ActivityEventEntity)
 }
 
+/**
+ * Permanent rejections (and payloads that can never validate) are marked FAILED and skipped so one bad row cannot
+ * stall the queue; FAILED rows are never deleted. Everything else is transient and keeps the row PENDING.
+ */
+fun isTerminalUploadFailure(failure: Throwable): Boolean = when (failure) {
+    is FirebaseFirestoreException -> failure.code in TERMINAL_FIRESTORE_CODES
+    is IllegalArgumentException -> true
+    else -> false
+}
+
+private const val TAG = "ActivitySync"
+
+/** Logs identity and failure kind only: never payload content or the uid. */
+private fun logTerminalFailure(kind: String, id: String, failure: Exception) {
+    val reason = (failure as? FirebaseFirestoreException)?.code?.name ?: failure.javaClass.simpleName
+    Log.w(TAG, "Activity $kind $id rejected permanently ($reason); marked FAILED")
+}
+
+private val TERMINAL_FIRESTORE_CODES = setOf(
+    FirebaseFirestoreException.Code.PERMISSION_DENIED,
+    FirebaseFirestoreException.Code.INVALID_ARGUMENT,
+    FirebaseFirestoreException.Code.FAILED_PRECONDITION,
+)
+
 /** UID is immutable; late acknowledgements update A's journal, never whichever user is now active. */
 class ActivityEventSync(
     private val dao: ActivityDao,
@@ -63,7 +89,14 @@ class ActivityEventSync(
         for (event in dao.pending(owner)) {
             if (currentUid() != uid) return@withLock
             require(event.owner == owner) { "Foreign activity owner" }
-            withTimeout(30_000) { uploader.upload(uid, event) }
+            try {
+                withTimeout(30_000) { uploader.upload(uid, event) }
+            } catch (failure: Exception) {
+                if (!isTerminalUploadFailure(failure)) throw failure
+                dao.markFailed(owner, event.eventId)
+                logTerminalFailure("event", event.eventId, failure)
+                continue
+            }
             dao.acknowledge(owner, event.eventId)
         }
     }
@@ -113,6 +146,13 @@ class FirestoreActivityRepository(
         }
     }
 
+    override suspend fun rearmFailed(owner: String) = retryMutex.withLock {
+        require(owner == this.owner) { "Foreign activity owner" }
+        if (currentUid() != uid) return@withLock
+        dao.rearmFailed(owner)
+        dao.rearmFailedCoverage(owner)
+    }
+
     override suspend fun retryPending(owner: String) = retryMutex.withLock {
         require(owner == this.owner) { "Foreign activity owner" }
         if (currentUid() != uid) return@withLock
@@ -120,7 +160,15 @@ class FirestoreActivityRepository(
         for (coverage in dao.pendingCoverage(owner)) {
             if (currentUid() != uid) return@withLock
             require(coverage.owner == owner)
-            withTimeout(30_000) { remote.uploadCoverage(uid, coverage) }
+            try {
+                withTimeout(30_000) { remote.uploadCoverage(uid, coverage) }
+            } catch (failure: Exception) {
+                if (!isTerminalUploadFailure(failure)) throw failure
+                dao.markCoverageFailed(coverage)
+                logTerminalFailure("coverage", coverageIdentity(ActivityCoverageInterval(coverage.owner, coverage.sourceId,
+                    coverage.fromEpochDay, coverage.toEpochDay, coverage.recordingSchema, coverage.uncertain)), failure)
+                continue
+            }
             dao.acknowledgeCoverage(coverage)
         }
     }
@@ -162,6 +210,14 @@ suspend fun runActivityRetryLoop(
 /** Caller cancellation ends both the backoff timer and connectivity/new-record subscription. */
 suspend fun runActivityRetrySession(repository: ActivityRepository, owner: String,
     currentOwner: () -> String?, signals: Flow<Unit>, onFailure: (Throwable?) -> Unit) = coroutineScope {
+    if (currentOwner() == owner) {
+        try { repository.rearmFailed(owner) }
+        catch (failure: Exception) {
+            if (failure is CancellationException && failure !is TimeoutCancellationException) throw failure
+            currentCoroutineContext().ensureActive() // an outer timeout/cancel is not a retry failure
+            if (currentOwner() == owner) onFailure(failure)
+        }
+    }
     launch { runActivityRetryLoop(repository, owner, currentOwner, onFailure) }
     signals.collect {
         if (currentOwner() == owner) {

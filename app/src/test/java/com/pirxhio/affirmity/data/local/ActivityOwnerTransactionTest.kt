@@ -86,6 +86,9 @@ class ActivityOwnerTransactionTest {
         override fun observeRange(owner: String, from: Long, to: Long): Flow<List<ActivityEventEntity>> = flowOf(emptyList())
         override suspend fun pending(owner: String): List<ActivityEventEntity> = error("Not used")
         override suspend fun acknowledge(owner: String, eventId: String) = Unit
+        override suspend fun markFailed(owner: String, eventId: String) = Unit
+        override suspend fun rearmFailed(owner: String) = Unit
+        override suspend fun rearmFailedCoverage(owner: String) = Unit
         override suspend fun insertCoverage(coverage: ActivityCoverageEntity): Long {
             if (coverage in coverages) return -1L
             coverages.add(coverage)
@@ -95,5 +98,6 @@ class ActivityOwnerTransactionTest {
         override fun observeCoverage(owner: String, from: Long, to: Long): Flow<List<ActivityCoverageEntity>> = flowOf(emptyList())
         override suspend fun pendingCoverage(owner: String): List<ActivityCoverageEntity> = error("Not used")
         override suspend fun markCoverageUploaded(owner: String, sourceId: String, schema: Int, from: Long, to: Long, uncertain: Boolean) = Unit
+        override suspend fun markCoverageFailedRow(owner: String, sourceId: String, schema: Int, from: Long, to: Long, uncertain: Boolean) = Unit
     }
 }

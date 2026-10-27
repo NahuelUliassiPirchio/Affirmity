@@ -18,6 +18,7 @@ fun unavailableActivitySession(uid: String, failure: Throwable? = null) = Activi
         override fun observeRange(owner: String, fromEpochDay: Long, toEpochDay: Long) =
             flowOf(if (failure == null) ActivityRangeState.Loading else ActivityRangeState.Error(failure))
         override suspend fun retryPending(owner: String) = Unit
+        override suspend fun rearmFailed(owner: String) = Unit
     },
 )
 
@@ -46,6 +47,7 @@ class RoomActivitySession(
                 emitAll(repository().observeRange(owner, fromEpochDay, toEpochDay))
             }
             override suspend fun retryPending(owner: String) = repository().retryPending(owner)
+            override suspend fun rearmFailed(owner: String) = repository().rearmFailed(owner)
             private suspend fun repository() = RoomActivityRepository(journal, owner.await().owner)
         })
 

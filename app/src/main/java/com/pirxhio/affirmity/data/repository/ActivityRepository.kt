@@ -10,4 +10,6 @@ interface ActivityRepository {
     suspend fun record(command: ActivityEvent): ActivitySaveState
     fun observeRange(owner: String, fromEpochDay: Long, toEpochDay: Long): Flow<ActivityRangeState>
     suspend fun retryPending(owner: String)
+    /** Gives terminally rejected rows one fresh attempt; called once per retry session. */
+    suspend fun rearmFailed(owner: String)
 }
