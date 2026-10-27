@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.withTransaction
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 /** Additive: creates `daily_completion` empty. No backfill from the old streak-only history. */
@@ -271,6 +272,36 @@ val MIGRATION_15_16 = object : androidx.room.migration.Migration(15, 16) {
     }
 }
 
+/** Additive journal only; retained moods, completions and user content are never reconstructed. */
+val MIGRATION_16_17 = object : androidx.room.migration.Migration(16, 17) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS `activity_event` (`owner` TEXT NOT NULL, `eventId` TEXT NOT NULL, " +
+            "`epochDay` INTEGER NOT NULL, `kind` TEXT NOT NULL, `occurredAtMillis` INTEGER NOT NULL, " +
+            "`startMillis` INTEGER NOT NULL, `endMillis` INTEGER NOT NULL, `zoneId` TEXT NOT NULL, " +
+            "`meditationId` TEXT, `nameSnapshot` TEXT, `activeSeconds` INTEGER NOT NULL, " +
+            "`sourceId` TEXT NOT NULL, `uploadState` TEXT NOT NULL, PRIMARY KEY(`owner`, `eventId`))")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_activity_event_owner_epochDay` ON `activity_event` (`owner`, `epochDay`)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS `activity_owner` (`owner` TEXT NOT NULL, `sourceId` TEXT NOT NULL, " +
+            "`claimedUid` TEXT, `active` INTEGER NOT NULL, PRIMARY KEY(`owner`))")
+        db.execSQL("CREATE TABLE IF NOT EXISTS `activity_coverage` (`owner` TEXT NOT NULL, `sourceId` TEXT NOT NULL, " +
+            "`fromEpochDay` INTEGER NOT NULL, `toEpochDay` INTEGER NOT NULL, `recordingSchema` INTEGER NOT NULL, " +
+            "`uncertain` INTEGER NOT NULL, `uploadState` TEXT NOT NULL, " +
+            "PRIMARY KEY(`owner`, `sourceId`, `recordingSchema`, `fromEpochDay`, `toEpochDay`, `uncertain`))")
+    }
+}
+
+/** Keep v17 intact: development devices may already hold its exported schema. */
+val MIGRATION_17_18 = object : androidx.room.migration.Migration(17, 18) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `activity_owner` ADD COLUMN `legacyAdoptionComplete` INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE `activity_owner` ADD COLUMN `legacyAdopterOwner` TEXT")
+        db.execSQL("CREATE TABLE IF NOT EXISTS `activity_daily_fact` (`owner` TEXT NOT NULL, `epochDay` INTEGER NOT NULL, " +
+            "`moodValue` INTEGER, `note` TEXT, `completionPresent` INTEGER NOT NULL DEFAULT 0, " +
+            "`meditationDone` INTEGER NOT NULL DEFAULT 0, `affirmationDone` INTEGER NOT NULL DEFAULT 0, " +
+            "`healedAtMillis` INTEGER, PRIMARY KEY(`owner`, `epochDay`))")
+    }
+}
+
 @Database(
     entities = [
         AffirmationEntity::class,
@@ -287,8 +318,12 @@ val MIGRATION_15_16 = object : androidx.room.migration.Migration(15, 16) {
         UserCollectionEntity::class,
         UserCollectionItemEntity::class,
         DefaultGroupStateEntity::class,
+        ActivityEventEntity::class,
+        ActivityOwnerEntity::class,
+        ActivityCoverageEntity::class,
+        ActivityDailyFactEntity::class,
     ],
-    version = 16,
+    version = 18,
     exportSchema = true,
 )
 @androidx.room.TypeConverters(OverridesConverters::class)
@@ -306,6 +341,21 @@ abstract class AffirmityDatabase : RoomDatabase() {
     abstract fun personalizationSignalDao(): PersonalizationSignalDao
     abstract fun userCollectionDao(): UserCollectionDao
     abstract fun defaultGroupStateDao(): DefaultGroupStateDao
+    abstract fun activityDao(): ActivityDao
+    abstract fun activityDailyFactDao(): ActivityDailyFactDao
+
+    suspend fun initializeAnonymousActivityOwner(candidate: ActivityOwnerEntity): ActivityOwnerEntity = withTransaction {
+        val owner = activityDao().anonymousOwner(candidate)
+        activityDailyFactDao().adoptLegacyOnce(owner.owner)
+        requireNotNull(activityDao().owner(owner.owner))
+    }
+
+    suspend fun claimActivitySnapshot(owner: String, uid: String): ActivityClaimSnapshot = withTransaction {
+        val claimed = activityDao().claimAnonymous(owner, uid)
+        ActivityClaimSnapshot(claimed, activityDailyFactDao().getAll(owner),
+            activityDao().getRange(owner, Long.MIN_VALUE, Long.MAX_VALUE),
+            activityDao().coverageRange(owner, Long.MIN_VALUE, Long.MAX_VALUE))
+    }
 
     companion object {
         @Volatile
@@ -333,6 +383,8 @@ abstract class AffirmityDatabase : RoomDatabase() {
                     MIGRATION_13_14,
                     MIGRATION_14_15,
                     MIGRATION_15_16,
+                    MIGRATION_16_17,
+                    MIGRATION_17_18,
                 ).build().also { instance = it }
             }
     }

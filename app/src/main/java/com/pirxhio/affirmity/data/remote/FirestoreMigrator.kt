@@ -20,11 +20,18 @@ class RealFirestoreMigrationSource(private val firestore: FirebaseFirestore) : F
         firestore.document(FirestorePaths.migratedMarkerDoc(uid)).get().await().exists()
 
     override suspend fun commitChunk(writes: List<DocWrite>) {
-        val batch = firestore.batch()
-        writes.forEach { write ->
-            batch.set(firestore.document(write.path), write.fields, SetOptions.merge())
-        }
-        batch.commit().await()
+        // Firestore requires all reads before any writes. The transaction closes retry-vs-edit races.
+        firestore.runTransaction { transaction ->
+            val destinations = writes.associateWith { write ->
+                if (write.policy == MigrationWritePolicy.MERGE) null
+                else transaction.get(firestore.document(write.path)).let { if (it.exists()) it.data else null }
+            }
+            writes.forEach { write ->
+                resolveMigrationWrite(write, destinations[write])?.let { fields ->
+                    transaction.set(firestore.document(write.path), fields, SetOptions.merge())
+                }
+            }
+        }.await()
     }
 }
 

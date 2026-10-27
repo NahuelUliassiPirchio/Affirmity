@@ -49,6 +49,8 @@ object DayClock {
      * millis-per-day, so it stays correct across a DST boundary.
      */
     fun attributedEpochDay(startMillis: Long, endMillis: Long, calendar: Calendar = Calendar.getInstance()): Long {
+        // A wall clock stepped backward mid-span (end < start) has no measurable overlap: use the end day.
+        if (endMillis < startMillis) return epochDay((calendar.clone() as Calendar).apply { timeInMillis = endMillis })
         val startDay = epochDay((calendar.clone() as Calendar).apply { timeInMillis = startMillis })
         val endDay = epochDay((calendar.clone() as Calendar).apply { timeInMillis = endMillis })
         if (startDay == endDay) return startDay

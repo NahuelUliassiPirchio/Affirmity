@@ -1,5 +1,18 @@
 package com.pirxhio.affirmity.data
 
+import com.pirxhio.affirmity.data.repository.ActivitySessionBinding
+import com.pirxhio.affirmity.data.repository.ActivityIdentityHandle
+import com.pirxhio.affirmity.data.repository.ActivityIdentity
+import com.pirxhio.affirmity.data.repository.RoomActivitySession
+import com.pirxhio.affirmity.data.local.ActivityOwnerEntity
+import com.pirxhio.affirmity.data.local.AnonymousGenerationClaimedException
+import com.pirxhio.affirmity.data.remote.FirestoreActivityRepository
+import com.pirxhio.affirmity.data.remote.FirebaseActivityClient
+import com.pirxhio.affirmity.data.remote.ActivityHistoryImporter
+import com.pirxhio.affirmity.data.remote.FirebaseActivityImportSource
+import kotlinx.coroutines.async
+import com.pirxhio.affirmity.data.local.advanceOwnedDailyViews
+
 import android.content.Context
 import android.net.Uri
 import android.util.Log
@@ -174,6 +187,8 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
@@ -488,6 +503,11 @@ class AffirmityAppState(
     private val scope: CoroutineScope,
     private val local: DataSession.Local,
     private val remoteSessionFactory: (uid: String) -> DataSession.Remote,
+    private val localSessionFactory: () -> DataSession.Local = { local },
+    private val activityJournal: com.pirxhio.affirmity.data.local.ActivityDao? = null,
+    private val activityConnectivity: Flow<Unit> = kotlinx.coroutines.flow.emptyFlow(),
+    private val claimActivity: suspend (DataSession.Local, String) -> Unit = { _, _ -> },
+    private val importActivity: suspend (String) -> Unit = { },
     private val migrator: FirestoreMigrator,
     private val trackerPreferences: TrackerPreferences,
     private val onboardingPreferences: OnboardingPreferences,
@@ -1054,6 +1074,10 @@ class AffirmityAppState(
     }
 
     private var affirmationsViewedToday = DailyViewCount(epochDay = -1L, count = 0)
+    private var activityContinuityBroken = false
+    private val activitySaveMutex = Mutex()
+    private val viewEligibilityMutex = Mutex()
+    private val activityRetrySignals = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     /**
      * The single source of truth for which store is active. See design.md's "The swap moment":
@@ -1062,20 +1086,34 @@ class AffirmityAppState(
      * stale Room collector survives a sign-in/sign-out swap. Writers suspend in [ready] instead of
      * racing the swap (single-writer is a type-level property, not a convention).
      */
+    private val activityLoadRetry = MutableStateFlow(0)
+    private var activeLocal = local
+    private var previousSessionUid: String? = null
+    private var sessionIdentityInitialized = false
     private val session: StateFlow<DataSession> = authRepository.authState
         .map { (it as? AuthState.SignedIn)?.uid }
         .distinctUntilChanged()
+        .combine(activityLoadRetry) { uid, _ -> uid }
         .transformLatest { uid ->
             // A PER_USE grant belongs to a user, not a process (design §4b): every identity change
             // -- uid `null` <-> uid, including the very first emission at cold start -- clears it.
-            sessionAdUnlocks.value = emptySet()
+            if (!sessionIdentityInitialized || previousSessionUid != uid) {
+                sessionAdUnlocks.value = emptySet()
+                affirmationsViewedToday = DailyViewCount(epochDay = -1L, count = 0)
+                sessionIdentityInitialized = true
+            }
+            if (previousSessionUid != null && previousSessionUid != uid) activeLocal = localSessionFactory()
+            previousSessionUid = uid
             if (uid == null || !useRemoteSession) {
-                emit(local)
+                emit(activeLocal)
                 return@transformLatest
             }
-            emit(DataSession.Migrating(uid, local))
+            emit(DataSession.Migrating(uid, activeLocal))
             try {
-                migrator.ensureMigrated(migrationSnapshotFor(uid))
+                val source = activeLocal
+                claimActivity(source, uid)
+                migrator.ensureMigrated(migrationSnapshotFor(uid, source))
+                importActivity(uid)
                 syncError.value = null
                 val remote = remoteSessionFactory(uid)
                 // EC-1/Q3 reconciliation: replay every local durable ad-unlock into the remote
@@ -1088,36 +1126,49 @@ class AffirmityAppState(
                 throw cancellation
             } catch (failure: Exception) {
                 syncError.value = failure.message
-                emit(local)
+                emit(DataSession.Failed(uid, failure, remoteSessionFactory(uid)))
             }
         }
         .stateIn(scope, SharingStarted.Eagerly, local)
 
     /** Suspends until the session leaves [DataSession.Migrating] (design.md's `ready()`), so no
      * write can land in the wrong store while a migration is in flight. */
-    private suspend fun ready(): DataSession = session.first { it !is DataSession.Migrating }
+    private suspend fun ready(): DataSession {
+        val expectedUid = (authRepository.authState.value as? AuthState.SignedIn)?.uid
+        val captured = session.first { candidate ->
+            when (candidate) {
+                is DataSession.Migrating -> false
+                is DataSession.Local -> expectedUid == null || !useRemoteSession
+                is DataSession.Remote -> candidate.uid == expectedUid
+                is DataSession.Failed -> candidate.uid == expectedUid
+            }
+        }
+        if (captured is DataSession.Failed) throw IllegalStateException("Account migration failed", captured.cause)
+        check((authRepository.authState.value as? AuthState.SignedIn)?.uid == expectedUid) { "Session changed" }
+        return captured
+    }
 
     /** One-time snapshot of the Room/DataStore state for [uid], taken right before migration
      * (design.md's "The swap moment" step 4). Always reads through [local] — never [session] —
      * since this runs while the session is still [DataSession.Migrating]. */
-    private suspend fun migrationSnapshotFor(uid: String): MigrationSnapshot {
+    private suspend fun migrationSnapshotFor(uid: String, source: DataSession.Local): MigrationSnapshot {
         val today = DayClock.epochDay()
         return MigrationSnapshot(
             uid = uid,
-            affirmations = local.affirmations.observeAll().first(),
-            completions = local.completions.getRange(today - STREAK_LOOKBACK_DAYS, today + 6),
-            moods = local.moods.getRange(today - STREAK_LOOKBACK_DAYS, today),
-            healerUses = local.healerUses.getRange(healerStartEpochDay(today), today),
-            meditationDurationSeconds = local.meditation.observeMeditationDurationSeconds().first(),
+            affirmations = source.affirmations.observeAll().first(),
+            completions = source.completions.getRange(Long.MIN_VALUE, Long.MAX_VALUE),
+            moods = source.moods.getRange(Long.MIN_VALUE, Long.MAX_VALUE),
+            healerUses = source.healerUses.getRange(Long.MIN_VALUE, Long.MAX_VALUE),
+            meditationDurationSeconds = source.meditation.observeMeditationDurationSeconds().first(),
             notificationSettings = mapOf(
-                NotificationChannelSpec.REMINDER to local.notifications.observe(NotificationChannelSpec.REMINDER).first(),
-                NotificationChannelSpec.REFLECTION to local.notifications.observe(NotificationChannelSpec.REFLECTION).first(),
-                NotificationChannelSpec.MOOD to local.notifications.observe(NotificationChannelSpec.MOOD).first(),
-                NotificationChannelSpec.STREAK to local.notifications.observe(NotificationChannelSpec.STREAK).first(),
-                NotificationChannelSpec.HEALER to local.notifications.observe(NotificationChannelSpec.HEALER).first(),
-                NotificationChannelSpec.MEDITATION_RETURN to local.notifications.observe(NotificationChannelSpec.MEDITATION_RETURN).first(),
+                NotificationChannelSpec.REMINDER to source.notifications.observe(NotificationChannelSpec.REMINDER).first(),
+                NotificationChannelSpec.REFLECTION to source.notifications.observe(NotificationChannelSpec.REFLECTION).first(),
+                NotificationChannelSpec.MOOD to source.notifications.observe(NotificationChannelSpec.MOOD).first(),
+                NotificationChannelSpec.STREAK to source.notifications.observe(NotificationChannelSpec.STREAK).first(),
+                NotificationChannelSpec.HEALER to source.notifications.observe(NotificationChannelSpec.HEALER).first(),
+                NotificationChannelSpec.MEDITATION_RETURN to source.notifications.observe(NotificationChannelSpec.MEDITATION_RETURN).first(),
             ),
-            quietHours = local.notifications.observeQuietHours().first(),
+            quietHours = source.notifications.observeQuietHours().first(),
             migratedAt = System.currentTimeMillis(),
         )
     }
@@ -1154,6 +1205,49 @@ class AffirmityAppState(
     }
 
     init {
+        scope.launch { activityConnectivity.collect { if (session.value is DataSession.Failed) retryActivityLoading() } }
+        if (activityJournal != null) scope.launch {
+            session.collectLatest { captured ->
+                if (captured is DataSession.Local) {
+                    val identity = captured.activity.identity.await()
+                    activityContinuityBroken = false
+                    val continuity = ActivityContinuity(identity.owner, identity.sourceId, DayClock.epochDay(),
+                        System.nanoTime() / 1_000_000, java.util.TimeZone.getDefault().id, System.currentTimeMillis())
+                    while (true) {
+                        kotlinx.coroutines.delay(30_000)
+                        val intervals = continuity.observe(DayClock.epochDay(), System.nanoTime() / 1_000_000,
+                            java.util.TimeZone.getDefault().id, System.currentTimeMillis())
+                        activitySaveMutex.withLock {
+                            for (interval in intervals) {
+                                val proof = interval.copy(uncertain = interval.uncertain || activityContinuityBroken || activitySaveError.value != null)
+                                try {
+                                    activityJournal.recordCoverage(com.pirxhio.affirmity.data.local.ActivityCoverageEntity(
+                                        proof.owner, proof.sourceId, proof.fromEpochDay, proof.toEpochDay,
+                                        proof.recordingSchema, proof.uncertain, "LOCAL"))
+                                } catch (failure: Exception) {
+                                    if (failure is CancellationException) throw failure
+                                    if (session.value === captured) activitySaveError.value = failure
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        scope.launch {
+            session.collectLatest { captured ->
+                if (captured is DataSession.Remote) {
+                    val owner = "account:${captured.uid}"
+                    com.pirxhio.affirmity.data.remote.runActivityRetrySession(captured.activity.repository, owner,
+                        { (authRepository.authState.value as? AuthState.SignedIn)?.uid?.let { "account:$it" } },
+                        kotlinx.coroutines.flow.merge(activityConnectivity, activityRetrySignals)) { failure ->
+                        if ((authRepository.authState.value as? AuthState.SignedIn)?.uid == captured.uid) {
+                            syncError.value = failure?.message
+                        }
+                    }
+                }
+            }
+        }
         scope.launch(Dispatchers.IO) {
             // Bundled-asset-first seeding (design D2/D13, task 5.10). Fired once, off the main
             // thread, so a cold start's 2712-row seed never blocks first paint. Idempotent via
@@ -2201,20 +2295,87 @@ class AffirmityAppState(
     /** Null until the entitlement resolved: ads must never rely on the FREE default. */
     private fun resolvedTierOrNull(): AccessTier? = entitlementTier.value.takeIf { entitlementResolved.value }
 
+    var activitySaveError = mutableStateOf<Throwable?>(null)
+        private set
+
+    private fun capturedDataSession(): DataSession {
+        val uid = (authRepository.authState.value as? AuthState.SignedIn)?.uid
+        val current = session.value
+        return when {
+            uid == null || !useRemoteSession -> if (current is DataSession.Local) current else activeLocal
+            current is DataSession.Remote && current.uid == uid -> current
+            else -> remoteSessionFactory(uid)
+        }
+    }
+
+    private fun saveActivity(block: suspend () -> Unit) {
+        scope.launch {
+            try { activitySaveMutex.withLock { block() }; activitySaveError.value = null; activityRetrySignals.tryEmit(Unit) }
+            catch (cancellation: CancellationException) { throw cancellation }
+            catch (failure: Exception) { activityContinuityBroken = true; activitySaveError.value = failure }
+        }
+    }
+
+    fun startMeditationActivity(kind: ActivityKind, meditationId: String?, name: String, startMillis: Long): MeditationActivityCapture =
+        ActivityRecorder(capturedDataSession().activity).startSession(kind, meditationId, name, startMillis)
+
+    fun completeMeditationActivity(capture: MeditationActivityCapture?, activeSeconds: Long,
+        endMillis: Long = System.currentTimeMillis(), zoneId: String = java.util.TimeZone.getDefault().id) {
+        capture ?: return
+        val zone = java.util.TimeZone.getTimeZone(zoneId)
+        saveActivity { capture.complete(activeSeconds, endMillis, zone) }
+    }
+
+    fun retryActivityLoading() {
+        if (session.value is DataSession.Failed) activityLoadRetry.value++
+    }
+
+    fun observeActivityMonth(from: Long, to: Long): Flow<ActivityMonthState> {
+        require(to >= from && to - from <= 41)
+        return session.flatMapLatest { captured -> flow {
+            emit(ActivityMonthState.Loading)
+            when (captured) {
+                is DataSession.Migrating -> return@flow
+                is DataSession.Failed -> { emit(ActivityMonthState.Error(captured.cause)); return@flow }
+                else -> Unit
+            }
+            val identity = captured.activity.identity.await()
+            emitAll(combine(captured.activity.repository.observeRange(identity.owner, from, to),
+                captured.moods.observeRange(from, to), captured.completions.observeRange(from, to),
+                captured.healerUses.observeRange(from, to)) { activity, moods, completions, healers ->
+                joinActivityMonth(activity, moods, completions, healers)
+            })
+        }.catch { failure ->
+            if (failure is CancellationException) throw failure
+            emit(ActivityMonthState.Error(failure))
+        } }
+    }
+
+    /** Launches a daily-fact write; sign-in claiming the anonymous owner mid-suspension rejects it,
+     *  and the write is dropped rather than crashing or being redirected to another owner. */
+    private fun launchDailyFactWrite(block: suspend () -> Unit) {
+        scope.launch {
+            try { block() } catch (_: AnonymousGenerationClaimedException) { }
+        }
+    }
+
     /** Call once per affirmation the user settles on while swiping the feed. */
     fun recordAffirmationViewed() {
-        scope.launch {
+        val captured = capturedDataSession()
+        val occurredAtMillis = System.currentTimeMillis()
+        val zone = java.util.TimeZone.getDefault()
+        val recorder = ActivityRecorder(captured.activity)
+        saveActivity { recorder.view(occurredAtMillis, zone) }
+        launchDailyFactWrite {
+            viewEligibilityMutex.withLock {
             val today = DayClock.epochDay()
             val viewed = affirmationsViewedToday
-            val updated = if (viewed.epochDay == today) {
-                viewed.copy(count = viewed.count + 1)
-            } else {
-                DailyViewCount(epochDay = today, count = 1)
-            }
+            val identity = captured.activity.identity.await()
+            val updated = advanceOwnedDailyViews(viewed, identity.owner, today)
             affirmationsViewedToday = updated
             trackerPreferences.saveAffirmationsViewedToday(updated)
             if (updated.count >= AFFIRMATIONS_GOAL_PER_DAY) {
-                ready().completions.markAffirmation(today)
+                captured.completions.markAffirmation(today)
                 widgetUpdater.refresh()
                 // D9: emit on the exact crossing (==), not on every subsequent >= call this day --
                 // recordAffirmationViewed is idempotent-repeat-called, the >= branch above is
@@ -2222,7 +2383,8 @@ class AffirmityAppState(
                 if (updated.count == AFFIRMATIONS_GOAL_PER_DAY) {
                     analytics.log(AnalyticsEvent.DailyGoalReached(DailyGoal.AFFIRMATION))
                 }
-                cancelStreakNotificationIfRequirementComplete(today)
+                cancelStreakNotificationIfRequirementComplete(today, captured)
+            }
             }
         }
     }
@@ -2233,8 +2395,8 @@ class AffirmityAppState(
      * affirmation and meditation done -- mirroring the server's `shouldFireStreakAlert` negation
      * (`functions/src/streak.ts`). Called from both completion sites ([recordAffirmationViewed] and
      * [recordMeditationCompleted]) since either one can be the action that completes the day. */
-    private suspend fun cancelStreakNotificationIfRequirementComplete(day: Long) {
-        val row = ready().completions.getRange(day, day).firstOrNull()
+    private suspend fun cancelStreakNotificationIfRequirementComplete(day: Long, captured: DataSession? = null) {
+        val row = (captured ?: ready()).completions.getRange(day, day).firstOrNull()
         if (isStreakRequirementCompleteToday(row)) {
             notificationCanceller?.cancelFamily(NotificationChannelSpec.STREAK)
             completeNotificationAttribution(NotificationChannelSpec.STREAK.wireChannelKey)
@@ -2292,10 +2454,24 @@ class AffirmityAppState(
      * timer itself runs on) so a session crossing local midnight is archived on the day it mostly
      * ran on, via [DayClock.attributedEpochDay] -- not always the day it happened to finish on.
      */
-    fun recordMeditationCompleted(startMillis: Long, endMillis: Long = System.currentTimeMillis()) {
-        scope.launch {
+    fun captureMeditationCompletionRecorder(): (Long, Long) -> Unit {
+        val captured = capturedDataSession()
+        val uid = (authRepository.authState.value as? AuthState.SignedIn)?.uid
+        return { start, end ->
+            val currentUid = (authRepository.authState.value as? AuthState.SignedIn)?.uid
+            if (currentUid == uid && (captured !is DataSession.Local || activeLocal === captured)) {
+                recordMeditationCompletedFor(captured, start, end)
+            }
+        }
+    }
+
+    fun recordMeditationCompleted(startMillis: Long, endMillis: Long = System.currentTimeMillis()) =
+        recordMeditationCompletedFor(capturedDataSession(), startMillis, endMillis)
+
+    private fun recordMeditationCompletedFor(captured: DataSession, startMillis: Long, endMillis: Long) {
+        launchDailyFactWrite {
             val day = DayClock.attributedEpochDay(startMillis, endMillis)
-            ready().completions.markMeditation(day)
+            captured.completions.markMeditation(day)
             widgetUpdater.refresh()
             if (day != meditationGoalEmittedEpochDay) {
                 meditationGoalEmittedEpochDay = day
@@ -2306,7 +2482,7 @@ class AffirmityAppState(
             // "Cancelled on meditating" scenario) -- unlike Streak, there is no compound condition.
             notificationCanceller?.cancelFamily(NotificationChannelSpec.MEDITATION_RETURN)
             completeNotificationAttribution(NotificationChannelSpec.MEDITATION_RETURN.wireChannelKey)
-            cancelStreakNotificationIfRequirementComplete(day)
+            cancelStreakNotificationIfRequirementComplete(day, captured)
         }
     }
 
@@ -2320,8 +2496,9 @@ class AffirmityAppState(
 
     /** Call from the day-detail sheet, for today or any past day the user is backfilling. */
     fun recordMood(epochDay: Long, moodValue: Int, note: String?) {
-        scope.launch {
-            ready().moods.upsert(epochDay, moodValue, note?.trim()?.ifBlank { null })
+        val captured = capturedDataSession()
+        launchDailyFactWrite {
+            captured.moods.upsert(epochDay, moodValue, note?.trim()?.ifBlank { null })
             // Task 4.7: cancel-on-completion for Mood (design §6/"mood-checkin-sheet" capability's
             // "Saving cancels the pending notification" scenario). Scoped to *today* only -- this
             // function also backfills past days from the calendar, and a past-day edit must not
@@ -2341,13 +2518,13 @@ class AffirmityAppState(
      * the same class of bug as the previously recorded UTC-vs-zone one).
      */
     fun activateStreakHealer() {
-        scope.launch {
+        launchDailyFactWrite {
             val today = healerTodayEpochDay()
             val start = healerStartEpochDay(today)
             val activeSession = ready()
             val rows = activeSession.completions.getRange(start, today)
             val uses = activeSession.healerUses.getRange(start, today)
-            if (session.value !== activeSession || healerTodayEpochDay() != today) return@launch
+            if (session.value !== activeSession || healerTodayEpochDay() != today) return@launchDailyFactWrite
             val activation = StreakHealerStats.evaluate(rows, uses, todayEpochDay = today, startEpochDay = start).activation
             if (activation is HealerActivation.Available) {
                 activeSession.healerUses.recordUse(activation.breakEpochDay)
@@ -2613,16 +2790,25 @@ fun rememberAffirmityAppState(userGoalsStore: UserGoalsStore): AffirmityAppState
         val onboardingPreferences = OnboardingPreferences(context)
         val onboardingGuidePreferences = OnboardingGuidePreferences(context)
         val firestore = FirebaseFirestore.getInstance()
-        val local = DataSession.Local(
+        fun localSession(): DataSession.Local {
+            val owner = scope.async {
+                database.initializeAnonymousActivityOwner(ActivityOwnerEntity(
+                    "local:${java.util.UUID.randomUUID()}", java.util.UUID.randomUUID().toString(), null, true))
+            }
+            val scoped = RoomActivitySession(owner, database.activityDao(), database.activityDailyFactDao())
+            return DataSession.Local(
+            activity = scoped.activity,
             affirmations = RoomAffirmationRepository(database.affirmationDao()),
-            completions = RoomDailyCompletionRepository(database.dailyCompletionDao()),
-            moods = RoomDailyMoodRepository(database.dailyMoodDao()),
-            healerUses = RoomStreakHealerRepository(database.streakHealerUseDao()),
+            completions = scoped.completions,
+            moods = scoped.moods,
+            healerUses = scoped.healerUses,
             meditation = RoomMeditationPreferencesRepository(trackerPreferences),
             notifications = RoomNotificationSettingsRepository(notificationPreferences),
             adUnlocks = RoomAdUnlockRepository(database.adUnlockDao(), database.timedAdUnlockDao()),
             catalogOverrides = RoomCatalogOverrideRepository(database.catalogOverrideDao()),
         )
+        }
+        val local = localSession()
         val sharedAnalytics = ConsentGatedAnalyticsLogger(
             // Real delegate as of PR7 -- delivers nothing end-to-end until spec §9.1 item 4
             // (Firebase console Analytics enablement + a regenerated google-services.json) is
@@ -2639,9 +2825,28 @@ fun rememberAffirmityAppState(userGoalsStore: UserGoalsStore): AffirmityAppState
         AffirmityAppState(
             scope = scope,
             local = local,
+            localSessionFactory = ::localSession,
+            activityJournal = database.activityDao(),
+            activityConnectivity = com.pirxhio.affirmity.data.remote.observeActivityConnectivity(context),
+            claimActivity = { source, uid ->
+                val identity = source.activity.identity.await()
+                check(FirebaseAuth.getInstance().currentUser?.uid == uid) { "Activity owner changed" }
+                database.claimActivitySnapshot(identity.owner, uid)
+            },
+            importActivity = { uid ->
+                val importer = ActivityHistoryImporter(FirebaseActivityImportSource(firestore))
+                for (owner in database.activityDao().claimedOwners(uid)) {
+                    val snapshot = database.claimActivitySnapshot(owner.owner, uid)
+                    importer.import(snapshot, uid) { FirebaseAuth.getInstance().currentUser?.uid }
+                }
+            },
             remoteSessionFactory = { uid ->
                 DataSession.Remote(
                     uid = uid,
+                    activity = ActivitySessionBinding(ActivityIdentityHandle {
+                        ActivityIdentity("account:$uid", local.activity.identity.await().sourceId)
+                    }, FirestoreActivityRepository(database.activityDao(), uid, FirebaseActivityClient(firestore),
+                        { FirebaseAuth.getInstance().currentUser?.uid })),
                     affirmations = FirestoreAffirmationRepository(firestore, uid),
                     completions = FirestoreDailyCompletionRepository(firestore, uid),
                     moods = FirestoreDailyMoodRepository(firestore, uid),

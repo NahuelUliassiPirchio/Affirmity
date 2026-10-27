@@ -132,7 +132,7 @@ fun GuidedMeditationScreen(
      * when the user presses Start, not on catalog tap or completion, so the caller can persist it
      * (see [com.pirxhio.affirmity.data.local.TrackerPreferences.recordRecentMeditation]) without
      * this screen knowing anything about that storage. */
-    onSessionStarted: () -> Unit = {},
+    onSessionStarted: (startWallMillis: Long) -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -174,7 +174,7 @@ fun GuidedMeditationScreen(
         // then the engine.
         val sendEvent: (MeditationEvent) -> Unit = { event ->
             director?.onEvent(event)
-            engineRef.send(event)
+            dispatchTrackedMeditationEvent(engineRef, sessionTracker, event)
         }
         val audio = GuidedMeditationAudioExecutor(
             context = context.applicationContext,
@@ -222,7 +222,7 @@ fun GuidedMeditationScreen(
             performGuidedSessionPause(
                 pause = {
                     sessionTracker.pause()
-                    engine.send(pauseEvent)
+                    dispatchTrackedMeditationEvent(engine, sessionTracker, pauseEvent)
                 },
                 abandonFocus = { audioFocus.abandon() },
             )
@@ -243,7 +243,7 @@ fun GuidedMeditationScreen(
     // reaching Completed.
     LaunchedEffect(state.status) {
         if (state.status == SessionStatus.Completed) {
-            onSessionEnded(SessionEndReason.Completed, sessionTracker.summary())
+            onSessionEnded(SessionEndReason.Completed, sessionTracker.finish())
             audioFocus.abandon()
         }
     }
@@ -262,9 +262,9 @@ fun GuidedMeditationScreen(
             exitHandled = true
             performGuidedSessionExit(
                 status = engine.state.value.status,
-                cancel = { engine.send(MeditationEvent.Cancel) },
+                cancel = { dispatchTrackedMeditationEvent(engine, sessionTracker, MeditationEvent.Cancel) },
                 onSessionEnded = { reason ->
-                    onSessionEnded(reason, sessionTracker.summary())
+                    onSessionEnded(reason, sessionTracker.finish())
                 },
                 onExit = onExit,
             )
@@ -315,15 +315,15 @@ fun GuidedMeditationScreen(
                 sessionTracker.start()
                 audioFocus.request()
                 onEvent(AnalyticsEvent.MeditationStarted(AnalyticsId.of(entry), currentAccess.provenance()))
-                onSessionStarted()
-                engine.send(MeditationEvent.Start)
+                onSessionStarted(sessionTracker.summary().startWallMillis)
+                dispatchTrackedMeditationEvent(engine, sessionTracker, MeditationEvent.Start)
             }
         },
         onPause = {
             performGuidedSessionPause(
                 pause = {
                     sessionTracker.pause()
-                    engine.send(MeditationEvent.Pause)
+                    dispatchTrackedMeditationEvent(engine, sessionTracker, MeditationEvent.Pause)
                 },
                 abandonFocus = { audioFocus.abandon() },
             )
@@ -333,12 +333,12 @@ fun GuidedMeditationScreen(
                 requestFocus = { audioFocus.request() },
                 resume = {
                     sessionTracker.resume()
-                    engine.send(MeditationEvent.Resume)
+                    dispatchTrackedMeditationEvent(engine, sessionTracker, MeditationEvent.Resume)
                 },
             )
         },
-        onSkip = { engine.send(MeditationEvent.Skip) },
-        onRelease = { engine.send(MeditationEvent.UserAction()) },
+        onSkip = { dispatchTrackedMeditationEvent(engine, sessionTracker, MeditationEvent.Skip) },
+        onRelease = { dispatchTrackedMeditationEvent(engine, sessionTracker, MeditationEvent.UserAction()) },
         // Item 13: session-complete had no visible exit affordance -- wired to the same single
         // exit path (`requestExit`) the BackHandler above and MainActivity's top-bar back icon
         // already dispatch through, so there is still exactly one exit implementation.
@@ -701,4 +701,10 @@ private fun phaseLabel(
     status == SessionStatus.Completed -> stringResource(R.string.guided_meditation_completed)
     currentLiteralText != null -> currentLiteralText
     else -> currentTextId?.let { textResources[it] }?.let { stringResource(it) } ?: ""
+}
+
+/** Every synchronous engine terminal path freezes the same tracker, including Skip/release. */
+internal fun dispatchTrackedMeditationEvent(engine: MeditationEngine, tracker: SessionTracker, event: MeditationEvent) {
+    engine.send(event)
+    if (engine.state.value.status == SessionStatus.Completed) tracker.finish()
 }

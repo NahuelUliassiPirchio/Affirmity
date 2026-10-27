@@ -12,6 +12,7 @@ package com.pirxhio.affirmity.data.repository
  * - [Remote]: signed-in, migrated session for [uid], backed exclusively by Firestore.
  */
 sealed interface DataSession {
+    val activity: ActivitySessionBinding
     val affirmations: AffirmationRepository
     val completions: DailyCompletionRepository
     val moods: DailyMoodRepository
@@ -33,6 +34,7 @@ sealed interface DataSession {
     val catalogOverrides: CatalogOverrideRepository
 
     class Local(
+        override val activity: ActivitySessionBinding,
         override val affirmations: AffirmationRepository,
         override val completions: DailyCompletionRepository,
         override val moods: DailyMoodRepository,
@@ -48,6 +50,7 @@ sealed interface DataSession {
         val uid: String,
         private val local: Local,
     ) : DataSession {
+        override val activity = unavailableActivitySession(uid)
         override val affirmations: AffirmationRepository get() = local.affirmations
         override val completions: DailyCompletionRepository get() = local.completions
         override val moods: DailyMoodRepository get() = local.moods
@@ -61,6 +64,7 @@ sealed interface DataSession {
 
     class Remote(
         val uid: String,
+        override val activity: ActivitySessionBinding,
         override val affirmations: AffirmationRepository,
         override val completions: DailyCompletionRepository,
         override val moods: DailyMoodRepository,
@@ -74,4 +78,8 @@ sealed interface DataSession {
         override val adUnlocks: AdUnlockRepository,
         override val catalogOverrides: CatalogOverrideRepository = NoOpCatalogOverrideRepository,
     ) : DataSession
+
+    class Failed(val uid: String, val cause: Throwable, private val intended: Remote) : DataSession by intended {
+        override val activity = unavailableActivitySession(uid, cause)
+    }
 }

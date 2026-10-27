@@ -16,6 +16,36 @@ class SessionTrackerTest {
     private val time = FakeTime()
     private val tracker = SessionTracker(monotonicTimeSource = time, wallClockMillis = { time.wall })
 
+    @Test fun `completion freezes end wall and timezone before delayed callback`() {
+        var zone = "UTC"
+        val tracked = SessionTracker(time, { time.wall }, { zone })
+        tracked.start()
+        time.advance(1_999)
+        val end = time.wall
+        val complete = tracked.finish()
+        time.advance(100_000)
+        zone = "Asia/Tokyo"
+        assertEquals(end, complete.endWallMillis)
+        assertEquals("UTC", tracked.finish().endZoneId)
+        assertEquals(1L, tracked.summary().activeElapsedSeconds)
+    }
+
+    @Test fun `finished summary freezes before delayed UI disposal and restart resets it`() {
+        tracker.start()
+        time.advance(2_000)
+        tracker.pause()
+        time.advance(10_000)
+        tracker.resume()
+        time.advance(3_000)
+        val completed = tracker.finish()
+        time.advance(60_000)
+        assertEquals(SessionEndSummary(15, 5, completed.startWallMillis, completed.endWallMillis, completed.endZoneId), tracker.summary())
+        assertEquals(completed, tracker.finish())
+        tracker.start()
+        time.advance(1_000)
+        assertEquals(1L, tracker.summary().activeElapsedSeconds)
+    }
+
     @Test
     fun `summary before start is zero elapsed and stamps the current wall time`() {
         val summary = tracker.summary()

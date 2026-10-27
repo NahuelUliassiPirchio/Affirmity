@@ -7,6 +7,12 @@ import com.pirxhio.affirmity.access.ContentKey
  * Schema" section). No Firebase/Android dependency — unit-tested directly.
  */
 object FirestorePaths {
+    fun activityEventsCollection(uid: String): String = "users/$uid/activityEvents"
+    fun activityEventDoc(uid: String, eventId: String): String = "${activityEventsCollection(uid)}/$eventId"
+    fun activityCoverageCollection(uid: String): String = "users/$uid/activityCoverage"
+    fun activityCoverageDoc(uid: String, coverageId: String): String = "${activityCoverageCollection(uid)}/$coverageId"
+    fun activityMigratedMarkerDoc(uid: String): String = "users/$uid/meta/activity-v1"
+
     fun affirmationsCollection(uid: String): String = "users/$uid/affirmations"
 
     fun affirmationDoc(uid: String, id: String): String = "${affirmationsCollection(uid)}/$id"

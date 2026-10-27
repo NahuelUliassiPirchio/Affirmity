@@ -160,6 +160,7 @@ private fun buildState(
     knownThemeIds: Set<String> = setOf("bienestar.t1", "fuerza_de_voluntad.t1"),
 ): AffirmityAppState {
     val local = DataSession.Local(
+        activity = com.pirxhio.affirmity.data.testActivitySession(),
         affirmations = NoopAffirmationRepository(),
         completions = NoopDailyCompletionRepository(),
         moods = NoopDailyMoodRepository(),
@@ -187,6 +188,7 @@ private fun buildState(
         local = local,
         remoteSessionFactory = { uid ->
             DataSession.Remote(
+        activity = com.pirxhio.affirmity.data.testActivitySession("account:$uid"),
                 uid = uid,
                 affirmations = NoopAffirmationRepository(),
                 completions = NoopDailyCompletionRepository(),

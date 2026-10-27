@@ -42,12 +42,27 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
+import com.pirxhio.affirmity.data.ActivityMonthState
 import com.pirxhio.affirmity.data.CompletionHistorySlice
 import com.pirxhio.affirmity.data.HealerActivation
 import com.pirxhio.affirmity.data.StreakHealerState
 import com.pirxhio.affirmity.data.WeeklyStreak
+import com.pirxhio.affirmity.ui.components.FloatingStatusReservedEnd
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
+
+/** Horizontal page padding of the Progress screen's list. */
+internal val ProgressPagePadding = 24.dp
+
+/** End inset for the title so it stops before the floating profile pill (which sits over the page padding). */
+internal val ProgressTitleEndInset = FloatingStatusReservedEnd - ProgressPagePadding
+
+/**
+ * Width the calendar grid may borrow from each side of [ProgressPagePadding] so 7x48dp fits on 360dp phones
+ * (312dp content + 2x12dp = 336dp). Leaves ProgressPagePadding - 12dp = 12dp of the padding on each side
+ * as the minimum distance from the screen edge (and the system back-gesture zone) for the edge cells.
+ */
+internal val ProgressCalendarBleed = ProgressPagePadding - 12.dp
 
 @Composable
 fun ProgressScreen(
@@ -55,6 +70,9 @@ fun ProgressScreen(
     meditationStreak: WeeklyStreak,
     streakHealer: StreakHealerState,
     onActivateHealer: () -> Unit,
+    observeActivityMonth: ((Long, Long) -> Flow<ActivityMonthState>)? = null,
+    activitySaveError: Throwable? = null,
+    onRetryActivity: () -> Unit = {},
     observeEarliestCompletionEpochDay: () -> Flow<Long?> = { flowOf(null) },
     observeCompletionHistory: (from: Long, to: Long) -> Flow<CompletionHistorySlice> =
         { _, _ -> flowOf(CompletionHistorySlice(emptyList(), emptySet())) },
@@ -68,7 +86,7 @@ fun ProgressScreen(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background),
-        contentPadding = PaddingValues(24.dp),
+        contentPadding = PaddingValues(ProgressPagePadding),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         item {
@@ -76,8 +94,13 @@ fun ProgressScreen(
                 text = stringResource(R.string.progress_title),
                 style = MaterialTheme.typography.headlineLarge,
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(top = 16.dp),
+                // Keep the title clear of the floating profile pill hosted in MainActivity.
+                modifier = Modifier.padding(top = 16.dp, end = ProgressTitleEndInset),
             )
+        }
+
+        if (observeActivityMonth != null) item {
+            ActivityCalendar(observeActivityMonth, activitySaveError, onRetryActivity, gridBleed = ProgressCalendarBleed)
         }
 
         item {

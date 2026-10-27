@@ -54,7 +54,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -117,8 +119,10 @@ private class FakeDailyCompletionRepository(
 ) : DailyCompletionRepository {
     override fun observeRange(from: Long, to: Long): Flow<List<DailyCompletionEntity>> = flow
     override suspend fun getRange(from: Long, to: Long): List<DailyCompletionEntity> = read()
-    override suspend fun markMeditation(epochDay: Long) = Unit
-    override suspend fun markAffirmation(epochDay: Long) = Unit
+    val meditationWrites = mutableListOf<Long>()
+    override suspend fun markMeditation(epochDay: Long) { meditationWrites += epochDay }
+    val affirmationWrites = mutableListOf<Long>()
+    override suspend fun markAffirmation(epochDay: Long) { affirmationWrites += epochDay }
     override suspend fun earliestEpochDay(): Long? = earliest()
 }
 
@@ -277,17 +281,20 @@ private fun fakeLocal(
     events: MutableList<String>,
     id: String = "local-1",
     adUnlocks: AdUnlockRepository = FakeAdUnlockRepository(),
+    activity: com.pirxhio.affirmity.data.repository.ActivitySessionBinding = testActivitySession(),
+    moods: DailyMoodRepository = FakeDailyMoodRepository(EventedFlow("local-moods", events, listOf(emptyList()))),
     seededAffirmations: List<AffirmationEntity> = listOf(affirmation(id)),
     entitlements: EntitlementRepository = LocalFreeEntitlementRepository(),
     notificationSettings: Map<NotificationChannelSpec, ChannelSettings> = emptyMap(),
     completions: DailyCompletionRepository = FakeDailyCompletionRepository(EventedFlow("local-completions", events, listOf(emptyList()))),
     healerUses: StreakHealerRepository = FakeStreakHealerRepository(EventedFlow("local-healerUses", events, listOf(emptyList()))),
 ): DataSession.Local = DataSession.Local(
+        activity = activity,
     affirmations = FakeAffirmationRepository(
         EventedFlow("local-affirmations", events, listOf(seededAffirmations)),
     ),
     completions = completions,
-    moods = FakeDailyMoodRepository(EventedFlow("local-moods", events, listOf(emptyList()))),
+    moods = moods,
     healerUses = healerUses,
     entitlements = entitlements,
     meditation = FakeMeditationPreferencesRepository(EventedFlow("local-meditation", events, listOf(600))),
@@ -310,6 +317,7 @@ private fun fakeRemote(
         EventedFlow("remote-notifications", events, listOf(ChannelSettings(enabled = false, segments = setOf(DaySegment.MANANA, DaySegment.TARDE)))),
     ),
 ): DataSession.Remote = DataSession.Remote(
+        activity = com.pirxhio.affirmity.data.testActivitySession("account:$uid"),
     uid = uid,
     affirmations = FakeAffirmationRepository(
         EventedFlow("remote-affirmations", events, listOf(listOf(affirmation(id)))),
@@ -408,6 +416,109 @@ private fun buildState(
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AffirmityAppStateSwapTest {
+
+    @Test fun `same UID retry preserves partial eligibility and per-use grants`() = runTest {
+        var fail = true
+        val source = object : FirestoreMigrationSource {
+            override suspend fun markerExists(uid: String) = false
+            override suspend fun commitChunk(writes: List<DocWrite>) { if (fail) error("Offline") }
+        }
+        val completions = FakeDailyCompletionRepository()
+        val state = buildState(fakeLocal(mutableListOf()),
+            { fakeRemote("A", mutableListOf(), completions = completions) }, FirestoreMigrator(source),
+            FakeAuthRepository(AuthState.SignedIn("A", null, null)), backgroundScope)
+        runCurrent()
+        repeat(4) { state.recordAffirmationViewed() }
+        runCurrent()
+        val grant = com.pirxhio.affirmity.access.ContentKey(com.pirxhio.affirmity.access.ContentType.MEDITATION, "calma")
+        state.sessionAdUnlocks.value = setOf(grant)
+        fail = false
+        state.retryActivityLoading()
+        runCurrent()
+        assertEquals(setOf(grant), state.sessionAdUnlocks.value)
+        state.recordAffirmationViewed()
+        runCurrent()
+        assertEquals(1, completions.affirmationWrites.size)
+    }
+
+    @Test fun `explicit calendar retry recovers failed account migration without anonymous fallback`() = runTest {
+        var fail = true
+        val source = object : FirestoreMigrationSource {
+            override suspend fun markerExists(uid: String) = false
+            override suspend fun commitChunk(writes: List<DocWrite>) { if (fail) error("Offline") }
+        }
+        val state = buildState(fakeLocal(mutableListOf(), id = "anonymous"),
+            { fakeRemote("A", mutableListOf(), id = "account") }, FirestoreMigrator(source),
+            FakeAuthRepository(AuthState.SignedIn("A", null, null)), backgroundScope)
+        runCurrent()
+        assertTrue(state.syncError.value != null)
+        fail = false
+        state.retryActivityLoading()
+        runCurrent()
+        assertEquals(null, state.syncError.value)
+        assertTrue(state.affirmations.any { it.id == "account" })
+        assertTrue(state.affirmations.none { it.id == "anonymous" })
+    }
+
+    @Test fun `Start captured streak callback never credits a later account`() = runTest {
+        val auth = FakeAuthRepository()
+        val localCompletions = FakeDailyCompletionRepository()
+        val accountCompletions = FakeDailyCompletionRepository()
+        val state = buildState(fakeLocal(mutableListOf(), completions = localCompletions),
+            { fakeRemote("A", mutableListOf(), completions = accountCompletions) },
+            FirestoreMigrator(ImmediateFirestoreMigrationSource()), auth, backgroundScope)
+        runCurrent()
+        val captured = state.captureMeditationCompletionRecorder()
+        val now = System.currentTimeMillis()
+        captured(now, now)
+        runCurrent()
+        assertEquals(1, localCompletions.meditationWrites.size)
+        auth.emit(AuthState.SignedIn("A", null, null))
+        runCurrent()
+        captured(now, now)
+        runCurrent()
+        assertEquals(1, localCompletions.meditationWrites.size)
+        assertEquals(0, accountCompletions.meditationWrites.size)
+    }
+
+    @Test fun `calendar month reaches a mood-only day outside streak lookback`() = runTest {
+        val oldDay = DayClock.epochDay() - 1_000
+        val state = buildState(fakeLocal(mutableListOf(), moods = FakeDailyMoodRepository(flowOf(listOf(DailyMoodEntity(oldDay, 4, "saved"))))),
+            { fakeRemote("A", mutableListOf()) }, FirestoreMigrator(ImmediateFirestoreMigrationSource()), FakeAuthRepository(), backgroundScope)
+        runCurrent()
+        val month = state.observeActivityMonth(oldDay, oldDay + 30).first { it is ActivityMonthState.Ready } as ActivityMonthState.Ready
+        assertEquals(4, month.days.getValue(oldDay).mood?.moodValue)
+        assertEquals(ActivityCoverage.UNKNOWN, month.days.getValue(oldDay).activity.coverage)
+    }
+
+    @Test fun `qualifying view callbacks independently persist every viewed event`() = runTest {
+        val journal = mutableListOf<ActivityEvent>()
+        val repo = object : com.pirxhio.affirmity.data.repository.ActivityRepository {
+            override suspend fun record(command: ActivityEvent): ActivitySaveState { journal += command; return ActivitySaveState.LOCAL }
+            override fun observeRange(owner: String, fromEpochDay: Long, toEpochDay: Long) = flowOf(ActivityRangeState.Loading)
+            override suspend fun retryPending(owner: String) = Unit
+        }
+        val binding = com.pirxhio.affirmity.data.repository.ActivitySessionBinding(
+            com.pirxhio.affirmity.data.repository.ActivityIdentityHandle { com.pirxhio.affirmity.data.repository.ActivityIdentity("local:G", "device") }, repo)
+        val state = buildState(fakeLocal(mutableListOf(), activity = binding),
+            { fakeRemote("A", mutableListOf()) }, FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            FakeAuthRepository(), backgroundScope)
+        runCurrent()
+        repeat(3) { state.recordAffirmationViewed() }
+        runCurrent()
+        assertEquals(3, journal.size)
+        assertEquals(3, journal.map { it.eventId }.distinct().size)
+        assertTrue(journal.all { it.owner == "local:G" && it.kind == ActivityKind.VIEW })
+    }
+
+    @Test fun `migrating activity exposes intended UID loading not anonymous history`() = runBlocking {
+        val migrating = DataSession.Migrating("A", fakeLocal(mutableListOf()))
+        assertEquals("account:A", migrating.activity.identity.await().owner)
+        assertEquals(ActivityRangeState.Loading,
+            migrating.activity.repository.observeRange("account:A", 20_000, 20_001).first())
+        assertTrue(runCatching { migrating.activity.repository.record(
+            ActivityEvent("account:A", "late", 20_000, ActivityKind.VIEW, 1, 1, 1, "UTC", null, null, 0, "device")) }.isFailure)
+    }
 
     @Test
     fun `activation uses fresh inventory and aborts if the day changes during reads`() = runTest {
@@ -805,7 +916,7 @@ class AffirmityAppStateSwapTest {
     }
 
     @Test
-    fun `a migration failure keeps the session Local and sets syncError`() = runBlocking {
+    fun `a migration failure keeps intended account authority and sets syncError`() = runBlocking {
         val events = mutableListOf<String>()
         val local = fakeLocal(events, id = "local-only")
         val authRepository = FakeAuthRepository()
@@ -825,10 +936,10 @@ class AffirmityAppStateSwapTest {
 
         assertNotNull("a failed migration must set syncError", state.syncError.value)
         assertTrue(
-            "the session must stay Local — affirmations must still be the Room fake's",
-            state.affirmations.any { it.id == "local-only" },
+            "failed authenticated migration must not expose anonymous history",
+            state.affirmations.none { it.id == "local-only" },
         )
-        assertTrue(state.affirmations.none { it.id == "remote-only" })
+        assertTrue(state.affirmations.any { it.id == "remote-only" })
 
         scope.cancel()
     }

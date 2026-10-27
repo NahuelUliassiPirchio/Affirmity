@@ -9,7 +9,20 @@ import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 
 /** One idempotent document write: a full Firestore doc path and the fields to `set(..., merge)`. */
-data class DocWrite(val path: String, val fields: Map<String, Any>)
+enum class MigrationWritePolicy { MERGE, CREATE_IF_ABSENT, OR_COMPLETION }
+
+data class DocWrite(val path: String, val fields: Map<String, Any>, val policy: MigrationWritePolicy = MigrationWritePolicy.MERGE)
+
+/** Null means preserve the existing destination unchanged; no timestamp/recency is invented. */
+fun resolveMigrationWrite(write: DocWrite, existing: Map<String, Any>?): Map<String, Any>? = when (write.policy) {
+    MigrationWritePolicy.MERGE -> write.fields
+    MigrationWritePolicy.CREATE_IF_ABSENT -> if (existing == null) write.fields else null
+    MigrationWritePolicy.OR_COMPLETION -> write.fields.toMutableMap().apply {
+        for (field in listOf("meditationDone", "affirmationDone")) {
+            this[field] = write.fields[field] == true || existing?.get(field) == true
+        }
+    }
+}
 
 /**
  * A one-time snapshot of a signed-in user's local state, taken once at the start of migration
@@ -42,15 +55,15 @@ object MigrationPlan {
             writes += DocWrite(FirestorePaths.affirmationDoc(snapshot.uid, entity.id), affirmationToMap(entity))
         }
         snapshot.completions.forEach { entity ->
-            writes += DocWrite(FirestorePaths.dailyCompletionDoc(snapshot.uid, entity.epochDay), dailyCompletionToMap(entity))
+            writes += DocWrite(FirestorePaths.dailyCompletionDoc(snapshot.uid, entity.epochDay), dailyCompletionToMap(entity), MigrationWritePolicy.OR_COMPLETION)
         }
         snapshot.moods.forEach { entity ->
-            writes += DocWrite(FirestorePaths.dailyMoodDoc(snapshot.uid, entity.epochDay), dailyMoodToMap(entity))
+            writes += DocWrite(FirestorePaths.dailyMoodDoc(snapshot.uid, entity.epochDay), dailyMoodToMap(entity), MigrationWritePolicy.CREATE_IF_ABSENT)
         }
         snapshot.healerUses.forEach { entity ->
             writes += DocWrite(
                 FirestorePaths.streakHealerUseDoc(snapshot.uid, entity.healedEpochDay),
-                streakHealerUseToMap(entity),
+                streakHealerUseToMap(entity), MigrationWritePolicy.CREATE_IF_ABSENT,
             )
         }
         writes += DocWrite(FirestorePaths.settingsPreferencesDoc(snapshot.uid), preferencesMap(snapshot))

@@ -131,4 +131,16 @@ class DayClockTest {
         assertEquals("W", letters.last()) // today = Wednesday
         assertEquals("T", letters.first()) // 6 days before Wednesday = last Thursday
     }
+
+    @Test
+    fun `attributedEpochDay attributes a backward-clock span to the day it ended on`() {
+        val utc = TimeZone.getTimeZone("UTC")
+        val calendar = Calendar.getInstance(utc)
+        val day = 86_400_000L
+        val start = 2 * day + 600_000   // 00:10 on epoch day 2
+        val end = 2 * day - 600_000     // 23:50 on epoch day 1, clock stepped back
+
+        assertEquals(1L, DayClock.attributedEpochDay(start, end, calendar))
+        assertEquals(2L, DayClock.attributedEpochDay(end + 1_200_000, end + 1_800_000, calendar))
+    }
 }

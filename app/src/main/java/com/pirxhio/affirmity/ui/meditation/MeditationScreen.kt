@@ -171,6 +171,8 @@ fun MeditationScreen(
      *  attribution across a local-midnight crossing (see [DayClock.attributedEpochDay]). */
     onSessionCompleted: (durationSeconds: Long, startWallMillis: Long) -> Unit,
     entries: List<MeditationCatalogEntry>,
+    onSessionStarted: (startWallMillis: Long) -> Unit = {},
+    onActivityCompleted: (activeSeconds: Long, startMillis: Long, endMillis: Long, zoneId: String) -> Unit = { _, _, _, _ -> },
     /** Pre-launch audit item #5's "recent meditations" shelf -- already resolved and ordered
      *  most-recent-first by the caller (see [com.pirxhio.affirmity.data.local.TrackerPreferences.
      *  observeRecentMeditationIds]); this screen does no lookup or sorting of its own. */
@@ -228,13 +230,15 @@ fun MeditationScreen(
         clock.events.collect { event ->
             when (event) {
                 is ClockEvent.Tick -> event.remainingMillis?.let { secondsRemaining = (it / 1000L).toInt() }
-                ClockEvent.Completed -> {
+                is ClockEvent.Completed -> {
                     isRunning = false
                     hasStarted = false
                     gongPlayer.seekTo(0)
                     gongPlayer.start()
                     secondsRemaining = durationSeconds
-                    onSessionCompleted(durationSeconds.toLong(), sessionStartWallMillis ?: System.currentTimeMillis())
+                    val start = sessionStartWallMillis ?: event.endWallMillis
+                    onActivityCompleted(event.activeElapsedMillis / 1000L, start, event.endWallMillis, event.endZoneId)
+                    onSessionCompleted(event.activeElapsedMillis / 1000L, start)
                 }
             }
         }
@@ -321,6 +325,7 @@ fun MeditationScreen(
                                     } else {
                                         clock.start(durationSeconds * 1000L)
                                         sessionStartWallMillis = System.currentTimeMillis()
+                                        onSessionStarted(requireNotNull(sessionStartWallMillis))
                                     }
                                     hasStarted = true
                                     isRunning = true

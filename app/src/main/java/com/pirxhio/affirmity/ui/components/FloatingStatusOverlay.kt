@@ -33,6 +33,15 @@ import coil3.compose.AsyncImage
 private const val FloatingChromeAlpha = 0.9f
 private val TouchTarget = 48.dp
 
+/** Gap between the floating status pill and the screen's end edge. */
+internal val FloatingStatusOverlayEndMargin = 16.dp
+
+/** Width of the avatar-only pill (Progress screen): one 48dp target plus 4dp padding on each side. */
+internal val FloatingStatusAvatarPillWidth = TouchTarget + 8.dp
+
+/** Horizontal space, from the screen's end edge, that the avatar-only pill occupies. */
+internal val FloatingStatusReservedEnd = FloatingStatusOverlayEndMargin + FloatingStatusAvatarPillWidth
+
 /** Container colour shared by the floating chrome over the feed (this pill, the Save-to button). */
 @Composable
 internal fun floatingChromeColor(): Color = MaterialTheme.colorScheme.surface.copy(alpha = FloatingChromeAlpha)

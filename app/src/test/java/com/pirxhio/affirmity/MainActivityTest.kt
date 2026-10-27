@@ -29,6 +29,18 @@ class MainActivityTest {
 
     private val now = 1_000_000L
 
+    @Test fun `short guided completion is journaled without streak credit and abandonment is excluded`() {
+        var journaled = 0
+        var streaks = 0
+        for (reason in listOf(SessionEndReason.Completed, SessionEndReason.Cancelled)) {
+            handleGuidedMeditationSessionEnded("calma", reason, 1, 1, CALMA_EXPECTED_MILLIS,
+                AccessDecision.Unlocked, { _, _ -> }, { streaks++ },
+                recordActivityCompleted = { journaled++ })
+        }
+        assertEquals(1, journaled)
+        assertEquals(0, streaks)
+    }
+
     @Test
     fun `identical mood notification intents still create distinct launch events`() {
         var eventKey = 0

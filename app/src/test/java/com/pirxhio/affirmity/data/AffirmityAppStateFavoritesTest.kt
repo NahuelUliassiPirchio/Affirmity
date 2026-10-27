@@ -371,6 +371,7 @@ private fun buildState(
     val onboardingGuidePreferences = mock(OnboardingGuidePreferences::class.java)
     whenever(onboardingGuidePreferences.observeHasSeenGuide()).thenReturn(flowOf(true))
     val local = DataSession.Local(
+        activity = com.pirxhio.affirmity.data.testActivitySession(),
         affirmations = affirmations,
         completions = EmptyCompletionsRepository,
         moods = EmptyMoodsRepository,

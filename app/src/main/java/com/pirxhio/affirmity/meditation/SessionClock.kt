@@ -19,7 +19,7 @@ fun interface MonotonicTimeSource {
 
 sealed interface ClockEvent {
     data class Tick(val elapsedMillis: Long, val remainingMillis: Long?) : ClockEvent
-    data object Completed : ClockEvent
+    data class Completed(val activeElapsedMillis: Long, val endWallMillis: Long, val endZoneId: String) : ClockEvent
 }
 
 /**
@@ -80,6 +80,8 @@ class RealSessionClock(
     private val scope: CoroutineScope,
     private val timeSource: MonotonicTimeSource,
     private val tickIntervalMillis: Long = 200L,
+    private val wallClockMillis: () -> Long = System::currentTimeMillis,
+    private val zoneId: () -> String = { java.util.TimeZone.getDefault().id },
 ) : SessionClock {
     private val tracker = ElapsedTimeTracker(timeSource)
     private val _events = MutableSharedFlow<ClockEvent>(extraBufferCapacity = 8)
@@ -112,7 +114,8 @@ class RealSessionClock(
             while (isActive) {
                 _events.emit(ClockEvent.Tick(tracker.elapsedMillis(), tracker.remainingMillis()))
                 if (tracker.isCompleted()) {
-                    _events.emit(ClockEvent.Completed)
+                    tracker.pause()
+                    _events.emit(ClockEvent.Completed(tracker.elapsedMillis(), wallClockMillis(), zoneId()))
                     break
                 }
                 delay(tickIntervalMillis)

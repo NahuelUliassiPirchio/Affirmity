@@ -76,7 +76,12 @@ class AffirmityAppStateInstrumentedTest {
         val notificationPreferences = NotificationPreferences(context)
         val notificationDebugLog = NotificationDebugLog(context.applicationContext)
         val trackerPreferences = TrackerPreferences(context)
+        kotlinx.coroutines.runBlocking { db.initializeAnonymousActivityOwner(com.pirxhio.affirmity.data.local.ActivityOwnerEntity("local:test", "test", null, true)) }
+        val activityBinding = com.pirxhio.affirmity.data.repository.ActivitySessionBinding(
+            com.pirxhio.affirmity.data.repository.ActivityIdentityHandle { com.pirxhio.affirmity.data.repository.ActivityIdentity("local:test", "test") },
+            com.pirxhio.affirmity.data.repository.RoomActivityRepository(db.activityDao(), "local:test"))
         val local = DataSession.Local(
+            activity = activityBinding,
             affirmations = RoomAffirmationRepository(db.affirmationDao()),
             completions = RoomDailyCompletionRepository(db.dailyCompletionDao()),
             moods = RoomDailyMoodRepository(db.dailyMoodDao()),
