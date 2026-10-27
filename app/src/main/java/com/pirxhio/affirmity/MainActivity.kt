@@ -109,6 +109,7 @@ import com.pirxhio.affirmity.ui.collections.CollectionsFeedOverlay
 import com.pirxhio.affirmity.ui.collections.YourGroupsSection
 import com.pirxhio.affirmity.ui.collections.feedEmptyState
 import com.pirxhio.affirmity.ui.components.FloatingStatusOverlay
+import com.pirxhio.affirmity.ui.components.FloatingStatusOverlayEndMargin
 import com.pirxhio.affirmity.ui.components.SystemBarsEffect
 import com.pirxhio.affirmity.ui.favorites.FavoritesScreen
 import com.pirxhio.affirmity.ui.hidden.HiddenAffirmationsScreen
@@ -1985,7 +1986,7 @@ fun AffirmityApp(
                 FloatingStatusOverlay(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 16.dp, end = 16.dp),
+                        .padding(top = 16.dp, end = FloatingStatusOverlayEndMargin),
                     photoUrl = (appState.authState.value as? AuthState.SignedIn)?.photoUrl,
                     generalStreakDays = appState.streakHealer.value.generalStreakDays,
                     isTodayDone = appState.streakHealer.value.isTodayDone,

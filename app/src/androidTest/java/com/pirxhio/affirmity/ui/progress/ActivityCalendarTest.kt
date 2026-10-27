@@ -1,12 +1,25 @@
 package com.pirxhio.affirmity.ui.progress
 
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import com.pirxhio.affirmity.data.*
 import com.pirxhio.affirmity.R
 import java.util.Calendar
@@ -79,6 +92,53 @@ class ActivityCalendarTest {
         compose.onNodeWithText(compose.activity.getString(R.string.activity_viewed_count, 0)).assertExists()
         compose.onNodeWithText(compose.activity.getString(R.string.activity_load_error)).assertDoesNotExist()
         org.junit.Assert.assertEquals(1, retries)
+    }
+
+    private fun setCalendarAt(width: Int, fontScale: Float = 1f, bleed: Dp = 0.dp) {
+        compose.setContent {
+            val base = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(base.density, fontScale)) {
+                MaterialTheme {
+                    Box(Modifier.wrapContentWidth(Alignment.Start, unbounded = true).width(width.dp).padding(ProgressPagePadding)) {
+                        ActivityCalendar(observeMonth = { _, _ -> flowOf(ActivityMonthState.Ready(emptyMap(), 0)) }, gridBleed = bleed)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test fun allSevenColumnsAreVisibleWithoutScrollingOnATypicalPhone() {
+        setCalendarAt(411)
+        compose.onNodeWithText(compose.activity.getString(R.string.activity_scroll_hint)).assertDoesNotExist()
+        val last = compose.onNodeWithTag("calendar-weekday-6").getUnclippedBoundsInRoot()
+        val first = compose.onNodeWithTag("calendar-weekday-0").getUnclippedBoundsInRoot()
+        org.junit.Assert.assertTrue("Saturday column must be inside the 411dp-24dp page: ${last.right}", last.right <= (411.dp - ProgressPagePadding) + 0.5.dp)
+        org.junit.Assert.assertTrue(first.left >= ProgressPagePadding)
+        org.junit.Assert.assertTrue("columns must be at least 48dp wide", last.right - last.left >= 48.dp)
+    }
+
+    @Test fun weekdayHeadersStaySingleLineAtLargeFontScale() {
+        setCalendarAt(411, fontScale = 2f)
+        repeat(7) {
+            val b = compose.onNodeWithTag("calendar-weekday-$it").getUnclippedBoundsInRoot()
+            org.junit.Assert.assertTrue("header $it wrapped: height ${b.bottom - b.top}", b.bottom - b.top <= 40.dp)
+        }
+    }
+
+    @Test fun threeSixtyDpPhoneFitsAllColumnsByBleedingIntoPagePadding() {
+        setCalendarAt(360, bleed = ProgressCalendarBleed)
+        compose.onNodeWithText(compose.activity.getString(R.string.activity_scroll_hint)).assertDoesNotExist()
+        val last = compose.onNodeWithTag("calendar-weekday-6").getUnclippedBoundsInRoot()
+        val first = compose.onNodeWithTag("calendar-weekday-0").getUnclippedBoundsInRoot()
+        org.junit.Assert.assertTrue("grid must stay inside the 360dp screen: ${last.right}", last.right <= 360.dp + 0.5.dp)
+        org.junit.Assert.assertTrue(first.left >= 0.dp)
+    }
+
+    @Test fun narrowWidthKeepsTheHorizontalScrollFallback() {
+        setCalendarAt(320)
+        compose.onNodeWithText(compose.activity.getString(R.string.activity_scroll_hint)).assertExists()
+        compose.onNodeWithText(compose.activity.getString(R.string.activity_scroll_end)).assertExists()
+        compose.onNodeWithText(compose.activity.getString(R.string.activity_scroll_start)).assertExists()
     }
 
     private fun fullDate(day: Long): String = DateFormat.getDateInstance(DateFormat.FULL,

@@ -4,8 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -16,9 +16,14 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -26,7 +31,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.*
 import java.text.DateFormat
-import java.text.DateFormatSymbols
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -35,9 +39,16 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
-/** Embedded daily practice; fixed six-week geometry preserves 48dp targets on narrow screens. */
+/**
+ * Embedded daily practice calendar. Seven equal-weight columns of 48dp touch targets fill the available width and
+ * the grid scrolls horizontally only when 7x48dp cannot fit.
+ *
+ * [gridBleed] lets the grid overflow the host's horizontal padding by this much on each side to avoid scrolling.
+ * Contract: the host must have at least this much horizontal padding on each side and must not clip its content.
+ */
 @Composable
-fun ActivityCalendar(observeMonth: (Long, Long) -> Flow<ActivityMonthState>, saveError: Throwable? = null, onRetry: () -> Unit = {}) {
+internal fun ActivityCalendar(observeMonth: (Long, Long) -> Flow<ActivityMonthState>, saveError: Throwable? = null, onRetry: () -> Unit = {},
+    gridBleed: Dp = 0.dp) {
     val configuration = LocalConfiguration.current
     val locale = configuration.locales[0] ?: Locale.getDefault()
     var refresh by remember { mutableIntStateOf(0) }
@@ -60,13 +71,13 @@ fun ActivityCalendar(observeMonth: (Long, Long) -> Flow<ActivityMonthState>, sav
     val now = Calendar.getInstance()
     val currentMonth = now.get(Calendar.YEAR) * 12 + now.get(Calendar.MONTH)
     var month by rememberSaveable { mutableIntStateOf(currentMonth) }
-    val layout = remember(month, boundary, locale) { HistoryMonthLayout.of(month.floorDiv(12), month.mod(12), Calendar.getInstance()) }
-    var selected by rememberSaveable(month) { mutableLongStateOf(if (month == currentMonth) today else layout.cells.first().epochDay) }
+    val monthLayout = remember(month, boundary, locale) { HistoryMonthLayout.of(month.floorDiv(12), month.mod(12), Calendar.getInstance(locale)) }
+    var selected by rememberSaveable(month) { mutableLongStateOf(if (month == currentMonth) today else monthLayout.cells.first().epochDay) }
     val monthFlow = remember(month, refresh, boundary, observeMonth) {
-        observeMonth(layout.cells.first().epochDay, layout.cells.last().epochDay)
+        observeMonth(monthLayout.cells.first().epochDay, monthLayout.cells.last().epochDay)
     }
     val state by monthFlow.collectAsState(initial = ActivityMonthState.Loading)
-    val monthDate = remember(month, boundary) { DayClock.calendarForEpochDay(layout.cells.first().epochDay).time }
+    val monthDate = remember(month, boundary) { DayClock.calendarForEpochDay(monthLayout.cells.first().epochDay).time }
     val monthLabel = SimpleDateFormat("LLLL yyyy", locale).format(monthDate)
     val ready = state as? ActivityMonthState.Ready
     Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
@@ -81,34 +92,40 @@ fun ActivityCalendar(observeMonth: (Long, Long) -> Flow<ActivityMonthState>, sav
             }
         }
         BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val narrow = maxWidth < 384.dp
+            val fits = CalendarGridLayout.fits(maxWidth, gridBleed)
             val scroll = rememberScrollState()
             val scope = rememberCoroutineScope()
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (narrow) {
+            val narrowLabels = CalendarGridLayout.usesNarrowWeekdays(LocalDensity.current.fontScale)
+            val weekdays = remember(locale, narrowLabels) { weekdayLabels(locale, narrowLabels) }
+            Column(verticalArrangement = Arrangement.spacedBy(CalendarGridLayout.SectionSpacing)) {
+                if (!fits) {
                     Text(stringResource(R.string.activity_scroll_hint), style = MaterialTheme.typography.bodySmall)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(CalendarGridLayout.SectionSpacing)) {
                         TextButton(onClick = { scope.launch { scroll.animateScrollTo(0) } }) { Text(stringResource(R.string.activity_scroll_start)) }
                         TextButton(onClick = { scope.launch { scroll.animateScrollTo(scroll.maxValue) } }) { Text(stringResource(R.string.activity_scroll_end)) }
                     }
                 }
-                Column(Modifier.horizontalScroll(scroll).width(384.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val firstWeekday = Calendar.getInstance().firstDayOfWeek
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        repeat(7) { offset ->
-                            val weekday = (firstWeekday - 1 + offset) % 7 + 1
-                            Box(Modifier.width(48.dp), contentAlignment = Alignment.Center) {
-                                Text(DateFormatSymbols(locale).shortWeekdays[weekday], style = MaterialTheme.typography.labelMedium)
+                // Equal-weight columns fill the available width; below 7x48dp the grid keeps its minimum width and scrolls.
+                val gridModifier = if (fits) Modifier.fillMaxWidth().bleedToMinWidth()
+                else Modifier.horizontalScroll(scroll).width(CalendarGridLayout.MinWidth)
+                Column(gridModifier, verticalArrangement = Arrangement.spacedBy(CalendarGridLayout.RowSpacing)) {
+                    Row(Modifier.fillMaxWidth()) {
+                        weekdays.forEachIndexed { offset, weekday ->
+                            Box(Modifier.weight(1f).testTag("calendar-weekday-$offset"), contentAlignment = Alignment.Center) {
+                                Text(weekday.short, style = MaterialTheme.typography.labelMedium, maxLines = 1, softWrap = false,
+                                    modifier = Modifier.semantics { contentDescription = weekday.full })
                             }
                         }
                     }
                     repeat(6) { week ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(Modifier.fillMaxWidth()) {
                             repeat(7) { weekday ->
-                                val cell = layout.cells.getOrNull(week * 7 + weekday - layout.leadingBlanks)
-                                if (cell == null) Spacer(Modifier.size(48.dp))
-                                else ActivityDateCell(cell, ready?.days?.get(cell.epochDay), cell.epochDay == today,
-                                    cell.epochDay == selected, cell.epochDay <= today, locale) { selected = cell.epochDay }
+                                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                    val cell = monthLayout.cells.getOrNull(week * 7 + weekday - monthLayout.leadingBlanks)
+                                    if (cell == null) Spacer(Modifier.size(CalendarGridLayout.CellSize))
+                                    else ActivityDateCell(cell, ready?.days?.get(cell.epochDay), cell.epochDay == today,
+                                        cell.epochDay == selected, cell.epochDay <= today, locale) { selected = cell.epochDay }
+                                }
                             }
                         }
                     }
@@ -137,6 +154,13 @@ fun ActivityCalendar(observeMonth: (Long, Long) -> Flow<ActivityMonthState>, sav
     }
 }
 
+/** Widens the grid to [CalendarGridLayout.MinWidth] when the host is narrower, centred over the host's padding. */
+private fun Modifier.bleedToMinWidth(): Modifier = layout { measurable, constraints ->
+    val target = maxOf(constraints.maxWidth, CalendarGridLayout.MinWidth.roundToPx())
+    val placeable = measurable.measure(Constraints.fixedWidth(target))
+    layout(constraints.maxWidth, placeable.height) { placeable.place((constraints.maxWidth - target) / 2, 0) }
+}
+
 @Composable
 private fun ActivityDateCell(cell: HistoryLayoutCell, day: ActivityCalendarDay?, today: Boolean,
     selectedDay: Boolean, enabled: Boolean, locale: Locale, onSelect: () -> Unit) {
@@ -148,7 +172,7 @@ private fun ActivityDateCell(cell: HistoryLayoutCell, day: ActivityCalendarDay?,
     val recordLabel = if (hasRecord) stringResource(R.string.activity_has_records) else ""
     val shape = CircleShape
     val colors = MaterialTheme.colorScheme
-    Box(Modifier.size(48.dp).background(if (selectedDay) colors.secondaryContainer else colors.surface, shape)
+    Box(Modifier.size(CalendarGridLayout.CellSize).background(if (selectedDay) colors.secondaryContainer else colors.surface, shape)
         .then(if (today) Modifier.border(1.dp, colors.primary, shape) else Modifier)
         .clickable(enabled = enabled, role = Role.Button, onClick = onSelect)
         .semantics(mergeDescendants = true) {
