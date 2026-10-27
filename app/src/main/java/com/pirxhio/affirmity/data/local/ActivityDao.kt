@@ -7,6 +7,9 @@ import androidx.room.Query
 import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
+/** Rows loaded per upload page, so a long offline backlog never sits in memory at once. */
+const val ACTIVITY_PENDING_PAGE_SIZE = 100
+
 @Dao
 abstract class ActivityDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
@@ -41,8 +44,8 @@ abstract class ActivityDao {
     @Query("SELECT * FROM activity_event WHERE owner = :owner AND epochDay BETWEEN :from AND :to ORDER BY occurredAtMillis, eventId")
     abstract fun observeRange(owner: String, from: Long, to: Long): Flow<List<ActivityEventEntity>>
 
-    @Query("SELECT * FROM activity_event WHERE owner = :owner AND uploadState = 'PENDING' ORDER BY occurredAtMillis, eventId")
-    abstract suspend fun pending(owner: String): List<ActivityEventEntity>
+    @Query("SELECT * FROM activity_event WHERE owner = :owner AND uploadState = 'PENDING' ORDER BY occurredAtMillis, eventId LIMIT :limit")
+    abstract suspend fun pending(owner: String, limit: Int): List<ActivityEventEntity>
 
     @Query("UPDATE activity_event SET uploadState = 'UPLOADED' WHERE owner = :owner AND eventId = :eventId")
     abstract suspend fun acknowledge(owner: String, eventId: String)
@@ -77,8 +80,8 @@ abstract class ActivityDao {
     @Query("SELECT * FROM activity_coverage WHERE owner = :owner AND fromEpochDay <= :to AND toEpochDay >= :from")
     abstract fun observeCoverage(owner: String, from: Long, to: Long): Flow<List<ActivityCoverageEntity>>
 
-    @Query("SELECT * FROM activity_coverage WHERE owner = :owner AND uploadState = 'PENDING'")
-    abstract suspend fun pendingCoverage(owner: String): List<ActivityCoverageEntity>
+    @Query("SELECT * FROM activity_coverage WHERE owner = :owner AND uploadState = 'PENDING' ORDER BY fromEpochDay, toEpochDay, sourceId, recordingSchema, uncertain LIMIT :limit")
+    abstract suspend fun pendingCoverage(owner: String, limit: Int): List<ActivityCoverageEntity>
 
     @Query("UPDATE activity_coverage SET uploadState = 'UPLOADED' WHERE owner = :owner AND sourceId = :sourceId AND recordingSchema = :schema AND fromEpochDay = :from AND toEpochDay = :to AND uncertain = :uncertain")
     protected abstract suspend fun markCoverageUploaded(owner: String, sourceId: String, schema: Int, from: Long, to: Long, uncertain: Boolean)

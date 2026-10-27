@@ -84,7 +84,7 @@ class ActivityOwnerTransactionTest {
         override suspend fun get(owner: String, eventId: String) = events[owner to eventId]
         override suspend fun getRange(owner: String, from: Long, to: Long) = events.values.filter { it.owner == owner && it.epochDay in from..to }
         override fun observeRange(owner: String, from: Long, to: Long): Flow<List<ActivityEventEntity>> = flowOf(emptyList())
-        override suspend fun pending(owner: String): List<ActivityEventEntity> = error("Not used")
+        override suspend fun pending(owner: String, limit: Int): List<ActivityEventEntity> = error("Not used")
         override suspend fun acknowledge(owner: String, eventId: String) = Unit
         override suspend fun markFailed(owner: String, eventId: String) = Unit
         override suspend fun rearmFailed(owner: String) = Unit
@@ -96,7 +96,7 @@ class ActivityOwnerTransactionTest {
         }
         override suspend fun coverageRange(owner: String, from: Long, to: Long) = coverages.filter { it.owner == owner && it.fromEpochDay <= to && it.toEpochDay >= from }
         override fun observeCoverage(owner: String, from: Long, to: Long): Flow<List<ActivityCoverageEntity>> = flowOf(emptyList())
-        override suspend fun pendingCoverage(owner: String): List<ActivityCoverageEntity> = error("Not used")
+        override suspend fun pendingCoverage(owner: String, limit: Int): List<ActivityCoverageEntity> = error("Not used")
         override suspend fun markCoverageUploaded(owner: String, sourceId: String, schema: Int, from: Long, to: Long, uncertain: Boolean) = Unit
         override suspend fun markCoverageFailedRow(owner: String, sourceId: String, schema: Int, from: Long, to: Long, uncertain: Boolean) = Unit
     }

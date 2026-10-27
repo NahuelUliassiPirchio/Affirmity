@@ -29,8 +29,26 @@ class ActivityJournalTest {
         db = open()
         db.activityDao().record(event)
         assertEquals(listOf(event), db.activityDao().getRange("account:A", 20_000, 20_000))
-        assertEquals(listOf(event), db.activityDao().pending("account:A"))
+        assertEquals(listOf(event), db.activityDao().pending("account:A", ACTIVITY_PENDING_PAGE_SIZE))
         assertEquals(emptyList<ActivityEventEntity>(), db.activityDao().getRange("account:B", 20_000, 20_000))
+    }
+
+    @Test fun pendingQueriesRespectLimitAndKeepOldestFirstOrder() = runBlocking {
+        val dao = open().activityDao()
+        val base = ActivityEventEntity("account:A", "e000", 20_000, "guided", 1_000,
+            0, 1_000, "UTC", "breathing", "Breathing", 120, "device", "PENDING")
+        val events = (0 until 5).map { base.copy(eventId = "e00$it", occurredAtMillis = 1_000L + it) }
+        events.reversed().forEach { dao.record(it) }
+        assertEquals(events.take(3), dao.pending("account:A", 3))
+        assertEquals(events, dao.pending("account:A", ACTIVITY_PENDING_PAGE_SIZE))
+        dao.acknowledge("account:A", "e000")
+        assertEquals(events.drop(1).take(2), dao.pending("account:A", 2))
+        val coverage = (0 until 5).map {
+            ActivityCoverageEntity("account:A", "device", 20_000L + it, 20_000L + it, 1, false, "PENDING")
+        }
+        coverage.reversed().forEach { dao.recordCoverage(it) }
+        assertEquals(coverage.take(3), dao.pendingCoverage("account:A", 3))
+        assertEquals(coverage, dao.pendingCoverage("account:A", ACTIVITY_PENDING_PAGE_SIZE))
     }
 
     @Test fun sameIdentityRejectsConflictingFactsAndDoesNotResetAcknowledgement() = runBlocking {
@@ -40,7 +58,7 @@ class ActivityJournalTest {
         dao.record(event)
         dao.acknowledge(event.owner, event.eventId)
         assertEquals("UPLOADED", dao.record(event).uploadState)
-        assertEquals(emptyList<ActivityEventEntity>(), dao.pending(event.owner))
+        assertEquals(emptyList<ActivityEventEntity>(), dao.pending(event.owner, ACTIVITY_PENDING_PAGE_SIZE))
         try {
             dao.record(event.copy(activeSeconds = 180))
             fail("Conflicting event identity must fail")
@@ -108,8 +126,8 @@ class ActivityJournalTest {
         dao.recordCoverage(foreign)
         dao.acknowledgeCoverage(full)
         dao.recordCoverage(full)
-        assertEquals(emptyList<ActivityCoverageEntity>(), dao.pendingCoverage(full.owner))
-        assertEquals(listOf(foreign), dao.pendingCoverage(foreign.owner))
+        assertEquals(emptyList<ActivityCoverageEntity>(), dao.pendingCoverage(full.owner, ACTIVITY_PENDING_PAGE_SIZE))
+        assertEquals(listOf(foreign), dao.pendingCoverage(foreign.owner, ACTIVITY_PENDING_PAGE_SIZE))
         assertEquals("UPLOADED", dao.coverageRange(full.owner, 20_000, 20_001).single().uploadState)
     }
 
@@ -122,15 +140,15 @@ class ActivityJournalTest {
         dao.recordCoverage(full)
         dao.markFailed(event.owner, event.eventId)
         dao.markCoverageFailed(full)
-        assertEquals(emptyList<ActivityEventEntity>(), dao.pending(event.owner))
-        assertEquals(emptyList<ActivityCoverageEntity>(), dao.pendingCoverage(full.owner))
+        assertEquals(emptyList<ActivityEventEntity>(), dao.pending(event.owner, ACTIVITY_PENDING_PAGE_SIZE))
+        assertEquals(emptyList<ActivityCoverageEntity>(), dao.pendingCoverage(full.owner, ACTIVITY_PENDING_PAGE_SIZE))
         assertEquals("FAILED", dao.getRange(event.owner, 20_000, 20_000).single().uploadState)
         assertEquals("FAILED", dao.coverageRange(full.owner, 20_000, 20_001).single().uploadState)
 
         dao.rearmFailed(event.owner)
         dao.rearmFailedCoverage(full.owner)
-        assertEquals(listOf(event), dao.pending(event.owner))
-        assertEquals(listOf(full), dao.pendingCoverage(full.owner))
+        assertEquals(listOf(event), dao.pending(event.owner, ACTIVITY_PENDING_PAGE_SIZE))
+        assertEquals(listOf(full), dao.pendingCoverage(full.owner, ACTIVITY_PENDING_PAGE_SIZE))
 
         dao.acknowledge(event.owner, event.eventId)
         dao.acknowledgeCoverage(full)

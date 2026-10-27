@@ -14,7 +14,7 @@ class ActivitySyncTest {
         val first = ActivityEventEntity("account:A", "one", 20_000, "guided", 1_000,
             0, 1_000, "UTC", "breathing", "Breathing", 120, "device", "PENDING")
         val pending = mutableListOf(first, first.copy(eventId = "two"))
-        Mockito.`when`(dao.pending("account:A")).thenAnswer { pending.toList() }
+        Mockito.`when`(dao.pending(Mockito.anyString(), Mockito.anyInt())).thenAnswer { pending.toList() }
         for (id in listOf("one", "two")) {
             Mockito.doAnswer { pending.removeAll { row -> row.eventId == id }; null }
                 .`when`(dao).acknowledge("account:A", id)
@@ -40,7 +40,7 @@ class ActivitySyncTest {
         val event = ActivityEventEntity("account:A", "session", 20_000, "guided", 1_000,
             0, 1_000, "UTC", "breathing", "Breathing", 120, "device", "PENDING")
         val pending = mutableListOf(event)
-        Mockito.`when`(dao.pending("account:A")).thenAnswer { pending.toList() }
+        Mockito.`when`(dao.pending(Mockito.anyString(), Mockito.anyInt())).thenAnswer { pending.toList() }
         Mockito.doAnswer { pending.clear(); null }.`when`(dao).acknowledge("account:A", "session")
         val accepted = mutableListOf<Pair<String, ActivityEventEntity>>()
         var failUpload = true

@@ -37,7 +37,7 @@ class ActivityTerminalFailureTest {
         val states = rows.associate { it.eventId to it.uploadState }.toMutableMap()
         val rows = rows
         val dao: ActivityDao = Mockito.mock(ActivityDao::class.java).also { dao -> runBlocking {
-            Mockito.`when`(dao.pending("account:A")).thenAnswer {
+            Mockito.`when`(dao.pending(Mockito.anyString(), Mockito.anyInt())).thenAnswer {
                 rows.filter { states[it.eventId] == "PENDING" }
             }
             Mockito.doAnswer { states[it.getArgument<String>(1)] = "UPLOADED"; null }
@@ -116,8 +116,8 @@ class ActivityTerminalFailureTest {
         val second = first.copy(fromEpochDay = 20_002, toEpochDay = 20_003)
         val states = mutableMapOf(first to "PENDING", second to "PENDING")
         val dao = Mockito.mock(ActivityDao::class.java)
-        Mockito.`when`(dao.pending("account:A")).thenReturn(emptyList())
-        Mockito.`when`(dao.pendingCoverage("account:A")).thenAnswer {
+        Mockito.`when`(dao.pending(Mockito.anyString(), Mockito.anyInt())).thenReturn(emptyList())
+        Mockito.`when`(dao.pendingCoverage(Mockito.anyString(), Mockito.anyInt())).thenAnswer {
             states.filterValues { it == "PENDING" }.keys.toList()
         }
         Mockito.doAnswer { states[second] = "UPLOADED"; null }.`when`(dao).acknowledgeCoverage(second)
@@ -140,8 +140,8 @@ class ActivityTerminalFailureTest {
     @Test fun `transient coverage failure propagates and keeps coverage pending`() = runTest {
         val first = ActivityCoverageEntity("account:A", "device", 20_000, 20_001, 1, false, "PENDING")
         val dao = Mockito.mock(ActivityDao::class.java)
-        Mockito.`when`(dao.pending("account:A")).thenReturn(emptyList())
-        Mockito.`when`(dao.pendingCoverage("account:A")).thenReturn(listOf(first))
+        Mockito.`when`(dao.pending(Mockito.anyString(), Mockito.anyInt())).thenReturn(emptyList())
+        Mockito.`when`(dao.pendingCoverage(Mockito.anyString(), Mockito.anyInt())).thenReturn(listOf(first))
         val remote = object : ActivityRemoteClient {
             override suspend fun uploadEvent(uid: String, event: ActivityEventEntity) = Unit
             override suspend fun uploadCoverage(uid: String, coverage: ActivityCoverageEntity) =
@@ -175,8 +175,8 @@ class ActivityTerminalFailureTest {
     @Test fun `coverage timeout is transient and keeps coverage pending`() = runTest {
         val first = ActivityCoverageEntity("account:A", "device", 20_000, 20_001, 1, false, "PENDING")
         val dao = Mockito.mock(ActivityDao::class.java)
-        Mockito.`when`(dao.pending("account:A")).thenReturn(emptyList())
-        Mockito.`when`(dao.pendingCoverage("account:A")).thenReturn(listOf(first))
+        Mockito.`when`(dao.pending(Mockito.anyString(), Mockito.anyInt())).thenReturn(emptyList())
+        Mockito.`when`(dao.pendingCoverage(Mockito.anyString(), Mockito.anyInt())).thenReturn(listOf(first))
         val remote = object : ActivityRemoteClient {
             override suspend fun uploadEvent(uid: String, event: ActivityEventEntity) = Unit
             override suspend fun uploadCoverage(uid: String, coverage: ActivityCoverageEntity) = delay(60_000)
@@ -194,8 +194,8 @@ class ActivityTerminalFailureTest {
     @Test fun `re-arm runs once per session and a previously failed row uploads in its first pass`() = runTest {
         val states = mutableMapOf("one" to "FAILED")
         val dao = Mockito.mock(ActivityDao::class.java)
-        Mockito.`when`(dao.pending("account:A")).thenAnswer { listOf(one).filter { states[it.eventId] == "PENDING" } }
-        Mockito.`when`(dao.pendingCoverage("account:A")).thenReturn(emptyList())
+        Mockito.`when`(dao.pending(Mockito.anyString(), Mockito.anyInt())).thenAnswer { listOf(one).filter { states[it.eventId] == "PENDING" } }
+        Mockito.`when`(dao.pendingCoverage(Mockito.anyString(), Mockito.anyInt())).thenReturn(emptyList())
         Mockito.doAnswer { states.replaceAll { _, _ -> "PENDING" }; null }.`when`(dao).rearmFailed("account:A")
         Mockito.doAnswer { states[it.getArgument(1)] = "UPLOADED"; null }
             .`when`(dao).acknowledge(Mockito.anyString(), Mockito.anyString())

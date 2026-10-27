@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.data.remote
 
+import com.pirxhio.affirmity.data.local.ACTIVITY_PENDING_PAGE_SIZE
 import com.pirxhio.affirmity.data.local.ActivityDao
 import com.pirxhio.affirmity.data.local.ActivityEventEntity
 import com.pirxhio.affirmity.data.ActivityCoverageInterval
@@ -74,6 +75,45 @@ private val TERMINAL_FIRESTORE_CODES = setOf(
     FirebaseFirestoreException.Code.FAILED_PRECONDITION,
 )
 
+/** Remembers only the identity keys of the previous page, so tracking stays O(page size). */
+internal class PendingPageTracker<K> {
+    private var previous: Set<K> = emptySet()
+    val trackedCount: Int get() = previous.size
+
+    /** True when any key repeats from the previous page: a row stayed PENDING, so the pass made no progress. */
+    fun stalled(keys: List<K>): Boolean = keys.any { it in previous }
+
+    fun remember(keys: List<K>) { previous = keys.toHashSet() }
+}
+
+private data class CoverageKey(val sourceId: String, val schema: Int, val from: Long, val to: Long, val uncertain: Boolean)
+
+private fun ActivityCoverageEntity.key() = CoverageKey(sourceId, recordingSchema, fromEpochDay, toEpochDay, uncertain)
+
+/**
+ * Drains a pending queue page by page so a backlog completes in one pass without loading it all.
+ * [handle] returns false to stop the pass (uid guard); a throw also stops it (transient failure).
+ * Handled rows leave PENDING (acknowledged or FAILED) and pages are oldest first, so a row that stayed PENDING without
+ * throwing reappears in the very next page. A page repeating any key of the previous page ends the pass before that
+ * row is handled again; an empty or short page also ends it, so the loop cannot spin.
+ */
+internal suspend fun <T, K> drainPendingPages(
+    fetch: suspend (limit: Int) -> List<T>,
+    key: (T) -> K,
+    handle: suspend (T) -> Boolean,
+) {
+    val tracker = PendingPageTracker<K>()
+    while (true) {
+        val page = fetch(ACTIVITY_PENDING_PAGE_SIZE)
+        if (page.isEmpty()) return
+        val keys = page.map(key)
+        if (tracker.stalled(keys)) return
+        for (row in page) if (!handle(row)) return
+        if (page.size < ACTIVITY_PENDING_PAGE_SIZE) return
+        tracker.remember(keys)
+    }
+}
+
 /** UID is immutable; late acknowledgements update A's journal, never whichever user is now active. */
 class ActivityEventSync(
     private val dao: ActivityDao,
@@ -86,8 +126,8 @@ class ActivityEventSync(
     suspend fun retryPending() = mutex.withLock {
         if (currentUid() != uid) return@withLock
         val owner = "account:$uid"
-        for (event in dao.pending(owner)) {
-            if (currentUid() != uid) return@withLock
+        drainPendingPages({ limit -> dao.pending(owner, limit) }, { it.eventId }) { event ->
+            if (currentUid() != uid) return@drainPendingPages false
             require(event.owner == owner) { "Foreign activity owner" }
             try {
                 withTimeout(30_000) { uploader.upload(uid, event) }
@@ -95,9 +135,10 @@ class ActivityEventSync(
                 if (!isTerminalUploadFailure(failure)) throw failure
                 dao.markFailed(owner, event.eventId)
                 logTerminalFailure("event", event.eventId, failure)
-                continue
+                return@drainPendingPages true
             }
             dao.acknowledge(owner, event.eventId)
+            true
         }
     }
 }
@@ -157,8 +198,8 @@ class FirestoreActivityRepository(
         require(owner == this.owner) { "Foreign activity owner" }
         if (currentUid() != uid) return@withLock
         sync.retryPending()
-        for (coverage in dao.pendingCoverage(owner)) {
-            if (currentUid() != uid) return@withLock
+        drainPendingPages({ limit -> dao.pendingCoverage(owner, limit) }, { it.key() }) { coverage ->
+            if (currentUid() != uid) return@drainPendingPages false
             require(coverage.owner == owner)
             try {
                 withTimeout(30_000) { remote.uploadCoverage(uid, coverage) }
@@ -167,9 +208,10 @@ class FirestoreActivityRepository(
                 dao.markCoverageFailed(coverage)
                 logTerminalFailure("coverage", coverageIdentity(ActivityCoverageInterval(coverage.owner, coverage.sourceId,
                     coverage.fromEpochDay, coverage.toEpochDay, coverage.recordingSchema, coverage.uncertain)), failure)
-                continue
+                return@drainPendingPages true
             }
             dao.acknowledgeCoverage(coverage)
+            true
         }
     }
 }
