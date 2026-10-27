@@ -328,6 +328,16 @@
     <string name="widget_empty_state_label">Start today</string>
     <string name="widget_action_affirm_label">Affirm</string>
     <string name="widget_action_meditate_label">Meditate</string>
+    <string name="widget_day_both_done">affirmed and meditated</string>
+    <string name="widget_day_affirm_only">affirmed</string>
+    <string name="widget_day_meditate_only">meditated</string>
+    <string name="widget_day_nothing">nothing logged</string>
+    <string name="widget_day_healed">no activity, saved by a streak healer</string>
+    <string name="widget_day_today">today</string>
+    <string name="widget_streak_unit">day streak</string>
+    <string name="widget_streak_unit_one">day streak</string>
+    <string name="widget_today_done">today done</string>
+    <string name="widget_today_pending">today still open</string>
 
     <string name="affirmation_group_badge_premium">Premium</string>
     <string name="affirmation_group_badge_ad">Pro only</string>
