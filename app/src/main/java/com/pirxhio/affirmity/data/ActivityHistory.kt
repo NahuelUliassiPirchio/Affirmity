@@ -79,7 +79,7 @@ sealed interface ActivityRangeState {
     data class Error(val cause: Throwable) : ActivityRangeState
 }
 
-enum class ActivitySaveState { LOCAL, PENDING, UPLOADED }
+enum class ActivitySaveState { LOCAL, PENDING, UPLOADED, FAILED }
 
 fun mergeActivityEvents(owner: String, remote: List<ActivityEvent>, pending: List<ActivityEvent>): List<ActivityEvent> {
     val events = remote + pending

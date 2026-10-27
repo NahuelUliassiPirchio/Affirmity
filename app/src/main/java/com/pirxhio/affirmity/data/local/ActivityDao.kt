@@ -47,6 +47,17 @@ abstract class ActivityDao {
     @Query("UPDATE activity_event SET uploadState = 'UPLOADED' WHERE owner = :owner AND eventId = :eventId")
     abstract suspend fun acknowledge(owner: String, eventId: String)
 
+    /** Terminal rejection: kept for recovery, excluded from [pending] and from the sync-pending count. */
+    @Query("UPDATE activity_event SET uploadState = 'FAILED' WHERE owner = :owner AND eventId = :eventId AND uploadState = 'PENDING'")
+    abstract suspend fun markFailed(owner: String, eventId: String)
+
+    /** Bounded recovery: FAILED rows get one fresh attempt per retry session. */
+    @Query("UPDATE activity_event SET uploadState = 'PENDING' WHERE owner = :owner AND uploadState = 'FAILED'")
+    abstract suspend fun rearmFailed(owner: String)
+
+    @Query("UPDATE activity_coverage SET uploadState = 'PENDING' WHERE owner = :owner AND uploadState = 'FAILED'")
+    abstract suspend fun rearmFailedCoverage(owner: String)
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     protected abstract suspend fun insertCoverage(coverage: ActivityCoverageEntity): Long
 
@@ -73,6 +84,13 @@ abstract class ActivityDao {
     protected abstract suspend fun markCoverageUploaded(owner: String, sourceId: String, schema: Int, from: Long, to: Long, uncertain: Boolean)
 
     suspend fun acknowledgeCoverage(coverage: ActivityCoverageEntity) = markCoverageUploaded(
+        coverage.owner, coverage.sourceId, coverage.recordingSchema, coverage.fromEpochDay, coverage.toEpochDay, coverage.uncertain,
+    )
+
+    @Query("UPDATE activity_coverage SET uploadState = 'FAILED' WHERE owner = :owner AND sourceId = :sourceId AND recordingSchema = :schema AND fromEpochDay = :from AND toEpochDay = :to AND uncertain = :uncertain AND uploadState = 'PENDING'")
+    protected abstract suspend fun markCoverageFailedRow(owner: String, sourceId: String, schema: Int, from: Long, to: Long, uncertain: Boolean)
+
+    suspend fun markCoverageFailed(coverage: ActivityCoverageEntity) = markCoverageFailedRow(
         coverage.owner, coverage.sourceId, coverage.recordingSchema, coverage.fromEpochDay, coverage.toEpochDay, coverage.uncertain,
     )
 

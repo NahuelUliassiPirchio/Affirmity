@@ -113,5 +113,32 @@ class ActivityJournalTest {
         assertEquals("UPLOADED", dao.coverageRange(full.owner, 20_000, 20_001).single().uploadState)
     }
 
+    @Test fun failedRowsAreExcludedFromPendingButNeverDeleted() = runBlocking {
+        val dao = open().activityDao()
+        val event = ActivityEventEntity("account:A", "event", 20_000, "guided", 1_000,
+            0, 1_000, "UTC", "breathing", "Breathing", 120, "device", "PENDING")
+        val full = ActivityCoverageEntity("account:A", "device", 20_000, 20_001, 1, false, "PENDING")
+        dao.record(event)
+        dao.recordCoverage(full)
+        dao.markFailed(event.owner, event.eventId)
+        dao.markCoverageFailed(full)
+        assertEquals(emptyList<ActivityEventEntity>(), dao.pending(event.owner))
+        assertEquals(emptyList<ActivityCoverageEntity>(), dao.pendingCoverage(full.owner))
+        assertEquals("FAILED", dao.getRange(event.owner, 20_000, 20_000).single().uploadState)
+        assertEquals("FAILED", dao.coverageRange(full.owner, 20_000, 20_001).single().uploadState)
+
+        dao.rearmFailed(event.owner)
+        dao.rearmFailedCoverage(full.owner)
+        assertEquals(listOf(event), dao.pending(event.owner))
+        assertEquals(listOf(full), dao.pendingCoverage(full.owner))
+
+        dao.acknowledge(event.owner, event.eventId)
+        dao.acknowledgeCoverage(full)
+        dao.markFailed(event.owner, event.eventId)
+        dao.markCoverageFailed(full)
+        assertEquals("UPLOADED", dao.getRange(event.owner, 20_000, 20_000).single().uploadState)
+        assertEquals("UPLOADED", dao.coverageRange(full.owner, 20_000, 20_001).single().uploadState)
+    }
+
     private companion object { const val DB = "activity-journal-test" }
 }

@@ -497,6 +497,7 @@ class AffirmityAppStateSwapTest {
             override suspend fun record(command: ActivityEvent): ActivitySaveState { journal += command; return ActivitySaveState.LOCAL }
             override fun observeRange(owner: String, fromEpochDay: Long, toEpochDay: Long) = flowOf(ActivityRangeState.Loading)
             override suspend fun retryPending(owner: String) = Unit
+            override suspend fun rearmFailed(owner: String) = Unit
         }
         val binding = com.pirxhio.affirmity.data.repository.ActivitySessionBinding(
             com.pirxhio.affirmity.data.repository.ActivityIdentityHandle { com.pirxhio.affirmity.data.repository.ActivityIdentity("local:G", "device") }, repo)

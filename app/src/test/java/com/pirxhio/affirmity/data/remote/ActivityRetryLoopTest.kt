@@ -131,5 +131,6 @@ class ActivityRetryLoopTest {
         override suspend fun record(command: ActivityEvent): ActivitySaveState = error("Not used")
         override fun observeRange(owner: String, fromEpochDay: Long, toEpochDay: Long): Flow<ActivityRangeState> = error("Not used")
         override suspend fun retryPending(owner: String) = retry()
+        override suspend fun rearmFailed(owner: String) = Unit
     }
 }

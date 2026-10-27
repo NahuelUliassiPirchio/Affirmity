@@ -13,6 +13,7 @@ class ActivityCaptureTest {
             override suspend fun record(command: ActivityEvent): ActivitySaveState { events += command; return ActivitySaveState.LOCAL }
             override fun observeRange(owner: String, fromEpochDay: Long, toEpochDay: Long) = error("Unused")
             override suspend fun retryPending(owner: String) = Unit
+            override suspend fun rearmFailed(owner: String) = Unit
         }
         val binding = ActivitySessionBinding(ActivityIdentityHandle { ActivityIdentity("local:G", "device") }, repository)
         val recorder = ActivityRecorder(binding)
@@ -37,6 +38,7 @@ class ActivityCaptureTest {
             override suspend fun record(command: ActivityEvent): ActivitySaveState { events += command; return ActivitySaveState.LOCAL }
             override fun observeRange(owner: String, fromEpochDay: Long, toEpochDay: Long) = error("Unused")
             override suspend fun retryPending(owner: String) = Unit
+            override suspend fun rearmFailed(owner: String) = Unit
         }
         val binding = ActivitySessionBinding(ActivityIdentityHandle { ActivityIdentity("local:G", "device") }, repository)
         val utc = TimeZone.getTimeZone("UTC")

@@ -13,5 +13,6 @@ fun testActivitySession(owner: String = "local:test") = ActivitySessionBinding(
                 aggregateActivityDay(it, emptyList(), ActivityCoverage.UNKNOWN)
             }, 0))
         override suspend fun retryPending(owner: String) = Unit
+        override suspend fun rearmFailed(owner: String) = Unit
     },
 )

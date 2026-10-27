@@ -40,4 +40,17 @@ class ActivitySessionBindingTest {
         Mockito.verify(daily).markAffirmation("local:H", 20_000)
         assertEquals("local:H", h.activity.identity.await().owner)
     }
+
+    @Test fun `room activity delegate forwards rearmFailed to the underlying repository`() = runTest {
+        val journal = Mockito.mock(ActivityDao::class.java)
+        val daily = Mockito.mock(ActivityDailyFactDao::class.java)
+        val session = RoomActivitySession(CompletableDeferred(ActivityOwnerEntity("local:G", "device", null, true)), journal, daily)
+        session.activity.repository.rearmFailed("local:G")
+        // The Room repository rejects a foreign owner, so reaching it proves the call was forwarded.
+        try {
+            session.activity.repository.rearmFailed("local:other")
+            org.junit.Assert.fail("delegate must forward to the owner-checked repository")
+        } catch (_: IllegalArgumentException) {
+        }
+    }
 }
