@@ -4,7 +4,11 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.auth.AuthState
 import com.pirxhio.affirmity.data.local.ChannelSettings
@@ -58,7 +62,10 @@ class SettingsMyGoalsRowTest {
             )
         }
 
-        composeTestRule.onNodeWithText("Editar").performClick()
+        val label = composeTestRule.activity.getString(R.string.settings_my_goals_edit_button)
+        // SettingsScreen is a LazyColumn: the row may not be composed until it is scrolled into view.
+        composeTestRule.onNode(hasScrollAction()).performScrollToNode(hasText(label))
+        composeTestRule.onNodeWithText(label).performClick()
 
         assertTrue(opened)
     }

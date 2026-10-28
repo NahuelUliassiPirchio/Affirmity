@@ -1,12 +1,17 @@
 package com.pirxhio.affirmity.ui.settings
 
 import androidx.activity.ComponentActivity
+import com.pirxhio.affirmity.R
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.pirxhio.affirmity.personalization.goals.DivergenceState
 import com.pirxhio.affirmity.personalization.goals.OnboardingAnswers
+import com.pirxhio.affirmity.personalization.goals.UserGoal
 import com.pirxhio.affirmity.personalization.goals.UserGoalsStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,10 +31,13 @@ class MyGoalsScreenTest {
         val store = RecordingGoalsStore(setOf("calm"))
         composeTestRule.setContent { MyGoalsScreen(store = store) }
 
-        composeTestRule.onNodeWithText("Fortalecer mi confianza").performClick()
+        val confidenceLabel = UserGoal.all.first { it.id == "confidence" }.label
+        composeTestRule.onNodeWithText(confidenceLabel).performClick()
         composeTestRule.runOnIdle { assertEquals(0, store.saveCalls) }
 
-        composeTestRule.onNodeWithText("Actualizar mis objetivos").performClick()
+        val saveLabel = composeTestRule.activity.getString(R.string.my_goals_save_button)
+        composeTestRule.onNode(hasScrollAction()).performScrollToNode(hasText(saveLabel))
+        composeTestRule.onNodeWithText(saveLabel).performClick()
         composeTestRule.waitUntil(timeoutMillis = 5_000) { store.saveCalls == 1 }
 
         assertEquals(setOf("calm", "confidence"), store.savedGoalIds)

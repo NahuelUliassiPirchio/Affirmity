@@ -4,6 +4,9 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.access.AccessTier
@@ -68,9 +71,10 @@ class SettingsOnboardingGuideRowTest {
             )
         }
 
-        composeTestRule.onNodeWithText(
-            composeTestRule.activity.getString(R.string.settings_onboarding_guide_open_button),
-        ).performClick()
+        val label = composeTestRule.activity.getString(R.string.settings_onboarding_guide_open_button)
+        // SettingsScreen is a LazyColumn: the row may not be composed until it is scrolled into view.
+        composeTestRule.onNode(hasScrollAction()).performScrollToNode(hasText(label))
+        composeTestRule.onNodeWithText(label).performClick()
 
         assertTrue("tapping the row must invoke onOpenOnboardingGuide", opened)
     }
