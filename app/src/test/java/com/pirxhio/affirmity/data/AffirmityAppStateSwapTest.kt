@@ -62,6 +62,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -309,6 +310,8 @@ private fun fakeRemote(
     uid: String,
     events: MutableList<String>,
     id: String = "remote-1",
+    activity: com.pirxhio.affirmity.data.repository.ActivitySessionBinding =
+        com.pirxhio.affirmity.data.testActivitySession("account:$uid"),
     adUnlocks: AdUnlockRepository = FakeAdUnlockRepository(),
     entitlements: EntitlementRepository = FakeEntitlementRepository(),
     completions: DailyCompletionRepository = FakeDailyCompletionRepository(EventedFlow("remote-completions", events, listOf(emptyList()))),
@@ -317,7 +320,7 @@ private fun fakeRemote(
         EventedFlow("remote-notifications", events, listOf(ChannelSettings(enabled = false, segments = setOf(DaySegment.MANANA, DaySegment.TARDE)))),
     ),
 ): DataSession.Remote = DataSession.Remote(
-        activity = com.pirxhio.affirmity.data.testActivitySession("account:$uid"),
+        activity = activity,
     uid = uid,
     affirmations = FakeAffirmationRepository(
         EventedFlow("remote-affirmations", events, listOf(listOf(affirmation(id)))),
@@ -360,6 +363,9 @@ private fun buildState(
     deviceLocaleToken: () -> String = { "es" },
     legacyGroupIdsProvider: suspend () -> Set<String>? = { null },
     goalIdsProvider: suspend () -> Set<String>? = { null },
+    claimActivity: suspend (DataSession.Local, String) -> Unit = { _, _ -> },
+    syncFailureReporter: com.pirxhio.affirmity.diagnostics.SyncFailureReporter =
+        com.pirxhio.affirmity.diagnostics.NoOpSyncFailureReporter,
 ): AffirmityAppState {
     val trackerPreferences = mock(TrackerPreferences::class.java)
     whenever(trackerPreferences.observeAffirmationsViewedToday())
@@ -411,6 +417,8 @@ private fun buildState(
         proOnlyThemeIds = proOnlyThemeIds,
         legacyGroupIdsProvider = legacyGroupIdsProvider,
         goalIdsProvider = goalIdsProvider,
+        claimActivity = claimActivity,
+        syncFailureReporter = syncFailureReporter,
     )
 }
 
@@ -510,6 +518,112 @@ class AffirmityAppStateSwapTest {
         assertEquals(3, journal.size)
         assertEquals(3, journal.map { it.eventId }.distinct().size)
         assertTrue(journal.all { it.owner == "local:G" && it.kind == ActivityKind.VIEW })
+    }
+
+    private fun failingSaveSession(failure: Throwable): com.pirxhio.affirmity.data.repository.ActivitySessionBinding {
+        val repo = object : com.pirxhio.affirmity.data.repository.ActivityRepository {
+            override suspend fun record(command: ActivityEvent): ActivitySaveState = throw failure
+            override fun observeRange(owner: String, fromEpochDay: Long, toEpochDay: Long) = flowOf(ActivityRangeState.Loading)
+            override suspend fun retryPending(owner: String) = Unit
+            override suspend fun rearmFailed(owner: String) = Unit
+        }
+        return com.pirxhio.affirmity.data.repository.ActivitySessionBinding(
+            com.pirxhio.affirmity.data.repository.ActivityIdentityHandle {
+                com.pirxhio.affirmity.data.repository.ActivityIdentity("local:G", "device") }, repo)
+    }
+
+    @Test fun `recorder save failures are reported once per run without the message`() = runTest {
+        val reporter = com.pirxhio.affirmity.diagnostics.FakeSyncFailureReporter()
+        val state = buildState(fakeLocal(mutableListOf(), activity = failingSaveSession(IllegalStateException("users/uid-123/x"))),
+            { fakeRemote("A", mutableListOf()) }, FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            FakeAuthRepository(), backgroundScope,
+            syncFailureReporter = com.pirxhio.affirmity.diagnostics.OncePerRunSyncFailureReporter(reporter))
+        runCurrent()
+        repeat(3) { state.recordAffirmationViewed() }
+        runCurrent()
+        val report = reporter.reports.single()
+        assertEquals(com.pirxhio.affirmity.diagnostics.SyncFailureKind.ACTIVITY_SAVE, report.kind)
+        assertEquals("java.lang.IllegalStateException", report.errorClass)
+        assertTrue(!report.toString().contains("uid-123"))
+    }
+
+    @Test fun `expected recorder exceptions are not reported`() = runTest {
+        val reporter = com.pirxhio.affirmity.diagnostics.FakeSyncFailureReporter()
+        val state = buildState(fakeLocal(mutableListOf(),
+            activity = failingSaveSession(com.pirxhio.affirmity.data.local.AnonymousGenerationClaimedException())),
+            { fakeRemote("A", mutableListOf()) }, FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            FakeAuthRepository(), backgroundScope, syncFailureReporter = reporter)
+        runCurrent()
+        state.recordAffirmationViewed()
+        runCurrent()
+        assertTrue(reporter.reports.isEmpty())
+    }
+
+    private fun signedInState(
+        scope: CoroutineScope,
+        reporter: com.pirxhio.affirmity.diagnostics.SyncFailureReporter,
+        claim: suspend (DataSession.Local, String) -> Unit = { _, _ -> },
+        remote: () -> DataSession.Remote = { fakeRemote("A", mutableListOf()) },
+    ) = buildState(fakeLocal(mutableListOf()), remote, FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+        FakeAuthRepository(AuthState.SignedIn("A", null, null)), scope,
+        claimActivity = claim, syncFailureReporter = reporter)
+
+    @Test fun `activity claim failure is reported without the message`() = runTest {
+        val reporter = com.pirxhio.affirmity.diagnostics.FakeSyncFailureReporter()
+        signedInState(backgroundScope, reporter, claim = { _, _ -> throw IllegalStateException("users/uid-SECRET owner changed") })
+        runCurrent()
+        val report = reporter.reports.single()
+        assertEquals(com.pirxhio.affirmity.diagnostics.SyncFailureKind.CLAIM, report.kind)
+        assertTrue(!report.toString().contains("SECRET"))
+    }
+
+    @Test fun `expected anonymous claim race is not reported`() = runTest {
+        val reporter = com.pirxhio.affirmity.diagnostics.FakeSyncFailureReporter()
+        signedInState(backgroundScope, reporter,
+            claim = { _, _ -> throw com.pirxhio.affirmity.data.local.AnonymousGenerationClaimedException() })
+        runCurrent()
+        assertTrue(reporter.reports.isEmpty())
+    }
+
+    @Test fun `a throwing reporter does not replace the original claim exception`() = runTest {
+        val reporter = com.pirxhio.affirmity.diagnostics.FakeSyncFailureReporter(IllegalStateException("sdk down"))
+        val state = signedInState(backgroundScope, reporter, claim = { _, _ -> throw java.io.IOException("claim broke") })
+        runCurrent()
+        assertEquals(1, reporter.reports.size)
+        assertEquals("claim broke", state.syncError.value)
+    }
+
+    @Test fun `a throwing reporter does not stop the save path from surfacing the error`() = runTest {
+        val reporter = com.pirxhio.affirmity.diagnostics.FakeSyncFailureReporter(IllegalStateException("sdk down"))
+        val failure = IllegalStateException("disk")
+        val state = buildState(fakeLocal(mutableListOf(), activity = failingSaveSession(failure)),
+            { fakeRemote("A", mutableListOf()) }, FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            FakeAuthRepository(), backgroundScope, syncFailureReporter = reporter)
+        runCurrent()
+        state.recordAffirmationViewed()
+        runCurrent()
+        assertEquals(1, reporter.reports.size)
+        assertEquals(failure, state.activitySaveError.value)
+    }
+
+    @Test fun `the account retry session passes the reporter to the retry loop`() = runTest {
+        val reporter = com.pirxhio.affirmity.diagnostics.FakeSyncFailureReporter()
+        val failing = object : com.pirxhio.affirmity.data.repository.ActivityRepository {
+            override suspend fun record(command: ActivityEvent): ActivitySaveState = ActivitySaveState.LOCAL
+            override fun observeRange(owner: String, fromEpochDay: Long, toEpochDay: Long) = flowOf(ActivityRangeState.Loading)
+            override suspend fun retryPending(owner: String) = throw IllegalStateException("systematic")
+            override suspend fun rearmFailed(owner: String) = Unit
+        }
+        val binding = com.pirxhio.affirmity.data.repository.ActivitySessionBinding(
+            com.pirxhio.affirmity.data.repository.ActivityIdentityHandle {
+                com.pirxhio.affirmity.data.repository.ActivityIdentity("account:A", "device") }, failing)
+        signedInState(backgroundScope, reporter, remote = { fakeRemote("A", mutableListOf(), activity = binding) })
+        runCurrent()
+        advanceTimeBy(15_000)
+        runCurrent()
+        val report = reporter.reports.single()
+        assertEquals(com.pirxhio.affirmity.diagnostics.SyncFailureKind.RETRY_LOOP, report.kind)
+        assertEquals("java.lang.IllegalStateException", report.errorClass)
     }
 
     @Test fun `migrating activity exposes intended UID loading not anonymous history`() = runBlocking {

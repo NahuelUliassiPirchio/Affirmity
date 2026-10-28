@@ -21,7 +21,7 @@ class ActivityRetryLoopTest {
         var attempts = 0
         val repository = RetryRepository { attempts++ }
         val job = backgroundScope.launch {
-            runActivityRetrySession(repository, "account:A", { owner }, signals) {}
+            runActivityRetrySession(repository, "account:A", { owner }, signals, onFailure = {})
         }
         runCurrent()
         assertEquals(1, attempts)
@@ -43,7 +43,7 @@ class ActivityRetryLoopTest {
             attempts += testScheduler.currentTime
             if (attempts.size == 1) error("Offline")
         }
-        backgroundScope.launch { runActivityRetryLoop(repository, "account:A", { owner }) { failures += it?.message } }
+        backgroundScope.launch { runActivityRetryLoop(repository, "account:A", { owner }, onFailure = { failures += it?.message }) }
         runCurrent()
         advanceTimeBy(999)
         runCurrent()
@@ -60,7 +60,7 @@ class ActivityRetryLoopTest {
     @Test fun `repeated failures increase backoff rather than spin`() = runTest {
         val attempts = mutableListOf<Long>()
         val repository = RetryRepository { attempts += testScheduler.currentTime; error("Offline") }
-        backgroundScope.launch { runActivityRetryLoop(repository, "account:A", { "account:A" }) {} }
+        backgroundScope.launch { runActivityRetryLoop(repository, "account:A", { "account:A" }, onFailure = {}) }
         runCurrent()
         advanceTimeBy(7_000)
         runCurrent()
@@ -76,7 +76,7 @@ class ActivityRetryLoopTest {
             if (attempts.size == 2) kotlinx.coroutines.withTimeout(5) { kotlinx.coroutines.delay(10) }
         }
         val job = backgroundScope.launch {
-            runActivityRetrySession(repository, "account:A", { "account:A" }, signals) { failures += it?.javaClass?.simpleName }
+            runActivityRetrySession(repository, "account:A", { "account:A" }, signals, onFailure = { failures += it?.javaClass?.simpleName })
         }
         runCurrent()
         signals.emit(Unit)
@@ -100,7 +100,7 @@ class ActivityRetryLoopTest {
         val repository = RetryRepository { if (++attempts == 2) kotlinx.coroutines.delay(10_000) }
         val session = backgroundScope.async {
             kotlinx.coroutines.withTimeout(100) {
-                runActivityRetrySession(repository, "account:A", { "account:A" }, signals) { failures += it?.javaClass?.simpleName }
+                runActivityRetrySession(repository, "account:A", { "account:A" }, signals, onFailure = { failures += it?.javaClass?.simpleName })
             }
         }
         runCurrent()
@@ -117,7 +117,7 @@ class ActivityRetryLoopTest {
         val repository = RetryRepository { kotlinx.coroutines.delay(10_000) }
         val loop = backgroundScope.async {
             kotlinx.coroutines.withTimeout(100) {
-                runActivityRetryLoop(repository, "account:A", { "account:A" }) { failures += it?.javaClass?.simpleName }
+                runActivityRetryLoop(repository, "account:A", { "account:A" }, onFailure = { failures += it?.javaClass?.simpleName })
             }
         }
         runCurrent()

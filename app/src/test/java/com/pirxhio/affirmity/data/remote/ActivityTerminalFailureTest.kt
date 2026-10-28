@@ -53,7 +53,7 @@ class ActivityTerminalFailureTest {
         val sync = ActivityEventSync(journal.dao, "A", ActivityUploader { _, event ->
             if (event.eventId == "one") throw firestore(Code.PERMISSION_DENIED)
             uploaded += event.eventId
-        }) { "A" }
+        }, currentUid = { "A" })
         sync.retryPending()
         assertEquals(mapOf("one" to "FAILED", "two" to "UPLOADED"), journal.states)
         assertEquals(listOf("two"), uploaded)
@@ -66,7 +66,7 @@ class ActivityTerminalFailureTest {
         val sync = ActivityEventSync(journal.dao, "A", ActivityUploader { _, _ ->
             attempts++
             throw firestore(Code.INVALID_ARGUMENT)
-        }) { "A" }
+        }, currentUid = { "A" })
         sync.retryPending()
         sync.retryPending()
         assertEquals(1, attempts)
@@ -76,7 +76,7 @@ class ActivityTerminalFailureTest {
         val journal = Journal(listOf(one, two))
         val sync = ActivityEventSync(journal.dao, "A", ActivityUploader { _, event ->
             if (event.eventId == "one") throw IllegalArgumentException("bad payload")
-        }) { "A" }
+        }, currentUid = { "A" })
         sync.retryPending()
         assertEquals(mapOf("one" to "FAILED", "two" to "UPLOADED"), journal.states)
     }
@@ -87,7 +87,7 @@ class ActivityTerminalFailureTest {
         val sync = ActivityEventSync(journal.dao, "A", ActivityUploader { _, event ->
             seen += event.eventId
             throw firestore(Code.UNAVAILABLE)
-        }) { "A" }
+        }, currentUid = { "A" })
         try {
             sync.retryPending()
             fail("transient failures must propagate for backoff")
@@ -102,7 +102,7 @@ class ActivityTerminalFailureTest {
         val journal = Journal(listOf(one))
         val sync = ActivityEventSync(journal.dao, "A", ActivityUploader { _, _ ->
             kotlinx.coroutines.delay(60_000)
-        }) { "A" }
+        }, currentUid = { "A" })
         try {
             sync.retryPending()
             fail("timeout must propagate")
@@ -132,7 +132,7 @@ class ActivityTerminalFailureTest {
             override fun observeEvents(uid: String, from: Long, to: Long) = flowOf(emptyList<ActivityEventEntity>())
             override fun observeCoverage(uid: String, from: Long, to: Long) = flowOf(emptyList<ActivityCoverageEntity>())
         }
-        FirestoreActivityRepository(dao, "A", remote) { "A" }.retryPending("account:A")
+        FirestoreActivityRepository(dao, "A", remote, currentUid = { "A" }).retryPending("account:A")
         assertEquals(mapOf(first to "FAILED", second to "UPLOADED"), states)
         assertEquals(listOf(20_002L), uploaded)
     }
@@ -150,7 +150,7 @@ class ActivityTerminalFailureTest {
             override fun observeCoverage(uid: String, from: Long, to: Long) = flowOf(emptyList<ActivityCoverageEntity>())
         }
         try {
-            FirestoreActivityRepository(dao, "A", remote) { "A" }.retryPending("account:A")
+            FirestoreActivityRepository(dao, "A", remote, currentUid = { "A" }).retryPending("account:A")
             fail("transient failures must propagate")
         } catch (_: FirebaseFirestoreException) {
             Mockito.verify(dao, Mockito.never()).markCoverageFailed(first)
@@ -163,7 +163,7 @@ class ActivityTerminalFailureTest {
         val sync = ActivityEventSync(journal.dao, "A", ActivityUploader { _, _ ->
             started.complete(Unit)
             awaitCancellation()
-        }) { "A" }
+        }, currentUid = { "A" })
         val job = launch { sync.retryPending() }
         started.await()
         job.cancel()
@@ -184,7 +184,7 @@ class ActivityTerminalFailureTest {
             override fun observeCoverage(uid: String, from: Long, to: Long) = flowOf(emptyList<ActivityCoverageEntity>())
         }
         try {
-            FirestoreActivityRepository(dao, "A", remote) { "A" }.retryPending("account:A")
+            FirestoreActivityRepository(dao, "A", remote, currentUid = { "A" }).retryPending("account:A")
             fail("timeout must propagate")
         } catch (_: TimeoutCancellationException) {
             Mockito.verify(dao, Mockito.never()).markCoverageFailed(first)
@@ -206,10 +206,10 @@ class ActivityTerminalFailureTest {
             override fun observeEvents(uid: String, from: Long, to: Long) = flowOf(emptyList<ActivityEventEntity>())
             override fun observeCoverage(uid: String, from: Long, to: Long) = flowOf(emptyList<ActivityCoverageEntity>())
         }
-        val repo = FirestoreActivityRepository(dao, "A", remote) { "A" }
+        val repo = FirestoreActivityRepository(dao, "A", remote, currentUid = { "A" })
         val signals = MutableSharedFlow<Unit>()
         val session = backgroundScope.launch {
-            runActivityRetrySession(repo, "account:A", { "account:A" }, signals) { }
+            runActivityRetrySession(repo, "account:A", { "account:A" }, signals, onFailure = { })
         }
         runCurrent()
         signals.emit(Unit)
@@ -231,7 +231,7 @@ class ActivityTerminalFailureTest {
         }
         val signals = MutableSharedFlow<Unit>()
         val session = backgroundScope.launch {
-            runActivityRetrySession(repo, "account:A", { "account:A" }, signals) { failures += it?.javaClass?.simpleName }
+            runActivityRetrySession(repo, "account:A", { "account:A" }, signals, onFailure = { failures += it?.javaClass?.simpleName })
         }
         runCurrent()
         signals.emit(Unit)
@@ -251,7 +251,7 @@ class ActivityTerminalFailureTest {
             override suspend fun uploadCoverage(uid: String, coverage: ActivityCoverageEntity) = Unit
             override fun observeEvents(uid: String, from: Long, to: Long) = flowOf(emptyList<ActivityEventEntity>())
             override fun observeCoverage(uid: String, from: Long, to: Long) = flowOf(emptyList<ActivityCoverageEntity>())
-        }) { "A" }
+        }, currentUid = { "A" })
         assertEquals(com.pirxhio.affirmity.data.ActivitySaveState.FAILED, repo.record(command))
     }
 
@@ -264,7 +264,7 @@ class ActivityTerminalFailureTest {
             override suspend fun retryPending(owner: String) = Unit
         }
         val session = backgroundScope.launch {
-            runActivityRetrySession(repo, "account:A", { "account:B" }, MutableSharedFlow()) { }
+            runActivityRetrySession(repo, "account:A", { "account:B" }, MutableSharedFlow(), onFailure = { })
         }
         runCurrent()
         assertEquals(0, rearms)
