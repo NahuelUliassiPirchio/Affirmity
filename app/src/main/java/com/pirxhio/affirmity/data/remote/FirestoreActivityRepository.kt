@@ -153,6 +153,9 @@ class ActivityEventSync(
             if (currentUid() != uid) return@drainPendingPages false
             require(event.owner == owner) { "Foreign activity owner" }
             try {
+                // A timed-out upload is abandoned, not cancelled: Firestore keeps the write queued and may still
+                // apply it. The row stays PENDING and is re-sent; that is safe because the doc id is deterministic
+                // and the payload identical, which firestore.rules accept as "create, or identical update".
                 withTimeout(30_000) { uploader.upload(uid, event) }
             } catch (failure: Exception) {
                 if (!isTerminalUploadFailure(failure)) throw failure
@@ -226,6 +229,7 @@ class FirestoreActivityRepository(
             if (currentUid() != uid) return@drainPendingPages false
             require(coverage.owner == owner)
             try {
+                // Abandoned on timeout like events: re-sent under the same coverage id and identical content.
                 withTimeout(30_000) { remote.uploadCoverage(uid, coverage) }
             } catch (failure: Exception) {
                 if (!isTerminalUploadFailure(failure)) throw failure

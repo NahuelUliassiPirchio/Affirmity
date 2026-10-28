@@ -606,6 +606,44 @@ class AffirmityAppStateSwapTest {
         assertEquals(failure, state.activitySaveError.value)
     }
 
+    private class PassCountingActivityRepository : com.pirxhio.affirmity.data.repository.ActivityRepository {
+        var passes = 0
+        override suspend fun record(command: ActivityEvent): ActivitySaveState = ActivitySaveState.LOCAL
+        override fun observeRange(owner: String, fromEpochDay: Long, toEpochDay: Long) = flowOf(ActivityRangeState.Loading)
+        override suspend fun retryPending(owner: String) { passes++ }
+        override suspend fun rearmFailed(owner: String) = Unit
+    }
+
+    private fun passCountingState(scope: CoroutineScope, repo: PassCountingActivityRepository): AffirmityAppState {
+        val binding = com.pirxhio.affirmity.data.repository.ActivitySessionBinding(
+            com.pirxhio.affirmity.data.repository.ActivityIdentityHandle {
+                com.pirxhio.affirmity.data.repository.ActivityIdentity("account:A", "device") }, repo)
+        return signedInState(scope, com.pirxhio.affirmity.diagnostics.NoOpSyncFailureReporter,
+            remote = { fakeRemote("A", mutableListOf(), activity = binding) })
+    }
+
+    @Test fun `twenty views within the window cause at most two upload passes`() = runTest {
+        val repo = PassCountingActivityRepository()
+        val state = passCountingState(backgroundScope, repo)
+        runCurrent()
+        val base = repo.passes
+        repeat(20) { state.recordAffirmationViewed(); runCurrent() }
+        assertEquals("leading pass only while the window is open", base + 1, repo.passes)
+        advanceTimeBy(ACTIVITY_VIEW_SIGNAL_WINDOW_MILLIS); runCurrent()
+        assertEquals("plus one trailing pass", base + 2, repo.passes)
+    }
+
+    @Test fun `a meditation completion uploads immediately inside an open view window`() = runTest {
+        val repo = PassCountingActivityRepository()
+        val state = passCountingState(backgroundScope, repo)
+        runCurrent()
+        state.recordAffirmationViewed(); runCurrent()
+        val afterLeadingView = repo.passes
+        val capture = state.startMeditationActivity(ActivityKind.GUIDED, "m1", "Calm", 0L)
+        state.completeMeditationActivity(capture, 60L, endMillis = 60_000L, zoneId = "UTC"); runCurrent()
+        assertEquals(afterLeadingView + 1, repo.passes)
+    }
+
     @Test fun `the account retry session passes the reporter to the retry loop`() = runTest {
         val reporter = com.pirxhio.affirmity.diagnostics.FakeSyncFailureReporter()
         val failing = object : com.pirxhio.affirmity.data.repository.ActivityRepository {

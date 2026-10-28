@@ -1086,6 +1086,8 @@ class AffirmityAppState(
     private val activitySaveMutex = Mutex()
     private val viewEligibilityMutex = Mutex()
     private val activityRetrySignals = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    /** VIEW saves signal here; throttled so a swiping burst does not trigger a pass per swipe. */
+    private val activityViewSignals = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     /**
      * The single source of truth for which store is active. See design.md's "The swap moment":
@@ -1253,7 +1255,8 @@ class AffirmityAppState(
                     val owner = "account:${captured.uid}"
                     com.pirxhio.affirmity.data.remote.runActivityRetrySession(captured.activity.repository, owner,
                         { (authRepository.authState.value as? AuthState.SignedIn)?.uid?.let { "account:$it" } },
-                        kotlinx.coroutines.flow.merge(activityConnectivity, activityRetrySignals),
+                        kotlinx.coroutines.flow.merge(activityConnectivity, activityRetrySignals,
+                            activityViewSignals.throttleLatest(ACTIVITY_VIEW_SIGNAL_WINDOW_MILLIS)),
                         onFailure = { failure ->
                             if ((authRepository.authState.value as? AuthState.SignedIn)?.uid == captured.uid) {
                                 syncError.value = failure?.message
@@ -2323,9 +2326,12 @@ class AffirmityAppState(
         }
     }
 
-    private fun saveActivity(block: suspend () -> Unit) {
+    private fun saveActivity(
+        signal: kotlinx.coroutines.flow.MutableSharedFlow<Unit> = activityRetrySignals,
+        block: suspend () -> Unit,
+    ) {
         scope.launch {
-            try { activitySaveMutex.withLock { block() }; activitySaveError.value = null; activityRetrySignals.tryEmit(Unit) }
+            try { activitySaveMutex.withLock { block() }; activitySaveError.value = null; signal.tryEmit(Unit) }
             catch (cancellation: CancellationException) { throw cancellation }
             catch (failure: Exception) {
                 activityContinuityBroken = true
@@ -2390,7 +2396,7 @@ class AffirmityAppState(
         val occurredAtMillis = System.currentTimeMillis()
         val zone = java.util.TimeZone.getDefault()
         val recorder = ActivityRecorder(captured.activity)
-        saveActivity { recorder.view(occurredAtMillis, zone) }
+        saveActivity(activityViewSignals) { recorder.view(occurredAtMillis, zone) }
         launchDailyFactWrite {
             viewEligibilityMutex.withLock {
             val today = DayClock.epochDay()
