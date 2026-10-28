@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.google.services)
+    alias(libs.plugins.firebase.crashlytics)
 }
 
 // Ad secrets are resolved from (in order): a Gradle project property (-P), local.properties (not
@@ -175,6 +176,8 @@ dependencies {
     // Versionless, BOM-managed (matches firebase.auth/firestore/messaging above) -- NOT the
     // deprecated firebase-analytics-ktx, folded into the main artifact since BOM 32.x (D6).
     implementation(libs.firebase.analytics)
+    // Versionless, BOM-managed. Sync-failure non-fatals only (no user id, no PII); see diagnostics/.
+    implementation(libs.firebase.crashlytics)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
