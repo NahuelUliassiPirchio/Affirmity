@@ -13,6 +13,7 @@ import kotlinx.coroutines.tasks.await
 
 /** Thin SDK adapter; all payload validation and source identity are shared with retry/import reads. */
 class FirebaseActivityClient(private val firestore: FirebaseFirestore) : ActivityRemoteClient {
+    /** Deterministic doc id and identical payload on every send, so a re-send after an abandoned (timed-out) upload is an identical update. */
     override suspend fun uploadEvent(uid: String, event: ActivityEventEntity) {
         require(event.owner == "account:$uid")
         val payload = activityEventToMap(event)
