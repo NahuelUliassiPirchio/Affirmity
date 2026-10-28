@@ -5,4 +5,5 @@ enum class SyncFailureKind(val wireName: String) {
     TERMINAL_UPLOAD("terminal_upload"),
     CLAIM("claim"),
     ACTIVITY_SAVE("activity_save"),
+    PAGE_STALL("page_stall"),
 }

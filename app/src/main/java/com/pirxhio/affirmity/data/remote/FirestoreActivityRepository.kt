@@ -17,6 +17,7 @@ import com.pirxhio.affirmity.data.repository.ActivityRepository
 import android.util.Log
 import com.pirxhio.affirmity.diagnostics.NoOpSyncFailureReporter
 import com.pirxhio.affirmity.diagnostics.SyncFailureKind
+import com.pirxhio.affirmity.diagnostics.SyncFailureReport
 import com.pirxhio.affirmity.diagnostics.SyncFailureReporter
 import com.pirxhio.affirmity.diagnostics.TerminalRowKind
 import com.pirxhio.affirmity.diagnostics.safeReport
@@ -108,6 +109,12 @@ internal class PendingPageTracker<K> {
     fun remember(keys: List<K>) { previous = keys.toHashSet() }
 }
 
+/** Logs row kind and page size only: no ids, uid or payload. The stop behavior is unchanged by reporting. */
+private fun recordPageStall(kind: TerminalRowKind, pageSize: Int, reporter: SyncFailureReporter) {
+    Log.w(TAG, "Activity ${kind.wireName} pending page of $pageSize repeated a row; pass stopped")
+    reporter.safeReport(SyncFailureReport(SyncFailureKind.PAGE_STALL, "PendingPageStall", rowKind = kind))
+}
+
 private data class CoverageKey(val sourceId: String, val schema: Int, val from: Long, val to: Long, val uncertain: Boolean)
 
 private fun ActivityCoverageEntity.key() = CoverageKey(sourceId, recordingSchema, fromEpochDay, toEpochDay, uncertain)
@@ -117,11 +124,14 @@ private fun ActivityCoverageEntity.key() = CoverageKey(sourceId, recordingSchema
  * [handle] returns false to stop the pass (uid guard); a throw also stops it (transient failure).
  * Handled rows leave PENDING (acknowledged or FAILED) and pages are oldest first, so a row that stayed PENDING without
  * throwing reappears in the very next page. A page repeating any key of the previous page ends the pass before that
- * row is handled again; an empty or short page also ends it, so the loop cannot spin.
+ * row is handled again (and is logged and reported as PAGE_STALL); an empty or short page also ends it, so the loop
+ * cannot spin.
  */
 internal suspend fun <T, K> drainPendingPages(
     fetch: suspend (limit: Int) -> List<T>,
     key: (T) -> K,
+    rowKind: TerminalRowKind,
+    reporter: SyncFailureReporter,
     handle: suspend (T) -> Boolean,
 ) {
     val tracker = PendingPageTracker<K>()
@@ -129,7 +139,10 @@ internal suspend fun <T, K> drainPendingPages(
         val page = fetch(ACTIVITY_PENDING_PAGE_SIZE)
         if (page.isEmpty()) return
         val keys = page.map(key)
-        if (tracker.stalled(keys)) return
+        if (tracker.stalled(keys)) {
+            recordPageStall(rowKind, page.size, reporter)
+            return
+        }
         for (row in page) if (!handle(row)) return
         if (page.size < ACTIVITY_PENDING_PAGE_SIZE) return
         tracker.remember(keys)
@@ -149,7 +162,7 @@ class ActivityEventSync(
     suspend fun retryPending() = mutex.withLock {
         if (currentUid() != uid) return@withLock
         val owner = "account:$uid"
-        drainPendingPages({ limit -> dao.pending(owner, limit) }, { it.eventId }) { event ->
+        drainPendingPages({ limit -> dao.pending(owner, limit) }, { it.eventId }, rowKind = TerminalRowKind.EVENT, reporter = reporter) { event ->
             if (currentUid() != uid) return@drainPendingPages false
             require(event.owner == owner) { "Foreign activity owner" }
             try {
@@ -225,7 +238,7 @@ class FirestoreActivityRepository(
         require(owner == this.owner) { "Foreign activity owner" }
         if (currentUid() != uid) return@withLock
         sync.retryPending()
-        drainPendingPages({ limit -> dao.pendingCoverage(owner, limit) }, { it.key() }) { coverage ->
+        drainPendingPages({ limit -> dao.pendingCoverage(owner, limit) }, { it.key() }, rowKind = TerminalRowKind.COVERAGE, reporter = reporter) { coverage ->
             if (currentUid() != uid) return@drainPendingPages false
             require(coverage.owner == owner)
             try {
