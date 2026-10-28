@@ -1,5 +1,11 @@
 package com.pirxhio.affirmity.ui.settings
 
+import android.content.res.Configuration
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import java.util.Locale
 import androidx.activity.ComponentActivity
 import com.pirxhio.affirmity.R
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -31,7 +37,9 @@ class MyGoalsScreenTest {
         val store = RecordingGoalsStore(setOf("calm"))
         composeTestRule.setContent { MyGoalsScreen(store = store) }
 
-        val confidenceLabel = UserGoal.all.first { it.id == "confidence" }.label
+        val confidenceLabel = composeTestRule.activity.getString(
+            UserGoal.all.first { it.id == "confidence" }.labelRes,
+        )
         composeTestRule.onNodeWithText(confidenceLabel).performClick()
         composeTestRule.runOnIdle { assertEquals(0, store.saveCalls) }
 
@@ -41,6 +49,26 @@ class MyGoalsScreenTest {
         composeTestRule.waitUntil(timeoutMillis = 5_000) { store.saveCalls == 1 }
 
         assertEquals(setOf("calm", "confidence"), store.savedGoalIds)
+    }
+
+    @Test
+    fun goalsAreShownInEnglishWhenLocaleIsEnglish() {
+        composeTestRule.setContent {
+            WithLocale("en", composeTestRule.activity) { MyGoalsScreen(store = RecordingGoalsStore(setOf("calm"))) }
+        }
+
+        composeTestRule.onNodeWithText("Find calm").assertExists()
+        composeTestRule.onNodeWithText("Encontrar calma").assertDoesNotExist()
+    }
+
+    @Test
+    fun goalsAreShownInSpanishWhenLocaleIsSpanish() {
+        composeTestRule.setContent {
+            WithLocale("es", composeTestRule.activity) { MyGoalsScreen(store = RecordingGoalsStore(setOf("calm"))) }
+        }
+
+        composeTestRule.onNodeWithText("Encontrar calma").assertExists()
+        composeTestRule.onNodeWithText("Find calm").assertDoesNotExist()
     }
 }
 
@@ -72,4 +100,17 @@ private class RecordingGoalsStore(initialGoalIds: Set<String>?) : UserGoalsStore
     override suspend fun recordDivergencePromptShown(atMillis: Long) = Unit
 
     override suspend fun recordDivergenceDismissal(goalId: String, atMillis: Long) = Unit
+}
+
+/** Renders [content] with an explicitly pinned locale so assertions never depend on the device language. */
+@Composable
+private fun WithLocale(language: String, activity: ComponentActivity, content: @Composable () -> Unit) {
+    val configuration = Configuration(activity.resources.configuration).apply {
+        setLocale(Locale.forLanguageTag(language))
+    }
+    CompositionLocalProvider(
+        LocalContext provides activity.createConfigurationContext(configuration),
+        LocalConfiguration provides configuration,
+        content = content,
+    )
 }

@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.ui.onboarding
 
+import com.pirxhio.affirmity.R
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -20,13 +21,13 @@ class OnboardingQuestionTest {
 
         assertEquals(
             listOf(
-                OnboardingOption("calm", "Encontrar calma"),
-                OnboardingOption("confidence", "Fortalecer mi confianza"),
-                OnboardingOption("self_love", "Tratarme con más amor"),
-                OnboardingOption("motivation", "Recuperar motivación"),
-                OnboardingOption("connection", "Sentirme más conectado/a"),
-                OnboardingOption("change", "Atravesar cambios"),
-                OnboardingOption("direction", "Encontrar dirección"),
+                OnboardingOption("calm", "", labelRes = R.string.user_goal_calm),
+                OnboardingOption("confidence", "", labelRes = R.string.user_goal_confidence),
+                OnboardingOption("self_love", "", labelRes = R.string.user_goal_self_love),
+                OnboardingOption("motivation", "", labelRes = R.string.user_goal_motivation),
+                OnboardingOption("connection", "", labelRes = R.string.user_goal_connection),
+                OnboardingOption("change", "", labelRes = R.string.user_goal_change),
+                OnboardingOption("direction", "", labelRes = R.string.user_goal_direction),
             ),
             onboardingQuestions[0].options,
         )

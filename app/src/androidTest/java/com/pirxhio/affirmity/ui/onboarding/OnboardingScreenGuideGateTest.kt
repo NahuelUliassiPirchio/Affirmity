@@ -1,5 +1,12 @@
 package com.pirxhio.affirmity.ui.onboarding
 
+import android.content.res.Configuration
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import java.util.Locale
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsEnabled
@@ -65,6 +72,26 @@ class OnboardingScreenGuideGateTest {
     }
 
     @Test
+    fun goalOptionsAreShownInEnglishWhenLocaleIsEnglish() {
+        composeTestRule.setContent {
+            WithLocale("en", composeTestRule.activity) { onboardingScreen(resumeAtQuestions = true) }
+        }
+
+        composeTestRule.onNodeWithText("Find calm").assertExists()
+        composeTestRule.onNodeWithText("Encontrar calma").assertDoesNotExist()
+    }
+
+    @Test
+    fun goalOptionsAreShownInSpanishWhenLocaleIsSpanish() {
+        composeTestRule.setContent {
+            WithLocale("es", composeTestRule.activity) { onboardingScreen(resumeAtQuestions = true) }
+        }
+
+        composeTestRule.onNodeWithText("Encontrar calma").assertExists()
+        composeTestRule.onNodeWithText("Find calm").assertDoesNotExist()
+    }
+
+    @Test
     fun signedInPersistedResumeCompletesAfterLastQuestionWithoutRenderingFinalAuth() {
         val completionEvents = mutableListOf<String>()
         composeTestRule.setContent {
@@ -77,7 +104,7 @@ class OnboardingScreenGuideGateTest {
         }
 
         onboardingQuestions.forEach { question ->
-            composeTestRule.onNodeWithText(question.options.first().label).performClick()
+            composeTestRule.onNodeWithText(question.options.first().displayLabel()).performClick()
             composeTestRule.onNodeWithText(
                 composeTestRule.activity.getString(R.string.onboarding_next_button),
             ).performClick()
@@ -154,7 +181,7 @@ class OnboardingScreenGuideGateTest {
 
         repeat(2) { questionIndex ->
             val question = onboardingQuestions[questionIndex]
-            composeTestRule.onNodeWithText(question.options.first().label).performClick()
+            composeTestRule.onNodeWithText(question.options.first().displayLabel()).performClick()
             composeTestRule.onNodeWithText(
                 composeTestRule.activity.getString(R.string.onboarding_next_button),
             ).performClick()
@@ -178,7 +205,7 @@ class OnboardingScreenGuideGateTest {
         }
 
         onboardingQuestions.forEach { question ->
-            composeTestRule.onNodeWithText(question.options.first().label).performClick()
+            composeTestRule.onNodeWithText(question.options.first().displayLabel()).performClick()
             composeTestRule.onNodeWithText(
                 composeTestRule.activity.getString(R.string.onboarding_next_button),
             ).performClick()
@@ -211,7 +238,7 @@ class OnboardingScreenGuideGateTest {
         }
 
         onboardingQuestions.forEach { question ->
-            composeTestRule.onNodeWithText(question.options.first().label).performClick()
+            composeTestRule.onNodeWithText(question.options.first().displayLabel()).performClick()
             composeTestRule.onNodeWithText(
                 composeTestRule.activity.getString(R.string.onboarding_next_button),
             ).performClick()
@@ -241,11 +268,11 @@ class OnboardingScreenGuideGateTest {
 
         next.assertIsNotEnabled()
         onboardingQuestions[0].options.take(3).forEach {
-            composeTestRule.onNodeWithText(it.label).performClick()
+            composeTestRule.onNodeWithText(it.displayLabel()).performClick()
         }
-        composeTestRule.onNodeWithText(onboardingQuestions[0].options[3].label).assertIsNotEnabled()
-        composeTestRule.onNodeWithText(onboardingQuestions[0].options[0].label).performClick()
-        composeTestRule.onNodeWithText(onboardingQuestions[0].options[3].label).assertIsEnabled()
+        composeTestRule.onNodeWithText(onboardingQuestions[0].options[3].displayLabel()).assertIsNotEnabled()
+        composeTestRule.onNodeWithText(onboardingQuestions[0].options[0].displayLabel()).performClick()
+        composeTestRule.onNodeWithText(onboardingQuestions[0].options[3].displayLabel()).assertIsEnabled()
         next.performClick()
 
         composeTestRule.onNodeWithText("Suave").performClick().assertIsSelected()
@@ -275,7 +302,7 @@ class OnboardingScreenGuideGateTest {
         }
 
         onboardingQuestions.forEach { question ->
-            composeTestRule.onNodeWithText(question.options.first().label).performClick()
+            composeTestRule.onNodeWithText(question.options.first().displayLabel()).performClick()
             val next = composeTestRule.onNodeWithText(
                 composeTestRule.activity.getString(R.string.onboarding_next_button),
             )
@@ -308,7 +335,7 @@ class OnboardingScreenGuideGateTest {
         }
 
         onboardingQuestions.forEach { question ->
-            composeTestRule.onNodeWithText(question.options.first().label).performClick()
+            composeTestRule.onNodeWithText(question.options.first().displayLabel()).performClick()
             composeTestRule.onNodeWithText(
                 composeTestRule.activity.getString(R.string.onboarding_next_button),
             ).performClick()
@@ -353,5 +380,21 @@ class OnboardingScreenGuideGateTest {
         uid = "returning-user",
         displayName = null,
         email = null,
+    )
+}
+
+private fun OnboardingOption.displayLabel(): String =
+    labelRes?.let { InstrumentationRegistry.getInstrumentation().targetContext.getString(it) } ?: label
+
+/** Renders [content] with an explicitly pinned locale so assertions never depend on the device language. */
+@Composable
+private fun WithLocale(language: String, activity: ComponentActivity, content: @Composable () -> Unit) {
+    val configuration = Configuration(activity.resources.configuration).apply {
+        setLocale(Locale.forLanguageTag(language))
+    }
+    CompositionLocalProvider(
+        LocalContext provides activity.createConfigurationContext(configuration),
+        LocalConfiguration provides configuration,
+        content = content,
     )
 }

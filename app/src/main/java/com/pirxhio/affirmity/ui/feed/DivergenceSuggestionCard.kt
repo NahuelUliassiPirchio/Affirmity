@@ -69,12 +69,12 @@ fun DivergenceSuggestionCard(
 
 @StringRes
 internal fun divergenceGoalLabelRes(goalId: String): Int? = when (goalId) {
-    "calm" -> R.string.divergence_goal_calm
-    "confidence" -> R.string.divergence_goal_confidence
-    "self_love" -> R.string.divergence_goal_self_love
-    "motivation" -> R.string.divergence_goal_motivation
-    "connection" -> R.string.divergence_goal_connection
-    "change" -> R.string.divergence_goal_change
-    "direction" -> R.string.divergence_goal_direction
+    "calm" -> R.string.user_goal_calm
+    "confidence" -> R.string.user_goal_confidence
+    "self_love" -> R.string.user_goal_self_love
+    "motivation" -> R.string.user_goal_motivation
+    "connection" -> R.string.user_goal_connection
+    "change" -> R.string.user_goal_change
+    "direction" -> R.string.user_goal_direction
     else -> null
 }
