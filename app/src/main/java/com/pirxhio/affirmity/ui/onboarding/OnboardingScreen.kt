@@ -302,7 +302,7 @@ private fun QuestionStep(
                         )
                     }
                     Column(modifier = Modifier.padding(start = 8.dp)) {
-                        Text(text = option.label)
+                        Text(text = option.labelRes?.let { stringResource(it) } ?: option.label)
                         option.example?.let { example ->
                             Text(text = example, style = MaterialTheme.typography.bodySmall)
                         }

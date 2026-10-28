@@ -556,13 +556,13 @@
     <string name="divergence_prompt_suggested_goal">Suggested goal: %1$s</string>
     <string name="divergence_prompt_add">Add</string>
     <string name="divergence_prompt_dismiss">Not now</string>
-    <string name="divergence_goal_calm">Find calm</string>
-    <string name="divergence_goal_confidence">Build my confidence</string>
-    <string name="divergence_goal_self_love">Treat myself with more love</string>
-    <string name="divergence_goal_motivation">Regain motivation</string>
-    <string name="divergence_goal_connection">Feel more connected</string>
-    <string name="divergence_goal_change">Navigate change</string>
-    <string name="divergence_goal_direction">Find direction</string>
+    <string name="user_goal_calm">Find calm</string>
+    <string name="user_goal_confidence">Build my confidence</string>
+    <string name="user_goal_self_love">Treat myself with more love</string>
+    <string name="user_goal_motivation">Regain motivation</string>
+    <string name="user_goal_connection">Feel more connected</string>
+    <string name="user_goal_change">Navigate change</string>
+    <string name="user_goal_direction">Find direction</string>
 
     <!-- Your feed source toggles. -->
     <string name="your_feed_sources_title">What else goes in your feed</string>

@@ -112,7 +112,7 @@ fun MyGoalsScreen(
             ) {
                 Checkbox(checked = checked, onCheckedChange = null)
                 Text(
-                    text = goal.label,
+                    text = stringResource(goal.labelRes),
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(start = 12.dp),
                 )

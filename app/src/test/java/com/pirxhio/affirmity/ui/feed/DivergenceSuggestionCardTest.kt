@@ -22,13 +22,13 @@ class DivergenceSuggestionCardTest {
 
     @Test
     fun `every catalog goal resolves to banner-scoped localized copy`() {
-        assertEquals(R.string.divergence_goal_calm, divergenceGoalLabelRes("calm"))
-        assertEquals(R.string.divergence_goal_confidence, divergenceGoalLabelRes("confidence"))
-        assertEquals(R.string.divergence_goal_self_love, divergenceGoalLabelRes("self_love"))
-        assertEquals(R.string.divergence_goal_motivation, divergenceGoalLabelRes("motivation"))
-        assertEquals(R.string.divergence_goal_connection, divergenceGoalLabelRes("connection"))
-        assertEquals(R.string.divergence_goal_change, divergenceGoalLabelRes("change"))
-        assertEquals(R.string.divergence_goal_direction, divergenceGoalLabelRes("direction"))
+        assertEquals(R.string.user_goal_calm, divergenceGoalLabelRes("calm"))
+        assertEquals(R.string.user_goal_confidence, divergenceGoalLabelRes("confidence"))
+        assertEquals(R.string.user_goal_self_love, divergenceGoalLabelRes("self_love"))
+        assertEquals(R.string.user_goal_motivation, divergenceGoalLabelRes("motivation"))
+        assertEquals(R.string.user_goal_connection, divergenceGoalLabelRes("connection"))
+        assertEquals(R.string.user_goal_change, divergenceGoalLabelRes("change"))
+        assertEquals(R.string.user_goal_direction, divergenceGoalLabelRes("direction"))
     }
 
     @Test

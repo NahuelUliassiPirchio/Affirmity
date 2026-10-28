@@ -1,5 +1,6 @@
 package com.pirxhio.affirmity.ui.onboarding
 
+import androidx.annotation.StringRes
 import com.pirxhio.affirmity.personalization.goals.OnboardingAnswers
 import com.pirxhio.affirmity.personalization.goals.UserGoal
 
@@ -7,6 +8,8 @@ data class OnboardingOption(
     val id: String,
     val label: String,
     val example: String? = null,
+    /** When set, takes precedence over [label] and is resolved in the UI so it follows the locale. */
+    @StringRes val labelRes: Int? = null,
 )
 
 /** A single onboarding question with stable option IDs and an explicit selection limit. */
@@ -44,7 +47,7 @@ val onboardingQuestions: List<OnboardingQuestion> = listOf(
     OnboardingQuestion(
         id = "goals",
         question = "¿Qué te vendría bien ahora?",
-        options = UserGoal.all.map { OnboardingOption(id = it.id, label = it.label) },
+        options = UserGoal.all.map { OnboardingOption(id = it.id, label = "", labelRes = it.labelRes) },
         maxSelections = 3,
     ),
     OnboardingQuestion(
