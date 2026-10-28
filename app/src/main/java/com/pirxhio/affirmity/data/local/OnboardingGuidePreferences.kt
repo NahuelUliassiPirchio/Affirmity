@@ -1,6 +1,8 @@
 package com.pirxhio.affirmity.data.local
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
@@ -18,19 +20,21 @@ private val Context.onboardingGuideDataStore by preferencesDataStore(name = "onb
  * [com.pirxhio.affirmity.data.resolveGuideBackfill] for the migration-default resolution), `false`
  * means armed (guide owed), `true` means seen.
  */
-class OnboardingGuidePreferences(private val context: Context) {
+class OnboardingGuidePreferences internal constructor(private val dataStore: DataStore<Preferences>) {
+
+    constructor(context: Context) : this(context.onboardingGuideDataStore)
 
     fun observeHasSeenGuide(): Flow<Boolean?> =
-        context.onboardingGuideDataStore.data.map { it[HAS_SEEN_ONBOARDING_GUIDE] }
+        dataStore.data.map { it[HAS_SEEN_ONBOARDING_GUIDE] }
 
     /** Called from `completeOnboarding()` -- arms the auto-show gate (writes `false`). */
     suspend fun arm() {
-        context.onboardingGuideDataStore.edit { it[HAS_SEEN_ONBOARDING_GUIDE] = false }
+        dataStore.edit { it[HAS_SEEN_ONBOARDING_GUIDE] = false }
     }
 
     /** Called on Skip/complete/manual-close -- commits "seen" (writes `true`). */
     suspend fun markSeen() {
-        context.onboardingGuideDataStore.edit { it[HAS_SEEN_ONBOARDING_GUIDE] = true }
+        dataStore.edit { it[HAS_SEEN_ONBOARDING_GUIDE] = true }
     }
 
     private companion object {
