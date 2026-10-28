@@ -24,7 +24,7 @@ class ActivitySyncTest {
         val sync = ActivityEventSync(dao, "A", ActivityUploader { uid, event ->
             accepted += "$uid:${event.eventId}"
             currentUid = "B"
-        }) { currentUid }
+        }, currentUid = { currentUid })
         sync.retryPending()
         sync.retryPending()
         assertEquals(listOf("A:one"), accepted)
@@ -48,7 +48,7 @@ class ActivitySyncTest {
             if (failUpload) error("Offline")
             accepted += uid to payload
         }
-        val sync = ActivityEventSync(dao, "A", uploader) { "A" }
+        val sync = ActivityEventSync(dao, "A", uploader, currentUid = { "A" })
         try {
             sync.retryPending()
             fail("Offline is a retryable failure")

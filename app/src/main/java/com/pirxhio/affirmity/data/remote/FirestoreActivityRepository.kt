@@ -15,6 +15,12 @@ import com.pirxhio.affirmity.data.local.domain
 import com.pirxhio.affirmity.data.local.stored
 import com.pirxhio.affirmity.data.repository.ActivityRepository
 import android.util.Log
+import com.pirxhio.affirmity.diagnostics.NoOpSyncFailureReporter
+import com.pirxhio.affirmity.diagnostics.SyncFailureKind
+import com.pirxhio.affirmity.diagnostics.SyncFailureReporter
+import com.pirxhio.affirmity.diagnostics.TerminalRowKind
+import com.pirxhio.affirmity.diagnostics.safeReport
+import com.pirxhio.affirmity.diagnostics.syncFailureReport
 import com.google.firebase.firestore.FirebaseFirestoreException
 import java.security.MessageDigest
 import kotlinx.coroutines.CancellationException
@@ -64,9 +70,25 @@ fun isTerminalUploadFailure(failure: Throwable): Boolean = when (failure) {
 private const val TAG = "ActivitySync"
 
 /** Logs identity and failure kind only: never payload content or the uid. */
-private fun logTerminalFailure(kind: String, id: String, failure: Exception) {
+private fun recordTerminalFailure(kind: TerminalRowKind, id: String, failure: Exception, reporter: SyncFailureReporter) {
     val reason = (failure as? FirebaseFirestoreException)?.code?.name ?: failure.javaClass.simpleName
-    Log.w(TAG, "Activity $kind $id rejected permanently ($reason); marked FAILED")
+    Log.w(TAG, "Activity ${kind.wireName} $id rejected permanently ($reason); marked FAILED")
+    // The report omits the id and message; the reporter rate-limits per code so a re-armed row cannot spam.
+    reporter.safeReport(syncFailureReport(SyncFailureKind.TERMINAL_UPLOAD, failure, kind))
+}
+
+/** Consecutive failed passes before a streak with a non-network failure is reported. */
+internal const val RETRY_FAILURE_REPORT_THRESHOLD = 5
+
+/** Consecutive failed passes before a streak of only network-transient failures is reported. */
+internal const val RETRY_NETWORK_FAILURE_REPORT_THRESHOLD = 10
+
+private fun isNetworkTransient(failure: Throwable): Boolean = when (failure) {
+    is FirebaseFirestoreException ->
+        failure.code == FirebaseFirestoreException.Code.UNAVAILABLE ||
+            failure.code == FirebaseFirestoreException.Code.DEADLINE_EXCEEDED
+    is TimeoutCancellationException -> true
+    else -> false
 }
 
 private val TERMINAL_FIRESTORE_CODES = setOf(
@@ -120,6 +142,7 @@ class ActivityEventSync(
     private val uid: String,
     private val uploader: ActivityUploader,
     private val currentUid: () -> String?,
+    private val reporter: SyncFailureReporter = NoOpSyncFailureReporter,
 ) {
     private val mutex = Mutex()
 
@@ -134,7 +157,7 @@ class ActivityEventSync(
             } catch (failure: Exception) {
                 if (!isTerminalUploadFailure(failure)) throw failure
                 dao.markFailed(owner, event.eventId)
-                logTerminalFailure("event", event.eventId, failure)
+                recordTerminalFailure(TerminalRowKind.EVENT, event.eventId, failure, reporter)
                 return@drainPendingPages true
             }
             dao.acknowledge(owner, event.eventId)
@@ -155,9 +178,10 @@ class FirestoreActivityRepository(
     private val uid: String,
     private val remote: ActivityRemoteClient,
     private val currentUid: () -> String?,
+    private val reporter: SyncFailureReporter = NoOpSyncFailureReporter,
 ) : ActivityRepository {
     private val owner = "account:$uid"
-    private val sync = ActivityEventSync(dao, uid, ActivityUploader(remote::uploadEvent), currentUid)
+    private val sync = ActivityEventSync(dao, uid, ActivityUploader(remote::uploadEvent), currentUid, reporter)
     private val retryMutex = Mutex()
     init { require(uid.isNotBlank() && '/' !in uid) }
 
@@ -206,8 +230,8 @@ class FirestoreActivityRepository(
             } catch (failure: Exception) {
                 if (!isTerminalUploadFailure(failure)) throw failure
                 dao.markCoverageFailed(coverage)
-                logTerminalFailure("coverage", coverageIdentity(ActivityCoverageInterval(coverage.owner, coverage.sourceId,
-                    coverage.fromEpochDay, coverage.toEpochDay, coverage.recordingSchema, coverage.uncertain)), failure)
+                recordTerminalFailure(TerminalRowKind.COVERAGE, coverageIdentity(ActivityCoverageInterval(coverage.owner, coverage.sourceId,
+                    coverage.fromEpochDay, coverage.toEpochDay, coverage.recordingSchema, coverage.uncertain)), failure, reporter)
                 return@drainPendingPages true
             }
             dao.acknowledgeCoverage(coverage)
@@ -221,28 +245,47 @@ private fun accountRange(from: Long, to: Long, events: List<ActivityEvent>, pend
         aggregateActivityDay(day, events, ActivityCoverage.UNKNOWN)
     }, pendingCount)
 
-/** Restart calls retry immediately; identity changes stop retries without discarding durable rows. */
+/**
+ * Restart calls retry immediately; identity changes stop retries without discarding durable rows.
+ * Reports one non-fatal per failure streak: at the 5th consecutive failed pass if any failure in the streak is
+ * not network-transient, else at the 10th. Counts only this loop's passes, not signal-triggered ones.
+ */
 suspend fun runActivityRetryLoop(
     repository: ActivityRepository,
     owner: String,
     currentOwner: () -> String?,
     onFailure: (Throwable?) -> Unit,
+    reporter: SyncFailureReporter = NoOpSyncFailureReporter,
 ) {
-    var failures = 0
+    var backoffStep = 0
+    var consecutiveFailures = 0
+    var streakReported = false
+    var streakNonNetworkFailure: Throwable? = null
     while (currentOwner() == owner) {
         val waitMillis = try {
             repository.retryPending(owner)
             if (currentOwner() != owner) return
             onFailure(null)
-            failures = 0
+            backoffStep = 0
+            consecutiveFailures = 0
+            streakReported = false
+            streakNonNetworkFailure = null
             60_000L
         } catch (failure: Exception) {
             if (failure is CancellationException && failure !is TimeoutCancellationException) throw failure
             currentCoroutineContext().ensureActive() // an outer timeout/cancel is not a retry failure
             if (currentOwner() != owner) return
             onFailure(failure)
-            val backoff = (1_000L shl failures.coerceAtMost(6)).coerceAtMost(60_000L)
-            failures = (failures + 1).coerceAtMost(6)
+            consecutiveFailures++
+            if (!isNetworkTransient(failure)) streakNonNetworkFailure = failure
+            val threshold = if (streakNonNetworkFailure != null) RETRY_FAILURE_REPORT_THRESHOLD
+                else RETRY_NETWORK_FAILURE_REPORT_THRESHOLD
+            if (!streakReported && consecutiveFailures >= threshold) {
+                streakReported = true
+                reporter.safeReport(syncFailureReport(SyncFailureKind.RETRY_LOOP, streakNonNetworkFailure ?: failure))
+            }
+            val backoff = (1_000L shl backoffStep.coerceAtMost(6)).coerceAtMost(60_000L)
+            backoffStep = (backoffStep + 1).coerceAtMost(6)
             backoff
         }
         delay(waitMillis)
@@ -251,7 +294,8 @@ suspend fun runActivityRetryLoop(
 
 /** Caller cancellation ends both the backoff timer and connectivity/new-record subscription. */
 suspend fun runActivityRetrySession(repository: ActivityRepository, owner: String,
-    currentOwner: () -> String?, signals: Flow<Unit>, onFailure: (Throwable?) -> Unit) = coroutineScope {
+    currentOwner: () -> String?, signals: Flow<Unit>, onFailure: (Throwable?) -> Unit,
+    reporter: SyncFailureReporter = NoOpSyncFailureReporter) = coroutineScope {
     if (currentOwner() == owner) {
         try { repository.rearmFailed(owner) }
         catch (failure: Exception) {
@@ -260,7 +304,7 @@ suspend fun runActivityRetrySession(repository: ActivityRepository, owner: Strin
             if (currentOwner() == owner) onFailure(failure)
         }
     }
-    launch { runActivityRetryLoop(repository, owner, currentOwner, onFailure) }
+    launch { runActivityRetryLoop(repository, owner, currentOwner, onFailure, reporter) }
     signals.collect {
         if (currentOwner() == owner) {
             try { repository.retryPending(owner); if (currentOwner() == owner) onFailure(null) }

@@ -65,6 +65,12 @@ import com.pirxhio.affirmity.analytics.NotificationLocaleValue
 import com.pirxhio.affirmity.analytics.RoundSource
 import com.pirxhio.affirmity.analytics.firebase.AndroidFirebaseAnalyticsSink
 import com.pirxhio.affirmity.analytics.toAdFailureReason
+import com.pirxhio.affirmity.diagnostics.ProcessDiagnostics
+import com.pirxhio.affirmity.diagnostics.NoOpSyncFailureReporter
+import com.pirxhio.affirmity.diagnostics.SyncFailureKind
+import com.pirxhio.affirmity.diagnostics.SyncFailureReporter
+import com.pirxhio.affirmity.diagnostics.safeReport
+import com.pirxhio.affirmity.diagnostics.syncFailureReport
 import com.pirxhio.affirmity.ads.GoogleRewardedAdGateway
 import com.pirxhio.affirmity.ads.GoogleRoundInterstitialGateway
 import com.pirxhio.affirmity.ads.RoundInterstitialCoordinator
@@ -586,6 +592,8 @@ class AffirmityAppState(
      *  injection convention as [adUnlockSource]. The composition root swaps this once for the
      *  real, consent-gated instance ([ConsentGatedAnalyticsLogger]) -- the one-line kill switch. */
     private val analytics: AnalyticsLogger = NoOpAnalyticsLogger,
+    /** Activity-sync non-fatals: class names and codes only. Rate limiting and consent are the wiring's job. */
+    private val syncFailureReporter: SyncFailureReporter = NoOpSyncFailureReporter,
     /** Slice 2's injected seam (design D3/spec "Emission via injected recorder") -- functional,
      *  NEVER wrapped by [analytics]'s consent gate. Defaulted to [NoOpPersonalizationSignalRecorder],
      *  the same injection convention as [analytics]/[adUnlockSource]. */
@@ -1111,7 +1119,12 @@ class AffirmityAppState(
             emit(DataSession.Migrating(uid, activeLocal))
             try {
                 val source = activeLocal
-                claimActivity(source, uid)
+                try {
+                    claimActivity(source, uid)
+                } catch (failure: Exception) {
+                    reportSyncFailure(SyncFailureKind.CLAIM, failure)
+                    throw failure
+                }
                 migrator.ensureMigrated(migrationSnapshotFor(uid, source))
                 importActivity(uid)
                 syncError.value = null
@@ -1240,11 +1253,13 @@ class AffirmityAppState(
                     val owner = "account:${captured.uid}"
                     com.pirxhio.affirmity.data.remote.runActivityRetrySession(captured.activity.repository, owner,
                         { (authRepository.authState.value as? AuthState.SignedIn)?.uid?.let { "account:$it" } },
-                        kotlinx.coroutines.flow.merge(activityConnectivity, activityRetrySignals)) { failure ->
-                        if ((authRepository.authState.value as? AuthState.SignedIn)?.uid == captured.uid) {
-                            syncError.value = failure?.message
-                        }
-                    }
+                        kotlinx.coroutines.flow.merge(activityConnectivity, activityRetrySignals),
+                        onFailure = { failure ->
+                            if ((authRepository.authState.value as? AuthState.SignedIn)?.uid == captured.uid) {
+                                syncError.value = failure?.message
+                            }
+                        },
+                        reporter = syncFailureReporter)
                 }
             }
         }
@@ -2312,8 +2327,18 @@ class AffirmityAppState(
         scope.launch {
             try { activitySaveMutex.withLock { block() }; activitySaveError.value = null; activityRetrySignals.tryEmit(Unit) }
             catch (cancellation: CancellationException) { throw cancellation }
-            catch (failure: Exception) { activityContinuityBroken = true; activitySaveError.value = failure }
+            catch (failure: Exception) {
+                activityContinuityBroken = true
+                activitySaveError.value = failure
+                reportSyncFailure(SyncFailureKind.ACTIVITY_SAVE, failure)
+            }
         }
+    }
+
+    /** Expected outcomes (cancellation, the anonymous-generation claim race) are never reported. */
+    private fun reportSyncFailure(kind: SyncFailureKind, failure: Throwable) {
+        if (failure is CancellationException || failure is AnonymousGenerationClaimedException) return
+        syncFailureReporter.safeReport(syncFailureReport(kind, failure))
     }
 
     fun startMeditationActivity(kind: ActivityKind, meditationId: String?, name: String, startMillis: Long): MeditationActivityCapture =
@@ -2809,6 +2834,9 @@ fun rememberAffirmityAppState(userGoalsStore: UserGoalsStore): AffirmityAppState
         )
         }
         val local = localSession()
+        // Process-scoped, so "once per run" survives Activity recreation. Consent is applied in
+        // AffirmityApplication.onCreate; a future consent surface must re-run it on every change.
+        val syncFailureReporter = ProcessDiagnostics.shared.syncFailureReporter
         val sharedAnalytics = ConsentGatedAnalyticsLogger(
             // Real delegate as of PR7 -- delivers nothing end-to-end until spec §9.1 item 4
             // (Firebase console Analytics enablement + a regenerated google-services.json) is
@@ -2816,15 +2844,14 @@ fun rememberAffirmityAppState(userGoalsStore: UserGoalsStore): AffirmityAppState
             delegate = FirebaseAnalyticsLogger(
                 AndroidFirebaseAnalyticsSink(FirebaseAnalytics.getInstance(context.applicationContext)),
             ),
-            // PD-1: default-DENY, globally. UNKNOWN and DENIED both suppress fully. This
-            // lambda is the ONE place a future consent surface (spec §9.1 item 3) plugs in
-            // (design D5) -- swapping this whole `analytics` argument for NoOpAnalyticsLogger
-            // is the one-line kill switch (design D1/REQ-4.6).
-            consentState = { AnalyticsConsentState.UNKNOWN },
+            // Swapping this whole `analytics` argument for NoOpAnalyticsLogger is the one-line
+            // kill switch (design D1/REQ-4.6).
+            consentState = ProcessDiagnostics.Companion::currentConsent,
         )
         AffirmityAppState(
             scope = scope,
             local = local,
+            syncFailureReporter = syncFailureReporter,
             localSessionFactory = ::localSession,
             activityJournal = database.activityDao(),
             activityConnectivity = com.pirxhio.affirmity.data.remote.observeActivityConnectivity(context),
@@ -2846,7 +2873,8 @@ fun rememberAffirmityAppState(userGoalsStore: UserGoalsStore): AffirmityAppState
                     activity = ActivitySessionBinding(ActivityIdentityHandle {
                         ActivityIdentity("account:$uid", local.activity.identity.await().sourceId)
                     }, FirestoreActivityRepository(database.activityDao(), uid, FirebaseActivityClient(firestore),
-                        { FirebaseAuth.getInstance().currentUser?.uid })),
+                        currentUid = { FirebaseAuth.getInstance().currentUser?.uid },
+                        reporter = syncFailureReporter)),
                     affirmations = FirestoreAffirmationRepository(firestore, uid),
                     completions = FirestoreDailyCompletionRepository(firestore, uid),
                     moods = FirestoreDailyMoodRepository(firestore, uid),

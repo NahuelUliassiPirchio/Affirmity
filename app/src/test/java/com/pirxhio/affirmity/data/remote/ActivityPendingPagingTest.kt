@@ -45,7 +45,7 @@ class ActivityPendingPagingTest {
     @Test fun `backlog larger than a page drains fully in one pass, in bounded pages`() = runTest {
         val journal = Journal(events(250))
         val uploaded = mutableListOf<String>()
-        ActivityEventSync(journal.dao, "A", ActivityUploader { _, event -> uploaded += event.eventId }) { "A" }
+        ActivityEventSync(journal.dao, "A", ActivityUploader { _, event -> uploaded += event.eventId }, currentUid = { "A" })
             .retryPending()
         assertEquals(journal.rows.map { it.eventId }, uploaded)
         assertTrue(journal.states.values.all { it == "UPLOADED" })
@@ -56,7 +56,7 @@ class ActivityPendingPagingTest {
 
     @Test fun `backlog that is an exact multiple of the page size ends on an empty page`() = runTest {
         val journal = Journal(events(200))
-        ActivityEventSync(journal.dao, "A", ActivityUploader { _, _ -> }) { "A" }.retryPending()
+        ActivityEventSync(journal.dao, "A", ActivityUploader { _, _ -> }, currentUid = { "A" }).retryPending()
         assertEquals(listOf(100, 100, 0), journal.pageSizes)
         assertTrue(journal.states.values.all { it == "UPLOADED" })
     }
@@ -67,7 +67,7 @@ class ActivityPendingPagingTest {
         ActivityEventSync(journal.dao, "A", ActivityUploader { _, event ->
             if (event.eventId == "e005") throw firestore(Code.PERMISSION_DENIED)
             uploaded += event.eventId
-        }) { "A" }.retryPending()
+        }, currentUid = { "A" }).retryPending()
         assertEquals("FAILED", journal.states["e005"])
         assertEquals(249, uploaded.size)
         assertEquals(249, journal.states.values.count { it == "UPLOADED" })
@@ -81,7 +81,7 @@ class ActivityPendingPagingTest {
             ActivityEventSync(journal.dao, "A", ActivityUploader { _, event ->
                 if (event.eventId == "e150") throw firestore(Code.UNAVAILABLE)
                 seen += event.eventId
-            }) { "A" }.retryPending()
+            }, currentUid = { "A" }).retryPending()
             fail("transient failures must propagate for backoff")
         } catch (failure: FirebaseFirestoreException) {
             assertEquals(Code.UNAVAILABLE, failure.code)
@@ -95,7 +95,7 @@ class ActivityPendingPagingTest {
     @Test fun `rows that stay pending without throwing are not refetched endlessly`() = runTest {
         val journal = Journal(events(150), acknowledges = false)
         var attempts = 0
-        ActivityEventSync(journal.dao, "A", ActivityUploader { _, _ -> attempts++ }) { "A" }.retryPending()
+        ActivityEventSync(journal.dao, "A", ActivityUploader { _, _ -> attempts++ }, currentUid = { "A" }).retryPending()
         assertEquals(100, attempts)
         assertEquals(2, journal.pageSizes.size)
     }
@@ -107,7 +107,7 @@ class ActivityPendingPagingTest {
         ActivityEventSync(journal.dao, "A", ActivityUploader { _, event ->
             uploaded += event.eventId
             if (uploaded.size == 120) currentUid = "B"
-        }) { currentUid }.retryPending()
+        }, currentUid = { currentUid }).retryPending()
         assertEquals(120, uploaded.size)
         assertEquals(2, journal.pageSizes.size)
     }
@@ -140,7 +140,7 @@ class ActivityPendingPagingTest {
             override suspend fun uploadCoverage(uid: String, coverage: ActivityCoverageEntity) = onCoverage(coverage)
             override fun observeEvents(uid: String, from: Long, to: Long) = flowOf(emptyList<ActivityEventEntity>())
             override fun observeCoverage(uid: String, from: Long, to: Long) = flowOf(emptyList<ActivityCoverageEntity>())
-        }) { "A" }
+        }, currentUid = { "A" })
 
     @Test fun `coverage backlog larger than a page drains fully in one pass, in bounded pages`() = runTest {
         val journal = CoverageJournal(coverage(250))
@@ -203,7 +203,7 @@ class ActivityPendingPagingTest {
     @Test fun `rows leaving pending between pages are never misread as no progress`() = runTest {
         val journal = Journal(events(450))
         var uploads = 0
-        ActivityEventSync(journal.dao, "A", ActivityUploader { _, _ -> uploads++ }) { "A" }.retryPending()
+        ActivityEventSync(journal.dao, "A", ActivityUploader { _, _ -> uploads++ }, currentUid = { "A" }).retryPending()
         assertEquals(450, uploads)
         assertEquals(listOf(100, 100, 100, 100, 50), journal.pageSizes)
     }

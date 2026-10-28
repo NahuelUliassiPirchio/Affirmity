@@ -25,7 +25,7 @@ class ActivityRepositoryTest {
     @Test fun `record acknowledges durable local pending state before network upload`() = runTest {
         val dao = Mockito.mock(ActivityDao::class.java)
         Mockito.`when`(dao.record(entity)).thenReturn(entity)
-        val repo = FirestoreActivityRepository(dao, "A", TestRemote(), { "A" })
+        val repo = FirestoreActivityRepository(dao, "A", TestRemote(), currentUid = { "A" })
         assertEquals(ActivitySaveState.PENDING, repo.record(command))
         Mockito.verify(dao).record(entity)
     }
@@ -34,7 +34,7 @@ class ActivityRepositoryTest {
         val dao = Mockito.mock(ActivityDao::class.java)
         Mockito.`when`(dao.observeRange("account:A", 20_000, 20_001)).thenReturn(flowOf(listOf(entity.copy(uploadState = "UPLOADED"))))
         Mockito.`when`(dao.observeCoverage("account:A", 20_000, 20_001)).thenReturn(flowOf(emptyList()))
-        val states = FirestoreActivityRepository(dao, "A", TestRemote(), { "A" })
+        val states = FirestoreActivityRepository(dao, "A", TestRemote(), currentUid = { "A" })
             .observeRange("account:A", 20_000, 20_001).toList()
         val ready = states.last() as ActivityRangeState.Ready
         assertEquals(1, ready.days.getValue(20_000).sessions.size)
@@ -47,7 +47,7 @@ class ActivityRepositoryTest {
         val dao = Mockito.mock(ActivityDao::class.java)
         Mockito.`when`(dao.observeRange("account:A", 20_000, 20_001)).thenReturn(flowOf(listOf(entity)))
         Mockito.`when`(dao.observeCoverage("account:A", 20_000, 20_001)).thenReturn(flowOf(emptyList()))
-        val repo = FirestoreActivityRepository(dao, "A", TestRemote(listOf(entity.copy(uploadState = "UPLOADED"))), { "A" })
+        val repo = FirestoreActivityRepository(dao, "A", TestRemote(listOf(entity.copy(uploadState = "UPLOADED"))), currentUid = { "A" })
         val states = repo.observeRange("account:A", 20_000, 20_001).toList()
         assertEquals(ActivityRangeState.Loading, states.first())
         val ready = states.last() as ActivityRangeState.Ready
@@ -62,7 +62,7 @@ class ActivityRepositoryTest {
     fun `failed local persistence is not reported as saved`() = runTest {
         val dao = Mockito.mock(ActivityDao::class.java)
         Mockito.`when`(dao.record(entity)).thenThrow(IllegalStateException("Disk full"))
-        FirestoreActivityRepository(dao, "A", TestRemote(), { "A" }).record(command)
+        FirestoreActivityRepository(dao, "A", TestRemote(), currentUid = { "A" }).record(command)
         Unit
     }
 
@@ -70,21 +70,21 @@ class ActivityRepositoryTest {
         val dao = Mockito.mock(ActivityDao::class.java)
         Mockito.`when`(dao.observeRange("account:A", 20_000, 20_001)).thenReturn(flowOf(emptyList()))
         Mockito.`when`(dao.observeCoverage("account:A", 20_000, 20_001)).thenReturn(flowOf(emptyList()))
-        val repo = FirestoreActivityRepository(dao, "A", TestRemote(failure = IllegalStateException("Missing index")), { "A" })
+        val repo = FirestoreActivityRepository(dao, "A", TestRemote(failure = IllegalStateException("Missing index")), currentUid = { "A" })
         val states = repo.observeRange("account:A", 20_000, 20_001).toList()
         assertEquals("Missing index", (states.last() as ActivityRangeState.Error).cause.message)
     }
 
     @Test fun `stale A repository does not expose A range when B is active`() = runTest {
         val dao = Mockito.mock(ActivityDao::class.java)
-        val repo = FirestoreActivityRepository(dao, "A", TestRemote(listOf(entity)), { "B" })
+        val repo = FirestoreActivityRepository(dao, "A", TestRemote(listOf(entity)), currentUid = { "B" })
         assertEquals(listOf(ActivityRangeState.Loading), repo.observeRange("account:A", 20_000, 20_001).toList())
     }
 
     @Test(expected = IllegalArgumentException::class)
     fun `range cannot silently expand to unbounded history`() {
         val dao = Mockito.mock(ActivityDao::class.java)
-        FirestoreActivityRepository(dao, "A", TestRemote(), { "A" }).observeRange("account:A", 20_000, 20_042)
+        FirestoreActivityRepository(dao, "A", TestRemote(), currentUid = { "A" }).observeRange("account:A", 20_000, 20_042)
     }
 
     private class TestRemote(private val events: List<ActivityEventEntity> = emptyList(), private val failure: Throwable? = null) : ActivityRemoteClient {
