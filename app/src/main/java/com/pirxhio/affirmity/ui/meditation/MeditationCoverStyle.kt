@@ -14,21 +14,28 @@ internal enum class MeditationCoverMotif {
     CONSTELLATION, BANDS, WAVE, CRESCENT, OVERLAP, RADIATE,
 }
 
-/** Practice-specific overrides; unknown practices retain the neutral breathing form. */
-internal fun meditationCoverMotif(id: String): MeditationCoverMotif = when (id) {
-    "box_breathing" -> MeditationCoverMotif.SQUARES
-    "calma", "extended_exhale", "visualization", "muraqabah" -> MeditationCoverMotif.HORIZON
-    "zazen", "centering_prayer" -> MeditationCoverMotif.ROOT
-    "enfoque", "mantra_meditation", "om_meditation", "dhikr", "jesus_prayer", "lectio_divina" -> MeditationCoverMotif.CONVERGE
-    "trataka" -> MeditationCoverMotif.FLAME
-    "vipassana", "noting", "open_awareness" -> MeditationCoverMotif.CONSTELLATION
-    "body_scan", "yoganidra", "progressive_muscle_relaxation" -> MeditationCoverMotif.BANDS
-    "walking_meditation", "kapalabhati", "breath_of_fire", "wim_hof" -> MeditationCoverMotif.WAVE
-    "dormir" -> MeditationCoverMotif.CRESCENT
-    "autocompasion_5", "autocompasion_10", "self_compassion_break", "hitbodedut" -> MeditationCoverMotif.OVERLAP
-    "metta", "gratitude_meditation" -> MeditationCoverMotif.RADIATE
-    else -> MeditationCoverMotif.RINGS
+/** Practice-specific overrides, keyed by catalog id. Data rather than a `when` so a test can check
+ *  every key still exists in the catalog -- a renamed id would otherwise silently fall back. */
+internal val meditationCoverMotifsById: Map<String, MeditationCoverMotif> = buildMap {
+    fun form(motif: MeditationCoverMotif, vararg ids: String) = ids.forEach { put(it, motif) }
+    form(MeditationCoverMotif.SQUARES, "box_breathing")
+    form(MeditationCoverMotif.HORIZON, "calma", "extended_exhale", "visualization", "muraqabah")
+    form(MeditationCoverMotif.ROOT, "zazen", "centering_prayer")
+    form(MeditationCoverMotif.CONVERGE, "enfoque", "mantra_meditation", "om_meditation", "dhikr",
+        "jesus_prayer", "lectio_divina")
+    form(MeditationCoverMotif.FLAME, "trataka")
+    form(MeditationCoverMotif.CONSTELLATION, "vipassana", "noting", "open_awareness")
+    form(MeditationCoverMotif.BANDS, "body_scan", "yoganidra", "progressive_muscle_relaxation")
+    form(MeditationCoverMotif.WAVE, "walking_meditation", "kapalabhati", "breath_of_fire", "wim_hof")
+    form(MeditationCoverMotif.CRESCENT, "dormir")
+    form(MeditationCoverMotif.OVERLAP, "autocompasion_5", "autocompasion_10", "self_compassion_break",
+        "hitbodedut")
+    form(MeditationCoverMotif.RADIATE, "metta", "gratitude_meditation")
 }
+
+/** Unknown practices retain the neutral breathing form. */
+internal fun meditationCoverMotif(id: String): MeditationCoverMotif =
+    meditationCoverMotifsById[id] ?: MeditationCoverMotif.RINGS
 
 /** Explicit semantic colors stay stable when generated Android resource IDs change. */
 internal fun meditationCoverColor(categoryRes: Int): Long = when (categoryRes) {

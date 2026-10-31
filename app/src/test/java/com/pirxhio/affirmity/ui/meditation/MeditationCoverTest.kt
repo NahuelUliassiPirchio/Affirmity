@@ -1,10 +1,18 @@
 package com.pirxhio.affirmity.ui.meditation
 
 import com.pirxhio.affirmity.R
+import com.pirxhio.affirmity.ui.meditation.catalog.meditationCatalog
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MeditationCoverTest {
+    @Test fun `every practice with its own form is a real catalog id`() {
+        val catalogIds = meditationCatalog().map { it.id }.toSet()
+        val orphans = meditationCoverMotifsById.keys - catalogIds
+        assertTrue("Cover forms mapped to ids missing from the catalog: $orphans", orphans.isEmpty())
+    }
+
     @Test fun `duration changes cover rhythm at design boundaries`() {
         assertEquals(listOf(2, 2, 3, 3, 4), listOf(1, 3, 4, 10, 11).map(::meditationCoverRhythm))
     }
