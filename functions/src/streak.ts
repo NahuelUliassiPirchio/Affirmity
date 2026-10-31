@@ -4,6 +4,8 @@
  * requirement): general streak, at-risk trigger, and the single general-streak alert selection.
  */
 
+import type { HealerUse } from './healer';
+
 export interface Completion {
   epochDay: number;
   meditationDone: boolean;
@@ -31,10 +33,24 @@ export function streakOf(
 /**
  * "Current streak" as shown to the user: the GENERAL streak, i.e. consecutive days ending at
  * `todayEpochDay` with at least one activity (meditation OR affirmations). Days may be held by
- * different activities.
+ * different activities. Healed days (`healerUses`) count as done, mirroring the app's
+ * `StreakHealerStats.evaluate` (`effectiveDone = hasActivity || day in healedDays`).
  */
-export function currentStreak(rows: Completion[], todayEpochDay: number): number {
-  return streakOf(rows, todayEpochDay, (row) => row.meditationDone || row.affirmationDone);
+export function currentStreak(
+  rows: Completion[],
+  todayEpochDay: number,
+  healerUses: HealerUse[] = [],
+): number {
+  const healedDays = new Set(healerUses.map((use) => use.healedEpochDay));
+  const byDay = new Map(rows.map((row) => [row.epochDay, row]));
+  let streak = 0;
+  // A healed day may have no completion row at all, so walk days rather than rows.
+  for (let day = todayEpochDay; ; day--) {
+    const row = byDay.get(day);
+    if (!(row?.meditationDone || row?.affirmationDone || healedDays.has(day))) break;
+    streak++;
+  }
+  return streak;
 }
 
 export interface StreakAlertSelection {
@@ -51,23 +67,32 @@ export interface StreakAlertSelection {
  * is no activity yet on `todayEpochDay`. Basing the at-risk count on yesterday is essential:
  * early-morning planning normally runs before today's first completion.
  */
-export function shouldFireStreakAlert(rows: Completion[], todayEpochDay: number): boolean {
+export function shouldFireStreakAlert(
+  rows: Completion[],
+  todayEpochDay: number,
+  healerUses: HealerUse[] = [],
+): boolean {
   const today = rows.find((row) => row.epochDay === todayEpochDay);
   const activeToday = (today?.affirmationDone ?? false) || (today?.meditationDone ?? false);
 
   // Derived from `selectStreakAlert` (non-null iff the general streak through yesterday is live),
   // so the trigger and the selection cannot drift apart.
-  return selectStreakAlert(rows, todayEpochDay) !== null && !activeToday;
+  return selectStreakAlert(rows, todayEpochDay, healerUses) !== null && !activeToday;
 }
 
 /**
  * Builds the single streak alert: always about the GENERAL streak, plus each activity's own streak
  * through yesterday so the copy can explain what is holding it. Returns null when there is no live
- * general streak through yesterday. At least one per-activity streak is >= 1 when non-null.
+ * general streak through yesterday. Per-activity streaks are activity-only (healed days do not
+ * count), so both can be 0 when yesterday was only healed -- see `hasStreakBreakdown`.
  */
-export function selectStreakAlert(rows: Completion[], todayEpochDay: number): StreakAlertSelection | null {
+export function selectStreakAlert(
+  rows: Completion[],
+  todayEpochDay: number,
+  healerUses: HealerUse[] = [],
+): StreakAlertSelection | null {
   const yesterday = todayEpochDay - 1;
-  const general = currentStreak(rows, yesterday);
+  const general = currentStreak(rows, yesterday, healerUses);
   if (general < 1) return null;
 
   return {
@@ -77,15 +102,27 @@ export function selectStreakAlert(rows: Completion[], todayEpochDay: number): St
   };
 }
 
+/**
+ * The streak a healer notification protects/recovers on `localDay`: the general streak held
+ * through the break day (`localDay - 1`), i.e. as of `localDay - 2`, counting earlier heals.
+ */
+export function healerProtectedStreak(rows: Completion[], localDay: number, healerUses: HealerUse[] = []): number {
+  return currentStreak(rows, localDay - 2, healerUses);
+}
+
+/** False when yesterday was only healed (no activity), so no per-activity breakdown copy applies. */
+export function hasStreakBreakdown(selection: StreakAlertSelection): boolean {
+  return selection.meditationStreak > 0 || selection.affirmationsStreak > 0;
+}
+
 export type StreakBreakdownContext = 'streak_both' | 'streak_meditation_only' | 'streak_affirmations_only';
 
 /** Copy-context tag for which activities currently hold the general streak (never prints "0 days"). */
 export function streakBreakdownContext(selection: StreakAlertSelection): StreakBreakdownContext {
-  // A live general streak through yesterday means at least one activity was done yesterday, so its
-  // own streak is >= 1. Both being 0 is impossible for a `selectStreakAlert` result: fail loudly
-  // rather than silently tagging an arbitrary breakdown.
+  // Callers must check `hasStreakBreakdown` first: both streaks being 0 happens when yesterday was
+  // only healed. Fail loudly rather than silently tagging an arbitrary breakdown.
   if (selection.meditationStreak <= 0 && selection.affirmationsStreak <= 0) {
-    throw new Error('streakBreakdownContext: impossible state, both activity streaks are 0 with a live general streak');
+    throw new Error('streakBreakdownContext: both activity streaks are 0 (check hasStreakBreakdown first)');
   }
   if (selection.meditationStreak > 0 && selection.affirmationsStreak > 0) return 'streak_both';
   return selection.meditationStreak > 0 ? 'streak_meditation_only' : 'streak_affirmations_only';

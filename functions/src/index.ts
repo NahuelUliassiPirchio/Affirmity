@@ -37,7 +37,15 @@ import {
 import { taskName } from './tasks';
 import { hasTransientFcmFailures, sendAndPrune, type FcmClient, type TokenStore } from './fcm';
 import { evaluateSendEligibility, notificationTtl, type SendTimeSettings } from './sendPolicy';
-import { currentStreak, selectStreakAlert, streakBand, streakBreakdownContext, type Completion } from './streak';
+import {
+  currentStreak,
+  hasStreakBreakdown,
+  healerProtectedStreak,
+  selectStreakAlert,
+  streakBand,
+  streakBreakdownContext,
+  type Completion,
+} from './streak';
 import { isHealerExpiringToday, type HealerUse } from './healer';
 import { shouldFireMeditationReturn, type MeditationReturnState } from './meditationReturn';
 import {
@@ -402,7 +410,7 @@ export const sendNotification = onRequest(async (req, res) => {
   }));
 
   const healerUses: HealerUse[] =
-    channel === 'healer'
+    channel === 'healer' || channel === 'streak'
       ? (await db.collection(`users/${uid}/streakHealerUses`).get()).docs.map(
           (healerUseDoc: QueryDocumentSnapshot) => ({
             healedEpochDay: Number(healerUseDoc.data().healedEpochDay ?? healerUseDoc.id),
@@ -467,12 +475,10 @@ export const sendNotification = onRequest(async (req, res) => {
   // ONE streak alert per day, always about the GENERAL streak (see `selectStreakAlert`). The copy
   // context is the streak band plus which activities hold it; the per-activity streaks are
   // rendered into the body and also sent in the payload for the expanded notification.
-  const streakAlert = channel === 'streak' ? selectStreakAlert(completions, localDay) : null;
+  const streakAlert = channel === 'streak' ? selectStreakAlert(completions, localDay, healerUses) : null;
   const healerStreakValue =
     channel === 'healer'
-      ? // The streak count being protected/recovered by the healer -- the streak held through the
-        // break day (localDay - 1), i.e. as of localDay - 2.
-        String(currentStreak(completions, localDay - 2))
+      ? String(healerProtectedStreak(completions, localDay, healerUses))
       : undefined;
 
   const STREAK_GENERIC_CONTEXT = 'streak_generic';
@@ -488,7 +494,9 @@ export const sendNotification = onRequest(async (req, res) => {
   if (channel === 'streak') {
     if (streakAlert) {
       const primary: CopyAttempt = {
-        context: [streakBand(streakAlert.streakCount), streakBreakdownContext(streakAlert)],
+        context: hasStreakBreakdown(streakAlert)
+          ? [streakBand(streakAlert.streakCount), streakBreakdownContext(streakAlert)]
+          : [],
         streakCount: String(streakAlert.streakCount),
         extraData: {
           meditationStreak: String(streakAlert.meditationStreak),
@@ -502,11 +510,14 @@ export const sendNotification = onRequest(async (req, res) => {
       // Fallback when the breakdown variant is missing/disabled/malformed: still says "overall" and
       // carries the count. `streak_generic` appears ONLY here, so it never matches the primary
       // context, and the primary context (band + breakdown) never matches these variants.
-      attempts.push(primary, { ...primary, context: [STREAK_GENERIC_CONTEXT] });
+      const generic: CopyAttempt = { ...primary, context: [STREAK_GENERIC_CONTEXT] };
+      // Yesterday held only by a heal (no activity): no breakdown copy applies, go straight to generic.
+      if (hasStreakBreakdown(streakAlert)) attempts.push(primary, generic);
+      else attempts.push(generic);
     } else {
       attempts.push({
         context: [],
-        streakCount: String(currentStreak(completions, localDay - 1)),
+        streakCount: String(currentStreak(completions, localDay - 1, healerUses)),
         extraData: {},
         extraPlaceholders: {},
       });

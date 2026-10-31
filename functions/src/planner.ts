@@ -150,8 +150,8 @@ export function planUserTasks(
   }
 
   const streakAlert =
-    settings.streakEnabled && shouldFireStreakAlert(completions, localDay)
-      ? selectStreakAlert(completions, localDay)
+    settings.streakEnabled && shouldFireStreakAlert(completions, localDay, healerUses)
+      ? selectStreakAlert(completions, localDay, healerUses)
       : null;
   if (streakAlert) {
     const task: PlannedTask = {

@@ -129,7 +129,7 @@ export function evaluateSendEligibility(input: SendEligibilityInput): SendEligib
   if (!notificationTtl(input.channel, input.localDay, zone, input.nowMillis)) {
     return { eligible: false, reason: SEND_SKIP_REASON.TARGET_DAY_EXPIRED };
   }
-  if (input.channel === 'streak' && !shouldFireStreakAlert(input.completions, input.localDay)) {
+  if (input.channel === 'streak' && !shouldFireStreakAlert(input.completions, input.localDay, input.healerUses)) {
     return { eligible: false, reason: SEND_SKIP_REASON.STREAK_NO_LONGER_AT_RISK };
   }
   if (
