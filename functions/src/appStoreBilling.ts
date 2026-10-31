@@ -18,6 +18,7 @@
  * someone else's replayed JWS.
  */
 
+import { VerificationException, VerificationStatus } from '@apple/app-store-server-library';
 import { createHash } from 'node:crypto';
 
 import type { EntitlementDoc, EntitlementTier } from './billing';
@@ -52,10 +53,13 @@ export interface AppStoreTransactionPayload {
 const AUTO_RENEWABLE_SUBSCRIPTION_TYPE = 'Auto-Renewable Subscription';
 
 /** Hard server-side cap on how long a Sandbox-environment entitlement can live from the moment it
- * is synced. Apple App Review (and TestFlight/Xcode) always buy with sandbox-signed transactions,
- * so Sandbox JWS must be accepted -- but anyone can mint one for free with a sandbox account.
- * Bounding the grant means a sandbox purchase can never become a long-lived Pro: sandbox
- * subscriptions renew every few minutes anyway, and this caps even a forged/odd `expiresDate`. */
+ * is synced. Apple App Review always buys with sandbox-signed transactions against the production
+ * build, so Sandbox JWS must be accepted. Sandbox Apple Accounts can only be created by the
+ * developer in App Store Connect and the JWS is bound to our bundle ID, so valid sandbox JWS for
+ * this app only come from TestFlight builds, developer-signed builds and App Review. The residual
+ * exposure is TestFlight testers getting short-lived Pro for free, repeatably (sandbox
+ * subscriptions renew every few minutes). The cap is defense in depth: a sandbox grant can never
+ * become a long-lived Pro, even with an odd or missing `expiresDate`. */
 export const SANDBOX_ENTITLEMENT_MAX_AGE_MILLIS = 24 * 60 * 60 * 1000;
 
 export type AppStoreEntitlementDoc = EntitlementDoc & {
@@ -167,14 +171,22 @@ export type ClaimAndWriteOutcome = 'written' | 'dropped-stale' | 'claimed-by-oth
  *     both stored and incoming `expiryTimeMillis` are numbers, an incoming expiry strictly earlier
  *     than the stored one is stale (an older transaction redelivered after a newer one), regardless
  *     of `lastVerifiedAt`. A strictly later expiry is never stale.
+ *  0. Cross-environment: Production always supersedes Sandbox, Sandbox never replaces Production;
+ *     the ordering below applies only within the same environment.
  *  2. Otherwise (equal expiry, non-`sync-ios` source, or a missing/null expiry on either side) the
  *     existing tie-breaker applies: stale when `incoming.lastVerifiedAt <= stored.lastVerifiedAt`.
  *     Equal expiry therefore lets a later revocation of the latest transaction win. */
 export function isStaleIosEntitlement(
-  stored: { source?: unknown; expiryTimeMillis?: unknown; lastVerifiedAt?: unknown } | undefined,
+  stored: { source?: unknown; environment?: unknown; expiryTimeMillis?: unknown; lastVerifiedAt?: unknown } | undefined,
   incoming: AppStoreEntitlementDoc,
 ): boolean {
   if (!stored) return false;
+  // Production always supersedes Sandbox (including a revoked Production doc), and Sandbox never
+  // replaces Production. A stored doc without `environment` (legacy) is Production.
+  const storedEnvironment = stored.environment === 'Sandbox' ? 'Sandbox' : 'Production';
+  if (storedEnvironment !== incoming.environment) {
+    return incoming.environment === 'Sandbox';
+  }
   if (
     stored.source === 'sync-ios' &&
     typeof stored.expiryTimeMillis === 'number' &&
@@ -220,7 +232,9 @@ export interface AppStoreTransactionDecoder {
  * `SANDBOX_ENTITLEMENT_MAX_AGE_MILLIS` in `toAppStoreEntitlement` instead of by a config flag.
  * Falls back ONLY when `isInvalidEnvironment(err)`; any other failure is mapped via `mapError`
  * (401 for auth failures, rethrown for transient ones) without trying Sandbox. With no Production
- * verifier (`null`, e.g. dev/staging without `IOS_APP_APPLE_ID`) it verifies against Sandbox only.
+ * verifier (`null`: `IOS_APP_APPLE_ID` unset/malformed) it refuses outright. `IOS_APP_APPLE_ID` is
+ * REQUIRED wherever this function runs: this repo has a single Firebase project for dev and prod,
+ * so a Sandbox-only path would 401 every paying user whenever the variable is missing.
  * The result's `environment` is set from the verifier that succeeded.
  */
 export function createEnvironmentFallbackVerifier(
@@ -230,13 +244,16 @@ export function createEnvironmentFallbackVerifier(
 ): AppStoreVerifier {
   return {
     async verifyTransaction(signedTransaction: string) {
-      if (production) {
-        try {
-          const payload = await production.verifyAndDecodeTransaction(signedTransaction);
-          return { ...payload, environment: 'Production' };
-        } catch (err) {
-          if (!opts.isInvalidEnvironment(err)) throw opts.mapError(err);
-        }
+      if (!production) {
+        throw new AppStoreVerificationError(
+          'Production App Store verification is not configured (IOS_APP_APPLE_ID is unset or malformed)',
+        );
+      }
+      try {
+        const payload = await production.verifyAndDecodeTransaction(signedTransaction);
+        return { ...payload, environment: 'Production' };
+      } catch (err) {
+        if (!opts.isInvalidEnvironment(err)) throw opts.mapError(err);
       }
       try {
         const payload = await sandbox.verifyAndDecodeTransaction(signedTransaction);
@@ -246,6 +263,53 @@ export function createEnvironmentFallbackVerifier(
       }
     },
   };
+}
+
+/** True for the Apple library's INVALID_ENVIRONMENT failure (JWS valid but minted for the other
+ * environment) -- the only failure that triggers the Sandbox fallback. */
+export function isInvalidEnvironmentError(err: unknown): boolean {
+  return err instanceof VerificationException && err.status === VerificationStatus.INVALID_ENVIRONMENT;
+}
+
+/** Maps a verification failure: RETRYABLE_VERIFICATION_FAILURE (Apple OCSP/revocation endpoint
+ * unreachable) is transient and rethrown as-is (-> 500); every other `VerificationException` is an
+ * auth failure (-> 401 via `AppStoreVerificationError`). */
+export function mapVerificationError(err: unknown): Error {
+  if (err instanceof VerificationException && err.status === VerificationStatus.RETRYABLE_VERIFICATION_FAILURE) {
+    return err;
+  }
+  if (err instanceof VerificationException) {
+    return new AppStoreVerificationError(err.message || 'Apple JWS verification failed');
+  }
+  return err instanceof Error ? err : new Error('unknown-error');
+}
+
+/** The real wiring: fallback verifier with the actual Apple SDK error classification. */
+export function createAppStoreVerifier(
+  production: AppStoreTransactionDecoder | null,
+  sandbox: AppStoreTransactionDecoder,
+): AppStoreVerifier {
+  return createEnvironmentFallbackVerifier(production, sandbox, {
+    isInvalidEnvironment: isInvalidEnvironmentError,
+    mapError: mapVerificationError,
+  });
+}
+
+/** Emits one structured line per Sandbox grant actually written, so sandbox grant volume can be
+ * alerted on. `log` is `console.log`-shaped; no-op for Production or non-`written` outcomes. */
+export function logSandboxGrant(
+  log: (label: string, fields: Record<string, unknown>) => void,
+  uid: string,
+  doc: AppStoreEntitlementDoc,
+  outcome: ClaimAndWriteOutcome,
+): void {
+  if (outcome !== 'written' || doc.environment !== 'Sandbox') return;
+  log('[sandbox-entitlement-granted]', {
+    environment: doc.environment,
+    uid,
+    productId: doc.productId,
+    transactionId: doc.transactionId,
+  });
 }
 
 /**

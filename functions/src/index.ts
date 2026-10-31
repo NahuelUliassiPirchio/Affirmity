@@ -70,7 +70,8 @@ import {
 } from './billing';
 import {
   AppStoreVerificationError,
-  createEnvironmentFallbackVerifier,
+  createAppStoreVerifier,
+  logSandboxGrant,
   isStaleIosEntitlement,
   parseAppleAppId,
   resolveIosEntitlement,
@@ -791,15 +792,11 @@ async function verifyRtdnPushClaims(authorizationHeader: string | undefined): Pr
 // to use the same identifier string, but they're independently configurable.
 const IOS_BUNDLE_ID = process.env.IOS_BUNDLE_ID ?? 'com.pirxhio.affirmity';
 // App Store Connect's numeric "Apple ID" for this app. `SignedDataVerifier`'s constructor throws
-// unless this is provided whenever its environment is Production -- even though
-// `verifyAndDecodeTransaction` itself never reads it -- so it's a hard prerequisite for verifying
-// real (non-Sandbox) purchases, not an optional nicety. It's only obtainable once an app record
-// exists in App Store Connect; the iOS app has not shipped yet, so this is very likely unset in
-// every environment today. Left unset, `appStoreVerifier()` below constructs Sandbox-only, and any
-// Production-environment JWS from a real App Store purchase will fail verification with 401 --
-// deliberately *not* a hard failure here: TestFlight/Sandbox verification must keep working today,
-// pre-launch, with no Apple ID configured yet. `productionVerifier()` logs a warning the first
-// time this happens so the gap stays observable instead of silent.
+// unless this is provided whenever its environment is Production, so it is a hard prerequisite.
+// REQUIRED wherever this function runs: the repo has a single Firebase project for dev and prod,
+// so there is no "dev without it" mode. Left unset, every `syncEntitlementIOS` call is refused
+// with 401 (fail closed, including Sandbox/App Review JWS) and `productionVerifier()` logs a
+// warning the first time so the misconfiguration stays observable.
 const IOS_APP_APPLE_ID = parseAppleAppId(process.env.IOS_APP_APPLE_ID);
 
 // Sandbox-signed transactions are always accepted after a Production INVALID_ENVIRONMENT: Apple
@@ -832,12 +829,11 @@ let sandboxVerifierCache: SignedDataVerifier | null = null;
 function productionVerifier(): SignedDataVerifier | null {
   if (productionVerifierCache === undefined) {
     if (IOS_APP_APPLE_ID === undefined) {
-      // Loud, not silent: a real Production-environment JWS hitting this instance will now fail
-      // Sandbox-only verification with INVALID_ENVIRONMENT and get mapped to a 401 for a
-      // legitimate paying user -- this log line is what makes that failure mode visible instead
-      // of indistinguishable from a forged receipt.
+      // Loud, not silent: every sync (including a legitimate paying user's) is refused with 401
+      // -- this log line makes that failure mode visible instead of indistinguishable from a
+      // forged receipt.
       console.warn(
-        '[appStoreVerifier] IOS_APP_APPLE_ID is not configured -- Production App Store transactions cannot be verified; only Sandbox JWS will succeed.',
+        '[appStoreVerifier] IOS_APP_APPLE_ID is not configured -- ALL iOS entitlement syncs will be refused (401). It is required wherever this function runs.',
       );
     }
     productionVerifierCache =
@@ -866,21 +862,7 @@ function sandboxVerifier(): SignedDataVerifier {
  * status is a genuine auth failure, wrapped as `AppStoreVerificationError` (401).
  */
 function appStoreVerifier(): AppStoreVerifier {
-  return createEnvironmentFallbackVerifier(productionVerifier(), sandboxVerifier(), {
-    isInvalidEnvironment: (err) =>
-      err instanceof VerificationException && err.status === VerificationStatus.INVALID_ENVIRONMENT,
-    mapError: mapVerificationError,
-  });
-}
-
-function mapVerificationError(err: unknown): Error {
-  if (err instanceof VerificationException && err.status === VerificationStatus.RETRYABLE_VERIFICATION_FAILURE) {
-    return err;
-  }
-  if (err instanceof VerificationException) {
-    return new AppStoreVerificationError(err.message || 'Apple JWS verification failed');
-  }
-  return err instanceof Error ? err : new Error('unknown-error');
+  return createAppStoreVerifier(productionVerifier(), sandboxVerifier());
 }
 
 /**
@@ -925,6 +907,7 @@ export const syncEntitlementIOS = onRequest(async (req, res) => {
       res.status(401).send('Unauthorized');
       return;
     }
+    if (result.doc) logSandboxGrant(console.log, uid, result.doc, result.outcome);
     if (result.outcome === 'claimed-by-other-uid') {
       // Fix 1: this transactionId already belongs to a different uid -- a replayed/foreign JWS,
       // not a server error and not a success. 409 Conflict, distinct from 401 (bad signature) and
