@@ -598,6 +598,7 @@ describe('isStaleIosEntitlement', () => {
         expiresDate: 2000,
         type: 'Auto-Renewable Subscription',
         revocationDate: 1500,
+        environment: 'Production',
       },
       300,
     );
