@@ -1,7 +1,6 @@
 package com.pirxhio.affirmity.ui.meditation.catalog
 
 import androidx.annotation.StringRes
-import androidx.compose.ui.graphics.vector.ImageVector
 import com.pirxhio.affirmity.access.ContentAccess
 import com.pirxhio.affirmity.meditation.MeditationDefinition
 import com.pirxhio.affirmity.meditation.customization.CustomizationField
@@ -9,7 +8,7 @@ import com.pirxhio.affirmity.meditation.customization.CustomizationField
 /**
  * One shipping guided meditation. Direct analogue of
  * [com.pirxhio.affirmity.ui.groups.AffirmationGroup]: UI metadata + a [ContentAccess] declaration
- * + a reference to the domain artifact, living in `ui/` so it may hold `@StringRes`/`ImageVector`,
+ * + a reference to the domain artifact, living in `ui/` so it may hold `@StringRes`,
  * while the domain artifact itself ([definition]) stays Android-free in `meditation/` and
  * plain-JUnit testable.
  *
@@ -22,7 +21,6 @@ data class MeditationCatalogEntry(
     @StringRes val descriptionRes: Int,
     /** Second half of the Discover meta line ("10 min • Sueño") — the editorial category. */
     @StringRes val categoryRes: Int,
-    val icon: ImageVector,
     /** Declared runtime in whole minutes. Pinned against the definition's real Fixed-duration sum
      * by a catalog-level test so the two can never silently drift. */
     val approxDurationMinutes: Int,

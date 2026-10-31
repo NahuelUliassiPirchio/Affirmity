@@ -53,7 +53,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -530,28 +529,6 @@ fun MeditationScreen(
     }
 }
 
-/** One calming two-tone gradient per category, picked deterministically from [categoryRes] (a
- *  stable resource id) so the same category always renders the same cover-art tile without
- *  needing any drawable/photo assets -- the project ships none today (design 5a's cover art is an
- *  empty `image-slot` the designer couldn't generate photography for either). Kept as a small
- *  hand-picked palette rather than a hash-to-hue formula so every pairing stays on-brand and
- *  legible with a white icon on top, instead of risking a muddy or low-contrast random hue. */
-private val categoryGradients = listOf(
-    Color(0xFF6EE7DE) to Color(0xFF2F9E97), // teal
-    Color(0xFFB4A7F5) to Color(0xFF7C6FD1), // lavender
-    Color(0xFFFFC98B) to Color(0xFFF29B4C), // peach
-    Color(0xFFA8D8A0) to Color(0xFF5FA85A), // sage
-    Color(0xFF8FCBEA) to Color(0xFF4A97C9), // sky
-    Color(0xFFF6A9C0) to Color(0xFFDA6E92), // rose
-    Color(0xFFE8D9A0) to Color(0xFFC4A94E), // sand
-    Color(0xFFB7C4D6) to Color(0xFF7C8CA3), // slate
-)
-
-private fun gradientBrushForCategory(categoryRes: Int): Brush {
-    val (start, end) = categoryGradients[Math.floorMod(categoryRes, categoryGradients.size)]
-    return Brush.linearGradient(listOf(start, end))
-}
-
 /** Design 5a's category pill row -- "Todo" (all shelves) plus one pill per shelf (a lonely
  *  category's own name, or its [ShelfGroup] label once merged), scrollable so an arbitrary shelf
  *  count never wraps or gets cramped. */
@@ -657,8 +634,7 @@ private fun MeditationShelf(
     }
 }
 
-/** Design 5a's session card: a square cover-art tile (a per-category gradient standing in for the
- *  designer's empty `image-slot`, see [gradientBrushForCategory]) with a lock-state badge overlaid
+/** Design 5a's session card with design 9's procedural vector cover and a lock-state badge overlaid
  *  bottom-left, title and duration below. The whole card is one tap target across all three lock
  *  states -- unlike the old row layout, an ad-unlockable card no longer needs a separate inline
  *  CTA, since tapping it opens [AdUnlockSheet] instead. */
@@ -720,14 +696,9 @@ private fun MeditationSessionCard(
                 // Only the cover art dims to signal "locked" -- title and duration below stay at
                 // full opacity so they remain legible (mirrors the old row layout's Item 3 fix).
                 .alpha(if (locked) 0.82f else 1f)
-                .background(gradientBrushForCategory(entry.categoryRes), RoundedCornerShape(14.dp)),
+                .clip(RoundedCornerShape(14.dp)),
         ) {
-            Icon(
-                imageVector = entry.icon,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(30.dp).align(Alignment.Center),
-            )
+            MeditationCover(entry, Modifier.matchParentSize())
             if (adInFlight) {
                 CircularProgressIndicator(
                     modifier = Modifier
@@ -915,14 +886,9 @@ private fun MeditationPrimerSheet(
                 Box(
                     modifier = Modifier
                         .size(64.dp)
-                        .background(gradientBrushForCategory(entry.categoryRes), RoundedCornerShape(13.dp)),
+                        .clip(RoundedCornerShape(13.dp)),
                 ) {
-                    Icon(
-                        imageVector = entry.icon,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(26.dp).align(Alignment.Center),
-                    )
+                    MeditationCover(entry, Modifier.matchParentSize())
                 }
                 Column(modifier = Modifier.padding(start = 14.dp)) {
                     Text(
