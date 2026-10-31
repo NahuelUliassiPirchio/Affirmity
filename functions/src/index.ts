@@ -70,7 +70,7 @@ import {
 } from './billing';
 import {
   AppStoreVerificationError,
-  isSandboxEntitlementsAllowed,
+  createEnvironmentFallbackVerifier,
   isStaleIosEntitlement,
   parseAppleAppId,
   resolveIosEntitlement,
@@ -802,12 +802,11 @@ const IOS_BUNDLE_ID = process.env.IOS_BUNDLE_ID ?? 'com.pirxhio.affirmity';
 // time this happens so the gap stays observable instead of silent.
 const IOS_APP_APPLE_ID = parseAppleAppId(process.env.IOS_APP_APPLE_ID);
 
-// Fix 3 (HIGH finding): without this gate, `appStoreVerifier()` always fell back from Production to
-// Sandbox verification, so anyone could create a free Apple Sandbox account, generate a Sandbox
-// transaction, and get a real Production Pro entitlement for zero payment. Default OFF (unset ->
-// disabled). This should stay enabled in dev/staging Firebase projects -- where there is no shipped
-// Production build to test against yet -- and be turned OFF once the app is live in production.
-const IOS_ALLOW_SANDBOX_ENTITLEMENTS = isSandboxEntitlementsAllowed(process.env.IOS_ALLOW_SANDBOX_ENTITLEMENTS);
+// Sandbox-signed transactions are always accepted after a Production INVALID_ENVIRONMENT: Apple
+// App Review purchases with sandbox transactions against the production build, and rejecting them
+// fails review (guideline 2.1). App Store-distributed builds only ever produce Production
+// transactions, so the abuse surface is a free sandbox account; that is bounded by
+// `SANDBOX_ENTITLEMENT_MAX_AGE_MILLIS` (see appStoreBilling.ts), not by a flag.
 
 let appleRootCertificatesCache: Buffer[] | null = null;
 
@@ -867,36 +866,11 @@ function sandboxVerifier(): SignedDataVerifier {
  * status is a genuine auth failure, wrapped as `AppStoreVerificationError` (401).
  */
 function appStoreVerifier(): AppStoreVerifier {
-  return {
-    async verifyTransaction(signedTransaction: string) {
-      const production = productionVerifier();
-      if (production) {
-        try {
-          return await production.verifyAndDecodeTransaction(signedTransaction);
-        } catch (err) {
-          if (!(err instanceof VerificationException) || err.status !== VerificationStatus.INVALID_ENVIRONMENT) {
-            throw mapVerificationError(err);
-          }
-          // Production verification says this JWS was minted for Sandbox -- Fix 3: only fall
-          // through to Sandbox verification when IOS_ALLOW_SANDBOX_ENTITLEMENTS is explicitly on.
-          if (!IOS_ALLOW_SANDBOX_ENTITLEMENTS) {
-            throw new AppStoreVerificationError(err.message || 'Apple JWS verification failed');
-          }
-        }
-      } else if (!IOS_ALLOW_SANDBOX_ENTITLEMENTS) {
-        // No Production verifier configured (no IOS_APP_APPLE_ID) AND Sandbox entitlements are
-        // disabled -- refuse rather than silently verifying against Sandbox only.
-        throw new AppStoreVerificationError(
-          'Production App Store verification is not configured and Sandbox entitlements are disabled',
-        );
-      }
-      try {
-        return await sandboxVerifier().verifyAndDecodeTransaction(signedTransaction);
-      } catch (err) {
-        throw mapVerificationError(err);
-      }
-    },
-  };
+  return createEnvironmentFallbackVerifier(productionVerifier(), sandboxVerifier(), {
+    isInvalidEnvironment: (err) =>
+      err instanceof VerificationException && err.status === VerificationStatus.INVALID_ENVIRONMENT,
+    mapError: mapVerificationError,
+  });
 }
 
 function mapVerificationError(err: unknown): Error {

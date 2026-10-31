@@ -2,9 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   AppStoreVerificationError,
-  isSandboxEntitlementsAllowed,
+  SANDBOX_ENTITLEMENT_MAX_AGE_MILLIS,
   isStaleIosEntitlement,
   parseAppleAppId,
+  createEnvironmentFallbackVerifier,
   resolveIosEntitlement,
   toAppStoreEntitlement,
   type AppStoreEntitlementDoc,
@@ -21,6 +22,7 @@ describe('toAppStoreEntitlement', () => {
     productId: 'pro_monthly',
     expiresDate: Date.parse('2026-09-01T00:00:00.000Z'),
     type: 'Auto-Renewable Subscription',
+    environment: 'Production',
   };
 
   it('maps an active (unrevoked) transaction to pro', () => {
@@ -113,24 +115,138 @@ describe('toAppStoreEntitlement', () => {
   });
 });
 
-// Fix 3: gate Sandbox-verification fallback behind an explicit env var, default off, so a free
-// Apple Sandbox account can never mint a real Production Pro entitlement.
-describe('isSandboxEntitlementsAllowed (Fix 3)', () => {
-  it('is disabled by default (unset env var)', () => {
-    expect(isSandboxEntitlementsAllowed(undefined)).toBe(false);
+// Sandbox-signed transactions (App Review, TestFlight, Xcode) are accepted but bounded: a free
+// sandbox account must never become a long-lived Pro.
+describe('environment handling and sandbox bounds', () => {
+  const NOW = Date.parse('2026-10-31T00:00:00.000Z');
+  const HOUR = 60 * 60 * 1000;
+  const base: AppStoreTransactionPayload = {
+    transactionId: 'txn-env',
+    productId: 'pro_monthly',
+    type: 'Auto-Renewable Subscription',
+  };
+
+  it('records Production and leaves expiry untouched for a Production transaction', () => {
+    const expiresDate = NOW + 30 * 24 * HOUR;
+    const doc = toAppStoreEntitlement({ ...base, environment: 'Production', expiresDate }, NOW);
+    expect(doc.environment).toBe('Production');
+    expect(doc.expiryTimeMillis).toBe(expiresDate);
   });
 
-  it('is disabled for any value other than the literal "true"', () => {
-    expect(isSandboxEntitlementsAllowed('')).toBe(false);
-    expect(isSandboxEntitlementsAllowed('1')).toBe(false);
-    expect(isSandboxEntitlementsAllowed('TRUE')).toBe(false);
-    expect(isSandboxEntitlementsAllowed('yes')).toBe(false);
+  it('records Sandbox and keeps the transaction expiresDate when it is sooner than the hard cap', () => {
+    const expiresDate = NOW + 5 * 60 * 1000;
+    const doc = toAppStoreEntitlement({ ...base, environment: 'Sandbox', expiresDate }, NOW);
+    expect(doc.environment).toBe('Sandbox');
+    expect(doc.expiryTimeMillis).toBe(expiresDate);
   });
 
-  it('is enabled only for the exact literal "true"', () => {
-    expect(isSandboxEntitlementsAllowed('true')).toBe(true);
+  it('caps a Sandbox expiry at the hard server-side limit when expiresDate is later', () => {
+    const doc = toAppStoreEntitlement(
+      { ...base, environment: 'Sandbox', expiresDate: NOW + 30 * 24 * HOUR },
+      NOW,
+    );
+    expect(SANDBOX_ENTITLEMENT_MAX_AGE_MILLIS).toBeLessThanOrEqual(24 * HOUR);
+    expect(doc.expiryTimeMillis).toBe(NOW + SANDBOX_ENTITLEMENT_MAX_AGE_MILLIS);
+  });
+
+  it('caps a Sandbox transaction with no expiresDate instead of leaving it open-ended', () => {
+    const doc = toAppStoreEntitlement({ ...base, environment: 'Sandbox' }, NOW);
+    expect(doc.expiryTimeMillis).toBe(NOW + SANDBOX_ENTITLEMENT_MAX_AGE_MILLIS);
+  });
+
+  it('fails closed: an unknown or missing environment is treated as Sandbox', () => {
+    const expiresDate = NOW + 30 * 24 * HOUR;
+    for (const environment of [undefined, 'Xcode', 'LocalTesting']) {
+      const doc = toAppStoreEntitlement({ ...base, environment, expiresDate }, NOW);
+      expect(doc.environment).toBe('Sandbox');
+      expect(doc.expiryTimeMillis).toBe(NOW + SANDBOX_ENTITLEMENT_MAX_AGE_MILLIS);
+    }
+  });
+
+  it('writes a sandbox JWS end to end with environment Sandbox', async () => {
+    const written: AppStoreEntitlementDoc[] = [];
+    const store: IosEntitlementStore = {
+      async claimAndWriteEntitlement(_uid, _txn, doc) {
+        written.push(doc);
+        return 'written';
+      },
+    };
+    const verifier: AppStoreVerifier = {
+      verifyTransaction: vi.fn(async () => ({ ...base, environment: 'Sandbox', expiresDate: NOW + 3 * 60 * 1000 })),
+    };
+    const result = await resolveIosEntitlement(verifier, store, 'uid-1', 'jws', NOW);
+    expect(result.outcome).toBe('written');
+    expect(written[0]).toMatchObject({ environment: 'Sandbox', expiryTimeMillis: NOW + 3 * 60 * 1000 });
   });
 });
+
+
+// Production-first verification with a Sandbox fallback ONLY on INVALID_ENVIRONMENT (Apple's
+// documented approach; App Review always buys with sandbox-signed transactions).
+describe('createEnvironmentFallbackVerifier', () => {
+  class InvalidEnvironment extends Error {}
+  class BadSignature extends Error {}
+  const payload: AppStoreTransactionPayload = {
+    transactionId: 'txn-f',
+    type: 'Auto-Renewable Subscription',
+    expiresDate: 1,
+  };
+  const opts = {
+    isInvalidEnvironment: (err: unknown) => err instanceof InvalidEnvironment,
+    mapError: (err: unknown) => (err instanceof BadSignature ? new AppStoreVerificationError('bad') : (err as Error)),
+  };
+
+  it('uses Production first and tags the payload Production', async () => {
+    const sandbox = { verifyAndDecodeTransaction: vi.fn() };
+    const verifier = createEnvironmentFallbackVerifier(
+      { verifyAndDecodeTransaction: vi.fn(async () => payload) },
+      sandbox,
+      opts,
+    );
+    await expect(verifier.verifyTransaction('jws')).resolves.toMatchObject({ environment: 'Production' });
+    expect(sandbox.verifyAndDecodeTransaction).not.toHaveBeenCalled();
+  });
+
+  it('falls back to Sandbox on INVALID_ENVIRONMENT and tags the payload Sandbox', async () => {
+    const verifier = createEnvironmentFallbackVerifier(
+      { verifyAndDecodeTransaction: vi.fn(async () => { throw new InvalidEnvironment(); }) },
+      { verifyAndDecodeTransaction: vi.fn(async () => ({ ...payload, environment: 'Production' })) },
+      opts,
+    );
+    // The tag comes from the verifier that succeeded, never from the (client-controlled-looking) payload.
+    await expect(verifier.verifyTransaction('jws')).resolves.toMatchObject({ environment: 'Sandbox' });
+  });
+
+  it('does NOT fall back to Sandbox for a signature/chain failure', async () => {
+    const sandbox = { verifyAndDecodeTransaction: vi.fn(async () => payload) };
+    const verifier = createEnvironmentFallbackVerifier(
+      { verifyAndDecodeTransaction: vi.fn(async () => { throw new BadSignature(); }) },
+      sandbox,
+      opts,
+    );
+    await expect(verifier.verifyTransaction('jws')).rejects.toBeInstanceOf(AppStoreVerificationError);
+    expect(sandbox.verifyAndDecodeTransaction).not.toHaveBeenCalled();
+  });
+
+  it('maps a Sandbox-side verification failure after fallback', async () => {
+    const verifier = createEnvironmentFallbackVerifier(
+      { verifyAndDecodeTransaction: vi.fn(async () => { throw new InvalidEnvironment(); }) },
+      { verifyAndDecodeTransaction: vi.fn(async () => { throw new BadSignature(); }) },
+      opts,
+    );
+    await expect(verifier.verifyTransaction('jws')).rejects.toBeInstanceOf(AppStoreVerificationError);
+  });
+
+  it('verifies against Sandbox only when no Production verifier is configured (dev/staging)', async () => {
+    const verifier = createEnvironmentFallbackVerifier(
+      null,
+      { verifyAndDecodeTransaction: vi.fn(async () => payload) },
+      opts,
+    );
+    await expect(verifier.verifyTransaction('jws')).resolves.toMatchObject({ environment: 'Sandbox' });
+  });
+});
+
 
 describe('resolveIosEntitlement', () => {
   const UID = 'uid-1';
@@ -140,6 +256,7 @@ describe('resolveIosEntitlement', () => {
     productId: 'pro_monthly',
     expiresDate: 9999,
     type: 'Auto-Renewable Subscription',
+    environment: 'Production',
   };
 
   /**

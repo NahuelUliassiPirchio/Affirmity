@@ -40,6 +40,10 @@ export interface AppStoreTransactionPayload {
    * same convention as the rest of this interface). Always present on a real, verified StoreKit 2
    * transaction JWS. */
   type?: string;
+  /** StoreKit environment of the transaction. `createEnvironmentFallbackVerifier` overwrites this
+   * with the environment of the verifier that actually succeeded, so it is never taken on trust
+   * from the JWS alone. */
+  environment?: string;
 }
 
 /** The only `AppStoreTransactionPayload.type` value this app grants Pro for -- see Fix 2 doc
@@ -47,7 +51,16 @@ export interface AppStoreTransactionPayload {
  * `@apple/app-store-server-library`'s `Type.AUTO_RENEWABLE_SUBSCRIPTION`. */
 const AUTO_RENEWABLE_SUBSCRIPTION_TYPE = 'Auto-Renewable Subscription';
 
+/** Hard server-side cap on how long a Sandbox-environment entitlement can live from the moment it
+ * is synced. Apple App Review (and TestFlight/Xcode) always buy with sandbox-signed transactions,
+ * so Sandbox JWS must be accepted -- but anyone can mint one for free with a sandbox account.
+ * Bounding the grant means a sandbox purchase can never become a long-lived Pro: sandbox
+ * subscriptions renew every few minutes anyway, and this caps even a forged/odd `expiresDate`. */
+export const SANDBOX_ENTITLEMENT_MAX_AGE_MILLIS = 24 * 60 * 60 * 1000;
+
 export type AppStoreEntitlementDoc = EntitlementDoc & {
+  /** Additive field: which App Store environment verified this transaction. */
+  environment: 'Production' | 'Sandbox';
   /** Plaintext App Store transaction id, kept alongside `purchaseTokenHash` for support/debugging
    * -- unlike Play's purchase token, this is not a bearer credential, so there is no secrecy
    * reason to hash-only it. */
@@ -88,6 +101,12 @@ export function toAppStoreEntitlement(
     );
   }
   const tier: EntitlementTier = payload.revocationDate ? 'free' : 'pro';
+  // Fail closed: anything not positively Production (missing, Xcode, LocalTesting) is bounded.
+  const environment = payload.environment === 'Production' ? 'Production' : 'Sandbox';
+  const expiryTimeMillis =
+    environment === 'Production'
+      ? payload.expiresDate ?? null
+      : Math.min(payload.expiresDate ?? Infinity, nowMillis + SANDBOX_ENTITLEMENT_MAX_AGE_MILLIS);
   const transactionId = payload.transactionId;
   return {
     tier,
@@ -96,7 +115,8 @@ export function toAppStoreEntitlement(
     // No base-plan concept in StoreKit 2 transactions -- Play-only field, kept null for shape
     // parity with `EntitlementDoc`.
     basePlanId: null,
-    expiryTimeMillis: payload.expiresDate ?? null,
+    expiryTimeMillis,
+    environment,
     // Auto-renew status lives in StoreKit 2's *renewal info* JWS, not the transaction JWS this
     // function maps -- `syncEntitlementIOS` only verifies the transaction, so this is unknown
     // rather than false-as-fact. Left `false` (not derived) until renewal-info verification is
@@ -188,15 +208,44 @@ export interface ResolveIosEntitlementResult {
   doc?: AppStoreEntitlementDoc;
 }
 
-/** Fix 3 (HIGH finding): parses the `IOS_ALLOW_SANDBOX_ENTITLEMENTS` env var (same
- * `process.env.X ?? default` convention as `IOS_BUNDLE_ID`/`IOS_APP_APPLE_ID` in `index.ts`).
- * Default OFF -- only the exact literal `"true"` enables Sandbox-verification fallback. Without
- * this gate, anyone can create a free Apple Sandbox account, generate a Sandbox transaction, and
- * get a real Production Pro entitlement for zero payment. This should stay enabled in dev/staging
- * Firebase projects (where there is no shipped Production build yet) and be turned OFF once the
- * app is live in production. */
-export function isSandboxEntitlementsAllowed(envValue: string | undefined): boolean {
-  return envValue === 'true';
+/** Minimal decode port satisfied by `@apple/app-store-server-library`'s `SignedDataVerifier`. */
+export interface AppStoreTransactionDecoder {
+  verifyAndDecodeTransaction(signedTransaction: string): Promise<AppStoreTransactionPayload>;
+}
+
+/**
+ * Production-first verification with a Sandbox fallback, per Apple's documented approach. Apple
+ * App Review always purchases with sandbox-signed transactions against the production build, so
+ * the fallback is unconditional; the risk (a free sandbox account minting Pro) is bounded by
+ * `SANDBOX_ENTITLEMENT_MAX_AGE_MILLIS` in `toAppStoreEntitlement` instead of by a config flag.
+ * Falls back ONLY when `isInvalidEnvironment(err)`; any other failure is mapped via `mapError`
+ * (401 for auth failures, rethrown for transient ones) without trying Sandbox. With no Production
+ * verifier (`null`, e.g. dev/staging without `IOS_APP_APPLE_ID`) it verifies against Sandbox only.
+ * The result's `environment` is set from the verifier that succeeded.
+ */
+export function createEnvironmentFallbackVerifier(
+  production: AppStoreTransactionDecoder | null,
+  sandbox: AppStoreTransactionDecoder,
+  opts: { isInvalidEnvironment(err: unknown): boolean; mapError(err: unknown): Error },
+): AppStoreVerifier {
+  return {
+    async verifyTransaction(signedTransaction: string) {
+      if (production) {
+        try {
+          const payload = await production.verifyAndDecodeTransaction(signedTransaction);
+          return { ...payload, environment: 'Production' };
+        } catch (err) {
+          if (!opts.isInvalidEnvironment(err)) throw opts.mapError(err);
+        }
+      }
+      try {
+        const payload = await sandbox.verifyAndDecodeTransaction(signedTransaction);
+        return { ...payload, environment: 'Sandbox' };
+      } catch (err) {
+        throw opts.mapError(err);
+      }
+    },
+  };
 }
 
 /**
