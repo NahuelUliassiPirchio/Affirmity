@@ -70,7 +70,8 @@ import {
 } from './billing';
 import {
   AppStoreVerificationError,
-  isSandboxEntitlementsAllowed,
+  createAppStoreVerifier,
+  logSandboxGrant,
   isStaleIosEntitlement,
   parseAppleAppId,
   resolveIosEntitlement,
@@ -791,23 +792,18 @@ async function verifyRtdnPushClaims(authorizationHeader: string | undefined): Pr
 // to use the same identifier string, but they're independently configurable.
 const IOS_BUNDLE_ID = process.env.IOS_BUNDLE_ID ?? 'com.pirxhio.affirmity';
 // App Store Connect's numeric "Apple ID" for this app. `SignedDataVerifier`'s constructor throws
-// unless this is provided whenever its environment is Production -- even though
-// `verifyAndDecodeTransaction` itself never reads it -- so it's a hard prerequisite for verifying
-// real (non-Sandbox) purchases, not an optional nicety. It's only obtainable once an app record
-// exists in App Store Connect; the iOS app has not shipped yet, so this is very likely unset in
-// every environment today. Left unset, `appStoreVerifier()` below constructs Sandbox-only, and any
-// Production-environment JWS from a real App Store purchase will fail verification with 401 --
-// deliberately *not* a hard failure here: TestFlight/Sandbox verification must keep working today,
-// pre-launch, with no Apple ID configured yet. `productionVerifier()` logs a warning the first
-// time this happens so the gap stays observable instead of silent.
+// unless this is provided whenever its environment is Production, so it is a hard prerequisite.
+// REQUIRED wherever this function runs: the repo has a single Firebase project for dev and prod,
+// so there is no "dev without it" mode. Left unset, every `syncEntitlementIOS` call is refused
+// with 401 (fail closed, including Sandbox/App Review JWS) and `productionVerifier()` logs a
+// warning the first time so the misconfiguration stays observable.
 const IOS_APP_APPLE_ID = parseAppleAppId(process.env.IOS_APP_APPLE_ID);
 
-// Fix 3 (HIGH finding): without this gate, `appStoreVerifier()` always fell back from Production to
-// Sandbox verification, so anyone could create a free Apple Sandbox account, generate a Sandbox
-// transaction, and get a real Production Pro entitlement for zero payment. Default OFF (unset ->
-// disabled). This should stay enabled in dev/staging Firebase projects -- where there is no shipped
-// Production build to test against yet -- and be turned OFF once the app is live in production.
-const IOS_ALLOW_SANDBOX_ENTITLEMENTS = isSandboxEntitlementsAllowed(process.env.IOS_ALLOW_SANDBOX_ENTITLEMENTS);
+// Sandbox-signed transactions are always accepted after a Production INVALID_ENVIRONMENT: Apple
+// App Review purchases with sandbox transactions against the production build, and rejecting them
+// fails review (guideline 2.1). App Store-distributed builds only ever produce Production
+// transactions, so the abuse surface is a free sandbox account; that is bounded by
+// `SANDBOX_ENTITLEMENT_MAX_AGE_MILLIS` (see appStoreBilling.ts), not by a flag.
 
 let appleRootCertificatesCache: Buffer[] | null = null;
 
@@ -833,12 +829,11 @@ let sandboxVerifierCache: SignedDataVerifier | null = null;
 function productionVerifier(): SignedDataVerifier | null {
   if (productionVerifierCache === undefined) {
     if (IOS_APP_APPLE_ID === undefined) {
-      // Loud, not silent: a real Production-environment JWS hitting this instance will now fail
-      // Sandbox-only verification with INVALID_ENVIRONMENT and get mapped to a 401 for a
-      // legitimate paying user -- this log line is what makes that failure mode visible instead
-      // of indistinguishable from a forged receipt.
+      // Loud, not silent: every sync (including a legitimate paying user's) is refused with 401
+      // -- this log line makes that failure mode visible instead of indistinguishable from a
+      // forged receipt.
       console.warn(
-        '[appStoreVerifier] IOS_APP_APPLE_ID is not configured -- Production App Store transactions cannot be verified; only Sandbox JWS will succeed.',
+        '[appStoreVerifier] IOS_APP_APPLE_ID is not configured -- ALL iOS entitlement syncs will be refused (401). It is required wherever this function runs.',
       );
     }
     productionVerifierCache =
@@ -867,46 +862,7 @@ function sandboxVerifier(): SignedDataVerifier {
  * status is a genuine auth failure, wrapped as `AppStoreVerificationError` (401).
  */
 function appStoreVerifier(): AppStoreVerifier {
-  return {
-    async verifyTransaction(signedTransaction: string) {
-      const production = productionVerifier();
-      if (production) {
-        try {
-          return await production.verifyAndDecodeTransaction(signedTransaction);
-        } catch (err) {
-          if (!(err instanceof VerificationException) || err.status !== VerificationStatus.INVALID_ENVIRONMENT) {
-            throw mapVerificationError(err);
-          }
-          // Production verification says this JWS was minted for Sandbox -- Fix 3: only fall
-          // through to Sandbox verification when IOS_ALLOW_SANDBOX_ENTITLEMENTS is explicitly on.
-          if (!IOS_ALLOW_SANDBOX_ENTITLEMENTS) {
-            throw new AppStoreVerificationError(err.message || 'Apple JWS verification failed');
-          }
-        }
-      } else if (!IOS_ALLOW_SANDBOX_ENTITLEMENTS) {
-        // No Production verifier configured (no IOS_APP_APPLE_ID) AND Sandbox entitlements are
-        // disabled -- refuse rather than silently verifying against Sandbox only.
-        throw new AppStoreVerificationError(
-          'Production App Store verification is not configured and Sandbox entitlements are disabled',
-        );
-      }
-      try {
-        return await sandboxVerifier().verifyAndDecodeTransaction(signedTransaction);
-      } catch (err) {
-        throw mapVerificationError(err);
-      }
-    },
-  };
-}
-
-function mapVerificationError(err: unknown): Error {
-  if (err instanceof VerificationException && err.status === VerificationStatus.RETRYABLE_VERIFICATION_FAILURE) {
-    return err;
-  }
-  if (err instanceof VerificationException) {
-    return new AppStoreVerificationError(err.message || 'Apple JWS verification failed');
-  }
-  return err instanceof Error ? err : new Error('unknown-error');
+  return createAppStoreVerifier(productionVerifier(), sandboxVerifier());
 }
 
 /**
@@ -951,6 +907,7 @@ export const syncEntitlementIOS = onRequest(async (req, res) => {
       res.status(401).send('Unauthorized');
       return;
     }
+    if (result.doc) logSandboxGrant(console.log, uid, result.doc, result.outcome);
     if (result.outcome === 'claimed-by-other-uid') {
       // Fix 1: this transactionId already belongs to a different uid -- a replayed/foreign JWS,
       // not a server error and not a success. 409 Conflict, distinct from 401 (bad signature) and
