@@ -175,6 +175,43 @@ describe('notification-copy.v1.json data quality', () => {
     }
   });
 
+  describe('goal-incomplete nudge variants', () => {
+    const MISSING = ['meditation', 'affirmations'];
+    const TONES = ['soft', 'direct', 'powerful', 'manifestation', 'neutral'];
+    const nudges = () =>
+      catalog.variants.filter(
+        (v) => v.family === 'streak' && v.enabled && v.context.some((t) => t.startsWith('goal_missing_')),
+      );
+
+    it('has exactly one enabled variant per missing activity x (4 tones + neutral), no placeholders', () => {
+      expect(nudges()).toHaveLength(MISSING.length * TONES.length);
+      for (const missing of MISSING) {
+        for (const tone of TONES) {
+          const matching = nudges().filter(
+            (v) => v.context.includes(`goal_missing_${missing}`) && v.context.includes(`tone_${tone}`),
+          );
+          expect(matching, `${missing} ${tone}`).toHaveLength(1);
+          expect(matching[0].context).toHaveLength(2);
+          expect(matching[0].placeholders).toEqual([]);
+        }
+      }
+    });
+
+    it('tone attempt selects only its tone; neutral attempt selects only neutral; at-risk contexts never match', () => {
+      const pool = nudges();
+      for (const missing of MISSING) {
+        for (const tone of TONES.filter((t) => t !== 'neutral')) {
+          const picked = selectVariant(pool, 'streak', [`goal_missing_${missing}`, `tone_${tone}`], [], () => 0);
+          expect(picked?.key).toBe(`goal_incomplete_${missing}_${tone}`);
+        }
+        const neutral = selectVariant(pool, 'streak', [`goal_missing_${missing}`, 'tone_neutral'], [], () => 0);
+        expect(neutral?.key).toBe(`goal_incomplete_${missing}_neutral`);
+      }
+      expect(selectVariant(pool, 'streak', ['streak_1_3', 'streak_both'], [], () => 0)).toBeNull();
+      expect(selectVariant(pool, 'streak', ['streak_generic'], [], () => 0)).toBeNull();
+    });
+  });
+
   describe('overall streak variants', () => {
     const BREAKDOWNS = {
       streak_both: ['streakCount', 'meditationDays', 'affirmationsDays'],
@@ -186,7 +223,10 @@ describe('notification-copy.v1.json data quality', () => {
     const MAX_BODY_CHARS = 110;
     const OVERALL: Record<'es' | 'en', RegExp> = { es: /general/i, en: /overall/i };
     const FALLBACK_TAG = 'streak_generic';
-    const activeStreak = () => catalog.variants.filter((v) => v.family === 'streak' && v.enabled);
+    // The goal-incomplete nudges (goal_missing_* tags) are a separate pool, checked below.
+    const isGoalNudge = (v: { context: string[] }) => v.context.some((t) => t.startsWith('goal_missing_'));
+    const activeStreak = () =>
+      catalog.variants.filter((v) => v.family === 'streak' && v.enabled && !isGoalNudge(v));
     const isFallback = (v: { context: string[] }) => v.context.includes(FALLBACK_TAG);
     // Breakdown variants: the primary attempt's pool (band + breakdown tags).
     const active = () => activeStreak().filter((v) => !isFallback(v));

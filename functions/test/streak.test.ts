@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { missingDayGoalActivity, parsePreferredTone } from '../src/dayGoal';
 
 import {
   streakOf,
@@ -297,5 +298,27 @@ describe('healerProtectedStreak', () => {
     const rows = [med(MONDAY - 6), med(MONDAY - 5), med(MONDAY - 3), med(MONDAY - 2)];
     expect(healerProtectedStreak(rows, MONDAY)).toBe(2);
     expect(healerProtectedStreak(rows, MONDAY, [{ healedEpochDay: MONDAY - 4 }])).toBe(5);
+  });
+});
+
+describe('missingDayGoalActivity / parsePreferredTone', () => {
+  const day = 100;
+  const row = (meditationDone: boolean, affirmationDone: boolean) => [{ epochDay: day, meditationDone, affirmationDone }];
+
+  it('returns the missing activity only when exactly one is done today', () => {
+    expect(missingDayGoalActivity(row(true, false), day)).toBe('affirmations');
+    expect(missingDayGoalActivity(row(false, true), day)).toBe('meditation');
+    expect(missingDayGoalActivity(row(true, true), day)).toBeNull();
+    expect(missingDayGoalActivity(row(false, false), day)).toBeNull();
+    expect(missingDayGoalActivity([], day)).toBeNull();
+    expect(missingDayGoalActivity([{ epochDay: day - 1, meditationDone: true, affirmationDone: false }], day)).toBeNull();
+  });
+
+  it('whitelists the four tones', () => {
+    expect(parsePreferredTone('soft')).toBe('soft');
+    expect(parsePreferredTone('manifestation')).toBe('manifestation');
+    expect(parsePreferredTone('neutral')).toBeNull();
+    expect(parsePreferredTone(undefined)).toBeNull();
+    expect(parsePreferredTone(5)).toBeNull();
   });
 });
