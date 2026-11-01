@@ -338,6 +338,20 @@
     <string name="widget_streak_unit_one">day streak</string>
     <string name="widget_today_done">today done</string>
     <string name="widget_today_pending">today still open</string>
+    <!-- Widget end-of-day band: one short line per tone and state -->
+    <string name="widget_band_soft_meditation">There\'s still time to meditate</string>
+    <string name="widget_band_soft_affirmation">There\'s still time for your affirmations</string>
+    <string name="widget_band_soft_risk">Your streak is alive until midnight</string>
+    <string name="widget_band_direct_meditation">Today\'s meditation is still left</string>
+    <string name="widget_band_direct_affirmation">Today\'s affirmations are still left</string>
+    <string name="widget_band_direct_risk">Streak ends tonight. A minute is enough</string>
+    <string name="widget_band_powerful_meditation">Close the day with a meditation</string>
+    <string name="widget_band_powerful_affirmation">Close the day with your affirmations</string>
+    <string name="widget_band_powerful_risk">Hold your streak. You\'ve got this</string>
+    <string name="widget_band_manifestation_meditation">Open up to a moment of calm</string>
+    <string name="widget_band_manifestation_affirmation">Open up to today\'s affirmations</string>
+    <string name="widget_band_manifestation_risk">Your streak asks for one moment today</string>
+    <string name="widget_band_a11y">End-of-day reminder: %1$s</string>
 
     <string name="affirmation_group_badge_premium">Premium</string>
     <string name="affirmation_group_badge_ad">Pro only</string>

@@ -800,6 +800,20 @@
     <string name="widget_streak_unit_one">día de racha</string>
     <string name="widget_today_done">hoy completo</string>
     <string name="widget_today_pending">hoy pendiente</string>
+    <!-- Widget end-of-day band: one short line per tone and state -->
+    <string name="widget_band_soft_meditation">Aún hay tiempo para meditar</string>
+    <string name="widget_band_soft_affirmation">Aún hay tiempo para tus afirmaciones</string>
+    <string name="widget_band_soft_risk">Tu racha sigue viva hasta medianoche</string>
+    <string name="widget_band_direct_meditation">Falta la meditación de hoy</string>
+    <string name="widget_band_direct_affirmation">Faltan tus afirmaciones de hoy</string>
+    <string name="widget_band_direct_risk">Tu racha vence hoy. Un minuto alcanza</string>
+    <string name="widget_band_powerful_meditation">Cierra el día meditando</string>
+    <string name="widget_band_powerful_affirmation">Cierra el día con tus afirmaciones</string>
+    <string name="widget_band_powerful_risk">Sostén tu racha: tú puedes</string>
+    <string name="widget_band_manifestation_meditation">Ábrete a un momento de calma</string>
+    <string name="widget_band_manifestation_affirmation">Ábrete a tus afirmaciones de hoy</string>
+    <string name="widget_band_manifestation_risk">Hoy tu racha te pide un momento</string>
+    <string name="widget_band_a11y">Recordatorio del día: %1$s</string>
 
     <string name="affirmation_group_badge_premium">Premium</string>
     <string name="affirmation_group_badge_ad">Solo Pro</string>

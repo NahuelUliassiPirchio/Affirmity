@@ -112,6 +112,26 @@ class WeeklyTrackerLayoutTest {
     }
 
     @Test
+    fun activeBand_reservesItsPaddingAroundAThreeDigitLeadingStreak() {
+        val plain = computeTrackerLayout(320f, 56f, streakVisible = true)
+        val banded = computeTrackerLayout(320f, 56f, streakVisible = true, bandActive = true)
+        assertEquals(StreakPlacement.LeadingRow, banded.streakPlacement)
+        // Counter content (flame + gap + 3 digits) plus the band's 2 * 8dp must fit the reservation.
+        val needed = stripStreakContentWidthDp(3, sp = banded.leadingStreakSp) + 2 * BAND_PADDING_H_DP
+        assertTrue("reserved=${banded.leadingStreakWidth} needed=$needed", banded.leadingStreakWidth >= needed)
+        assertEquals(plain.leadingStreakWidth + 2 * BAND_PADDING_H_DP, banded.leadingStreakWidth, 0.01f)
+    }
+
+    @Test
+    fun activeBand_growsTheTallHeaderByItsVerticalPadding() {
+        val plain = computeTrackerLayout(380f, 210f, streakVisible = true)
+        val banded = computeTrackerLayout(380f, 210f, streakVisible = true, bandActive = true)
+        assertEquals(WidgetTier.Tall, banded.tier)
+        assertTrue(banded.tallHeaderHeight >= plain.tallHeaderHeight)
+        assertEquals(plain.tallHeaderHeight + 2 * BAND_PADDING_V_DP, tallHeaderContentHeightDp() + 2 * BAND_PADDING_V_DP, 0.01f)
+    }
+
+    @Test
     fun padding_shrinksBelow76() {
         assertEquals(10f, computeTrackerLayout(320f, 75f, streakVisible = false).padding)
         assertEquals(14f, computeTrackerLayout(320f, 76f, streakVisible = false).padding)

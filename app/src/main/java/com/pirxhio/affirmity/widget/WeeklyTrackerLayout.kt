@@ -53,6 +53,10 @@ private const val STRIP_LETTERS_MAX_SP = 11f
 private const val LETTERS_MAX_SP = 13f
 private const val MIN_LEGEND_SP = 9
 private const val STREAK_WIDTH_SLACK_DP = 4f
+
+/** Padding the end-of-day band adds around the streak counter (see `StreakBand` in the widget file). */
+internal const val BAND_PADDING_H_DP = 8f
+internal const val BAND_PADDING_V_DP = 2f
 private const val LINE_HEIGHT_FACTOR = 1.2f
 private const val DIGIT_WIDTH_EM = 0.6f
 private const val STREAK_DIGITS_RESERVED = 3
@@ -121,11 +125,12 @@ internal fun computeTrackerLayout(
     heightDp: Float,
     streakVisible: Boolean,
     spToDp: (Float) -> Float = { it },
+    bandActive: Boolean = false,
 ): TrackerLayout {
     val nominal = tierForHeight(heightDp)
-    val first = buildLayout(nominal, widthDp, heightDp, streakVisible, spToDp)
+    val first = buildLayout(nominal, widthDp, heightDp, streakVisible, spToDp, bandActive)
     if (nominal == WidgetTier.Tall && !first.cellsFit) {
-        return buildLayout(WidgetTier.Regular, widthDp, heightDp, streakVisible, spToDp).layout
+        return buildLayout(WidgetTier.Regular, widthDp, heightDp, streakVisible, spToDp, bandActive).layout
     }
     return first.layout
 }
@@ -154,9 +159,13 @@ private fun planSide(
     leadingSp: Float,
     streakVisible: Boolean,
     spToDp: (Float) -> Float,
+    bandActive: Boolean,
 ): SidePlan {
+    // The band pads the streak counter on all sides, so it costs width and height on top of the text.
+    val bandH = if (bandActive && streakVisible) 2 * BAND_PADDING_H_DP else 0f
+    val bandV = if (bandActive && streakVisible) 2 * BAND_PADDING_V_DP else 0f
     val legendHeight = if (legendVisible) legendHeightDp(legendSize, LEGEND_ROW_GAP_DP, spToDp) else 0f
-    val besideColumnWithStreak = streakLine + (if (legendVisible) SIDE_COLUMN_GAP_DP + legendHeight else 0f)
+    val besideColumnWithStreak = streakLine + bandV + (if (legendVisible) SIDE_COLUMN_GAP_DP + legendHeight else 0f)
     val placement = when {
         !streakVisible -> StreakPlacement.None
         tier == WidgetTier.Strip -> StreakPlacement.LeadingRow
@@ -166,17 +175,19 @@ private fun planSide(
     }
     val leadingStreakWidth =
         if (placement == StreakPlacement.LeadingRow) {
-            stripStreakContentWidthDp(STREAK_DIGITS_RESERVED, spToDp, leadingSp) + STREAK_WIDTH_SLACK_DP
+            stripStreakContentWidthDp(STREAK_DIGITS_RESERVED, spToDp, leadingSp) + STREAK_WIDTH_SLACK_DP + bandH
         } else {
             0f
         }
     // Legend width is the design's estimate at its nominal size, scaled with the text; with the
     // legend hidden, a beside-grid streak row is all that remains of the side column.
+    val besideStreakWidth = REGULAR_STREAK_FLAME_DP + STREAK_FLAME_GAP_DP +
+        kotlin.math.ceil(STREAK_DIGITS_RESERVED * DIGIT_WIDTH_EM * spToDp(REGULAR_STREAK_SP)) + bandH
+    val legendWidth = legendBaseWidth * spToDp(legendSize.toFloat()) / nominalLegend
     val sideColumnWidth = when {
-        legendVisible -> legendBaseWidth * spToDp(legendSize.toFloat()) / nominalLegend
-        placement == StreakPlacement.BesideGrid ->
-            REGULAR_STREAK_FLAME_DP + STREAK_FLAME_GAP_DP +
-                kotlin.math.ceil(STREAK_DIGITS_RESERVED * DIGIT_WIDTH_EM * spToDp(REGULAR_STREAK_SP))
+        legendVisible && placement == StreakPlacement.BesideGrid -> maxOf(legendWidth, besideStreakWidth)
+        legendVisible -> legendWidth
+        placement == StreakPlacement.BesideGrid -> besideStreakWidth
         else -> 0f
     }
     val gridWidth = if (tier == WidgetTier.Tall) {
@@ -196,6 +207,7 @@ private fun buildLayout(
     heightDp: Float,
     streakVisible: Boolean,
     spToDp: (Float) -> Float,
+    bandActive: Boolean,
 ): BuiltLayout {
     val narrow = widthDp < NARROW_BELOW_WIDTH
     val pad = if (heightDp < COMPACT_PADDING_BELOW) 10f else 14f
@@ -212,7 +224,8 @@ private fun buildLayout(
 
     // The leading streak's font steps down until its line fits the content height.
     var leadingSp = STRIP_STREAK_SP
-    while (leadingSp > MIN_LEADING_STREAK_SP && lineHeight(spToDp(leadingSp)) > contentHeight) leadingSp--
+    val bandV = if (bandActive && streakVisible) 2 * BAND_PADDING_V_DP else 0f
+    while (leadingSp > MIN_LEADING_STREAK_SP && lineHeight(spToDp(leadingSp)) + bandV > contentHeight) leadingSp--
 
     // Beside-grid legends are tried largest first, then smaller, then hidden, until both the
     // height and the horizontal budget (seven minimum cells plus everything else) are met. The
@@ -226,7 +239,7 @@ private fun buildLayout(
             listOf(MIN_LEGEND_SP to false)
     }
     val plans = legendCandidates.map { (size, visible) ->
-        planSide(tier, widthDp, pad, contentHeight, size, visible, nominalLegend, legendBaseWidth, streakLine, leadingSp, streakVisible, spToDp)
+        planSide(tier, widthDp, pad, contentHeight, size, visible, nominalLegend, legendBaseWidth, streakLine, leadingSp, streakVisible, spToDp, bandActive)
     }
     // Last resort when nothing fits: the hidden-legend plan, keeping the streak (cells may then
     // drop under the usual floor, see below).
@@ -240,7 +253,11 @@ private fun buildLayout(
     val gridWidth = plan.gridWidth
 
     val tallHeader = if (tier == WidgetTier.Tall) {
-        val streakColumn = if (streakVisible) tallHeaderContentHeightDp(spToDp) else 0f
+        val streakColumn = if (streakVisible) {
+            tallHeaderContentHeightDp(spToDp) + (if (bandActive) 2 * BAND_PADDING_V_DP else 0f)
+        } else {
+            0f
+        }
         val legendColumn = TALL_LEGEND_TOP_PADDING_DP + legendHeightDp(legendSize, TALL_LEGEND_GAP_DP, spToDp)
         maxOf(streakColumn, legendColumn)
     } else {

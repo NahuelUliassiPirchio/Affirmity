@@ -31,4 +31,22 @@ class DayRolloverScheduleTest {
         val expectedTarget = calendarAt(2026, Calendar.JANUARY, 15, 0, 1, 0)
         assertEquals(expectedTarget.timeInMillis - now.timeInMillis, delay)
     }
+
+    @Test
+    fun `threshold delay before 20_00 lands 60 seconds after today's 20_00`() {
+        val now = calendarAt(2026, Calendar.JANUARY, 14, 15, 0)
+
+        val delay = DayRolloverSchedule.delayUntilNextThresholdMillis(now.timeInMillis, now)
+
+        assertEquals(calendarAt(2026, Calendar.JANUARY, 14, 20, 1, 0).timeInMillis - now.timeInMillis, delay)
+    }
+
+    @Test
+    fun `threshold delay after 20_01 rolls to tomorrow`() {
+        val now = calendarAt(2026, Calendar.JANUARY, 14, 21, 30)
+
+        val delay = DayRolloverSchedule.delayUntilNextThresholdMillis(now.timeInMillis, now)
+
+        assertEquals(calendarAt(2026, Calendar.JANUARY, 15, 20, 1, 0).timeInMillis - now.timeInMillis, delay)
+    }
 }
