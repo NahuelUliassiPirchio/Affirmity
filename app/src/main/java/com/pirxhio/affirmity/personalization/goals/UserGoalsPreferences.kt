@@ -12,8 +12,11 @@ import kotlinx.coroutines.flow.map
 private val Context.userGoalsDataStore by preferencesDataStore(name = "user_goals_prefs")
 
 /**
- * Device-local goal preferences. Deliberately not part of DataSession or Firestore sync, and not
- * cleared on sign-out, matching [com.pirxhio.affirmity.data.local.AffirmationThemePreferences].
+ * Device-local goal preferences. Deliberately not part of DataSession, and not cleared on sign-out,
+ * matching [com.pirxhio.affirmity.data.local.AffirmationThemePreferences]. The preferred tone is
+ * additionally mirrored (best-effort, one-way) to the notification settings doc by
+ * [com.pirxhio.affirmity.data.AffirmityAppState] so server-rendered notification copy can use it;
+ * this store stays the source of truth.
  */
 class UserGoalsPreferences(private val context: Context) : UserGoalsStore {
 

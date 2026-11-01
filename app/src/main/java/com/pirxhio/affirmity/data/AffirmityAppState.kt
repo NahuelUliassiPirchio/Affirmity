@@ -182,6 +182,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
@@ -574,6 +575,8 @@ class AffirmityAppState(
      * `null` means no goals were saved. Defaulted to `{ null }` so existing JVM tests are
      * unaffected. */
     private val goalIdsProvider: suspend () -> Set<String>? = { null },
+    /** Local preferred-tone answers, mirrored to the server for notification copy (best-effort). */
+    private val preferredToneFlow: Flow<String?> = emptyFlow(),
     /** The seam Spec 5 replaces (design §9): the only way an ad unlock is ever created.
      *  Defaulted to [NoAdUnlockSource] -- the same injection convention as [deviceTimeZoneId] /
      *  [themePreferences] / [knownThemeIds] -- so Spec 5's entire integration into this class is
@@ -1526,6 +1529,24 @@ class AffirmityAppState(
                         throw cancellation
                     } catch (error: Exception) {
                         Log.e(TAG, "locale sync: FAILED", error)
+                    }
+                    // Same best-effort contract as the locale write. Observing (not one-shot) covers
+                    // first launch after update, the onboarding answer, and My Goals edits; it ends
+                    // when a session swap cancels this collectLatest body.
+                    try {
+                        preferredToneFlow.distinctUntilChanged().collect { tone ->
+                            try {
+                                remoteSession.notifications.setPreferredTone(tone)
+                            } catch (cancellation: CancellationException) {
+                                throw cancellation
+                            } catch (error: Exception) {
+                                Log.e(TAG, "preferred tone sync: FAILED", error)
+                            }
+                        }
+                    } catch (cancellation: CancellationException) {
+                        throw cancellation
+                    } catch (error: Exception) {
+                        Log.e(TAG, "preferred tone sync: observe FAILED", error)
                     }
                 }
         }
@@ -2929,6 +2950,7 @@ fun rememberAffirmityAppState(userGoalsStore: UserGoalsStore): AffirmityAppState
             proOnlyThemeIds = proOnlyThemeIds,
             legacyGroupIdsProvider = { readLegacySelectedGroupIds(context.applicationContext) },
             goalIdsProvider = { userGoalsStore.observeGoalIds().first() },
+            preferredToneFlow = userGoalsStore.observePreferredTone(),
             adUnlockSource = RewardedAdUnlockSource(
                 gateway = GoogleRewardedAdGateway(
                     // Re-resolved per call from the composable's own captured `context`, never
