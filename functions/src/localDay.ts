@@ -1,10 +1,12 @@
 /**
  * IANA time-zone <-> epoch-day <-> UTC-instant helpers.
  *
- * `epochDay` is days since 1970-01-01, aligned to the UTC calendar (same convention as the
- * retired client's `LocalDate.toEpochDay()` / `DayClock.epochDay`). No external date library is
- * used -- the `Intl.DateTimeFormat` API (available in Node 20) is sufficient and keeps
- * `functions/` dependency-free for this pure layer.
+ * `epochDay` is the local CALENDAR date's days since 1970-01-01 (Android client:
+ * `LocalDate.of(y, m, d).toEpochDay()` in `DayClock.kt`). It is injective per calendar date in
+ * every zone, DST included. Helpers that need an instant map the calendar date back to the UTC
+ * instant of local midnight / local wall time in the zone.
+ * No external date library is used -- the `Intl.DateTimeFormat` API (available in Node 20) is
+ * sufficient and keeps `functions/` dependency-free for this pure layer.
  */
 
 const MS_PER_DAY = 86_400_000;
@@ -93,30 +95,33 @@ function zonedTimeToUtcMillis(
   return candidates.sort((left, right) => right.wallMillis - left.wallMillis)[0].utcMillis;
 }
 
-/** epoch day -> {year, month, day} (UTC-calendar-aligned, matches `epochDay * MS_PER_DAY`). */
-function epochDayToYmd(epochDay: number): { year: number; month: number; day: number } {
-  const d = new Date(epochDay * MS_PER_DAY);
+function utcCalendarToYmd(utcDay: number): { year: number; month: number; day: number } {
+  const d = new Date(utcDay * MS_PER_DAY);
   return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
+}
+
+/** UTC millis for local midnight of the calendar date `ymd` in `zone` (first valid instant if 00:00 is skipped). */
+function midnightOfYmd(ymd: { year: number; month: number; day: number }, zone: string): number {
+  return zonedTimeToUtcMillis(ymd.year, ymd.month, ymd.day, 0, 0, 0, zone);
 }
 
 /** UTC millis for local midnight (00:00:00) of `epochDay` in `zone`. */
 export function localMidnightUtcMillis(epochDay: number, zone: string): number {
-  const { year, month, day } = epochDayToYmd(epochDay);
-  return zonedTimeToUtcMillis(year, month, day, 0, 0, 0, zone);
+  return midnightOfYmd(utcCalendarToYmd(epochDay), zone);
 }
 
 /** UTC millis for `minuteOfDay` on `epochDay` in `zone`, resolved as a complete local date/time. */
 export function localInstantMillis(epochDay: number, zone: string, minuteOfDay: number): number {
-  const { year, month, day } = epochDayToYmd(epochDay);
+  const { year, month, day } = utcCalendarToYmd(epochDay);
   const hour = Math.floor(minuteOfDay / 60);
   const minute = minuteOfDay % 60;
   return zonedTimeToUtcMillis(year, month, day, hour, minute, 0, zone);
 }
 
-/** The epoch day (UTC-calendar-aligned) that `utcMillis` falls on when viewed in `zone`. */
+/** The local calendar date's epoch day (days since 1970-01-01) that `utcMillis` falls on in `zone`. */
 export function utcMillisToLocalEpochDay(utcMillis: number, zone: string): number {
   const zoned = getZonedParts(utcMillis, zone);
-  return Math.floor(Date.UTC(zoned.year, zoned.month - 1, zoned.day) / MS_PER_DAY);
+  return Date.UTC(zoned.year, zoned.month - 1, zoned.day) / MS_PER_DAY;
 }
 
 /** The local hour-of-day (0-23) that `utcMillis` falls on when viewed in `zone`. */

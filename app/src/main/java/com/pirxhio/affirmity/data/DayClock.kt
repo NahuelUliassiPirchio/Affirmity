@@ -1,5 +1,8 @@
 package com.pirxhio.affirmity.data
 
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Calendar
 
 /**
@@ -8,37 +11,38 @@ import java.util.Calendar
  */
 object DayClock {
 
-    /** A device-local day count (arbitrary epoch, only used for day-difference math). */
-    fun epochDay(calendar: Calendar = Calendar.getInstance()): Long {
-        val midnight = (calendar.clone() as Calendar).apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        return midnight.timeInMillis / (24 * 60 * 60 * 1000L)
-    }
+    /**
+     * The local calendar date's days since 1970-01-01 (`LocalDate.toEpochDay()`), read from
+     * [calendar]'s own time zone. Injective per calendar date in every zone, DST included; mirrors
+     * the server's `utcMillisToLocalEpochDay`.
+     */
+    fun epochDay(calendar: Calendar = Calendar.getInstance()): Long =
+        LocalDate.of(
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH) + 1,
+            calendar.get(Calendar.DAY_OF_MONTH),
+        ).toEpochDay()
+
+    /** [epochDay] of the local date that [millis] falls on in [zone]. */
+    fun epochDay(zone: ZoneId, millis: Long): Long =
+        Instant.ofEpochMilli(millis).atZone(zone).toLocalDate().toEpochDay()
 
     /** [epochDay] of the day 6 days before [calendar] — start of the rolling last-7-days window. */
     fun rollingWindowStartEpochDay(calendar: Calendar = Calendar.getInstance()): Long =
         epochDay(calendar) - 6
 
     /**
-     * Inverse of [epochDay]: a [Calendar] set to local midnight for the device-local day identified
-     * by [epochDay]. Walks day-by-day from the current local midnight with [Calendar.add] rather
-     * than multiplying [epochDay] by a fixed millis-per-day, so the result stays correct even
-     * across DST transitions and is never off by a UTC-offset day on negative-offset timezones.
+     * Inverse of [epochDay]: a [Calendar] (in [calendar]'s time zone) set to local midnight of the
+     * calendar date identified by [epochDay], via [LocalDate.ofEpochDay]. Calendar's lenient
+     * fields resolve a skipped midnight (DST gap) to the first valid instant of that date.
      */
     fun calendarForEpochDay(epochDay: Long, calendar: Calendar = Calendar.getInstance()): Calendar {
-        val midnight = (calendar.clone() as Calendar).apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
+        val date = LocalDate.ofEpochDay(epochDay)
+        return (calendar.clone() as Calendar).apply {
+            clear()
+            set(date.year, date.monthValue - 1, date.dayOfMonth, 0, 0, 0)
             set(Calendar.MILLISECOND, 0)
         }
-        val dayDelta = (epochDay - epochDay(midnight)).toInt()
-        midnight.add(Calendar.DAY_OF_YEAR, dayDelta)
-        return midnight
     }
 
     /**
