@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-31T00:00:00Z",
+  "title": "Design System: Affirmity",
+  "extensions": {
+    "colorMeta": {
+      "sanctuary-teal": { "role": "primary", "displayName": "Sanctuary Teal", "canonical": "#00696F", "tonalRamp": ["#002022", "#00373A", "#00494D", "#00696F", "#18767D", "#3AA5AD", "#5BBCC3", "#B5E8EB"] },
+      "sanctuary-teal-bright": { "role": "primary", "displayName": "Sanctuary Teal Bright (dark-theme primary)", "canonical": "#5BBCC3" },
+      "sanctuary-teal-selected": { "role": "primary", "displayName": "Sanctuary Teal Selected", "canonical": "#18767D" },
+      "quiet-grey": { "role": "secondary", "displayName": "Quiet Grey", "canonical": "#5E5E5E" },
+      "streak-ember": { "role": "tertiary", "displayName": "Streak Ember", "canonical": "#E8590C", "tonalRamp": ["#3A2412", "#7A2E00", "#B93F00", "#E8590C", "#FF9A4D", "#FDA856", "#FFD3B0", "#FFEFD9"] },
+      "premium-light": { "role": "tertiary", "displayName": "Premium Apricot", "canonical": "#FFE0C7" },
+      "reflection-accent": { "role": "tertiary", "displayName": "Reflection Slate", "canonical": "#456582" },
+      "paper": { "role": "neutral", "displayName": "Paper", "canonical": "#F9F9F9", "tonalRamp": ["#1A1C1C", "#3E494A", "#6E797A", "#BDC9C9", "#E2E2E2", "#EEEEEE", "#F3F3F3", "#FFFFFF"] },
+      "night": { "role": "neutral", "displayName": "Night (true black)", "canonical": "#000000", "tonalRamp": ["#000000", "#111111", "#1C1C1C", "#272727", "#3A4344", "#5C6B6D", "#B0BEC0", "#FFFFFF"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#1A1C1C" },
+      "cover-ground": { "role": "neutral", "displayName": "Cover Ground", "canonical": "#0F1216" },
+      "tracker-surface": { "role": "neutral", "displayName": "Tracker Night", "canonical": "#232532" },
+      "tracker-meditation": { "role": "tertiary", "displayName": "Tracker Meditation Teal", "canonical": "#57B6B6" },
+      "tracker-affirmation": { "role": "tertiary", "displayName": "Tracker Affirmation Clay", "canonical": "#E3956C" },
+      "tracker-flame-lit": { "role": "tertiary", "displayName": "Flame Lit", "canonical": "#FDA856" },
+      "tracker-healed-heart": { "role": "tertiary", "displayName": "Healed Heart Lilac", "canonical": "#D2CEFD" },
+      "aurora-sea": { "role": "tertiary", "displayName": "Aurora Sea", "canonical": "#3FA796" },
+      "aurora-blush": { "role": "tertiary", "displayName": "Aurora Blush", "canonical": "#E8A9A0" },
+      "error": { "role": "error", "displayName": "Error", "canonical": "#BA1A1A" }
+    },
+    "typographyMeta": {
+      "headline-large": { "displayName": "Headline Large (serif)", "purpose": "Affirmation card text; screen heroes." },
+      "headline-medium": { "displayName": "Headline Medium (serif)", "purpose": "Major section heads." },
+      "headline-small": { "displayName": "Headline Small (serif)", "purpose": "Sheet and card titles." },
+      "title-large": { "displayName": "Title Large (serif)", "purpose": "List headers, dialog titles." },
+      "body-large": { "displayName": "Body Large", "purpose": "Reading text." },
+      "body-medium": { "displayName": "Body Medium", "purpose": "Default body." },
+      "body-small": { "displayName": "Body Small", "purpose": "Secondary descriptions." },
+      "label-large": { "displayName": "Label Large", "purpose": "Buttons." },
+      "label-medium": { "displayName": "Label Medium", "purpose": "Chips, nav labels." },
+      "label-small": { "displayName": "Label Small", "purpose": "Badges, captions." }
+    },
+    "shadows": [
+      { "name": "floating-chrome", "value": "0 2px 8px rgba(0,0,0,0.18)", "purpose": "Approximation of 4dp elevation on the floating status pill and save indicator (surface at 90% alpha)." },
+      { "name": "play-button", "value": "0 3px 12px rgba(0,0,0,0.22)", "purpose": "Approximation of the 6dp circular shadow on the group play button." }
+    ],
+    "motion": [
+      { "name": "standard", "value": "FastOutSlowInEasing / cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Default state transitions." },
+      { "name": "breath", "value": "cubic-bezier(0.37, 0, 0.63, 1)", "purpose": "BreathingOrb scale." },
+      { "name": "aurora-entry", "value": "1200ms cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Meditation backdrop entry." },
+      { "name": "aurora-warm-shift", "value": "2500ms FastOutSlowIn", "purpose": "Slow aurora color drift." },
+      { "name": "press-pop", "value": "90ms", "purpose": "Save indicator pop, group play press." },
+      { "name": "crossfade", "value": "150ms", "purpose": "Indicator crossfade." },
+      { "name": "like-burst", "value": "540-650ms, scale 0.15 -> 1.16 -> 1.0 -> 1.06", "purpose": "Affirmation like celebration." }
+    ],
+    "breakpoints": [
+      { "name": "adaptive", "value": "Material WindowAdaptiveInfo (NavigationSuiteScaffold: bar on compact, rail on medium+)" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Stock M3 filled button in Sanctuary Teal.",
+      "html": "<button class=\"ds-btn-primary\">Empezar</button>",
+      "css": ".ds-btn-primary { background: #00696F; color: #FFFFFF; height: 40px; padding: 0 24px; border: none; border-radius: 9999px; font: 600 14px/20px sans-serif; letter-spacing: 0.1px; transition: background 0.15s, box-shadow 0.15s; } .ds-btn-primary:hover { background: #18767D; box-shadow: 0 1px 3px rgba(0,0,0,0.2); } .ds-btn-primary:focus-visible { outline: 2px solid #5BBCC3; outline-offset: 2px; } .ds-btn-primary:active { background: #00494D; }"
+    },
+    {
+      "name": "Tonal Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Stock M3 FilledTonalButton; secondary actions.",
+      "html": "<button class=\"ds-btn-tonal\">Ya tengo una cuenta</button>",
+      "css": ".ds-btn-tonal { background: #E8E8E8; color: #1A1C1C; height: 40px; padding: 0 24px; border: none; border-radius: 9999px; font: 600 14px/20px sans-serif; transition: background 0.15s; } .ds-btn-tonal:hover { background: #E2E2E2; } .ds-btn-tonal:focus-visible { outline: 2px solid #00696F; outline-offset: 2px; }"
+    },
+    {
+      "name": "Surface Card",
+      "kind": "card",
+      "refersTo": "card-surface",
+      "description": "Flat tonal card, 20dp corners, no shadow.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-title\">Meditaciones para cada momento</div><div class=\"ds-card-body\">Sueño, calma, enfoque.</div></div>",
+      "css": ".ds-card { background: #EEEEEE; color: #1A1C1C; border-radius: 20px; padding: 16px; max-width: 320px; } .ds-card-title { font: 600 24px/30px serif; margin-bottom: 8px; } .ds-card-body { font: 400 16px/24px sans-serif; letter-spacing: 0.5px; color: #3E494A; }"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip-filter-selected",
+      "description": "M3 FilterChip; selected in Sanctuary Teal Selected.",
+      "html": "<button class=\"ds-chip ds-chip-on\">Calma</button> <button class=\"ds-chip\">Enfoque</button>",
+      "css": ".ds-chip { height: 32px; padding: 0 16px; border-radius: 8px; border: 1px solid #6E797A; background: transparent; color: #3E494A; font: 600 14px/20px sans-serif; transition: background 0.15s; } .ds-chip:hover { background: #F3F3F3; } .ds-chip:focus-visible { outline: 2px solid #00696F; outline-offset: 2px; } .ds-chip-on { background: #18767D; border-color: #18767D; color: #FFFFFF; }"
+    },
+    {
+      "name": "Navigation Bar",
+      "kind": "nav",
+      "refersTo": "nav-indicator-selected",
+      "description": "Adaptive NavigationSuiteScaffold bar; teal selected pill.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item ds-nav-on\"><span class=\"ds-nav-pill\">●</span>Afirmaciones</a><a class=\"ds-nav-item\"><span class=\"ds-nav-pill\">○</span>Meditar</a><a class=\"ds-nav-item\"><span class=\"ds-nav-pill\">○</span>Progreso</a></nav>",
+      "css": ".ds-nav { display: flex; justify-content: space-around; background: #F3F3F3; padding: 12px 0 16px; } .ds-nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #3E494A; font: 600 12px/16px sans-serif; cursor: pointer; } .ds-nav-pill { display: inline-flex; justify-content: center; width: 64px; height: 32px; line-height: 32px; border-radius: 9999px; } .ds-nav-on .ds-nav-pill { background: #18767D; color: #FFFFFF; } .ds-nav-item:hover .ds-nav-pill { background: #E8E8E8; } .ds-nav-on:hover .ds-nav-pill { background: #18767D; }"
+    },
+    {
+      "name": "Premium Badge",
+      "kind": "chip",
+      "refersTo": "premium-badge",
+      "description": "Apricot Pro badge.",
+      "html": "<span class=\"ds-badge-pro\">PRO</span>",
+      "css": ".ds-badge-pro { display: inline-block; background: #FFE0C7; color: #7A3B00; border-radius: 9999px; padding: 2px 8px; font: 600 10px/14px sans-serif; letter-spacing: 0.5px; }"
+    },
+    {
+      "name": "Affirmation Card",
+      "kind": "custom",
+      "refersTo": "affirmation-plate",
+      "description": "Full-bleed card with scrim and white serif affirmation.",
+      "html": "<div class=\"ds-aff\"><div class=\"ds-aff-text\">Yo puedo. Avanzo aunque cueste.</div><div class=\"ds-aff-rule\"></div></div>",
+      "css": ".ds-aff { position: relative; width: 280px; height: 420px; border-radius: 12px; background: linear-gradient(180deg, rgba(0,0,0,0.6), rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.8)), #3FA796; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; } .ds-aff-text { color: #FFFFFF; font: 700 32px/38px serif; letter-spacing: -0.5px; text-align: center; } .ds-aff-rule { width: 48px; height: 1px; background: rgba(255,255,255,0.7); margin-top: 16px; }"
+    },
+    {
+      "name": "Weekly Tracker Widget",
+      "kind": "custom",
+      "refersTo": "tracker-widget",
+      "description": "Dark Glance widget: 7-day half-disc grid and streak flame.",
+      "html": "<div class=\"ds-trk\"><div class=\"ds-trk-row\"><span class=\"ds-trk-d ds-full\"></span><span class=\"ds-trk-d ds-full\"></span><span class=\"ds-trk-d ds-med\"></span><span class=\"ds-trk-d ds-full\"></span><span class=\"ds-trk-d ds-heal\">♥</span><span class=\"ds-trk-d ds-full\"></span><span class=\"ds-trk-d\"></span></div><div class=\"ds-trk-streak\"><span class=\"ds-trk-flame\">🔥</span>12 <small>Hoy pendiente</small></div></div>",
+      "css": ".ds-trk { background: #232532; color: #E9E9ED; border-radius: 22px; padding: 16px; width: 300px; font-family: sans-serif; } .ds-trk-row { display: flex; gap: 8px; margin-bottom: 12px; } .ds-trk-d { width: 28px; height: 28px; border-radius: 50%; background: rgba(178,182,202,0.22); display: inline-flex; align-items: center; justify-content: center; color: #D2CEFD; font-size: 14px; } .ds-full { background: linear-gradient(90deg, #57B6B6 50%, #E3956C 50%); } .ds-med { background: linear-gradient(90deg, #57B6B6 50%, rgba(178,182,202,0.22) 50%); } .ds-heal { background: rgba(210,206,253,0.18); } .ds-trk-streak { font: 600 24px/30px sans-serif; color: #CFD3E5; } .ds-trk-streak small { font: 400 12px/16px sans-serif; color: #B2B6CA; margin-left: 8px; } .ds-trk-flame { margin-right: 6px; filter: saturate(0.9); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Inner Sanctuary",
+    "overview": "Affirmity is a private, safe place the user steps into for a few minutes a day. The content leads: a full-bleed affirmation card, a breathing orb over a slow aurora, a generated meditation cover. The chrome (Material 3 components on flat tonal surfaces) steps back so nothing competes with the moment.\n\nThe mood is calm and spacious. Light mode sits on soft paper greys and dark mode on true black, with a single brand accent, Sanctuary Teal, used sparingly for action and selection. Serif headlines give affirmations a voice. Sans-serif body and labels keep the operating surfaces plain and legible. Warmth comes from small, purposeful color families: ember orange for streak and momentum, and per-theme accents for affirmation universes and meditation categories.\n\nCelebration and urgency borrow the mechanics of gamified apps (streaks, milestones, nudges) but never their look. There are no mascots, no loud saturated palettes and no bouncy game badges.",
+    "keyCharacteristics": [
+      "One brand accent (Sanctuary Teal); everything else is tonal neutral or a scoped semantic family.",
+      "Content-first, full-bleed immersive surfaces; chrome is stock Material 3, flat and tonal.",
+      "Serif voice for headlines and affirmations, sans-serif for UI.",
+      "Full light and true-black dark themes; dynamic color is off on purpose so the brand palette wins.",
+      "Motion is slow and breath-like, never jittery."
+    ],
+    "rules": [
+      { "name": "The One Voice Rule", "body": "Sanctuary Teal is the only UI accent. Other hues appear only inside their scoped family: streak, premium, category, universe, group.", "section": "colors" },
+      { "name": "The One Meaning per Hue Rule", "body": "Ember orange means streak and momentum. Apricot means Pro. Don't borrow a family's hue for an unrelated purpose.", "section": "colors" },
+      { "name": "The Contrast-Checked Rule", "body": "New color pairs are verified with `ui/theme/ContrastRatio.kt` (tests already exist for the theme and the aurora).", "section": "colors" },
+      { "name": "The Serif Speaks Rule", "body": "Serif is for the voice (affirmations, headings, celebration moments). Controls, numbers in dense UI, and labels use sans.", "section": "typography" },
+      { "name": "The Flat-By-Default Rule", "body": "Surfaces are flat and tonal at rest. Shadow is reserved for elements that float over content.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use Sanctuary Teal (#00696F / #5BBCC3) as the single UI accent, and the surfaceContainer ramp for depth.",
+      "Do express streak and momentum through the ember family (#E8590C / #FF9A4D, flame #FDA856).",
+      "Do use serif (headline styles) for affirmations and celebration copy, sans for controls.",
+      "Do keep both themes: light paper (#F9F9F9) and true-black dark (#000000).",
+      "Do contrast-check every new pair with `ContrastRatio.kt`.",
+      "Do reuse the full-screen once-only pattern of `StreakHealerGrantedScreen` for big moments."
+    ],
+    "donts": [
+      "Don't use a cartoon mascot, a loud saturated palette or bouncy game-style badges; borrow gamification mechanics, not its look.",
+      "Don't add shadows to resting surfaces; lift is only for floating chrome.",
+      "Don't introduce a second UI accent or reuse a scoped family's hue for an unrelated meaning.",
+      "Don't turn on dynamic color; the brand palette wins.",
+      "Don't use the leftover template colors in `res/values/colors.xml` (purple_200/500/700, teal_200/700)."
+    ]
+  }
+}
