@@ -104,6 +104,9 @@ class FirebaseAnalyticsLogger(private val sink: FirebaseAnalyticsSink) : Analyti
         is AnalyticsEvent.RoundInterstitialSkipped -> listOf(
             text(AnalyticsParam.SKIP_REASON, event.reason.name),
         )
+        is AnalyticsEvent.MilestoneCelebrated -> listOf(
+            number(AnalyticsParam.MILESTONE_DAYS, event.milestoneDays.toLong()),
+        )
     }
 
     /** Shared param mapping for the three notification_* events (design §9): all four declared

@@ -35,6 +35,7 @@ enum class AnalyticsEventName(val wireName: String) {
     ROUND_INTERSTITIAL_SHOWN("round_interstitial_shown"),
     ROUND_INTERSTITIAL_FAILED("round_interstitial_failed"),
     ROUND_INTERSTITIAL_SKIPPED("round_interstitial_skipped"),
+    STREAK_MILESTONE_CELEBRATED("milestone_celebrated"),
 }
 
 /** Wire name for every declared parameter across the 19 events (REQ-4.5). */
@@ -67,6 +68,7 @@ enum class AnalyticsParam(val wireName: String) {
     INACTIVE_DAYS_BAND("inactive_days_band"),
     FEED_SIZE_BUCKET("feed_size_bucket"),
     SKIP_REASON("skip_reason"),
+    MILESTONE_DAYS("milestone_days"),
 }
 
 /** Bounded feed size at round completion (rounds only count from 10 affirmations up). */
@@ -359,5 +361,13 @@ sealed interface AnalyticsEvent {
         val reason: RoundSkipReason,
     ) : AnalyticsEvent {
         override val name = AnalyticsEventName.ROUND_INTERSTITIAL_SKIPPED
+    }
+
+    /** A general-streak milestone celebration screen was actually displayed, logged once per
+     * milestone when it first renders (value bounded by StreakMilestones.ALL). */
+    data class MilestoneCelebrated(
+        val milestoneDays: Int,
+    ) : AnalyticsEvent {
+        override val name = AnalyticsEventName.STREAK_MILESTONE_CELEBRATED
     }
 }

@@ -1,5 +1,11 @@
 package com.pirxhio.affirmity.data
 
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.transformLatest
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -26,6 +32,40 @@ object DayClock {
     /** [epochDay] of the local date that [millis] falls on in [zone]. */
     fun epochDay(zone: ZoneId, millis: Long): Long =
         Instant.ofEpochMilli(millis).atZone(zone).toLocalDate().toEpochDay()
+
+    /**
+     * Milliseconds from [nowMillis] until the next local midnight in [zone]. Computed from the
+     * zone's rules (not a fixed 24h), so 23h/25h DST days wake at the real boundary. Always >= 1.
+     */
+    fun millisUntilNextMidnight(nowMillis: Long, zone: ZoneId): Long {
+        val nextMidnight = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+            .plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        return (nextMidnight - nowMillis).coerceAtLeast(1L)
+    }
+
+    /**
+     * Emits the local epoch day now and again at every local midnight, so collectors whose query
+     * ranges are anchored to "today" can re-subscribe instead of going stale while the app stays
+     * open. Each [recheck] emission (app resume, time-zone or date change) re-reads the clock and
+     * restarts the midnight timer, since coroutine delays do not advance during deep sleep.
+     * Consecutive duplicates are dropped.
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    fun epochDayFlow(
+        recheck: Flow<Unit> = emptyFlow(),
+        nowMillis: () -> Long = System::currentTimeMillis,
+        zone: () -> ZoneId = ZoneId::systemDefault,
+    ): Flow<Long> = recheck
+        .onStart { emit(Unit) }
+        .transformLatest {
+            while (true) {
+                val now = nowMillis()
+                val z = zone()
+                emit(epochDay(z, now))
+                delay(millisUntilNextMidnight(now, z))
+            }
+        }
+        .distinctUntilChanged()
 
     /** [epochDay] of the day 6 days before [calendar] — start of the rolling last-7-days window. */
     fun rollingWindowStartEpochDay(calendar: Calendar = Calendar.getInstance()): Long =

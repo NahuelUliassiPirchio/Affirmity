@@ -254,6 +254,13 @@ class FirebaseAnalyticsLoggerTest {
     }
 
     @Test
+    fun `milestone_celebrated maps milestone_days as a number`() {
+        val logged = log(AnalyticsEvent.MilestoneCelebrated(7))
+        assertEquals("milestone_celebrated", logged.name)
+        assertEquals(listOf(AnalyticsParamValue.Number("milestone_days", 7L)), logged.params)
+    }
+
+    @Test
     fun `notification_opened maps family, variant_key, destination, locale`() {
         val logged = log(
             AnalyticsEvent.NotificationOpened(

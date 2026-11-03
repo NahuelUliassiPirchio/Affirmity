@@ -97,7 +97,11 @@ import com.pirxhio.affirmity.data.local.readLegacySelectedGroupIds
 import com.pirxhio.affirmity.data.local.NotificationDebugLog
 import com.pirxhio.affirmity.data.local.NotificationLogEntry
 import com.pirxhio.affirmity.data.local.NotificationPreferences
+import com.pirxhio.affirmity.data.local.InMemoryStreakMilestoneStore
 import com.pirxhio.affirmity.data.local.OnboardingGuidePreferences
+import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
+import com.pirxhio.affirmity.data.local.StreakMilestonePreferences
+import com.pirxhio.affirmity.data.local.StreakMilestoneStore
 import com.pirxhio.affirmity.data.local.OnboardingPreferences
 import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
@@ -450,16 +454,26 @@ fun resolvePreSurveyGuideGate(
  * still fires on the next composition after the guide is dismissed (covers the theoretical
  * collision in spec E4).
  */
-enum class GuideGateResolution { AUTO_GUIDE, MANUAL_GUIDE, HEALER_GRANTED, NONE }
+/** One streak-collector emission, tagged with the local day its query ranges were anchored to. */
+private data class StreakEmission(
+    val today: Long,
+    val rows: List<DailyCompletionEntity>,
+    val healerRows: List<StreakHealerUseEntity>,
+)
 
+enum class GuideGateResolution { AUTO_GUIDE, MANUAL_GUIDE, HEALER_GRANTED, MILESTONE, NONE }
+
+/** A pending milestone celebration waits behind the healer one: it stays un-consumed until then. */
 fun resolveGuideGate(
     autoShow: Boolean,
     manualShow: Boolean,
     healerJustGranted: Boolean,
+    milestoneJustReached: Boolean = false,
 ): GuideGateResolution = when {
     autoShow -> GuideGateResolution.AUTO_GUIDE
     manualShow -> GuideGateResolution.MANUAL_GUIDE
     healerJustGranted -> GuideGateResolution.HEALER_GRANTED
+    milestoneJustReached -> GuideGateResolution.MILESTONE
     else -> GuideGateResolution.NONE
 }
 
@@ -608,6 +622,14 @@ class AffirmityAppState(
     private val feedSeedSource: () -> Long = { Random.nextLong() },
     /** Fresh day reads around activation suspensions; default retains device-local boundaries. */
     private val healerTodayEpochDay: () -> Long = { DayClock.epochDay() },
+    /** Local streak-milestone bookkeeping + risk-banner dismissal. In-memory by default so JVM tests
+     *  never touch DataStore; the composition root injects [StreakMilestonePreferences]. */
+    private val milestoneStore: StreakMilestoneStore = InMemoryStreakMilestoneStore(),
+    /** Builds the "current local epoch day" flow from the resume/time-change recheck trigger. The
+     *  default emits once (the day at subscription), so JVM tests never run an endless midnight
+     *  timer; the composition root injects [DayClock.epochDayFlow]. */
+    private val epochDayFlowFactory: (recheck: Flow<Unit>) -> Flow<Long> =
+        { flow { emit(DayClock.epochDay()) } },
     /** Device-local user collections (design D2): deliberately OUTSIDE [DataSession], defaulted to
      *  [NoOpUserCollectionRepository] so every existing JVM test construction is unaffected. Named
      *  `collectionRepository` so it never clashes with the [userCollections] UI property. */
@@ -919,8 +941,60 @@ class AffirmityAppState(
         healerJustGranted.value = false
     }
 
-    private var healerFlowInitialized = false
+    /** Previous streak emission of the current session, or null before the first one. Reset on a
+     * session swap only (never on a day change); celebrations require a genuine +1 against it. */
+    private var previousStreakState: StreakHealerState? = null
+
+    /** Milestone (in days) awaiting its full-screen celebration, or null. Same lifecycle rules as
+     * [healerJustGranted]: never set on a flow's first emission or on a day change. */
+    var milestoneJustReached = mutableStateOf<Int?>(null)
         private set
+
+    fun acknowledgeMilestone() {
+        milestoneJustReached.value = null
+    }
+
+    /** Runs [StreakMilestoneDetector] against the persisted progress. Persistence happens right away
+     * (and non-cancellably) so a process kill or session swap can never replay a celebration. */
+    private suspend fun evaluateMilestone(generalStreakDays: Int, canCelebrate: Boolean) {
+        try {
+            val stored = milestoneStore.read()
+            val decision = StreakMilestoneDetector.evaluate(stored, generalStreakDays, canCelebrate)
+            decision.celebrate?.let { milestoneJustReached.value = it }
+            if (decision.updated != stored) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    milestoneStore.save(decision.updated)
+                }
+            }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Exception) {
+            Log.e(TAG, "milestone evaluation failed", error)
+        }
+    }
+
+    /** Lifetime best milestone reached (0 = none), for the Progress badges. */
+    var bestMilestoneReached = mutableStateOf(0)
+        private set
+
+    /** Epoch day for which the end-of-day risk banner was dismissed, or null. */
+    var dayRiskBannerDismissedDay = mutableStateOf<Long?>(null)
+        private set
+
+    fun dismissDayRiskBanner(epochDay: Long) {
+        dayRiskBannerDismissedDay.value = epochDay
+        scope.launch { milestoneStore.dismissBannerForDay(epochDay) }
+    }
+
+    private val dayRecheck = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST,
+    )
+
+    /** Call on app resume and on time-zone/date changes so day-anchored collectors re-evaluate "today". */
+    fun refreshDay() {
+        dayRecheck.tryEmit(Unit)
+    }
 
     /** Current Free/Pro gating tier, resolved from the live entitlement repository (design.md
      * D5/D8). Read by [rememberAffirmityAppState]'s callers to drive `GroupAccessPolicy`. */
@@ -1346,23 +1420,31 @@ class AffirmityAppState(
                 }
         }
         scope.launch {
-            val today = DayClock.epochDay()
-            val windowStart = DayClock.rollingWindowStartEpochDay()
-            val dayLabels = DayClock.rollingWindowDayLetters(dayLetters)
-            val healerStart = healerStartEpochDay(today)
+            val epochDays = epochDayFlowFactory(dayRecheck)
             // The healer-use flow is combined *inside* this flatMapLatest (design.md's "Combine
             // both flows inside the existing flatMapLatest" decision) rather than in a parallel
             // collector, so both subscriptions share the same swap-cancellation lifecycle: no
             // stale Room/Firestore collector for either flow can survive a sign-in/sign-out swap.
+            // The day flow is nested INSIDE the session switch: a midnight re-subscription re-anchors
+            // the query ranges to the new "today" without resetting the per-session first-emission
+            // guards below (that reset belongs to a session swap only).
             session.flatMapLatest { s ->
-                healerFlowInitialized = false
+                previousStreakState = null
                 healerJustGranted.value = false
-                combine(
-                    s.completions.observeRange(windowStart - STREAK_LOOKBACK_DAYS, windowStart + 6),
-                    s.healerUses.observeRange(healerStart, today),
-                ) { completionRows, healerRows -> completionRows to healerRows }
+                milestoneJustReached.value = null
+                epochDays.flatMapLatest { today ->
+                    val windowStart = today - 6
+                    val healerStart = healerStartEpochDay(today)
+                    combine(
+                        s.completions.observeRange(windowStart - STREAK_LOOKBACK_DAYS, windowStart + 6),
+                        s.healerUses.observeRange(healerStart, today),
+                    ) { completionRows, healerRows -> StreakEmission(today, completionRows, healerRows) }
+                }
             }.catch { error -> Log.e(TAG, "completions/healer flow failed", error) }
-                .collect { (rows, healerRows) ->
+                .collect { (today, rows, healerRows) ->
+                val windowStart = today - 6
+                val healerStart = healerStartEpochDay(today)
+                val dayLabels = DayClock.rollingWindowDayLetters(dayLetters, DayClock.calendarForEpochDay(today))
                 val newHealerState = StreakHealerStats.evaluate(
                     rows = rows,
                     uses = healerRows,
@@ -1385,21 +1467,39 @@ class AffirmityAppState(
                     todayEpochDay = today,
                     isDone = { it.meditationDone },
                 ).copy(dayLabels = dayLabels, healedDays = healedIndices)
-                if (healerFlowInitialized && newHealerState.healerCount > streakHealer.value.healerCount) {
+                // A celebration needs a genuine +1 against the previous emission of this session:
+                // first/cached snapshots, server catch-up jumps and midnight re-subscriptions
+                // (count unchanged) are absorbed silently.
+                val previous = previousStreakState
+                val canCelebrate = StreakMilestoneDetector.isGenuineStreakIncrement(previous, newHealerState)
+                if (StreakMilestoneDetector.isGenuineHealerGrant(previous, newHealerState)) {
                     healerJustGranted.value = true
                 }
-                healerFlowInitialized = true
+                previousStreakState = newHealerState
                 streakHealer.value = newHealerState
+                evaluateMilestone(newHealerState.generalStreakDays, canCelebrate)
             }
         }
         scope.launch {
-            val today = DayClock.epochDay()
-            session.flatMapLatest { it.moods.observeRange(today - STREAK_LOOKBACK_DAYS, today) }
+            val epochDays = epochDayFlowFactory(dayRecheck)
+            session.flatMapLatest { s ->
+                epochDays.flatMapLatest { today -> s.moods.observeRange(today - STREAK_LOOKBACK_DAYS, today) }
+            }
                 .catch { error -> Log.e(TAG, "moods flow failed", error) }
                 .collect { rows ->
                     moodEntries.clear()
                     moodEntries.addAll(rows)
                 }
+        }
+        scope.launch {
+            milestoneStore.observeBestReached()
+                .catch { error -> Log.e(TAG, "milestone best flow failed", error) }
+                .collect { bestMilestoneReached.value = it }
+        }
+        scope.launch {
+            milestoneStore.observeDismissedBannerDay()
+                .catch { error -> Log.e(TAG, "banner dismissal flow failed", error) }
+                .collect { dayRiskBannerDismissedDay.value = it }
         }
         scope.launch {
             trackerPreferences.observeAffirmationsViewedToday().collect { viewed ->
@@ -2917,6 +3017,8 @@ fun rememberAffirmityAppState(userGoalsStore: UserGoalsStore): AffirmityAppState
             trackerPreferences = trackerPreferences,
             onboardingPreferences = onboardingPreferences,
             onboardingGuidePreferences = onboardingGuidePreferences,
+            milestoneStore = StreakMilestonePreferences(context.applicationContext),
+            epochDayFlowFactory = { recheck -> DayClock.epochDayFlow(recheck) },
             imageStore = AffirmationImageStore(context.applicationContext),
             notificationDebugLog = notificationDebugLog,
             notifier = Notifier(context.applicationContext, notificationDebugLog),

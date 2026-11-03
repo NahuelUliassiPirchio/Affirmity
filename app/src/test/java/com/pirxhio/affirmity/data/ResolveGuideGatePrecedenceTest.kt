@@ -72,4 +72,34 @@ class ResolveGuideGatePrecedenceTest {
 
         assertEquals(GuideGateResolution.AUTO_GUIDE, resolution)
     }
+
+    @Test
+    fun `healer celebration takes precedence over a pending milestone`() {
+        val resolution = resolveGuideGate(
+            autoShow = false, manualShow = false, healerJustGranted = true, milestoneJustReached = true,
+        )
+
+        assertEquals(GuideGateResolution.HEALER_GRANTED, resolution)
+    }
+
+    @Test
+    fun `pending milestone resolves once the healer celebration is acknowledged`() {
+        val resolution = resolveGuideGate(
+            autoShow = false, manualShow = false, healerJustGranted = false, milestoneJustReached = true,
+        )
+
+        assertEquals(GuideGateResolution.MILESTONE, resolution)
+    }
+
+    @Test
+    fun `guides take precedence over a pending milestone`() {
+        assertEquals(
+            GuideGateResolution.AUTO_GUIDE,
+            resolveGuideGate(autoShow = true, manualShow = false, healerJustGranted = false, milestoneJustReached = true),
+        )
+        assertEquals(
+            GuideGateResolution.MANUAL_GUIDE,
+            resolveGuideGate(autoShow = false, manualShow = true, healerJustGranted = false, milestoneJustReached = true),
+        )
+    }
 }
