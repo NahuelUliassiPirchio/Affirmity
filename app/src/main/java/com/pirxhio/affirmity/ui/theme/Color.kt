@@ -59,7 +59,8 @@ val SecondaryContainerDarkArgb: Long = 0xFF5BBCC3
 val SecondaryContainerDark = Color(SecondaryContainerDarkArgb)
 val OnSecondaryContainerDarkArgb: Long = 0xFF00252A
 val OnSecondaryContainerDark = Color(OnSecondaryContainerDarkArgb)
-val OnSurfaceVariantDark = Color(0xFFB0BEC0)
+val OnSurfaceVariantDarkArgb: Long = 0xFFB0BEC0
+val OnSurfaceVariantDark = Color(OnSurfaceVariantDarkArgb)
 val OutlineDarkArgb: Long = 0xFF5C6B6D
 val OutlineDark = Color(OutlineDarkArgb)
 
@@ -125,3 +126,21 @@ val ActivityMoodDark = Color(0xFFA9ACEB)
 // (surfaceContainerLowest); dark #FF9A4D holds 9.18:1 on the near-black card. Both clear the 3:1 non-text minimum.
 val StreakEmberLight = Color(0xFFE8590C)
 val StreakEmberDark = Color(0xFFFF9A4D)
+
+// Neutral roles Material would otherwise fill with its purple baseline: card ground (surfaceContainerLowest),
+// surfaceVariant (fields, tracks), surfaceDim/Bright, and the inverse roles (snackbars). Values extend the
+// paper / night ramps in DESIGN.md; contrast is covered by ContrastRatioTest.
+val SurfaceContainerLowestDarkArgb: Long = 0xFF0A0A0A
+val SurfaceContainerLowestDark = Color(SurfaceContainerLowestDarkArgb)
+val SurfaceVariantDark = Color(0xFF272727)
+val SurfaceDimDark = Color(0xFF000000)
+val SurfaceBrightDark = Color(0xFF2C2C2C)
+val InverseSurfaceDarkArgb: Long = 0xFFE2E2E2
+val InverseOnSurfaceDarkArgb: Long = 0xFF1A1C1C
+val InversePrimaryDark = Color(0xFF00696F)
+val SurfaceVariantLight = Color(0xFFE2E2E2)
+val SurfaceDimLight = Color(0xFFDADADA)
+val SurfaceBrightLight = Color(0xFFF9F9F9)
+val InverseSurfaceLightArgb: Long = 0xFF2F3131
+val InverseOnSurfaceLightArgb: Long = 0xFFF1F1F1
+val InversePrimaryLight = Color(0xFF5BBCC3)

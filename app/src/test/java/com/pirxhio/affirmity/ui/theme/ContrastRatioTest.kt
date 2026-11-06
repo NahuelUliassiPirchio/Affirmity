@@ -84,4 +84,19 @@ class ContrastRatioTest {
         val ratio = wcagContrastRatio(OutlineDarkArgb, BackgroundDarkArgb)
         assertTrue("expected >= 3.0, was $ratio", ratio >= 3.0)
     }
+
+    @Test
+    fun `dark card text clears 4-5 to 1 on the neutral surfaceContainerLowest`() {
+        // Previously unset, so cards fell back to Material's purple-tinted baseline (#0F0D13).
+        val ratio = wcagContrastRatio(OnSurfaceVariantDarkArgb, SurfaceContainerLowestDarkArgb)
+        assertTrue("expected >= 4.5, was $ratio", ratio >= 4.5)
+    }
+
+    @Test
+    fun `snackbar text clears 4-5 to 1 on the neutral inverseSurface in both themes`() {
+        val light = wcagContrastRatio(InverseOnSurfaceLightArgb, InverseSurfaceLightArgb)
+        val dark = wcagContrastRatio(InverseOnSurfaceDarkArgb, InverseSurfaceDarkArgb)
+        assertTrue("light expected >= 4.5, was $light", light >= 4.5)
+        assertTrue("dark expected >= 4.5, was $dark", dark >= 4.5)
+    }
 }

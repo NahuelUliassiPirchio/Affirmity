@@ -9,6 +9,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 // Bug 2b fix: this previously left secondaryContainer/onSecondaryContainer/onSurfaceVariant/
@@ -25,6 +26,10 @@ private val DarkColorScheme = darkColorScheme(
     onSecondaryContainer = OnSecondaryContainerDark,
     background = BackgroundDark,
     surface = SurfaceDark,
+    surfaceVariant = SurfaceVariantDark,
+    surfaceDim = SurfaceDimDark,
+    surfaceBright = SurfaceBrightDark,
+    surfaceContainerLowest = SurfaceContainerLowestDark,
     surfaceContainerLow = SurfaceContainerLowDark,
     surfaceContainer = SurfaceContainerDark,
     surfaceContainerHigh = SurfaceContainerHighDark,
@@ -34,6 +39,9 @@ private val DarkColorScheme = darkColorScheme(
     onSurfaceVariant = OnSurfaceVariantDark,
     outline = OutlineDark,
     outlineVariant = OutlineVariantDark,
+    inverseSurface = Color(InverseSurfaceDarkArgb),
+    inverseOnSurface = Color(InverseOnSurfaceDarkArgb),
+    inversePrimary = InversePrimaryDark,
     error = ErrorDark,
 )
 
@@ -47,6 +55,9 @@ private val LightColorScheme = lightColorScheme(
     onSecondaryContainer = OnSecondaryContainerLight,
     background = BackgroundLight,
     surface = SurfaceLight,
+    surfaceVariant = SurfaceVariantLight,
+    surfaceDim = SurfaceDimLight,
+    surfaceBright = SurfaceBrightLight,
     surfaceContainerLowest = SurfaceContainerLowestLight,
     surfaceContainerLow = SurfaceContainerLowLight,
     surfaceContainer = SurfaceContainerLight,
@@ -57,6 +68,9 @@ private val LightColorScheme = lightColorScheme(
     onSurfaceVariant = OnSurfaceVariantLight,
     outline = OutlineLight,
     outlineVariant = OutlineVariantLight,
+    inverseSurface = Color(InverseSurfaceLightArgb),
+    inverseOnSurface = Color(InverseOnSurfaceLightArgb),
+    inversePrimary = InversePrimaryLight,
     error = ErrorLight,
 )
 
