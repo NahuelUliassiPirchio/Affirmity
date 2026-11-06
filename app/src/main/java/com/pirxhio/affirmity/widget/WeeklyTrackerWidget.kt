@@ -213,25 +213,51 @@ internal fun WeeklyTrackerContent(
     }
     val size = LocalSize.current
     val streakVisible = hasAny && generalStreakDays > 0
-    val layout = computeTrackerLayout(size.width.value, size.height.value, streakVisible, spToDpFor(context), bandActive = band.visible)
+    val layout = computeTrackerLayout(size.width.value, size.height.value, streakVisible, spToDpFor(context))
     val a11y = trackerA11yStrings(context, generalStreakDays)
+    // End-of-day takeover: the band recolors the whole card and its message becomes the headline.
+    val bandMessage = band.messageRes?.let { context.getString(it) }
+    val takeover = hasAny && bandMessage != null
+    val takeoverLayout = if (takeover) {
+        computeTakeoverLayout(size.width.value, size.height.value, streakVisible, bandMessage.length, spToDpFor(context))
+    } else {
+        null
+    }
+    val cardBackground = when (band.strength) {
+        BandStrength.Soft -> com.pirxhio.affirmity.R.drawable.widget_card_bg_soft
+        BandStrength.Warm -> com.pirxhio.affirmity.R.drawable.widget_card_bg_warm
+        BandStrength.None -> com.pirxhio.affirmity.R.drawable.widget_card_bg
+    }
 
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(ImageProvider(com.pirxhio.affirmity.R.drawable.widget_card_bg))
-            .padding(layout.padding.dp)
+            .background(ImageProvider(cardBackground))
+            .padding((takeoverLayout?.padding ?: layout.padding).dp)
             .clickable(actionStartActivity(tapIntent))
             .semantics {
                 val base = widgetDescription(hasAny, generalStreakDays, isTodayDone, a11y)
-                contentDescription = band.messageRes?.let {
-                    "$base. " + context.getString(com.pirxhio.affirmity.R.string.widget_band_a11y, context.getString(it))
+                contentDescription = bandMessage?.let {
+                    "$base. " + context.getString(com.pirxhio.affirmity.R.string.widget_band_a11y, it)
                 } ?: base
             },
         contentAlignment = Alignment.Center,
     ) {
         if (!hasAny) {
             EmptyState(compact = size.height < 76.dp)
+        } else if (takeoverLayout != null && bandMessage != null) {
+            TakeoverContent(
+                layout = takeoverLayout,
+                band = band,
+                message = bandMessage,
+                streak = StreakInfo(generalStreakDays, isTodayDone, band),
+                rows = rows,
+                weekStart = weekStart,
+                todayIndex = todayIndex,
+                dayLetters = dayLetters,
+                healedDays = healedDays,
+                a11y = a11y,
+            )
         } else {
             val streak = StreakInfo(generalStreakDays, isTodayDone, band)
             Column(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
@@ -242,13 +268,15 @@ internal fun WeeklyTrackerContent(
                 Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     if (layout.streakPlacement == StreakPlacement.LeadingRow) {
                         Row(modifier = GlanceModifier.width(layout.leadingStreakWidth.dp), verticalAlignment = Alignment.CenterVertically) {
-                            StreakBand(streak.band) { StreakCounter(streak, flameSize = STRIP_STREAK_FLAME_DP.dp, numberSize = layout.leadingStreakSp.sp) }
+                            StreakCounter(streak, flameSize = STRIP_STREAK_FLAME_DP.dp, numberSize = layout.leadingStreakSp.sp)
                         }
                         Spacer(modifier = GlanceModifier.width(12.dp))
                     }
                     WeekGrid(
                         modifier = GlanceModifier.defaultWeight(),
-                        layout = layout,
+                        cellDiameter = layout.cellDiameter,
+                        showLetters = layout.showLetters,
+                        letterSizeSp = layout.letterSizeSp,
                         rows = rows,
                         weekStart = weekStart,
                         todayIndex = todayIndex,
@@ -261,7 +289,7 @@ internal fun WeeklyTrackerContent(
                         Spacer(modifier = GlanceModifier.width(12.dp))
                         Column(horizontalAlignment = Alignment.Start) {
                             if (besideStreak) {
-                                StreakBand(streak.band) { StreakCounter(streak, flameSize = REGULAR_STREAK_FLAME_DP.dp, numberSize = REGULAR_STREAK_SP.sp) }
+                                StreakCounter(streak, flameSize = REGULAR_STREAK_FLAME_DP.dp, numberSize = REGULAR_STREAK_SP.sp)
                                 if (layout.legendVisible) Spacer(modifier = GlanceModifier.height(SIDE_COLUMN_GAP_DP.dp))
                             }
                             if (layout.legendVisible) {
@@ -336,29 +364,23 @@ private fun TallHeader(layout: TrackerLayout, streak: StreakInfo) {
     Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
         Column(modifier = GlanceModifier.defaultWeight()) {
             if (layout.streakPlacement == StreakPlacement.Header) {
-                StreakBand(streak.band, fillWidth = true) {
-                    Column {
-                        StreakCounter(streak, flameSize = 34.dp, numberSize = TALL_STREAK_SP.sp)
-                        // The band's message replaces the caption: still one line, as the layout reserves.
-                        val message = streak.band.messageRes?.let { context.getString(it) }
-                        val status = context.getString(
-                            if (streak.isTodayDone) com.pirxhio.affirmity.R.string.widget_today_done
-                            else com.pirxhio.affirmity.R.string.widget_today_pending,
-                        )
-                        Text(
-                            text = message ?: "${context.getString(streakUnitRes(streak.days))} · $status",
-                            // One line only: the layout reserves a single caption line (the widget's
-                            // content description still carries the full streak and status text).
-                            maxLines = 1,
-                            style = TextStyle(
-                                fontSize = TALL_CAPTION_SP.sp,
-                                fontWeight = if (message != null) FontWeight.Medium else FontWeight.Normal,
-                                color = GlanceColorProvider(
-                                    streak.band.messageColor?.let { Color(it) } ?: STREAK_CAPTION_COLOR,
-                                ),
-                            ),
-                        )
-                    }
+                Column {
+                    StreakCounter(streak, flameSize = 34.dp, numberSize = TALL_STREAK_SP.sp)
+                    val status = context.getString(
+                        if (streak.isTodayDone) com.pirxhio.affirmity.R.string.widget_today_done
+                        else com.pirxhio.affirmity.R.string.widget_today_pending,
+                    )
+                    Text(
+                        text = "${context.getString(streakUnitRes(streak.days))} · $status",
+                        // One line only: the layout reserves a single caption line (the widget's
+                        // content description still carries the full streak and status text).
+                        maxLines = 1,
+                        style = TextStyle(
+                            fontSize = TALL_CAPTION_SP.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = GlanceColorProvider(STREAK_CAPTION_COLOR),
+                        ),
+                    )
                 }
             }
         }
@@ -401,21 +423,68 @@ private fun StreakCounter(streak: StreakInfo, flameSize: Dp, numberSize: TextUni
 }
 
 /**
- * Rounded tinted ground behind the streak row when the end-of-day band is active; a plain
- * passthrough otherwise. Solid drawables because Glance has no gradients or per-view corners
- * on older APIs.
+ * End-of-day takeover body: the flame and the band message as the headline, with the streak and
+ * the week grid underneath as secondary context. Letters and the streak are recolored from the
+ * ember family so they keep AA contrast on the ember ground (see `WidgetBandTest`).
  */
 @androidx.compose.runtime.Composable
-private fun StreakBand(band: WidgetBand, fillWidth: Boolean = false, content: @androidx.compose.runtime.Composable () -> Unit) {
-    if (!band.visible) {
-        content()
-        return
-    }
-    val background = if (band.strength == BandStrength.Warm) com.pirxhio.affirmity.R.drawable.widget_band_warm
-    else com.pirxhio.affirmity.R.drawable.widget_band_soft
-    val base = if (fillWidth) GlanceModifier.fillMaxWidth() else GlanceModifier
-    Box(modifier = base.background(ImageProvider(background)).padding(horizontal = BAND_PADDING_H_DP.dp, vertical = BAND_PADDING_V_DP.dp)) {
-        content()
+private fun TakeoverContent(
+    layout: TakeoverLayout,
+    band: WidgetBand,
+    message: String,
+    streak: StreakInfo,
+    rows: List<DailyCompletionEntity>,
+    weekStart: Long,
+    todayIndex: Int,
+    dayLetters: List<String>,
+    healedDays: Set<Long>,
+    a11y: TrackerA11yStrings,
+) {
+    Column(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Image(
+                provider = ImageProvider(com.pirxhio.affirmity.R.drawable.ic_streak_flame),
+                contentDescription = null,
+                modifier = GlanceModifier.size(layout.flameDp.dp),
+                colorFilter = androidx.glance.ColorFilter.tint(
+                    GlanceColorProvider(Color(band.flameColor ?: WidgetBandPalette.EMBER_ACCENT)),
+                ),
+            )
+            Spacer(modifier = GlanceModifier.width(TAKEOVER_FLAME_GAP_DP.dp))
+            Text(
+                text = message,
+                modifier = GlanceModifier.defaultWeight(),
+                // The layout reserved exactly this many lines; Glance cuts the text beyond them.
+                maxLines = layout.messageMaxLines,
+                style = TextStyle(
+                    fontSize = layout.messageSp.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = GlanceColorProvider(Color(band.messageColor ?: WidgetBandPalette.EMBER_ACCENT)),
+                ),
+            )
+        }
+        if (layout.showGrid) {
+            Spacer(modifier = GlanceModifier.height(TAKEOVER_GRID_GAP_DP.dp))
+            Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                if (layout.showStreak) {
+                    StreakCounter(streak, flameSize = STRIP_STREAK_FLAME_DP.dp, numberSize = STRIP_STREAK_SP.sp)
+                    Spacer(modifier = GlanceModifier.width(TAKEOVER_STREAK_GAP_DP.dp))
+                }
+                WeekGrid(
+                    modifier = GlanceModifier.defaultWeight(),
+                    cellDiameter = layout.cellDiameter,
+                    showLetters = layout.showLetters,
+                    letterSizeSp = layout.letterSizeSp,
+                    rows = rows,
+                    weekStart = weekStart,
+                    todayIndex = todayIndex,
+                    dayLetters = dayLetters,
+                    healedDays = healedDays,
+                    a11y = a11y,
+                    letterColor = STREAK_CAPTION_COLOR,
+                )
+            }
+        }
     }
 }
 
@@ -470,13 +539,16 @@ private fun HalfDisc(left: Boolean, color: Color, size: Dp) {
 @androidx.compose.runtime.Composable
 private fun WeekGrid(
     modifier: GlanceModifier,
-    layout: TrackerLayout,
+    cellDiameter: Int,
+    showLetters: Boolean,
+    letterSizeSp: Int,
     rows: List<DailyCompletionEntity>,
     weekStart: Long,
     todayIndex: Int,
     dayLetters: List<String>,
     healedDays: Set<Long>,
     a11y: TrackerA11yStrings,
+    letterColor: Color = LETTER_COLOR,
 ) {
     val context = LocalContext.current
     val byDay = rows.associateBy { it.epochDay }
@@ -492,7 +564,7 @@ private fun WeekGrid(
                 val healed = epochDay in healedDays
                 Box(modifier = GlanceModifier.defaultWeight(), contentAlignment = Alignment.Center) {
                     DayCell(
-                        diameter = layout.cellDiameter.dp,
+                        diameter = cellDiameter.dp,
                         isToday = isToday,
                         affirmationDone = affirmed,
                         meditationDone = meditated,
@@ -502,7 +574,7 @@ private fun WeekGrid(
                 }
             }
         }
-        if (layout.showLetters) {
+        if (showLetters) {
             Spacer(modifier = GlanceModifier.height(4.dp))
             Row(modifier = GlanceModifier.fillMaxWidth()) {
                 for (offset in 0 until 7) {
@@ -511,9 +583,9 @@ private fun WeekGrid(
                         text = dayLetters.getOrElse(offset) { "" },
                         modifier = GlanceModifier.defaultWeight(),
                         style = TextStyle(
-                            fontSize = layout.letterSizeSp.sp,
+                            fontSize = letterSizeSp.sp,
                             fontWeight = if (isToday) FontWeight.Medium else FontWeight.Normal,
-                            color = GlanceColorProvider(if (isToday) TEXT_COLOR else LETTER_COLOR),
+                            color = GlanceColorProvider(if (isToday) TEXT_COLOR else letterColor),
                             textAlign = TextAlign.Center,
                         ),
                     )

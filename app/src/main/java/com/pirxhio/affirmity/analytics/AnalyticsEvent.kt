@@ -2,7 +2,7 @@ package com.pirxhio.affirmity.analytics
 
 import com.pirxhio.affirmity.access.AdUnlockPolicy
 
-/** Wire name for each of the 19 events. `wireName` is the only place a `String` lives on the name
+/** Wire name for each event. `wireName` is the only place a `String` lives on the name
  *  side of the model (REQ-4.5, validated by [com.pirxhio.affirmity.analytics.AnalyticsEventName]). */
 enum class AnalyticsEventName(val wireName: String) {
     MEDITATION_ENTRY_TAPPED("meditation_entry_tapped"),
@@ -36,9 +36,11 @@ enum class AnalyticsEventName(val wireName: String) {
     ROUND_INTERSTITIAL_FAILED("round_interstitial_failed"),
     ROUND_INTERSTITIAL_SKIPPED("round_interstitial_skipped"),
     STREAK_MILESTONE_CELEBRATED("milestone_celebrated"),
+    DAY_RISK_DIALOG_SHOWN("day_risk_dialog_shown"),
+    DAY_RISK_DIALOG_ACTION("day_risk_dialog_action"),
 }
 
-/** Wire name for every declared parameter across the 19 events (REQ-4.5). */
+/** Wire name for every declared parameter across all events (REQ-4.5). */
 enum class AnalyticsParam(val wireName: String) {
     ENTRY_ID("entry_id"),
     ACCESS_DECISION("access_decision"),
@@ -69,6 +71,8 @@ enum class AnalyticsParam(val wireName: String) {
     FEED_SIZE_BUCKET("feed_size_bucket"),
     SKIP_REASON("skip_reason"),
     MILESTONE_DAYS("milestone_days"),
+    DIALOG_VARIANT("dialog_variant"),
+    ACTION("action"),
 }
 
 /** Bounded feed size at round completion (rounds only count from 10 affirmations up). */
@@ -162,10 +166,19 @@ enum class CreationMethod { COLOR, IMAGE_URL, GALLERY }
 
 enum class DailyGoal { MEDITATION, AFFIRMATION }
 
+/** Which end-of-day state the risk dialog was shown for. */
+enum class DayRiskDialogVariant(val wireName: String) {
+    GOAL_INCOMPLETE("goal_incomplete"),
+    STREAK_AT_RISK("streak_at_risk"),
+}
+
+/** How the user closed the risk dialog: the primary button or "Later" (also back/outside tap). */
+enum class DayRiskDialogChoice(val wireName: String) { CTA("cta"), LATER("later") }
+
 enum class AnalyticsContentType { MEDITATION, AFFIRMATION_GROUP }
 
 /**
- * The closed, 19-member taxonomy (spec §5, PART 1). No subtype declares an unbounded `String`
+ * The closed taxonomy (spec §5, PART 1). No subtype declares an unbounded `String`
  * property — [AnalyticsId], [Int], [Long], [Boolean] and enum types are the entire allowed set
  * (REQ-4.3, D2), enforced structurally by the no-PII-representable test.
  */
@@ -369,5 +382,20 @@ sealed interface AnalyticsEvent {
         val milestoneDays: Int,
     ) : AnalyticsEvent {
         override val name = AnalyticsEventName.STREAK_MILESTONE_CELEBRATED
+    }
+
+    /** The end-of-day risk dialog was displayed (at most once per local day). */
+    data class DayRiskDialogShown(
+        val variant: DayRiskDialogVariant,
+    ) : AnalyticsEvent {
+        override val name = AnalyticsEventName.DAY_RISK_DIALOG_SHOWN
+    }
+
+    /** The user closed the risk dialog: `cta` (went to the missing activity) or `later`. */
+    data class DayRiskDialogAction(
+        val variant: DayRiskDialogVariant,
+        val choice: DayRiskDialogChoice,
+    ) : AnalyticsEvent {
+        override val name = AnalyticsEventName.DAY_RISK_DIALOG_ACTION
     }
 }

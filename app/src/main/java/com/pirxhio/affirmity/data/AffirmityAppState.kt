@@ -981,6 +981,10 @@ class AffirmityAppState(
     var dayRiskBannerDismissedDay = mutableStateOf<Long?>(null)
         private set
 
+    /** False until the persisted dismissal has been read once, so the dialog never flashes on cold start. */
+    var dayRiskDismissalLoaded = mutableStateOf(false)
+        private set
+
     fun dismissDayRiskBanner(epochDay: Long) {
         dayRiskBannerDismissedDay.value = epochDay
         scope.launch { milestoneStore.dismissBannerForDay(epochDay) }
@@ -1499,7 +1503,10 @@ class AffirmityAppState(
         scope.launch {
             milestoneStore.observeDismissedBannerDay()
                 .catch { error -> Log.e(TAG, "banner dismissal flow failed", error) }
-                .collect { dayRiskBannerDismissedDay.value = it }
+                .collect {
+                    dayRiskBannerDismissedDay.value = it
+                    dayRiskDismissalLoaded.value = true
+                }
         }
         scope.launch {
             trackerPreferences.observeAffirmationsViewedToday().collect { viewed ->

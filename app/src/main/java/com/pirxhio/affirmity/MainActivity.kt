@@ -126,8 +126,8 @@ import com.pirxhio.affirmity.ui.groups.isThemeToggleable
 import com.pirxhio.affirmity.ui.groups.themeAccessDecision
 import com.pirxhio.affirmity.ui.healer.StreakHealerGrantedScreen
 import com.pirxhio.affirmity.ui.milestone.StreakMilestoneScreen
-import com.pirxhio.affirmity.ui.streak.DayRiskBanner
-import com.pirxhio.affirmity.ui.components.FloatingStatusRowHeight
+import com.pirxhio.affirmity.ui.streak.DayRiskCtaTarget
+import com.pirxhio.affirmity.ui.streak.DayRiskDialog
 import kotlinx.coroutines.flow.map
 import com.pirxhio.affirmity.ui.meditation.GuidedMeditationScreen
 import com.pirxhio.affirmity.ui.meditation.MeditationScreen
@@ -1678,28 +1678,33 @@ fun AffirmityApp(
             val statusOverlayVisible = chrome.showStatusOverlay && (showsRacha ||
                 currentDestination == AppDestinations.ANIMO ||
                 currentDestination == AppDestinations.PROGRESO)
-            // Null until the tone flow has emitted, so the banner never flashes the default copy.
+            // Null until the tone flow has emitted, so the dialog never flashes the default copy.
             val loadedTone by remember(userGoalsStore) {
                 userGoalsStore.observePreferredTone().map { LoadedTone(it) }
             }.collectAsState(initial = null)
             Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
-            loadedTone?.let { loaded ->
-                if (chrome.showStatusOverlay) DayRiskBanner(
+            // Hoisted above the conditional so toggling the overlay does not re-log the exposure.
+            val shownLogKey = rememberSaveable { mutableStateOf<String?>(null) }
+            loadedTone?.takeIf { appState.dayRiskDismissalLoaded.value }?.let { loaded ->
+                // Lowest priority: the guide/healer/milestone gates above return before this
+                // scaffold composes, so the dialog can never share the screen with them.
+                if (chrome.showStatusOverlay) DayRiskDialog(
                     meditationDone = appState.meditationStreak.value.completedDays.lastOrNull() == true,
                     affirmationDone = appState.affirmationsStreak.value.completedDays.lastOrNull() == true,
                     // Same value the weekly widget feeds the evaluator (healer-aware, through today once done).
                     generalStreakDays = appState.streakHealer.value.generalStreakDays,
                     tone = loaded.value,
                     dismissedDay = appState.dayRiskBannerDismissedDay.value,
+                    shownLogKey = shownLogKey,
                     onDismiss = appState::dismissDayRiskBanner,
-                    // In the layout flow (pushes content down); clears the floating pill's row when shown.
-                    modifier = Modifier.padding(
-                        top = if (statusOverlayVisible) FloatingStatusRowHeight else 8.dp,
-                        start = 24.dp,
-                        end = 24.dp,
-                        bottom = 8.dp,
-                    ),
+                    onCta = { target ->
+                        currentDestination = when (target) {
+                            DayRiskCtaTarget.MEDITATION -> AppDestinations.MEDITAR
+                            DayRiskCtaTarget.AFFIRMATIONS -> AppDestinations.AFIRMACIONES
+                        }
+                    },
+                    onEvent = appState::logAnalyticsEvent,
                 )
             }
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {

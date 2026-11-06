@@ -212,7 +212,9 @@
     <string name="progress_milestones_all_reached">You reached every milestone</string>
     <string name="progress_milestone_reached_content_description">%1$d days: reached</string>
     <string name="progress_milestone_locked_content_description">%1$d days: locked</string>
-    <string name="day_risk_banner_dismiss_content_description">Hide until tomorrow</string>
+    <string name="day_risk_dialog_cta_meditate">Meditate now</string>
+    <string name="day_risk_dialog_cta_affirmations">See affirmations</string>
+    <string name="day_risk_dialog_later">Later</string>
     <string name="progress_weekly_streak_format">Streak: %1$d days</string>
     <string name="history_calendar_title_affirmations">Affirmations history</string>
     <string name="history_calendar_title_meditation">Meditation history</string>

@@ -42,10 +42,6 @@ internal val FloatingStatusAvatarPillWidth = TouchTarget + 8.dp
 /** Horizontal space, from the screen's end edge, that the avatar-only pill occupies. */
 internal val FloatingStatusReservedEnd = FloatingStatusOverlayEndMargin + FloatingStatusAvatarPillWidth
 
-/** Vertical space from the top edge taken by the floating pill: 16dp margin + 48dp target + 8dp padding,
- * plus a 8dp gap. In-flow content (the day-risk banner) starts below it. */
-internal val FloatingStatusRowHeight = 16.dp + TouchTarget + 8.dp + 8.dp
-
 /** Container colour shared by the floating chrome over the feed (this pill, the Save-to button). */
 @Composable
 internal fun floatingChromeColor(): Color = MaterialTheme.colorScheme.surface.copy(alpha = FloatingChromeAlpha)

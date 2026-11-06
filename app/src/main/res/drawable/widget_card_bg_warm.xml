@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- End-of-day takeover card (streak at risk): the whole widget in the warmer ember ground #55290C,
+     same 22dp corners as widget_card_bg. Mirrors WidgetBandPalette.WARM_BACKGROUND; keep in sync.
+     Hairline: ember accent #FF9A4D at 20%. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="22dp" />
+    <solid android:color="#55290C" />
+    <stroke
+        android:width="1dp"
+        android:color="#33FF9A4D" />
+</shape>

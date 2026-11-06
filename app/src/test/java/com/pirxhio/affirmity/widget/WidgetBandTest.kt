@@ -56,4 +56,17 @@ class WidgetBandTest {
             assertTrue("number $number", number >= 4.5)
         }
     }
+
+    @Test
+    fun `secondary takeover text meets WCAG AA on each ground`() {
+        // Weekday letters use neutral-400; the primary dialog button is ember fill with the ground as label.
+        val letters = 0xFFB2B6CAL
+        listOf(WidgetBandPalette.SOFT_BACKGROUND, WidgetBandPalette.WARM_BACKGROUND).forEach { bg ->
+            val letter = wcagContrastRatio(letters, bg)
+            val button = wcagContrastRatio(bg, WidgetBandPalette.EMBER_ACCENT)
+            println("takeover ${java.lang.Long.toHexString(bg)} letters=%.2f button=%.2f".format(letter, button))
+            assertTrue("letters $letter", letter >= 4.5)
+            assertTrue("button $button", button >= 4.5)
+        }
+    }
 }

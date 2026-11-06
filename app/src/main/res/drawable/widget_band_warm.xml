@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Warmer streak-at-risk band: ember tint #55290C. Mirrors WidgetBandPalette.WARM_BACKGROUND. -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <corners android:radius="14dp" />
-    <solid android:color="#55290C" />
-</shape>

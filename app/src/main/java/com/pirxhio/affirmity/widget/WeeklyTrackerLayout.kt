@@ -54,9 +54,6 @@ private const val LETTERS_MAX_SP = 13f
 private const val MIN_LEGEND_SP = 9
 private const val STREAK_WIDTH_SLACK_DP = 4f
 
-/** Padding the end-of-day band adds around the streak counter (see `StreakBand` in the widget file). */
-internal const val BAND_PADDING_H_DP = 8f
-internal const val BAND_PADDING_V_DP = 2f
 private const val LINE_HEIGHT_FACTOR = 1.2f
 private const val DIGIT_WIDTH_EM = 0.6f
 private const val STREAK_DIGITS_RESERVED = 3
@@ -125,12 +122,11 @@ internal fun computeTrackerLayout(
     heightDp: Float,
     streakVisible: Boolean,
     spToDp: (Float) -> Float = { it },
-    bandActive: Boolean = false,
 ): TrackerLayout {
     val nominal = tierForHeight(heightDp)
-    val first = buildLayout(nominal, widthDp, heightDp, streakVisible, spToDp, bandActive)
+    val first = buildLayout(nominal, widthDp, heightDp, streakVisible, spToDp)
     if (nominal == WidgetTier.Tall && !first.cellsFit) {
-        return buildLayout(WidgetTier.Regular, widthDp, heightDp, streakVisible, spToDp, bandActive).layout
+        return buildLayout(WidgetTier.Regular, widthDp, heightDp, streakVisible, spToDp).layout
     }
     return first.layout
 }
@@ -159,13 +155,9 @@ private fun planSide(
     leadingSp: Float,
     streakVisible: Boolean,
     spToDp: (Float) -> Float,
-    bandActive: Boolean,
 ): SidePlan {
-    // The band pads the streak counter on all sides, so it costs width and height on top of the text.
-    val bandH = if (bandActive && streakVisible) 2 * BAND_PADDING_H_DP else 0f
-    val bandV = if (bandActive && streakVisible) 2 * BAND_PADDING_V_DP else 0f
     val legendHeight = if (legendVisible) legendHeightDp(legendSize, LEGEND_ROW_GAP_DP, spToDp) else 0f
-    val besideColumnWithStreak = streakLine + bandV + (if (legendVisible) SIDE_COLUMN_GAP_DP + legendHeight else 0f)
+    val besideColumnWithStreak = streakLine + (if (legendVisible) SIDE_COLUMN_GAP_DP + legendHeight else 0f)
     val placement = when {
         !streakVisible -> StreakPlacement.None
         tier == WidgetTier.Strip -> StreakPlacement.LeadingRow
@@ -175,14 +167,14 @@ private fun planSide(
     }
     val leadingStreakWidth =
         if (placement == StreakPlacement.LeadingRow) {
-            stripStreakContentWidthDp(STREAK_DIGITS_RESERVED, spToDp, leadingSp) + STREAK_WIDTH_SLACK_DP + bandH
+            stripStreakContentWidthDp(STREAK_DIGITS_RESERVED, spToDp, leadingSp) + STREAK_WIDTH_SLACK_DP
         } else {
             0f
         }
     // Legend width is the design's estimate at its nominal size, scaled with the text; with the
     // legend hidden, a beside-grid streak row is all that remains of the side column.
     val besideStreakWidth = REGULAR_STREAK_FLAME_DP + STREAK_FLAME_GAP_DP +
-        kotlin.math.ceil(STREAK_DIGITS_RESERVED * DIGIT_WIDTH_EM * spToDp(REGULAR_STREAK_SP)) + bandH
+        kotlin.math.ceil(STREAK_DIGITS_RESERVED * DIGIT_WIDTH_EM * spToDp(REGULAR_STREAK_SP))
     val legendWidth = legendBaseWidth * spToDp(legendSize.toFloat()) / nominalLegend
     val sideColumnWidth = when {
         legendVisible && placement == StreakPlacement.BesideGrid -> maxOf(legendWidth, besideStreakWidth)
@@ -207,7 +199,6 @@ private fun buildLayout(
     heightDp: Float,
     streakVisible: Boolean,
     spToDp: (Float) -> Float,
-    bandActive: Boolean,
 ): BuiltLayout {
     val narrow = widthDp < NARROW_BELOW_WIDTH
     val pad = if (heightDp < COMPACT_PADDING_BELOW) 10f else 14f
@@ -224,8 +215,7 @@ private fun buildLayout(
 
     // The leading streak's font steps down until its line fits the content height.
     var leadingSp = STRIP_STREAK_SP
-    val bandV = if (bandActive && streakVisible) 2 * BAND_PADDING_V_DP else 0f
-    while (leadingSp > MIN_LEADING_STREAK_SP && lineHeight(spToDp(leadingSp)) + bandV > contentHeight) leadingSp--
+    while (leadingSp > MIN_LEADING_STREAK_SP && lineHeight(spToDp(leadingSp)) > contentHeight) leadingSp--
 
     // Beside-grid legends are tried largest first, then smaller, then hidden, until both the
     // height and the horizontal budget (seven minimum cells plus everything else) are met. The
@@ -239,7 +229,7 @@ private fun buildLayout(
             listOf(MIN_LEGEND_SP to false)
     }
     val plans = legendCandidates.map { (size, visible) ->
-        planSide(tier, widthDp, pad, contentHeight, size, visible, nominalLegend, legendBaseWidth, streakLine, leadingSp, streakVisible, spToDp, bandActive)
+        planSide(tier, widthDp, pad, contentHeight, size, visible, nominalLegend, legendBaseWidth, streakLine, leadingSp, streakVisible, spToDp)
     }
     // Last resort when nothing fits: the hidden-legend plan, keeping the streak (cells may then
     // drop under the usual floor, see below).
@@ -254,7 +244,7 @@ private fun buildLayout(
 
     val tallHeader = if (tier == WidgetTier.Tall) {
         val streakColumn = if (streakVisible) {
-            tallHeaderContentHeightDp(spToDp) + (if (bandActive) 2 * BAND_PADDING_V_DP else 0f)
+            tallHeaderContentHeightDp(spToDp)
         } else {
             0f
         }
@@ -307,6 +297,98 @@ private fun buildLayout(
         leadingStreakSp = leadingSp,
     )
     return BuiltLayout(layout, cellsFit = availableForCells >= MIN_CELL_DIAMETER)
+}
+
+/**
+ * Sizing of the end-of-day "takeover" (the whole widget turns ember and the band message becomes
+ * the headline). The week grid and streak stay, but secondary: they shrink or drop before the
+ * message does. All lengths are dp, text sizes sp.
+ */
+internal data class TakeoverLayout(
+    val padding: Float,
+    val messageSp: Float,
+    /** Lines reserved for the message (1 or 2); the text is cut at this count. */
+    val messageMaxLines: Int,
+    val flameDp: Float,
+    val showGrid: Boolean,
+    /** Streak counter leading the grid row; false when the row is too narrow or there is no grid. */
+    val showStreak: Boolean,
+    val cellDiameter: Int,
+    val showLetters: Boolean,
+    val letterSizeSp: Int,
+)
+
+internal const val TAKEOVER_FLAME_GAP_DP = 8f
+internal const val TAKEOVER_GRID_GAP_DP = 10f
+internal const val TAKEOVER_STREAK_GAP_DP = 12f
+private const val TAKEOVER_CELL_CAP = 36f
+private const val TAKEOVER_MIN_MESSAGE_SP = 13f
+private const val TAKEOVER_CHAR_WIDTH_EM = 0.55f
+private val TAKEOVER_MESSAGE_SPS = listOf(22f, 20f, 18f, 16f, 14f, TAKEOVER_MIN_MESSAGE_SP)
+
+/** Width the leading streak counter takes in the takeover grid row, gap to the grid included. */
+internal fun takeoverStreakWidthDp(spToDp: (Float) -> Float = { it }): Float =
+    stripStreakContentWidthDp(STREAK_DIGITS_RESERVED, spToDp) + STREAK_WIDTH_SLACK_DP + TAKEOVER_STREAK_GAP_DP
+
+/**
+ * Picks the largest headline that fits [messageLength] characters in at most two lines, then fits
+ * the grid in what is left (cells 10dp or more, letters when they fit, streak when the row is wide
+ * enough). When no headline size leaves room for the grid, the grid is dropped, never the message.
+ */
+internal fun computeTakeoverLayout(
+    widthDp: Float,
+    heightDp: Float,
+    streakVisible: Boolean,
+    messageLength: Int,
+    spToDp: (Float) -> Float = { it },
+): TakeoverLayout {
+    val pad = if (heightDp < COMPACT_PADDING_BELOW) 10f else 14f
+    val contentHeight = heightDp - 2 * pad
+    val contentWidth = widthDp - 2 * pad
+
+    fun flameFor(sp: Float) = kotlin.math.round(sp * 1.1f)
+    fun linesFor(sp: Float): Int {
+        val textWidth = contentWidth - flameFor(sp) - TAKEOVER_FLAME_GAP_DP
+        val charsWidth = messageLength * TAKEOVER_CHAR_WIDTH_EM * spToDp(sp)
+        return kotlin.math.ceil(charsWidth / textWidth).toInt().coerceAtLeast(1)
+    }
+    fun layoutOf(sp: Float, lines: Int, showGrid: Boolean, showStreak: Boolean, diameter: Int, letters: Boolean) =
+        TakeoverLayout(
+            padding = pad, messageSp = sp, messageMaxLines = lines.coerceAtMost(2), flameDp = flameFor(sp),
+            showGrid = showGrid, showStreak = showStreak, cellDiameter = diameter, showLetters = letters,
+            letterSizeSp = (diameter * 0.34f).roundToInt().coerceIn(10, 11),
+        )
+
+    val streakLine = lineHeight(spToDp(STRIP_STREAK_SP))
+    val lettersReserve = LETTERS_GAP_DP + lineHeight(spToDp(STRIP_LETTERS_MAX_SP))
+    for (sp in TAKEOVER_MESSAGE_SPS) {
+        val lines = linesFor(sp)
+        if (lines > 2) continue
+        val room = contentHeight - lines * lineHeight(spToDp(sp)) - TAKEOVER_GRID_GAP_DP
+        for (withStreak in if (streakVisible) listOf(true, false) else listOf(false)) {
+            val gridWidth = contentWidth - if (withStreak) takeoverStreakWidthDp(spToDp) else 0f
+            if (gridWidth < MIN_GRID_WIDTH) continue
+            val column = gridWidth / 7f
+            for (withLetters in listOf(true, false)) {
+                // The streak line must also fit the row, or it would push the grid out of the widget.
+                val avail = room - (if (withLetters) lettersReserve else 0f)
+                val rowNeeds = maxOf(MIN_CELL_DIAMETER + RING_ALLOWANCE, if (withStreak) streakLine else 0f)
+                if (avail < rowNeeds) continue
+                val diameter = floor(
+                    minOf(column * 0.8f, column - RING_ALLOWANCE, avail - RING_ALLOWANCE, TAKEOVER_CELL_CAP),
+                ).toInt()
+                if (diameter < MIN_CELL_DIAMETER) continue
+                return layoutOf(sp, lines, true, withStreak, diameter, withLetters)
+            }
+        }
+    }
+    for (sp in TAKEOVER_MESSAGE_SPS) {
+        val lines = linesFor(sp)
+        if (lines <= 2 && lines * lineHeight(spToDp(sp)) <= contentHeight) {
+            return layoutOf(sp, lines, false, false, 0, false)
+        }
+    }
+    return layoutOf(TAKEOVER_MIN_MESSAGE_SP, 1, false, false, 0, false)
 }
 
 /** Already-localized fragments used to build the widget's accessibility descriptions. */

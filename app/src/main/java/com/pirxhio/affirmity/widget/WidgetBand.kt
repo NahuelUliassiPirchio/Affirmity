@@ -6,10 +6,10 @@ import com.pirxhio.affirmity.analytics.DailyGoal
 import com.pirxhio.affirmity.data.DayRiskState
 
 /**
- * Colors of the end-of-day band behind the widget's streak row (DESIGN.md ember family). Packed
- * 0xAARRGGBB longs so the contrast test can check them without Compose. The `widget_band_*`
- * drawables repeat the two backgrounds as XML (Glance needs a drawable for rounded corners);
- * keep them in sync.
+ * Colors of the end-of-day band (DESIGN.md ember family): the whole weekly widget and the in-app
+ * dialog take these grounds. Packed 0xAARRGGBB longs so the contrast test can check them without
+ * Compose. The `widget_card_bg_soft` / `widget_card_bg_warm` drawables repeat the two backgrounds
+ * as XML (Glance needs a drawable for rounded corners); keep them in sync.
  */
 internal object WidgetBandPalette {
     /** streak-ground-night: the softer band (goal incomplete, streak safe). */
@@ -18,7 +18,7 @@ internal object WidgetBandPalette {
     const val WARM_BACKGROUND = 0xFF55290CL
     /** streak-ember-night: accent text and lit flame on both bands. */
     const val EMBER_ACCENT = 0xFFFF9A4DL
-    /** tracker-text: the streak number stays neutral on the band. */
+    /** tracker-text: the streak number and today's letter stay neutral on the band. */
     const val NUMBER_ON_BAND = 0xFFE9E9EDL
 }
 

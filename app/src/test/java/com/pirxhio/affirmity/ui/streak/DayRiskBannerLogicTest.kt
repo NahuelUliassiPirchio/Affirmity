@@ -49,6 +49,21 @@ class DayRiskBannerLogicTest {
     }
 
     @Test
+    fun `cta opens the missing activity, or affirmations when the streak is at risk`() {
+        assertEquals(DayRiskCtaTarget.MEDITATION, dayRiskCtaTarget(DayRiskState.GoalIncomplete(DailyGoal.MEDITATION)))
+        assertEquals(DayRiskCtaTarget.AFFIRMATIONS, dayRiskCtaTarget(DayRiskState.GoalIncomplete(DailyGoal.AFFIRMATION)))
+        assertEquals(DayRiskCtaTarget.AFFIRMATIONS, dayRiskCtaTarget(DayRiskState.StreakAtRisk))
+    }
+
+    @Test
+    fun `no cta target or variant when the dialog does not apply`() {
+        listOf(DayRiskState.Done, DayRiskState.NotStarted, DayRiskState.InProgress(setOf(DailyGoal.MEDITATION))).forEach {
+            assertEquals(null, dayRiskCtaTarget(it))
+            assertEquals(null, dayRiskDialogVariant(it))
+        }
+    }
+
+    @Test
     fun `before 20h the next wakeup is 20h today`() {
         val now = millis("2026-06-10T09:30:00+01:00[Europe/London]")
         assertEquals(millis("2026-06-10T20:00:00+01:00[Europe/London]"), nextDayRiskWakeupMillis(now, london))
