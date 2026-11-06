@@ -33,6 +33,21 @@ fun requiredAdSecret(propKey: String, envKey: String): String = adSecret(propKey
         "MISSING_$envKey"
     }
 
+// Google's committed public test ad ids, shared by every non-shipping build type.
+fun com.android.build.api.dsl.ApplicationBuildType.useGoogleTestAdUnits() {
+    manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713"
+    buildConfigField("String", "ADMOB_REWARDED_UNIT_PER_USE", "\"ca-app-pub-3940256099942544/5224354917\"")
+    buildConfigField("String", "ADMOB_REWARDED_UNIT_ONE_TIME_TRIAL", "\"ca-app-pub-3940256099942544/5224354917\"")
+    buildConfigField("String", "ADMOB_REWARDED_UNIT_TIMED_REPEATABLE", "\"ca-app-pub-3940256099942544/5224354917\"")
+    buildConfigField("String", "ADMOB_BANNER_UNIT", "\"ca-app-pub-3940256099942544/6300978111\"")
+    buildConfigField("String", "ADMOB_INTERSTITIAL_UNIT", "\"ca-app-pub-3940256099942544/1033173712\"")
+    buildConfigField(
+        "String",
+        "ADMOB_TEST_DEVICE_HASH",
+        "\"${adSecret("admob.testDeviceHash", "ADMOB_TEST_DEVICE_HASH") ?: ""}\"",
+    )
+}
+
 android {
     namespace = "com.pirxhio.affirmity"
     compileSdk {
@@ -68,17 +83,7 @@ android {
 
     buildTypes {
         debug {
-            manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713"
-            buildConfigField("String", "ADMOB_REWARDED_UNIT_PER_USE", "\"ca-app-pub-3940256099942544/5224354917\"")
-            buildConfigField("String", "ADMOB_REWARDED_UNIT_ONE_TIME_TRIAL", "\"ca-app-pub-3940256099942544/5224354917\"")
-            buildConfigField("String", "ADMOB_REWARDED_UNIT_TIMED_REPEATABLE", "\"ca-app-pub-3940256099942544/5224354917\"")
-            buildConfigField("String", "ADMOB_BANNER_UNIT", "\"ca-app-pub-3940256099942544/6300978111\"")
-            buildConfigField("String", "ADMOB_INTERSTITIAL_UNIT", "\"ca-app-pub-3940256099942544/1033173712\"")
-            buildConfigField(
-                "String",
-                "ADMOB_TEST_DEVICE_HASH",
-                "\"${adSecret("admob.testDeviceHash", "ADMOB_TEST_DEVICE_HASH") ?: ""}\"",
-            )
+            useGoogleTestAdUnits()
         }
         release {
             optimization {
@@ -121,6 +126,18 @@ android {
                 "ADMOB_INTERSTITIAL_UNIT",
                 "\"${requiredAdSecret("admob.interstitialUnit", "ADMOB_INTERSTITIAL_UNIT")}\"",
             )
+        }
+        // Release-equivalent build (R8 on, not debuggable) that installs locally without production
+        // secrets: signed with the debug key and wired to Google's public test ad units. Use it to
+        // judge real startup performance and as the target for Macrobenchmark runs. Never ship it.
+        create("benchmark") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            useGoogleTestAdUnits()
+            configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
+                mappingFileUploadEnabled = false
+            }
         }
     }
     compileOptions {
