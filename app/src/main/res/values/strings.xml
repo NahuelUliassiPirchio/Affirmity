@@ -205,6 +205,7 @@
     <string name="streak_milestone_confirm_button">Seguir</string>
     <string name="streak_milestone_icon_content_description">Ícono de logro de racha</string>
     <string name="progress_milestones_title">Logros de racha</string>
+    <string name="progress_section_streak">Racha</string>
     <plurals name="progress_milestones_next">
         <item quantity="one">Falta %1$d día para %2$d</item>
         <item quantity="other">Faltan %1$d días para %2$d</item>
@@ -1250,16 +1251,16 @@
     <string name="activity_today">Hoy</string>
     <string name="activity_selected">Seleccionado</string>
     <string name="activity_mood_value">Ánimo: %1$d de 5</string>
-    <string name="activity_has_records">Tiene registros</string>
-    <string name="activity_no_mood">Sin registro de ánimo</string>
+    <string name="activity_mood_score">%1$d de 5</string>
+    <string name="activity_not_recorded">Sin registro</string>
+    <string name="activity_goal_met">Objetivo cumplido</string>
+    <plurals name="activity_viewed_value">
+        <item quantity="one">%d vista</item>
+        <item quantity="other">%d vistas</item>
+    </plurals>
     <string name="activity_healed">Día sanado; no añade actividad registrada.</string>
-    <string name="activity_legacy_meditation">Meditación completada; detalles no disponibles.</string>
-    <string name="activity_legacy_affirmations">Objetivo de afirmaciones completado; recuento no disponible.</string>
     <string name="activity_unknown">Sin actividad registrada; el historial completo no está disponible.</string>
     <string name="activity_partial">Historial parcial: se muestra solo la actividad registrada.</string>
-    <string name="activity_empty">Sin actividad en este día registrado.</string>
-    <string name="activity_viewed_count">Afirmaciones vistas: %1$d</string>
-    <string name="activity_total_duration">Tiempo activo registrado: %1$s</string>
     <string name="activity_session_detail">%1$s · %2$s</string>
     <string name="activity_duration_format">%1$d min %2$d s</string>
 </resources>

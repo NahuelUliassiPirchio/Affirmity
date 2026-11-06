@@ -17,7 +17,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import com.pirxhio.affirmity.data.*
@@ -45,10 +47,10 @@ class ActivityCalendarTest {
         }
         compose.onNodeWithText("Breathing snapshot", substring = true).assertExists()
         compose.onNodeWithText("Second session", substring = true).assertExists()
-        compose.onNodeWithText(compose.activity.getString(R.string.activity_mood_value, 5)).assertExists()
-        compose.onNodeWithText(compose.activity.getString(R.string.activity_viewed_count, 2)).assertExists()
+        compose.onNodeWithText(compose.activity.getString(R.string.activity_mood_score, 5)).assertExists()
+        compose.onNodeWithText(compose.activity.resources.getQuantityString(R.plurals.activity_viewed_value, 2, 2)).assertExists()
         val duration = compose.activity.getString(R.string.activity_duration_format, 0L, 30L)
-        compose.onNodeWithText(compose.activity.getString(R.string.activity_total_duration, duration)).assertExists()
+        compose.onNodeWithText(duration).assertExists()
         compose.onNodeWithText(fullDate(day)).assertExists()
     }
 
@@ -67,10 +69,11 @@ class ActivityCalendarTest {
         compose.onNodeWithText("Historical mood").assertDoesNotExist()
         compose.onNodeWithContentDescription(fullDate(target), substring = true).performClick().assertIsSelected()
         compose.onNodeWithText(fullDate(target)).assertExists()
-        compose.onNodeWithText(compose.activity.getString(R.string.activity_mood_value, 3)).assertExists()
+        compose.onNodeWithText(compose.activity.getString(R.string.activity_mood_score, 3)).assertExists()
         compose.onNodeWithText("Historical mood").assertExists()
         compose.onNodeWithText(compose.activity.getString(R.string.activity_unknown)).assertExists()
-        compose.onNodeWithText(compose.activity.getString(R.string.activity_viewed_count, 0)).assertDoesNotExist()
+        // Affirmation and meditation rows stay empty: no invented "0 viewed" or "0 min" values.
+        compose.onAllNodesWithContentDescription(compose.activity.getString(R.string.activity_not_recorded)).assertCountEquals(2)
     }
 
     @Test fun retryInvokesRecoveryAndReplacesFailureWithActualReadyDetails() {
@@ -88,8 +91,8 @@ class ActivityCalendarTest {
         }
         compose.onNodeWithText(compose.activity.getString(R.string.activity_load_error)).assertExists()
         compose.onNodeWithText(compose.activity.getString(R.string.activity_retry)).performClick()
-        compose.onNodeWithText(compose.activity.getString(R.string.activity_empty)).assertExists()
-        compose.onNodeWithText(compose.activity.getString(R.string.activity_viewed_count, 0)).assertExists()
+        // A confirmed-empty day renders all three rows as not recorded.
+        compose.onAllNodesWithContentDescription(compose.activity.getString(R.string.activity_not_recorded)).assertCountEquals(3)
         compose.onNodeWithText(compose.activity.getString(R.string.activity_load_error)).assertDoesNotExist()
         org.junit.Assert.assertEquals(1, retries)
     }

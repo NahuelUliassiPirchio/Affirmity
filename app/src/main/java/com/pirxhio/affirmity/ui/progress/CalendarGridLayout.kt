@@ -47,6 +47,7 @@ internal fun weekdayLabels(locale: Locale, narrow: Boolean): List<WeekdayLabel> 
     val fullFormat = SimpleDateFormat("EEEE", locale)
     return List(7) { offset ->
         val date = Calendar.getInstance(locale).apply { set(Calendar.DAY_OF_WEEK, (firstWeekday - 1 + offset) % 7 + 1) }.time
-        WeekdayLabel(shortFormat.format(date), fullFormat.format(date))
+        // Drop abbreviation periods (es "lun.") so the label's optical center matches the day column.
+        WeekdayLabel(shortFormat.format(date).trimEnd('.'), fullFormat.format(date))
     }
 }

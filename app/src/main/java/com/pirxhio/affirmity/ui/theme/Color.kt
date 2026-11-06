@@ -110,3 +110,18 @@ val AuroraBlushLightArgb: Long = 0xFFE8A9A0
 val AuroraTealDarkArgb: Long = 0xFF3AA5AD
 val AuroraSeaDarkArgb: Long = 0xFF2E8B7A
 val AuroraBlushDarkArgb: Long = 0xFFC98A8F
+
+// Activity calendar dots: the weekly tracker widget's meditation/affirmation family plus a mood periwinkle.
+// Dark values match the widget; light values are darkened so every dot holds >= 3:1 (WCAG non-text)
+// against the light surface (#F9F9F9) and the selected-day tint.
+val ActivityAffirmationLight = Color(0xFFB05A3C)
+val ActivityMeditationLight = Color(0xFF1E7F80)
+val ActivityMoodLight = Color(0xFF5E62B8)
+val ActivityAffirmationDark = Color(0xFFE3956C)
+val ActivityMeditationDark = Color(0xFF57B6B6)
+val ActivityMoodDark = Color(0xFFA9ACEB)
+
+// Streak ember family (DESIGN.md) for the milestone path. Light #E8590C holds 3.58:1 on the white card
+// (surfaceContainerLowest); dark #FF9A4D holds 9.18:1 on the near-black card. Both clear the 3:1 non-text minimum.
+val StreakEmberLight = Color(0xFFE8590C)
+val StreakEmberDark = Color(0xFFFF9A4D)

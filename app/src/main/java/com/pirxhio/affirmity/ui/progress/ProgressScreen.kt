@@ -2,16 +2,18 @@ package com.pirxhio.affirmity.ui.progress
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.luminance
+import com.pirxhio.affirmity.ui.theme.StreakEmberDark
+import com.pirxhio.affirmity.ui.theme.StreakEmberLight
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -48,6 +50,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.ActivityMonthState
@@ -98,7 +104,7 @@ fun ProgressScreen(
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background),
         contentPadding = PaddingValues(ProgressPagePadding),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+        verticalArrangement = Arrangement.spacedBy(32.dp)
     ) {
         item {
             Text(
@@ -110,41 +116,49 @@ fun ProgressScreen(
             )
         }
 
+        item {
+            MilestoneBadgesCard(
+                bestMilestoneReached = bestMilestoneReached,
+                generalStreakDays = streakHealer.generalStreakDays,
+            )
+        }
+
         if (observeActivityMonth != null) item {
-            ActivityCalendar(observeActivityMonth, activitySaveError, onRetryActivity, gridBleed = ProgressCalendarBleed)
+            ProgressSection(stringResource(R.string.activity_title)) {
+                ActivityCalendar(observeActivityMonth, activitySaveError, onRetryActivity, gridBleed = ProgressCalendarBleed)
+            }
         }
 
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Always visible regardless of healer/activation state — distinct from the
-                // StreakHealerCard below (spec's `general-streak` domain: alive if either habit
-                // was done that day, independent of the per-habit trackers further down).
-                GeneralStreakCounter(
-                    generalStreakDays = streakHealer.generalStreakDays,
-                    isTodayDone = streakHealer.isTodayDone,
-                )
-                StreakHealerCard(streakHealer = streakHealer, onActivateHealer = onActivateHealer)
-                MilestoneBadgesCard(
-                    bestMilestoneReached = bestMilestoneReached,
-                    generalStreakDays = streakHealer.generalStreakDays,
-                )
-                // Bug fix vs. the mockup: Meditación used to render a minutes-goal
-                // progress bar here. It now shares the exact same day-circle tracker
-                // component as Afirmaciones, just with its own icon/data.
-                WeeklyStreakTracker(
-                    title = stringResource(R.string.progress_affirmations_label),
-                    icon = Icons.Filled.AutoAwesome,
-                    streak = affirmationsStreak,
-                    onClick = { historyHabit = HistoryHabit.AFFIRMATIONS },
-                )
-                WeeklyStreakTracker(
-                    title = stringResource(R.string.progress_meditation_label),
-                    icon = Icons.Filled.Timer,
-                    streak = meditationStreak,
-                    onClick = { historyHabit = HistoryHabit.MEDITATION },
-                )
+            ProgressSection(stringResource(R.string.progress_section_streak)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Always visible regardless of healer/activation state — distinct from the
+                    // StreakHealerCard below (spec's `general-streak` domain: alive if either habit
+                    // was done that day, independent of the per-habit trackers further down).
+                    GeneralStreakCounter(
+                        generalStreakDays = streakHealer.generalStreakDays,
+                        isTodayDone = streakHealer.isTodayDone,
+                    )
+                    StreakHealerCard(streakHealer = streakHealer, onActivateHealer = onActivateHealer)
+                    // Bug fix vs. the mockup: Meditación used to render a minutes-goal
+                    // progress bar here. It now shares the exact same day-circle tracker
+                    // component as Afirmaciones, just with its own icon/data.
+                    WeeklyStreakTracker(
+                        title = stringResource(R.string.progress_affirmations_label),
+                        icon = Icons.Filled.AutoAwesome,
+                        streak = affirmationsStreak,
+                        onClick = { historyHabit = HistoryHabit.AFFIRMATIONS },
+                    )
+                    WeeklyStreakTracker(
+                        title = stringResource(R.string.progress_meditation_label),
+                        icon = Icons.Filled.Timer,
+                        streak = meditationStreak,
+                        onClick = { historyHabit = HistoryHabit.MEDITATION },
+                    )
+                }
             }
         }
+
     }
 
     val openHabit = historyHabit
@@ -276,7 +290,6 @@ private fun StreakHealerCard(streakHealer: StreakHealerState, onActivateHealer: 
  * circle, filled once reached (lifetime best, so a broken streak keeps its badges), plus how far the
  * CURRENT streak is from the next one.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun MilestoneBadgesCard(bestMilestoneReached: Int, generalStreakDays: Int) {
     Card(
@@ -299,43 +312,7 @@ internal fun MilestoneBadgesCard(bestMilestoneReached: Int, generalStreakDays: I
                     modifier = Modifier.padding(start = 8.dp),
                 )
             }
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                StreakMilestones.ALL.forEach { days ->
-                    val reached = days <= bestMilestoneReached
-                    val description = stringResource(
-                        if (reached) R.string.progress_milestone_reached_content_description
-                        else R.string.progress_milestone_locked_content_description,
-                        days,
-                    )
-                    Box(
-                        modifier = Modifier
-                            .sizeIn(minWidth = 32.dp, minHeight = 32.dp)
-                            .background(
-                                color = if (reached) MaterialTheme.colorScheme.onSurface
-                                else MaterialTheme.colorScheme.surfaceContainerHighest,
-                                shape = CircleShape,
-                            )
-                            .then(
-                                if (!reached) Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
-                                else Modifier
-                            )
-                            .clearAndSetSemantics { contentDescription = description }
-                            .padding(horizontal = 6.dp, vertical = 4.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = days.toString(),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (reached) MaterialTheme.colorScheme.surface
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                        )
-                    }
-                }
-            }
+            MilestonePath(bestMilestoneReached)
             // Next CELEBRATED milestone: the 1-day badge is never a target.
             val next = StreakMilestoneDetector.CELEBRATED.firstOrNull { it > generalStreakDays }
             Text(
@@ -439,6 +416,76 @@ fun WeeklyStreakTracker(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/** A titled Progress section: hairline divider, serif title, then content. Never clips (the calendar bleeds). */
+@Composable
+private fun ProgressSection(title: String, content: @Composable () -> Unit) {
+    Column(Modifier.fillMaxWidth()) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Spacer(Modifier.height(20.dp))
+        Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.semantics { heading() })
+        Spacer(Modifier.height(12.dp))
+        content()
+    }
+}
+
+/**
+ * Single-row milestone path: one evenly weighted stop per milestone on a 2dp track, so the stops never wrap.
+ * Reached stops and the track up to the best milestone use the streak ember; the next target is an ember ring.
+ */
+@Composable
+private fun MilestonePath(bestMilestoneReached: Int) {
+    val colors = MaterialTheme.colorScheme
+    val ember = if (colors.surface.luminance() < 0.5f) StreakEmberDark else StreakEmberLight
+    val unfilled = colors.outlineVariant
+    val milestones = StreakMilestones.ALL
+    val nextTarget = milestones.firstOrNull { it > bestMilestoneReached }
+    Row(Modifier.fillMaxWidth()) {
+        milestones.forEachIndexed { index, days ->
+            val reached = days <= bestMilestoneReached
+            val rightFilled = milestones.getOrNull(index + 1)?.let { it <= bestMilestoneReached } == true
+            val description = stringResource(
+                if (reached) R.string.progress_milestone_reached_content_description
+                else R.string.progress_milestone_locked_content_description,
+                days,
+            )
+            Column(
+                Modifier.weight(1f).clearAndSetSemantics { contentDescription = description },
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    Modifier.fillMaxWidth().height(24.dp).drawBehind {
+                        val stroke = 2.dp.toPx()
+                        val y = size.height / 2
+                        val x = size.width / 2
+                        if (index > 0) drawLine(if (reached) ember else unfilled, Offset(0f, y), Offset(x, y), stroke)
+                        if (index < milestones.lastIndex) {
+                            drawLine(if (rightFilled) ember else unfilled, Offset(x, y), Offset(size.width, y), stroke)
+                        }
+                    },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    when {
+                        reached -> Box(Modifier.size(12.dp).background(ember, CircleShape))
+                        days == nextTarget -> Box(
+                            Modifier.size(12.dp).background(colors.surface, CircleShape).border(2.dp, ember, CircleShape)
+                        )
+                        else -> Box(Modifier.size(8.dp).background(unfilled, CircleShape))
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = days.toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (reached) colors.onSurface else colors.onSurfaceVariant,
+                    maxLines = 1,
+                    softWrap = false,
+                )
             }
         }
     }

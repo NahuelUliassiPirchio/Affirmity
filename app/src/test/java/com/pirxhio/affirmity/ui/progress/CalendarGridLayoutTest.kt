@@ -41,6 +41,8 @@ class CalendarGridLayoutTest {
         val es = weekdayLabels(java.util.Locale("es", "ES"), narrow = false)
         assertEquals("lunes", es.first().full)
         assertEquals("domingo", es.last().full)
+        // Abbreviation periods ("lun.") shift the label's optical center off the day column, so they are dropped.
+        es.forEach { assertEquals(false, it.short.endsWith(".")) }
         // Narrow ("EEEEE") single-letter output is Android/ICU behaviour; the JDK formatter returns full names, so it is
         // covered on-device by the font-scale 2.0 screenshot and weekdayHeadersStaySingleLineAtLargeFontScale.
     }

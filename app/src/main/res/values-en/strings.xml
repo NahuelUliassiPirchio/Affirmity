@@ -205,6 +205,7 @@
     <string name="streak_milestone_confirm_button">Keep going</string>
     <string name="streak_milestone_icon_content_description">Streak milestone icon</string>
     <string name="progress_milestones_title">Streak milestones</string>
+    <string name="progress_section_streak">Streak</string>
     <plurals name="progress_milestones_next">
         <item quantity="one">%1$d day to go until %2$d</item>
         <item quantity="other">%1$d days to go until %2$d</item>
@@ -1181,16 +1182,16 @@
     <string name="activity_today">Today</string>
     <string name="activity_selected">Selected</string>
     <string name="activity_mood_value">Mood: %1$d of 5</string>
-    <string name="activity_has_records">Has records</string>
-    <string name="activity_no_mood">No mood recorded</string>
+    <string name="activity_mood_score">%1$d of 5</string>
+    <string name="activity_not_recorded">Not recorded</string>
+    <string name="activity_goal_met">Goal met</string>
+    <plurals name="activity_viewed_value">
+        <item quantity="one">%d viewed</item>
+        <item quantity="other">%d viewed</item>
+    </plurals>
     <string name="activity_healed">Healed day; no recorded activity is added.</string>
-    <string name="activity_legacy_meditation">Meditation completed; details unavailable.</string>
-    <string name="activity_legacy_affirmations">Affirmation goal completed; viewed count unavailable.</string>
     <string name="activity_unknown">No recorded activity; complete history unavailable.</string>
     <string name="activity_partial">Partial history: only recorded activity is shown.</string>
-    <string name="activity_empty">No activity on this fully tracked day.</string>
-    <string name="activity_viewed_count">Affirmations viewed: %1$d</string>
-    <string name="activity_total_duration">Recorded active time: %1$s</string>
     <string name="activity_session_detail">%1$s · %2$s</string>
     <string name="activity_duration_format">%1$d min %2$d sec</string>
 </resources>
