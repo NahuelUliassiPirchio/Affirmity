@@ -354,6 +354,7 @@ private fun buildState(
     knownThemeIds: Set<String> = setOf("u1.t1"),
     defaultThematicThemeIds: Set<String> = setOf("u1.t1"),
     proOnlyThemeIds: Set<String> = emptySet(),
+    recentMeditationIdsFlow: Flow<List<String>>? = null,
     onboardingPreferencesOverride: OnboardingPreferences? = null,
     onboardingGuidePreferencesOverride: OnboardingGuidePreferences? = null,
     fcmTokenRepositoryOverride: FcmTokenRepository? = null,
@@ -376,6 +377,7 @@ private fun buildState(
     // failing their assertions or hanging forever on a channel receive.
     whenever(trackerPreferences.observeHiddenAffirmationIds()).thenReturn(flowOf(emptySet()))
     whenever(trackerPreferences.observeFeedSources()).thenReturn(flowOf(FeedSources()))
+    whenever(trackerPreferences.observeRecentMeditationIds()).thenReturn(recentMeditationIdsFlow ?: flowOf(emptyList()))
     val notificationDebugLog = mock(NotificationDebugLog::class.java)
     whenever(notificationDebugLog.entries)
         .thenReturn(EventedFlow("debug-log", mutableListOf(), listOf(emptyList())))
@@ -1762,6 +1764,77 @@ class AffirmityAppStateSwapTest {
         assertEquals(listOf(CompletionHistorySlice(emptyList(), emptySet())), collected)
 
         job.cancel()
+        scope.cancel()
+    }
+
+    // --- initial content gate / recents ------------------------------------------------------------
+
+    private class ControlledThemePreferences(val source: Flow<Set<String>?>) : ThemeSelectionPreferences {
+        override fun observeSelectedThemeIds(): Flow<Set<String>?> = source
+        override suspend fun saveSelectedThemeIds(ids: Set<String>) = Unit
+    }
+
+    private fun buildGateState(scope: CoroutineScope, themes: ThemeSelectionPreferences): AffirmityAppState {
+        val events = mutableListOf<String>()
+        return buildState(
+            local = fakeLocal(events, id = "local-gate"),
+            remote = { fakeRemote("uid-g", events) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = FakeAuthRepository(),
+            scope = scope,
+            themePreferences = themes,
+        )
+    }
+
+    @Test
+    fun `initial content stays unresolved until the theme selection resolves`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val source = kotlinx.coroutines.flow.MutableSharedFlow<Set<String>?>()
+        val state = buildGateState(scope, ControlledThemePreferences(source))
+        delay(100)
+
+        assertEquals(null, state.selectedThemeIds.value)
+        assertFalse(state.isInitialContentResolved.value)
+
+        source.emit(setOf("u1.t1"))
+        delay(100)
+        assertTrue(state.isInitialContentResolved.value)
+        scope.cancel()
+    }
+
+    @Test
+    fun `initial content still resolves when the theme read fails`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val state = buildGateState(
+            scope,
+            ControlledThemePreferences(kotlinx.coroutines.flow.flow { throw IllegalStateException("read failed") }),
+        )
+        delay(100)
+
+        assertTrue(state.isInitialContentResolved.value)
+        scope.cancel()
+    }
+
+    @Test
+    fun `recentMeditationEntries follows the recent ids flow`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val recents = kotlinx.coroutines.flow.MutableSharedFlow<List<String>>()
+        val events = mutableListOf<String>()
+        val state = buildState(
+            local = fakeLocal(events, id = "local-recents"),
+            remote = { fakeRemote("uid-r", events) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = FakeAuthRepository(),
+            scope = scope,
+            recentMeditationIdsFlow = recents,
+        )
+        delay(100)
+        assertTrue(state.recentMeditationEntries.value.isEmpty())
+
+        recents.emit(listOf("body_scan", "gone", "calma"))
+        delay(100)
+
+        assertEquals(listOf("body_scan", "calma"), state.recentMeditationEntries.value.map { it.id })
         scope.cancel()
     }
 }

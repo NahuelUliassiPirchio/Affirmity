@@ -136,6 +136,41 @@ class CatalogSeederTest {
         assertTrue(dao.calls.isEmpty())
     }
 
+    /** The already-seeded fast path must decide from the cheap version peek, never from a full
+     * parse: a body that would FAIL parsing (unknown collection id) is not touched when the
+     * marker matches and rows exist. */
+    @Test
+    fun `already seeded skips the full parse and writes nothing`() = runBlocking {
+        val unparseable = """{"version":"1.0.0","affirmations":[{"id":"x","collectionId":"unknown"}]}"""
+        val dao = RecordingFakeDao(existingRows = 1)
+        val prefs = RecordingFakePrefs(initial = "1.0.0|es")
+        val seeder = testSeeder({ unparseable }, dao, prefs)
+
+        seeder.seedIfNeeded()
+
+        assertTrue(dao.calls.isEmpty())
+        assertTrue(prefs.calls.isEmpty())
+    }
+
+    @Test
+    fun `a different locale in the marker still parses and reseeds`() = runBlocking {
+        val dao = RecordingFakeDao(existingRows = 1)
+        val prefs = RecordingFakePrefs(initial = "1.0.0|en")
+        val seeder = testSeeder({ catalogJson("1.0.0") }, dao, prefs)
+
+        seeder.seedIfNeeded()
+
+        assertEquals(listOf("replaceAll"), dao.calls)
+        assertEquals("1.0.0|es", prefs.observeSeededCatalogVersion().value())
+    }
+
+    @Test
+    fun `peekVersion reads the leading version and returns null when it cannot`() {
+        assertEquals("5.2.0+android.1", CatalogAssetParser.peekVersion(catalogJson("5.2.0+android.1")))
+        assertEquals(null, CatalogAssetParser.peekVersion("""{"affirmations":[],"version":"1"}"""))
+        assertEquals(null, CatalogAssetParser.peekVersion("not json"))
+    }
+
     /** Auto Backup restores DataStore (the marker) but excludes the Room DB, so a restored or
      * cleared-DB install has a matching marker over an empty table. The marker alone must not
      * gate seeding. */

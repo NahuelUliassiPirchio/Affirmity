@@ -224,7 +224,17 @@ private val WIM_HOF_SFX_RESOURCES: Map<String, Int> = mapOf(
     WimHofSfx.INHALE_RECOVERY to R.raw.whm_sfx_inhale_recovery,
 )
 
-fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
+/** Built once: entries are pure data (resource ids, lambdas resolved at launch), so memoizing is
+ * safe and avoids rebuilding the ~2,300-line list on every lookup or recomposition. */
+private val meditationCatalogEntries: List<MeditationCatalogEntry> by lazy { buildMeditationCatalog() }
+
+private val meditationCatalogById: Map<String, MeditationCatalogEntry> by lazy {
+    meditationCatalogEntries.associateBy { it.id }
+}
+
+fun meditationCatalog(): List<MeditationCatalogEntry> = meditationCatalogEntries
+
+private fun buildMeditationCatalog(): List<MeditationCatalogEntry> = listOf(
     MeditationCatalogEntry(
         id = "reset_rapido",
         titleRes = R.string.meditation_catalog_reset_rapido_title,
@@ -2551,4 +2561,9 @@ fun meditationCatalog(): List<MeditationCatalogEntry> = listOf(
 
 /** `null` for an unknown id is the fail-safe contract REQ-5.4.3 depends on. */
 fun findMeditationCatalogEntry(id: String): MeditationCatalogEntry? =
-    meditationCatalog().firstOrNull { it.id == id }
+    meditationCatalogById[id]
+
+/** Maps persisted most-recent-first ids to catalog entries, preserving order and silently
+ * dropping ids that no longer resolve (e.g. an entry removed in a later version). */
+fun resolveRecentMeditationEntries(ids: List<String>): List<MeditationCatalogEntry> =
+    ids.mapNotNull { findMeditationCatalogEntry(it) }

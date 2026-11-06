@@ -169,6 +169,8 @@ import com.pirxhio.affirmity.ui.groups.catalogCollectionsById
 import com.pirxhio.affirmity.ui.groups.catalogUniverseGroups
 import com.pirxhio.affirmity.ui.groups.catalogThemes
 import com.pirxhio.affirmity.ui.groups.catalogThemesById
+import com.pirxhio.affirmity.ui.meditation.catalog.MeditationCatalogEntry
+import com.pirxhio.affirmity.ui.meditation.catalog.resolveRecentMeditationEntries
 import com.pirxhio.affirmity.ui.groups.selectableAffirmationGroups
 import com.pirxhio.affirmity.ui.groups.themeAccessDecision
 import com.pirxhio.affirmity.access.isUnlocked
@@ -428,7 +430,8 @@ fun shouldShowGuide(resolvedGuideSeen: Boolean?): Boolean = resolvedGuideSeen ==
 fun areInitialContentInputsResolved(
     hasCompletedOnboarding: Boolean?,
     guideSeen: Boolean?,
-): Boolean = hasCompletedOnboarding != null && guideSeen != null
+    themesResolved: Boolean,
+): Boolean = hasCompletedOnboarding != null && guideSeen != null && themesResolved
 
 /** Resolves the first-launch surface without hiding the existing-account shortcut behind the
  * guide. A fresh user stays on the onboarding intro until they explicitly enter the survey; only
@@ -749,6 +752,12 @@ class AffirmityAppState(
      * resolves; the UI shows nothing theme-dependent until then. `personalizadas` is never a
      * member -- it is unconditionally included in the feed instead (scope decision #2). */
     var selectedThemeIds = mutableStateOf<Set<String>?>(null)
+        private set
+
+    /** Most-recent-first meditation catalog entries the user started (pre-launch audit item #5).
+     * Collected from construction time so the shelf is populated by the time the screen shows,
+     * instead of waiting for a composition-scoped effect. Unknown ids are dropped. */
+    var recentMeditationEntries = mutableStateOf<List<MeditationCatalogEntry>>(emptyList())
         private set
 
     /** Pending (uncommitted) selection "Your feed"/"See all themes" mutate while open. Seeded from
@@ -1151,7 +1160,14 @@ class AffirmityAppState(
     /** The native splash can leave only after both inputs that choose the first content surface
      * have emitted. Keeping this derived in app state prevents composition-local readiness races. */
     val isInitialContentResolved: State<Boolean> = derivedStateOf {
-        areInitialContentInputsResolved(hasCompletedOnboarding.value, hasSeenOnboardingGuide.value)
+        areInitialContentInputsResolved(
+            hasCompletedOnboarding = hasCompletedOnboarding.value,
+            guideSeen = hasSeenOnboardingGuide.value,
+            // Without this the feed renders owned rows only and can flash the EMPTY state for
+            // catalog content that is merely still loading. The theme collector always resolves
+            // (default fallback on a failed read), so this can never hold the splash forever.
+            themesResolved = selectedThemeIds.value != null,
+        )
     }
 
     /** Commits the guide as seen (spec R2.3, R4.2/R4.3) -- called by both the auto and manual
@@ -1511,6 +1527,17 @@ class AffirmityAppState(
         scope.launch {
             trackerPreferences.observeAffirmationsViewedToday().collect { viewed ->
                 affirmationsViewedToday = viewed
+            }
+        }
+        scope.launch {
+            try {
+                trackerPreferences.observeRecentMeditationIds().collect { ids ->
+                    recentMeditationEntries.value = resolveRecentMeditationEntries(ids)
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Log.e(TAG, "recent meditations flow failed", error)
             }
         }
         scope.launch {

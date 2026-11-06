@@ -62,11 +62,12 @@ class AffirmityAppStateGuideGateTest {
     }
 
     @Test
-    fun `first content stays unresolved until onboarding and guide inputs are both resolved`() {
-        assertFalse(areInitialContentInputsResolved(hasCompletedOnboarding = null, guideSeen = null))
-        assertFalse(areInitialContentInputsResolved(hasCompletedOnboarding = false, guideSeen = null))
-        assertFalse(areInitialContentInputsResolved(hasCompletedOnboarding = null, guideSeen = false))
-        assertTrue(areInitialContentInputsResolved(hasCompletedOnboarding = false, guideSeen = false))
-        assertTrue(areInitialContentInputsResolved(hasCompletedOnboarding = true, guideSeen = true))
+    fun `first content stays unresolved until onboarding, guide and theme inputs are all resolved`() {
+        assertFalse(areInitialContentInputsResolved(hasCompletedOnboarding = null, guideSeen = null, themesResolved = true))
+        assertFalse(areInitialContentInputsResolved(hasCompletedOnboarding = false, guideSeen = null, themesResolved = true))
+        assertFalse(areInitialContentInputsResolved(hasCompletedOnboarding = null, guideSeen = false, themesResolved = true))
+        assertFalse(areInitialContentInputsResolved(hasCompletedOnboarding = true, guideSeen = true, themesResolved = false))
+        assertTrue(areInitialContentInputsResolved(hasCompletedOnboarding = false, guideSeen = false, themesResolved = true))
+        assertTrue(areInitialContentInputsResolved(hasCompletedOnboarding = true, guideSeen = true, themesResolved = true))
     }
 }
