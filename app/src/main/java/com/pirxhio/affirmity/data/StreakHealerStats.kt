@@ -2,7 +2,7 @@ package com.pirxhio.affirmity.data
 
 import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.local.StreakHealerUseEntity
-import java.util.Calendar
+import java.time.LocalDate
 
 /**
  * Pure per-day accessors derived from raw [DailyCompletionEntity] rows only — "layer 1" of the
@@ -56,9 +56,7 @@ object StreakHealerStats {
 
     /** This feature's release day — completion history from before it can never retroactively
      * grant/heal (design.md's "Migration / Rollout" decision). */
-    val EPOCH_START_DAY: Long = DayClock.epochDay(
-        Calendar.getInstance().apply { set(2026, Calendar.AUGUST, 4, 0, 0, 0) }
-    )
+    val EPOCH_START_DAY: Long = LocalDate.of(2026, 8, 4).toEpochDay() // 20669
 
     /** Floors the usual [LOOKBACK_DAYS] window at [EPOCH_START_DAY] — bounds healer grant/heal/
      * activation eligibility only. Use [rawStreakStartEpochDay] for the visible day-count. */

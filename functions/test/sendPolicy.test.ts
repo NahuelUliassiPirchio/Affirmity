@@ -34,6 +34,7 @@ const baseInput = {
   },
   moodDeliveredAtMillis: null as number | null,
   familyAlreadyDeliveredToday: false,
+  meditationReturnDeliveredToday: false,
 };
 
 describe('evaluateSendEligibility', () => {
@@ -99,6 +100,95 @@ describe('evaluateSendEligibility', () => {
         { epochDay: LOCAL_DAY, meditationDone: true, affirmationDone: true },
       ],
     });
+
+    expect(result).toEqual({ eligible: false, reason: 'streak-no-longer-at-risk' });
+  });
+
+  it('lets a streak task through as a goal nudge when exactly one activity is done today, even at streak 0', () => {
+    const result = evaluateSendEligibility({
+      ...baseInput,
+      channel: 'streak',
+      completions: [{ epochDay: LOCAL_DAY, meditationDone: false, affirmationDone: true }],
+    });
+
+    expect(result).toEqual({ eligible: true });
+  });
+
+  describe('goal nudge supersession', () => {
+    // Healer fires: two days ago held, yesterday missed, none healed. Today: only affirmations done.
+    const healerWouldFire = [
+      { epochDay: LOCAL_DAY - 3, meditationDone: true, affirmationDone: true },
+      { epochDay: LOCAL_DAY - 2, meditationDone: true, affirmationDone: true },
+    ];
+    const missingMeditation = { epochDay: LOCAL_DAY, meditationDone: false, affirmationDone: true };
+    const missingAffirmations = { epochDay: LOCAL_DAY, meditationDone: true, affirmationDone: false };
+
+    it('skips the nudge when the healer alert would fire today', () => {
+      const result = evaluateSendEligibility({
+        ...baseInput,
+        channel: 'streak',
+        completions: [...healerWouldFire, missingMeditation],
+      });
+
+      expect(result).toEqual({ eligible: false, reason: 'nudge-superseded-by-healer' });
+    });
+
+    it('still sends the nudge when the healer toggle is off', () => {
+      const result = evaluateSendEligibility({
+        ...baseInput,
+        channel: 'streak',
+        settings: { ...enabledSettings, healerEnabled: false },
+        completions: [...healerWouldFire, missingMeditation],
+      });
+
+      expect(result).toEqual({ eligible: true });
+    });
+
+    it('still sends the nudge when the healer would not fire', () => {
+      const result = evaluateSendEligibility({
+        ...baseInput,
+        channel: 'streak',
+        completions: [missingMeditation],
+      });
+
+      expect(result).toEqual({ eligible: true });
+    });
+
+    it('skips a missing-meditation nudge when meditation_return was delivered today', () => {
+      const result = evaluateSendEligibility({
+        ...baseInput,
+        channel: 'streak',
+        meditationReturnDeliveredToday: true,
+        completions: [missingMeditation],
+      });
+
+      expect(result).toEqual({ eligible: false, reason: 'nudge-superseded-by-meditation-return' });
+    });
+
+    it('still sends a missing-meditation nudge when meditation_return was not delivered', () => {
+      const result = evaluateSendEligibility({
+        ...baseInput,
+        channel: 'streak',
+        completions: [missingMeditation],
+      });
+
+      expect(result).toEqual({ eligible: true });
+    });
+
+    it('still sends a missing-affirmations nudge even if meditation_return was delivered', () => {
+      const result = evaluateSendEligibility({
+        ...baseInput,
+        channel: 'streak',
+        meditationReturnDeliveredToday: true,
+        completions: [missingAffirmations],
+      });
+
+      expect(result).toEqual({ eligible: true });
+    });
+  });
+
+  it('skips a streak task when nothing was done and no streak is live', () => {
+    const result = evaluateSendEligibility({ ...baseInput, channel: 'streak' });
 
     expect(result).toEqual({ eligible: false, reason: 'streak-no-longer-at-risk' });
   });

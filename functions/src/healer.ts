@@ -14,10 +14,10 @@ export interface HealerUse {
 /** How far back to look when deriving healer eligibility -- mirrors `StreakHealerStats.LOOKBACK_DAYS`. */
 export const HEALER_LOOKBACK_DAYS = 370;
 
-/** This feature's release day (2026-08-04, UTC-calendar-aligned epoch day) -- mirrors
+/** This feature's release day: local calendar date 2026-08-04 (epoch day 20669) -- mirrors
  * `StreakHealerStats.EPOCH_START_DAY`. Completion history from before it can never retroactively
  * grant a healer. */
-export const HEALER_EPOCH_START_DAY = Math.floor(Date.UTC(2026, 7, 4) / 86_400_000);
+export const HEALER_EPOCH_START_DAY = 20669;
 
 /** Floors the usual [HEALER_LOOKBACK_DAYS] window at [HEALER_EPOCH_START_DAY]. */
 export function healerStartEpochDay(todayEpochDay: number): number {

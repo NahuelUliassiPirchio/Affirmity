@@ -254,6 +254,29 @@ class FirebaseAnalyticsLoggerTest {
     }
 
     @Test
+    fun `milestone_celebrated maps milestone_days as a number`() {
+        val logged = log(AnalyticsEvent.MilestoneCelebrated(7))
+        assertEquals("milestone_celebrated", logged.name)
+        assertEquals(listOf(AnalyticsParamValue.Number("milestone_days", 7L)), logged.params)
+    }
+
+    @Test
+    fun `day_risk_dialog events map variant and action`() {
+        val shown = log(AnalyticsEvent.DayRiskDialogShown(DayRiskDialogVariant.STREAK_AT_RISK))
+        assertEquals("day_risk_dialog_shown", shown.name)
+        assertEquals(listOf(AnalyticsParamValue.Text("dialog_variant", "streak_at_risk")), shown.params)
+        val action = log(AnalyticsEvent.DayRiskDialogAction(DayRiskDialogVariant.GOAL_INCOMPLETE, DayRiskDialogChoice.CTA))
+        assertEquals("day_risk_dialog_action", action.name)
+        assertEquals(
+            listOf(
+                AnalyticsParamValue.Text("dialog_variant", "goal_incomplete"),
+                AnalyticsParamValue.Text("action", "cta"),
+            ),
+            action.params,
+        )
+    }
+
+    @Test
     fun `notification_opened maps family, variant_key, destination, locale`() {
         val logged = log(
             AnalyticsEvent.NotificationOpened(

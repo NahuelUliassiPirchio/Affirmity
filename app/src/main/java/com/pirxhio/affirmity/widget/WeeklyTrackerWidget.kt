@@ -2,6 +2,7 @@ package com.pirxhio.affirmity.widget
 
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import android.util.TypedValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
@@ -49,6 +50,10 @@ import com.pirxhio.affirmity.AppDestinations
 import com.pirxhio.affirmity.EXTRA_START_DESTINATION
 import com.pirxhio.affirmity.MainActivity
 import com.pirxhio.affirmity.data.DayClock
+import com.pirxhio.affirmity.data.DayRiskEvaluator
+import com.pirxhio.affirmity.data.DayRiskState
+import com.pirxhio.affirmity.personalization.goals.UserGoalsPreferences
+import kotlinx.coroutines.flow.first
 import com.pirxhio.affirmity.data.StreakHealerStats
 import com.pirxhio.affirmity.data.local.ActivityOwnerEntity
 import com.pirxhio.affirmity.data.local.AffirmityDatabase
@@ -56,6 +61,9 @@ import com.pirxhio.affirmity.data.local.DailyCompletionEntity
 import com.pirxhio.affirmity.data.remote.FirestoreDailyCompletionRepository
 import com.pirxhio.affirmity.data.remote.FirestorePaths
 import com.pirxhio.affirmity.data.remote.FirestoreStreakHealerRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -93,8 +101,10 @@ class WeeklyTrackerWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val today = DayClock.epochDay()
-        val weekStart = DayClock.rollingWindowStartEpochDay()
+        // One clock snapshot: `today` and `minuteOfDay` must agree even across the Firestore awaits below.
+        val now = Calendar.getInstance()
+        val today = DayClock.epochDay(now)
+        val weekStart = DayClock.rollingWindowStartEpochDay(now)
         // Resolved fresh from `context.resources` on every call, never cached at the top level or
         // in a companion object (D6/D8): the widget's Context reflects the per-app locale on API
         // 33+, and this stays correct since it's read at the same moment `provideGlance` runs.
@@ -148,6 +158,21 @@ class WeeklyTrackerWidget : GlanceAppWidget() {
         }
         val rows = allRows.filter { it.epochDay in weekStart..(weekStart + 6) }
         val todayIndex = (today - weekStart).toInt().coerceIn(0, 6)
+        // Evaluated at render time with the device-local clock, so any refresh after 20:00 shows the band.
+        val todayRow = allRows.firstOrNull { it.epochDay == today }
+        val riskState = DayRiskEvaluator.evaluate(
+            meditationDone = todayRow?.meditationDone ?: false,
+            affirmationDone = todayRow?.affirmationDone ?: false,
+            generalStreakDays = generalStreakDays,
+            minuteOfDay = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE),
+        )
+        val tone = try {
+            UserGoalsPreferences(context).observePreferredTone().first()
+        } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
 
         provideContent {
             WeeklyTrackerContent(
@@ -159,6 +184,8 @@ class WeeklyTrackerWidget : GlanceAppWidget() {
                 generalStreakDays = generalStreakDays,
                 isTodayDone = isTodayDone,
                 healedDays = healedDays,
+                riskState = riskState,
+                tone = tone,
             )
         }
     }
@@ -175,8 +202,11 @@ internal fun WeeklyTrackerContent(
     generalStreakDays: Int = 0,
     isTodayDone: Boolean = false,
     healedDays: Set<Long> = emptySet(),
+    riskState: DayRiskState = DayRiskState.Done,
+    tone: String? = null,
 ) {
     val context = LocalContext.current
+    val band = if (hasAny) widgetBandFor(riskState, tone) else widgetBandFor(DayRiskState.Done, tone)
     val tapIntent = Intent(context, MainActivity::class.java).apply {
         setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         putExtra(EXTRA_START_DESTINATION, AppDestinations.AFIRMACIONES.name)
@@ -185,20 +215,51 @@ internal fun WeeklyTrackerContent(
     val streakVisible = hasAny && generalStreakDays > 0
     val layout = computeTrackerLayout(size.width.value, size.height.value, streakVisible, spToDpFor(context))
     val a11y = trackerA11yStrings(context, generalStreakDays)
+    // End-of-day takeover: the band recolors the whole card and its message becomes the headline.
+    val bandMessage = band.messageRes?.let { context.getString(it) }
+    val takeover = hasAny && bandMessage != null
+    val takeoverLayout = if (takeover) {
+        computeTakeoverLayout(size.width.value, size.height.value, streakVisible, bandMessage.length, spToDpFor(context))
+    } else {
+        null
+    }
+    val cardBackground = when (band.strength) {
+        BandStrength.Soft -> com.pirxhio.affirmity.R.drawable.widget_card_bg_soft
+        BandStrength.Warm -> com.pirxhio.affirmity.R.drawable.widget_card_bg_warm
+        BandStrength.None -> com.pirxhio.affirmity.R.drawable.widget_card_bg
+    }
 
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(ImageProvider(com.pirxhio.affirmity.R.drawable.widget_card_bg))
-            .padding(layout.padding.dp)
+            .background(ImageProvider(cardBackground))
+            .padding((takeoverLayout?.padding ?: layout.padding).dp)
             .clickable(actionStartActivity(tapIntent))
-            .semantics { contentDescription = widgetDescription(hasAny, generalStreakDays, isTodayDone, a11y) },
+            .semantics {
+                val base = widgetDescription(hasAny, generalStreakDays, isTodayDone, a11y)
+                contentDescription = bandMessage?.let {
+                    "$base. " + context.getString(com.pirxhio.affirmity.R.string.widget_band_a11y, it)
+                } ?: base
+            },
         contentAlignment = Alignment.Center,
     ) {
         if (!hasAny) {
             EmptyState(compact = size.height < 76.dp)
+        } else if (takeoverLayout != null && bandMessage != null) {
+            TakeoverContent(
+                layout = takeoverLayout,
+                band = band,
+                message = bandMessage,
+                streak = StreakInfo(generalStreakDays, isTodayDone, band),
+                rows = rows,
+                weekStart = weekStart,
+                todayIndex = todayIndex,
+                dayLetters = dayLetters,
+                healedDays = healedDays,
+                a11y = a11y,
+            )
         } else {
-            val streak = StreakInfo(generalStreakDays, isTodayDone)
+            val streak = StreakInfo(generalStreakDays, isTodayDone, band)
             Column(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
                 if (layout.tier == WidgetTier.Tall) {
                     TallHeader(layout, streak)
@@ -213,7 +274,9 @@ internal fun WeeklyTrackerContent(
                     }
                     WeekGrid(
                         modifier = GlanceModifier.defaultWeight(),
-                        layout = layout,
+                        cellDiameter = layout.cellDiameter,
+                        showLetters = layout.showLetters,
+                        letterSizeSp = layout.letterSizeSp,
                         rows = rows,
                         weekStart = weekStart,
                         todayIndex = todayIndex,
@@ -250,7 +313,7 @@ private fun spToDpFor(context: Context): (Float) -> Float {
     return { sp -> TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, metrics) / metrics.density }
 }
 
-private data class StreakInfo(val days: Int, val isTodayDone: Boolean)
+private data class StreakInfo(val days: Int, val isTodayDone: Boolean, val band: WidgetBand)
 
 private fun trackerA11yStrings(context: Context, streakDays: Int): TrackerA11yStrings {
     return TrackerA11yStrings(
@@ -301,18 +364,24 @@ private fun TallHeader(layout: TrackerLayout, streak: StreakInfo) {
     Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
         Column(modifier = GlanceModifier.defaultWeight()) {
             if (layout.streakPlacement == StreakPlacement.Header) {
-                StreakCounter(streak, flameSize = 34.dp, numberSize = TALL_STREAK_SP.sp)
-                val status = context.getString(
-                    if (streak.isTodayDone) com.pirxhio.affirmity.R.string.widget_today_done
-                    else com.pirxhio.affirmity.R.string.widget_today_pending,
-                )
-                Text(
-                    text = "${context.getString(streakUnitRes(streak.days))} · $status",
-                    // One line only: the layout reserves a single caption line (the widget's
-                    // content description still carries the full streak and status text).
-                    maxLines = 1,
-                    style = TextStyle(fontSize = TALL_CAPTION_SP.sp, color = GlanceColorProvider(STREAK_CAPTION_COLOR)),
-                )
+                Column {
+                    StreakCounter(streak, flameSize = 34.dp, numberSize = TALL_STREAK_SP.sp)
+                    val status = context.getString(
+                        if (streak.isTodayDone) com.pirxhio.affirmity.R.string.widget_today_done
+                        else com.pirxhio.affirmity.R.string.widget_today_pending,
+                    )
+                    Text(
+                        text = "${context.getString(streakUnitRes(streak.days))} · $status",
+                        // One line only: the layout reserves a single caption line (the widget's
+                        // content description still carries the full streak and status text).
+                        maxLines = 1,
+                        style = TextStyle(
+                            fontSize = TALL_CAPTION_SP.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = GlanceColorProvider(STREAK_CAPTION_COLOR),
+                        ),
+                    )
+                }
             }
         }
         Column(modifier = GlanceModifier.padding(top = 4.dp)) {
@@ -328,7 +397,7 @@ private fun TallHeader(layout: TrackerLayout, streak: StreakInfo) {
  */
 @androidx.compose.runtime.Composable
 private fun StreakCounter(streak: StreakInfo, flameSize: Dp, numberSize: TextUnit) {
-    val lit = streak.isTodayDone
+    val lit = streak.isTodayDone || streak.band.visible
     Row(verticalAlignment = Alignment.CenterVertically) {
         Image(
             provider = ImageProvider(
@@ -338,7 +407,7 @@ private fun StreakCounter(streak: StreakInfo, flameSize: Dp, numberSize: TextUni
             contentDescription = null,
             modifier = GlanceModifier.size(flameSize),
             colorFilter = androidx.glance.ColorFilter.tint(
-                GlanceColorProvider(if (lit) FLAME_LIT_COLOR else FLAME_DIM_COLOR),
+                GlanceColorProvider(streak.band.flameColor?.let { Color(it) } ?: if (lit) FLAME_LIT_COLOR else FLAME_DIM_COLOR),
             ),
         )
         Spacer(modifier = GlanceModifier.width(STREAK_FLAME_GAP_DP.dp))
@@ -347,9 +416,75 @@ private fun StreakCounter(streak: StreakInfo, flameSize: Dp, numberSize: TextUni
             style = TextStyle(
                 fontSize = numberSize,
                 fontWeight = FontWeight.Medium,
-                color = GlanceColorProvider(if (lit) TEXT_COLOR else STREAK_PENDING_NUMBER_COLOR),
+                color = GlanceColorProvider(if (streak.band.visible) Color(WidgetBandPalette.NUMBER_ON_BAND) else if (lit) TEXT_COLOR else STREAK_PENDING_NUMBER_COLOR),
             ),
         )
+    }
+}
+
+/**
+ * End-of-day takeover body: the flame and the band message as the headline, with the streak and
+ * the week grid underneath as secondary context. Letters and the streak are recolored from the
+ * ember family so they keep AA contrast on the ember ground (see `WidgetBandTest`).
+ */
+@androidx.compose.runtime.Composable
+private fun TakeoverContent(
+    layout: TakeoverLayout,
+    band: WidgetBand,
+    message: String,
+    streak: StreakInfo,
+    rows: List<DailyCompletionEntity>,
+    weekStart: Long,
+    todayIndex: Int,
+    dayLetters: List<String>,
+    healedDays: Set<Long>,
+    a11y: TrackerA11yStrings,
+) {
+    Column(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Image(
+                provider = ImageProvider(com.pirxhio.affirmity.R.drawable.ic_streak_flame),
+                contentDescription = null,
+                modifier = GlanceModifier.size(layout.flameDp.dp),
+                colorFilter = androidx.glance.ColorFilter.tint(
+                    GlanceColorProvider(Color(band.flameColor ?: WidgetBandPalette.EMBER_ACCENT)),
+                ),
+            )
+            Spacer(modifier = GlanceModifier.width(TAKEOVER_FLAME_GAP_DP.dp))
+            Text(
+                text = message,
+                modifier = GlanceModifier.defaultWeight(),
+                // The layout reserved exactly this many lines; Glance cuts the text beyond them.
+                maxLines = layout.messageMaxLines,
+                style = TextStyle(
+                    fontSize = layout.messageSp.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = GlanceColorProvider(Color(band.messageColor ?: WidgetBandPalette.EMBER_ACCENT)),
+                ),
+            )
+        }
+        if (layout.showGrid) {
+            Spacer(modifier = GlanceModifier.height(TAKEOVER_GRID_GAP_DP.dp))
+            Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                if (layout.showStreak) {
+                    StreakCounter(streak, flameSize = STRIP_STREAK_FLAME_DP.dp, numberSize = STRIP_STREAK_SP.sp)
+                    Spacer(modifier = GlanceModifier.width(TAKEOVER_STREAK_GAP_DP.dp))
+                }
+                WeekGrid(
+                    modifier = GlanceModifier.defaultWeight(),
+                    cellDiameter = layout.cellDiameter,
+                    showLetters = layout.showLetters,
+                    letterSizeSp = layout.letterSizeSp,
+                    rows = rows,
+                    weekStart = weekStart,
+                    todayIndex = todayIndex,
+                    dayLetters = dayLetters,
+                    healedDays = healedDays,
+                    a11y = a11y,
+                    letterColor = STREAK_CAPTION_COLOR,
+                )
+            }
+        }
     }
 }
 
@@ -404,13 +539,16 @@ private fun HalfDisc(left: Boolean, color: Color, size: Dp) {
 @androidx.compose.runtime.Composable
 private fun WeekGrid(
     modifier: GlanceModifier,
-    layout: TrackerLayout,
+    cellDiameter: Int,
+    showLetters: Boolean,
+    letterSizeSp: Int,
     rows: List<DailyCompletionEntity>,
     weekStart: Long,
     todayIndex: Int,
     dayLetters: List<String>,
     healedDays: Set<Long>,
     a11y: TrackerA11yStrings,
+    letterColor: Color = LETTER_COLOR,
 ) {
     val context = LocalContext.current
     val byDay = rows.associateBy { it.epochDay }
@@ -426,7 +564,7 @@ private fun WeekGrid(
                 val healed = epochDay in healedDays
                 Box(modifier = GlanceModifier.defaultWeight(), contentAlignment = Alignment.Center) {
                     DayCell(
-                        diameter = layout.cellDiameter.dp,
+                        diameter = cellDiameter.dp,
                         isToday = isToday,
                         affirmationDone = affirmed,
                         meditationDone = meditated,
@@ -436,7 +574,7 @@ private fun WeekGrid(
                 }
             }
         }
-        if (layout.showLetters) {
+        if (showLetters) {
             Spacer(modifier = GlanceModifier.height(4.dp))
             Row(modifier = GlanceModifier.fillMaxWidth()) {
                 for (offset in 0 until 7) {
@@ -445,9 +583,9 @@ private fun WeekGrid(
                         text = dayLetters.getOrElse(offset) { "" },
                         modifier = GlanceModifier.defaultWeight(),
                         style = TextStyle(
-                            fontSize = layout.letterSizeSp.sp,
+                            fontSize = letterSizeSp.sp,
                             fontWeight = if (isToday) FontWeight.Medium else FontWeight.Normal,
-                            color = GlanceColorProvider(if (isToday) TEXT_COLOR else LETTER_COLOR),
+                            color = GlanceColorProvider(if (isToday) TEXT_COLOR else letterColor),
                             textAlign = TextAlign.Center,
                         ),
                     )
@@ -509,10 +647,26 @@ class WeeklyTrackerWidgetReceiver : GlanceAppWidgetReceiver() {
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
         DayRolloverWorker.enqueue(context)
+        DayRiskThresholdWorker.ensureScheduled(context)
+    }
+
+    // onEnabled only fires for the first instance; this also heals installs updated in place.
+    override fun onUpdate(context: Context, appWidgetManager: android.appwidget.AppWidgetManager, appWidgetIds: IntArray) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
+        // A time-zone / clock change can happen while the app is dead: recompute both delays.
+        // No goAsync() here: super.onUpdate already claimed the PendingResult, so a second call
+        // returns null. The reschedule is short; if the process dies first, the next onUpdate retries.
+        CoroutineScope(Dispatchers.Default).launch {
+            runCatching {
+                DayRolloverWorker.rescheduleForClockChange(context.applicationContext)
+                DayRiskThresholdWorker.rescheduleForClockChange(context.applicationContext)
+            }.onFailure { Log.w("WeeklyTrackerReceiver", "Reschedule after clock change failed", it) }
+        }
     }
 
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
         DayRolloverWorker.cancel(context)
+        DayRiskThresholdWorker.cancel(context)
     }
 }

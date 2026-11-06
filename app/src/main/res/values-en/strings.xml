@@ -191,6 +191,30 @@
     <string name="healer_granted_explanation">Each healer protects one missed day when you activate it the following day. You can save up to two healers, and each non-overlapping pair of complete days earns one. While you hold two, earning progress stops; after spending, start a fresh two-day pair. Your overall streak needs an affirmation OR a meditation each day. A healer only covers yesterday, so today still needs its own activity.</string>
     <string name="healer_granted_confirm_button">Got it</string>
     <string name="healer_granted_icon_content_description">Streak healer icon</string>
+    <string name="streak_milestone_title">%1$d days in a row!</string>
+    <string name="streak_milestone_subtitle_3">Your practice is starting to take shape.</string>
+    <string name="streak_milestone_subtitle_7">A whole week of showing up.</string>
+    <string name="streak_milestone_subtitle_14">Two weeks: this is a habit in motion.</string>
+    <string name="streak_milestone_subtitle_30">A month of caring for yourself every day.</string>
+    <string name="streak_milestone_subtitle_60">Two months of consistency. It shows.</string>
+    <string name="streak_milestone_subtitle_100">One hundred days of practice. That\'s huge.</string>
+    <string name="streak_milestone_subtitle_180">Half a year keeping your practice going.</string>
+    <string name="streak_milestone_subtitle_365">A full year. Thank you for choosing yourself every day.</string>
+    <string name="streak_milestone_explanation_next">Each day counts with one affirmation or meditation. Your next goal: %1$d days.</string>
+    <string name="streak_milestone_explanation_final">Keep your own pace: every day adds up.</string>
+    <string name="streak_milestone_confirm_button">Keep going</string>
+    <string name="streak_milestone_icon_content_description">Streak milestone icon</string>
+    <string name="progress_milestones_title">Streak milestones</string>
+    <plurals name="progress_milestones_next">
+        <item quantity="one">%1$d day to go until %2$d</item>
+        <item quantity="other">%1$d days to go until %2$d</item>
+    </plurals>
+    <string name="progress_milestones_all_reached">You reached every milestone</string>
+    <string name="progress_milestone_reached_content_description">%1$d days: reached</string>
+    <string name="progress_milestone_locked_content_description">%1$d days: locked</string>
+    <string name="day_risk_dialog_cta_meditate">Meditate now</string>
+    <string name="day_risk_dialog_cta_affirmations">See affirmations</string>
+    <string name="day_risk_dialog_later">Later</string>
     <string name="progress_weekly_streak_format">Streak: %1$d days</string>
     <string name="history_calendar_title_affirmations">Affirmations history</string>
     <string name="history_calendar_title_meditation">Meditation history</string>
@@ -338,6 +362,20 @@
     <string name="widget_streak_unit_one">day streak</string>
     <string name="widget_today_done">today done</string>
     <string name="widget_today_pending">today still open</string>
+    <!-- Widget end-of-day band: one short line per tone and state -->
+    <string name="widget_band_soft_meditation">There\'s still time to meditate</string>
+    <string name="widget_band_soft_affirmation">There\'s still time for your affirmations</string>
+    <string name="widget_band_soft_risk">Your streak is alive until midnight</string>
+    <string name="widget_band_direct_meditation">Today\'s meditation is still left</string>
+    <string name="widget_band_direct_affirmation">Today\'s affirmations are still left</string>
+    <string name="widget_band_direct_risk">Streak ends tonight. A minute is enough</string>
+    <string name="widget_band_powerful_meditation">Close the day with a meditation</string>
+    <string name="widget_band_powerful_affirmation">Close the day with your affirmations</string>
+    <string name="widget_band_powerful_risk">Hold your streak. You\'ve got this</string>
+    <string name="widget_band_manifestation_meditation">Open up to a moment of calm</string>
+    <string name="widget_band_manifestation_affirmation">Open up to today\'s affirmations</string>
+    <string name="widget_band_manifestation_risk">Your streak asks for one moment today</string>
+    <string name="widget_band_a11y">End-of-day reminder: %1$s</string>
 
     <string name="affirmation_group_badge_premium">Premium</string>
     <string name="affirmation_group_badge_ad">Pro only</string>

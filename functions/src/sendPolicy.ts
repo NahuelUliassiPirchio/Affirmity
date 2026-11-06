@@ -3,6 +3,7 @@ import { localInstantMillis, localMinuteOfDay } from './localDay';
 import { shouldFireMeditationReturn, type MeditationReturnState } from './meditationReturn';
 import type { NotificationChannel } from './planner';
 import { isWithinQuietHours } from './schedule';
+import { missingDayGoalActivity } from './dayGoal';
 import { shouldFireStreakAlert, type Completion } from './streak';
 
 const SEND_SKIP_REASON = {
@@ -19,6 +20,10 @@ const SEND_SKIP_REASON = {
   ACTIVITY_ALREADY_DONE: 'activity-already-done',
   /** design §4 (`meditation-return`'s own send-time re-check, matching the plan-time decision). */
   MEDITATION_RETURN_NOT_DUE: 'meditation-return-not-due',
+  /** Goal nudge would collide with the healer alert that fires at the same 20:00 slot. */
+  NUDGE_SUPERSEDED_BY_HEALER: 'nudge-superseded-by-healer',
+  /** "Missing meditation" nudge is redundant once meditation_return already went out today. */
+  NUDGE_SUPERSEDED_BY_MEDITATION_RETURN: 'nudge-superseded-by-meditation-return',
 } as const;
 
 /** design §3 row: "Mood <2h ago postpones/suppresses Compass" -- send-time half. */
@@ -72,6 +77,8 @@ export interface SendEligibilityInput {
   /** From `notificationDeliveries/{localDay}.families[channel]` presence -- the generic "≤1
    *  delivery per family per local day" frequency cap (design §3 table). */
   familyAlreadyDeliveredToday: boolean;
+  /** From `notificationDeliveries/{localDay}.families.meditation_return` presence. */
+  meditationReturnDeliveredToday: boolean;
 }
 
 export interface SendEligibilityResult {
@@ -129,8 +136,21 @@ export function evaluateSendEligibility(input: SendEligibilityInput): SendEligib
   if (!notificationTtl(input.channel, input.localDay, zone, input.nowMillis)) {
     return { eligible: false, reason: SEND_SKIP_REASON.TARGET_DAY_EXPIRED };
   }
-  if (input.channel === 'streak' && !shouldFireStreakAlert(input.completions, input.localDay)) {
-    return { eligible: false, reason: SEND_SKIP_REASON.STREAK_NO_LONGER_AT_RISK };
+  // Streak family: the at-risk alert (nothing done yet, streak live) OR the goal-incomplete nudge
+  // (exactly one activity done). Mirrors the client's `DayRiskEvaluator`; anything else is skipped.
+  if (input.channel === 'streak' && !shouldFireStreakAlert(input.completions, input.localDay, input.healerUses)) {
+    const missing = missingDayGoalActivity(input.completions, input.localDay);
+    if (missing === null) {
+      return { eligible: false, reason: SEND_SKIP_REASON.STREAK_NO_LONGER_AT_RISK };
+    }
+    // Nudge-only branch: yield to the healer alert (same 20:00 slot) and to a meditation_return
+    // already delivered today (19:00) when the nudge would ask for meditation again.
+    if (input.settings.healerEnabled && shouldFireHealerAlert(input.completions, input.healerUses, input.localDay)) {
+      return { eligible: false, reason: SEND_SKIP_REASON.NUDGE_SUPERSEDED_BY_HEALER };
+    }
+    if (missing === 'meditation' && input.meditationReturnDeliveredToday) {
+      return { eligible: false, reason: SEND_SKIP_REASON.NUDGE_SUPERSEDED_BY_MEDITATION_RETURN };
+    }
   }
   if (
     input.channel === 'healer' &&

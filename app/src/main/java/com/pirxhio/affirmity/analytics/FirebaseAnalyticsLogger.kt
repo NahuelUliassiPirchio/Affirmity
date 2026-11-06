@@ -104,6 +104,16 @@ class FirebaseAnalyticsLogger(private val sink: FirebaseAnalyticsSink) : Analyti
         is AnalyticsEvent.RoundInterstitialSkipped -> listOf(
             text(AnalyticsParam.SKIP_REASON, event.reason.name),
         )
+        is AnalyticsEvent.MilestoneCelebrated -> listOf(
+            number(AnalyticsParam.MILESTONE_DAYS, event.milestoneDays.toLong()),
+        )
+        is AnalyticsEvent.DayRiskDialogShown -> listOf(
+            text(AnalyticsParam.DIALOG_VARIANT, event.variant.wireName),
+        )
+        is AnalyticsEvent.DayRiskDialogAction -> listOf(
+            text(AnalyticsParam.DIALOG_VARIANT, event.variant.wireName),
+            text(AnalyticsParam.ACTION, event.choice.wireName),
+        )
     }
 
     /** Shared param mapping for the three notification_* events (design §9): all four declared

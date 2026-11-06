@@ -431,4 +431,41 @@ class WeeklyTrackerLayoutTest {
     fun widgetDescription_emptyStateReadsPrompt() {
         assertEquals("Start today", widgetDescription(false, 0, false, strings))
     }
+
+    // Longest shipped band copy is about 42 characters.
+    private val longMessage = 42
+
+    @Test
+    fun `takeover on a regular widget keeps a two-line headline and the grid`() {
+        val layout = computeTakeoverLayout(250f, 110f, streakVisible = true, messageLength = longMessage)
+        assertTrue(layout.showGrid)
+        assertTrue(layout.messageSp >= 16f)
+        assertTrue(layout.messageMaxLines in 1..2)
+        assertTrue(layout.cellDiameter >= 10)
+    }
+
+    @Test
+    fun `takeover on a tall widget shows letters and the streak`() {
+        val layout = computeTakeoverLayout(380f, 210f, streakVisible = true, messageLength = longMessage)
+        assertTrue(layout.showGrid && layout.showStreak && layout.showLetters)
+        assertEquals(22f, layout.messageSp)
+    }
+
+    @Test
+    fun `takeover on the smallest strip drops the grid but keeps a readable message`() {
+        val layout = computeTakeoverLayout(180f, 56f, streakVisible = true, messageLength = longMessage)
+        assertFalse(layout.showGrid)
+        assertTrue(layout.messageSp >= 13f)
+        assertTrue(layout.messageMaxLines in 1..2)
+    }
+
+    @Test
+    fun `takeover content always fits the widget height`() {
+        for (w in listOf(160f, 250f, 320f, 400f)) for (h in listOf(50f, 76f, 110f, 150f, 220f)) {
+            val l = computeTakeoverLayout(w, h, streakVisible = true, messageLength = longMessage)
+            var used = l.messageMaxLines * l.messageSp * 1.2f
+            if (l.showGrid) used += TAKEOVER_GRID_GAP_DP + l.cellDiameter + 6f + (if (l.showLetters) 4f + 11f * 1.2f else 0f)
+            assertTrue("${w}x$h used $used of ${h - 2 * l.padding}", used <= h - 2 * l.padding + 0.5f || !l.showGrid)
+        }
+    }
 }

@@ -340,6 +340,102 @@ describe('sendNotification', () => {
     expect(boundary.messagingSend).not.toHaveBeenCalled();
   });
 
+  describe('streak goal-incomplete nudge', () => {
+    const nudgeVariants = [
+      makeVariant({ key: 'n_aff_soft', family: 'streak', context: ['goal_missing_affirmations', 'tone_soft'], locales: { es: { title: 'Soft ES', body: 'b' }, en: { title: 'Soft EN', body: 'b' } } }),
+      makeVariant({ key: 'n_aff_direct', family: 'streak', context: ['goal_missing_affirmations', 'tone_direct'] }),
+      makeVariant({ key: 'n_aff_neutral', family: 'streak', context: ['goal_missing_affirmations', 'tone_neutral'], locales: { es: { title: 'Neutral ES', body: 'b' }, en: { title: 'Neutral EN', body: 'b' } } }),
+      makeVariant({ key: 'n_med_neutral', family: 'streak', context: ['goal_missing_meditation', 'tone_neutral'] }),
+    ];
+    const meditatedOnly = [{ epochDay: LOCAL_DAY, meditationDone: true, affirmationDone: false }];
+    const sentData = () => boundary.messagingSend.mock.calls[0][0].data as Record<string, string>;
+
+    it('sends the tone variant for the missing activity even with a zero streak', async () => {
+      const state = baseState({
+        settings: { ...baseState().settings, preferredTone: 'soft' },
+        completions: meditatedOnly,
+        catalogVariants: nudgeVariants,
+      });
+      boundary.messagingSend.mockResolvedValue('message-id');
+
+      await invoke(task('streak'), state);
+
+      expect(sentData()).toMatchObject({
+        channel: 'streak',
+        title: 'Soft ES',
+        variantKey: 'n_aff_soft',
+        streakKind: 'goal_incomplete',
+        destination: 'streak_action',
+      });
+      expect(sentData().streakCount).toBeUndefined();
+    });
+
+    it.each([[undefined], ['bogus'], [42]])('falls back to the neutral variant for tone %s', async (tone) => {
+      const state = baseState({
+        settings: { ...baseState().settings, preferredTone: tone },
+        completions: meditatedOnly,
+        catalogVariants: nudgeVariants,
+      });
+      boundary.messagingSend.mockResolvedValue('message-id');
+
+      await invoke(task('streak'), state);
+
+      expect(sentData().variantKey).toBe('n_aff_neutral');
+    });
+
+    it('falls back to neutral when the tone has no variant for that activity', async () => {
+      const state = baseState({
+        settings: { ...baseState().settings, preferredTone: 'powerful' },
+        completions: meditatedOnly,
+        catalogVariants: nudgeVariants,
+      });
+      boundary.messagingSend.mockResolvedValue('message-id');
+
+      await invoke(task('streak'), state);
+
+      expect(sentData().variantKey).toBe('n_aff_neutral');
+    });
+
+    it('skips without sending or logging a delivery when the catalog has no goal_incomplete variant', async () => {
+      const state = baseState({
+        completions: meditatedOnly,
+        catalogVariants: [makeVariant({ key: 'other', family: 'streak', context: ['streak_generic'] })],
+      });
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const response = await invoke({ ...task('streak'), title: 'Legacy', body: 'Legacy' }, state);
+
+      expect(response.status).toHaveBeenCalledWith(200);
+      expect(response.send).toHaveBeenCalledWith('Skipped: goal-nudge-copy-missing');
+      expect(boundary.messagingSend).not.toHaveBeenCalled();
+      expect(boundary.setWrites.filter((w) => w.path.includes('/notificationDeliveries/'))).toEqual([]);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('notification_copy_variant_missing'));
+      warn.mockRestore();
+    });
+
+    it('skips when nothing was done and there is no live streak', async () => {
+      const response = await invoke(task('streak'), baseState({ catalogVariants: nudgeVariants }));
+
+      expect(response.send).toHaveBeenCalledWith('Skipped: streak-no-longer-at-risk');
+      expect(boundary.messagingSend).not.toHaveBeenCalled();
+    });
+
+    it('leaves the at-risk alert unchanged (no nudge keys) when the streak is live and nothing is done', async () => {
+      const state = baseState({
+        settings: { ...baseState().settings, preferredTone: 'soft' },
+        completions: [{ epochDay: LOCAL_DAY - 1, meditationDone: true, affirmationDone: true }],
+        catalogVariants: nudgeVariants,
+      });
+      boundary.messagingSend.mockResolvedValue('message-id');
+
+      await invoke({ ...task('streak'), title: 'Legacy', data: { streakCount: '1' } }, state);
+
+      expect(sentData().streakKind).toBeUndefined();
+      expect(sentData().streakCount).toBe('1');
+      expect(sentData().title).toBe('Legacy');
+    });
+  });
+
   it('skips a healer alert after the healer was activated', async () => {
     const state = baseState({
       completions: [

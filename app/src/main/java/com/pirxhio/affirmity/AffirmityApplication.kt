@@ -1,6 +1,8 @@
 package com.pirxhio.affirmity
 
 import android.app.Application
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.media.RingtoneManager
@@ -9,6 +11,9 @@ import androidx.core.app.NotificationManagerCompat
 import com.pirxhio.affirmity.diagnostics.ProcessDiagnostics
 import com.pirxhio.affirmity.notifications.ChannelImportance
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
+import com.pirxhio.affirmity.widget.DayRiskThresholdWorker
+import com.pirxhio.affirmity.widget.DayRolloverWorker
+import com.pirxhio.affirmity.widget.WeeklyTrackerWidgetReceiver
 
 class AffirmityApplication : Application() {
 
@@ -18,6 +23,20 @@ class AffirmityApplication : Application() {
         ProcessDiagnostics.shared.applyStartupConsent(isDebugBuild = BuildConfig.DEBUG)
         createNotificationChannels()
         deleteRetiredNotificationChannels()
+        ensureWidgetWorkScheduled()
+    }
+
+    /**
+     * Widget receiver `onEnabled` fires only for the first instance ever added, so an in-place app
+     * update never re-arms the day jobs. Re-ensure them (KEEP, idempotent) when a tracker widget
+     * exists; the check is a synchronous AppWidgetManager query, so no Glance coroutine is needed.
+     */
+    private fun ensureWidgetWorkScheduled() {
+        val ids = AppWidgetManager.getInstance(this)
+            .getAppWidgetIds(ComponentName(this, WeeklyTrackerWidgetReceiver::class.java))
+        if (ids.isEmpty()) return
+        DayRolloverWorker.ensureScheduled(this)
+        DayRiskThresholdWorker.ensureScheduled(this)
     }
 
     /** Idempotent: re-creating a channel with the same id only updates name/description. Existing

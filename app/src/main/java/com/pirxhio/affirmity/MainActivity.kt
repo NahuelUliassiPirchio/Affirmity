@@ -16,6 +16,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -123,6 +125,10 @@ import com.pirxhio.affirmity.ui.groups.catalogThemesById
 import com.pirxhio.affirmity.ui.groups.isThemeToggleable
 import com.pirxhio.affirmity.ui.groups.themeAccessDecision
 import com.pirxhio.affirmity.ui.healer.StreakHealerGrantedScreen
+import com.pirxhio.affirmity.ui.milestone.StreakMilestoneScreen
+import com.pirxhio.affirmity.ui.streak.DayRiskCtaTarget
+import com.pirxhio.affirmity.ui.streak.DayRiskDialog
+import kotlinx.coroutines.flow.map
 import com.pirxhio.affirmity.ui.meditation.GuidedMeditationScreen
 import com.pirxhio.affirmity.ui.meditation.MeditationScreen
 import com.pirxhio.affirmity.ui.meditation.shouldShowMeditationBanner
@@ -926,6 +932,30 @@ fun AffirmityApp(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    // Day-anchored streak collectors re-read "today" on resume and on date/time-zone changes (the
+    // in-process midnight timer alone is not enough: delays do not advance while the device sleeps).
+    DisposableEffect(lifecycleOwner, context, appState) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) appState.refreshDay()
+        }
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: android.content.Context?, intent: android.content.Intent?) {
+                appState.refreshDay()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        val filter = android.content.IntentFilter().apply {
+            addAction(android.content.Intent.ACTION_TIMEZONE_CHANGED)
+            addAction(android.content.Intent.ACTION_DATE_CHANGED)
+            addAction(android.content.Intent.ACTION_TIME_CHANGED)
+        }
+        ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            context.unregisterReceiver(receiver)
+        }
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { notificationsPermissionGranted = NotificationManagerCompat.from(context).areNotificationsEnabled() }
@@ -1021,6 +1051,7 @@ fun AffirmityApp(
         autoShow = appState.shouldShowOnboardingGuide.value,
         manualShow = showOnboardingGuide,
         healerJustGranted = appState.healerJustGranted.value,
+        milestoneJustReached = appState.milestoneJustReached.value != null,
     )
 
     if (guideGateResolution == GuideGateResolution.AUTO_GUIDE) {
@@ -1599,6 +1630,23 @@ fun AffirmityApp(
         return
     }
 
+    if (guideGateResolution == GuideGateResolution.MILESTONE) {
+        BackHandler { appState.acknowledgeMilestone() }
+        val shownMilestone = appState.milestoneJustReached.value ?: 0
+        // Logged when the screen is actually displayed; keyed so it fires once per milestone.
+        LaunchedEffect(shownMilestone) {
+            if (shownMilestone > 0) {
+                appState.logAnalyticsEvent(AnalyticsEvent.MilestoneCelebrated(shownMilestone))
+            }
+        }
+        StreakMilestoneScreen(
+            milestoneDays = shownMilestone,
+            modifier = Modifier.fillMaxSize(),
+            onConfirm = { appState.acknowledgeMilestone() },
+        )
+        return
+    }
+
     NavigationSuiteScaffold(
         layoutType = if (chrome.showNavigation) {
             NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfo())
@@ -1625,7 +1673,41 @@ fun AffirmityApp(
             modifier = Modifier.fillMaxSize(),
             snackbarHost = { if (chrome.showSnackbar) SnackbarHost(snackbarHostState) },
         ) { innerPadding ->
+            val showsRacha = currentDestination == AppDestinations.AFIRMACIONES ||
+                currentDestination == AppDestinations.MEDITAR
+            val statusOverlayVisible = chrome.showStatusOverlay && (showsRacha ||
+                currentDestination == AppDestinations.ANIMO ||
+                currentDestination == AppDestinations.PROGRESO)
+            // Null until the tone flow has emitted, so the dialog never flashes the default copy.
+            val loadedTone by remember(userGoalsStore) {
+                userGoalsStore.observePreferredTone().map { LoadedTone(it) }
+            }.collectAsState(initial = null)
             Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize()) {
+            // Hoisted above the conditional so toggling the overlay does not re-log the exposure.
+            val shownLogKey = rememberSaveable { mutableStateOf<String?>(null) }
+            loadedTone?.takeIf { appState.dayRiskDismissalLoaded.value }?.let { loaded ->
+                // Lowest priority: the guide/healer/milestone gates above return before this
+                // scaffold composes, so the dialog can never share the screen with them.
+                if (chrome.showStatusOverlay) DayRiskDialog(
+                    meditationDone = appState.meditationStreak.value.completedDays.lastOrNull() == true,
+                    affirmationDone = appState.affirmationsStreak.value.completedDays.lastOrNull() == true,
+                    // Same value the weekly widget feeds the evaluator (healer-aware, through today once done).
+                    generalStreakDays = appState.streakHealer.value.generalStreakDays,
+                    tone = loaded.value,
+                    dismissedDay = appState.dayRiskBannerDismissedDay.value,
+                    shownLogKey = shownLogKey,
+                    onDismiss = appState::dismissDayRiskBanner,
+                    onCta = { target ->
+                        currentDestination = when (target) {
+                            DayRiskCtaTarget.MEDITATION -> AppDestinations.MEDITAR
+                            DayRiskCtaTarget.AFFIRMATIONS -> AppDestinations.AFIRMACIONES
+                        }
+                    },
+                    onEvent = appState::logAnalyticsEvent,
+                )
+            }
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when (currentDestination) {
                 AppDestinations.AFIRMACIONES -> {
                     // Docked, always-visible bottom sheet (feedback: the redesign must keep this
@@ -1962,6 +2044,7 @@ fun AffirmityApp(
                     meditationStreak = appState.meditationStreak.value,
                     streakHealer = appState.streakHealer.value,
                     onActivateHealer = { appState.activateStreakHealer() },
+                    bestMilestoneReached = appState.bestMilestoneReached.value,
                     observeEarliestCompletionEpochDay = { appState.observeEarliestCompletionEpochDay() },
                     observeCompletionHistory = { from, to -> appState.observeCompletionHistory(from, to) },
                 )
@@ -1977,12 +2060,9 @@ fun AffirmityApp(
                 )
             }
 
-            val showsRacha = currentDestination == AppDestinations.AFIRMACIONES ||
-                currentDestination == AppDestinations.MEDITAR
-            if (chrome.showStatusOverlay && (showsRacha ||
-                currentDestination == AppDestinations.ANIMO ||
-                currentDestination == AppDestinations.PROGRESO)
-            ) {
+            }
+            }
+            if (statusOverlayVisible) {
                 FloatingStatusOverlay(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -2190,3 +2270,6 @@ enum class AppDestinations(
     ANIMO(R.string.nav_mood_label, Icons.Filled.Mood),
     PROGRESO(R.string.nav_progress_label, Icons.Filled.Person),
 }
+
+/** Wrapper so "tone flow not emitted yet" (null) differs from "emitted, no preference". */
+private data class LoadedTone(val value: String?)

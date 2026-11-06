@@ -191,6 +191,30 @@
     <string name="healer_granted_explanation">Cada sanador protege un día sin actividad cuando lo activas al día siguiente. Puedes guardar hasta dos sanadores, y cada par de días completos sin superponerse otorga uno. Mientras guardas dos, el progreso se detiene; después de gastar uno, comienza un nuevo par de dos días. Tu racha general necesita una afirmación O una meditación cada día. El sanador solo cubre ayer: hoy aún necesita su propia actividad.</string>
     <string name="healer_granted_confirm_button">Entendido</string>
     <string name="healer_granted_icon_content_description">Ícono de sanador de racha</string>
+    <string name="streak_milestone_title">¡%1$d días seguidos!</string>
+    <string name="streak_milestone_subtitle_3">Tu práctica empieza a tomar forma.</string>
+    <string name="streak_milestone_subtitle_7">Una semana entera de presencia.</string>
+    <string name="streak_milestone_subtitle_14">Dos semanas: esto ya es un hábito en marcha.</string>
+    <string name="streak_milestone_subtitle_30">Un mes cuidándote cada día.</string>
+    <string name="streak_milestone_subtitle_60">Dos meses de constancia. Se nota.</string>
+    <string name="streak_milestone_subtitle_100">Cien días de práctica. Es un logro enorme.</string>
+    <string name="streak_milestone_subtitle_180">Medio año sosteniendo tu práctica.</string>
+    <string name="streak_milestone_subtitle_365">Un año completo. Gracias por elegirte cada día.</string>
+    <string name="streak_milestone_explanation_next">Cada día cuenta con una afirmación o una meditación. Tu próxima meta: %1$d días.</string>
+    <string name="streak_milestone_explanation_final">Sigue a tu ritmo: cada día suma.</string>
+    <string name="streak_milestone_confirm_button">Seguir</string>
+    <string name="streak_milestone_icon_content_description">Ícono de logro de racha</string>
+    <string name="progress_milestones_title">Logros de racha</string>
+    <plurals name="progress_milestones_next">
+        <item quantity="one">Falta %1$d día para %2$d</item>
+        <item quantity="other">Faltan %1$d días para %2$d</item>
+    </plurals>
+    <string name="progress_milestones_all_reached">Alcanzaste todos los logros</string>
+    <string name="progress_milestone_reached_content_description">%1$d días: logrado</string>
+    <string name="progress_milestone_locked_content_description">%1$d días: por lograr</string>
+    <string name="day_risk_dialog_cta_meditate">Meditar ahora</string>
+    <string name="day_risk_dialog_cta_affirmations">Ver afirmaciones</string>
+    <string name="day_risk_dialog_later">Más tarde</string>
     <string name="progress_weekly_streak_format">Racha: %1$d días</string>
     <string name="history_calendar_title_affirmations">Historial de afirmaciones</string>
     <string name="history_calendar_title_meditation">Historial de meditación</string>
@@ -800,6 +824,20 @@
     <string name="widget_streak_unit_one">día de racha</string>
     <string name="widget_today_done">hoy completo</string>
     <string name="widget_today_pending">hoy pendiente</string>
+    <!-- Widget end-of-day band: one short line per tone and state -->
+    <string name="widget_band_soft_meditation">Aún hay tiempo para meditar</string>
+    <string name="widget_band_soft_affirmation">Aún hay tiempo para tus afirmaciones</string>
+    <string name="widget_band_soft_risk">Tu racha sigue viva hasta medianoche</string>
+    <string name="widget_band_direct_meditation">Falta la meditación de hoy</string>
+    <string name="widget_band_direct_affirmation">Faltan tus afirmaciones de hoy</string>
+    <string name="widget_band_direct_risk">Tu racha vence hoy. Un minuto alcanza</string>
+    <string name="widget_band_powerful_meditation">Cierra el día meditando</string>
+    <string name="widget_band_powerful_affirmation">Cierra el día con tus afirmaciones</string>
+    <string name="widget_band_powerful_risk">Sostén tu racha: tú puedes</string>
+    <string name="widget_band_manifestation_meditation">Ábrete a un momento de calma</string>
+    <string name="widget_band_manifestation_affirmation">Ábrete a tus afirmaciones de hoy</string>
+    <string name="widget_band_manifestation_risk">Hoy tu racha te pide un momento</string>
+    <string name="widget_band_a11y">Recordatorio del día: %1$s</string>
 
     <string name="affirmation_group_badge_premium">Premium</string>
     <string name="affirmation_group_badge_ad">Solo Pro</string>

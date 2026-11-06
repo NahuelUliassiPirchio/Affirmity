@@ -37,7 +37,17 @@ import {
 import { taskName } from './tasks';
 import { hasTransientFcmFailures, sendAndPrune, type FcmClient, type TokenStore } from './fcm';
 import { evaluateSendEligibility, notificationTtl, type SendTimeSettings } from './sendPolicy';
-import { currentStreak, selectStreakAlert, streakBand, streakBreakdownContext, type Completion } from './streak';
+import { missingDayGoalActivity, parsePreferredTone } from './dayGoal';
+import {
+  currentStreak,
+  hasStreakBreakdown,
+  healerProtectedStreak,
+  selectStreakAlert,
+  shouldFireStreakAlert,
+  streakBand,
+  streakBreakdownContext,
+  type Completion,
+} from './streak';
 import { isHealerExpiringToday, type HealerUse } from './healer';
 import { shouldFireMeditationReturn, type MeditationReturnState } from './meditationReturn';
 import {
@@ -402,7 +412,7 @@ export const sendNotification = onRequest(async (req, res) => {
   }));
 
   const healerUses: HealerUse[] =
-    channel === 'healer'
+    channel === 'healer' || channel === 'streak'
       ? (await db.collection(`users/${uid}/streakHealerUses`).get()).docs.map(
           (healerUseDoc: QueryDocumentSnapshot) => ({
             healedEpochDay: Number(healerUseDoc.data().healedEpochDay ?? healerUseDoc.id),
@@ -423,6 +433,7 @@ export const sendNotification = onRequest(async (req, res) => {
   const deliveryLog = await loadDeliveryLog(uid, localDay);
   const family: NotificationFamily = channel;
   const familyAlreadyDeliveredToday = Boolean(deliveryLog?.families?.[family]);
+  const meditationReturnDeliveredToday = Boolean(deliveryLog?.families?.meditation_return);
   const moodDeliveredAtMillis = deliveryLog?.families?.mood?.deliveredAtMillis ?? null;
 
   const sendCheckedAtMillis = Date.now();
@@ -438,6 +449,7 @@ export const sendNotification = onRequest(async (req, res) => {
     compassAnsweredToday,
     moodDeliveredAtMillis,
     familyAlreadyDeliveredToday,
+    meditationReturnDeliveredToday,
     meditationReturnState,
   });
   if (!eligibility.eligible) {
@@ -467,12 +479,16 @@ export const sendNotification = onRequest(async (req, res) => {
   // ONE streak alert per day, always about the GENERAL streak (see `selectStreakAlert`). The copy
   // context is the streak band plus which activities hold it; the per-activity streaks are
   // rendered into the body and also sent in the payload for the expanded notification.
-  const streakAlert = channel === 'streak' ? selectStreakAlert(completions, localDay) : null;
+  // Streak family has two outcomes: at-risk alert (existing copy) or the goal-incomplete nudge
+  // (exactly one activity done today; tone-aware). Eligibility already guaranteed one of them.
+  const streakAtRisk = channel === 'streak' && shouldFireStreakAlert(completions, localDay, healerUses);
+  const streakAlert = streakAtRisk ? selectStreakAlert(completions, localDay, healerUses) : null;
+  const goalMissing =
+    channel === 'streak' && !streakAtRisk ? missingDayGoalActivity(completions, localDay) : null;
+  const preferredTone = parsePreferredTone(settingsData.preferredTone);
   const healerStreakValue =
     channel === 'healer'
-      ? // The streak count being protected/recovered by the healer -- the streak held through the
-        // break day (localDay - 1), i.e. as of localDay - 2.
-        String(currentStreak(completions, localDay - 2))
+      ? String(healerProtectedStreak(completions, localDay, healerUses))
       : undefined;
 
   const STREAK_GENERIC_CONTEXT = 'streak_generic';
@@ -486,9 +502,28 @@ export const sendNotification = onRequest(async (req, res) => {
   }
   const attempts: CopyAttempt[] = [];
   if (channel === 'streak') {
-    if (streakAlert) {
+    if (goalMissing) {
+      // Context tags: variants REQUIRE all their tags, so a tone variant (goal_missing_X + tone_T)
+      // only matches its own tone and the neutral one (tone_neutral) only matches the fallback.
+      const goalTag = `goal_missing_${goalMissing}`;
+      const nudgeBase = { streakCount: undefined, extraPlaceholders: {} };
+      if (preferredTone) {
+        attempts.push({
+          ...nudgeBase,
+          context: [goalTag, `tone_${preferredTone}`],
+          extraData: { streakKind: 'goal_incomplete' },
+        });
+      }
+      attempts.push({
+        ...nudgeBase,
+        context: [goalTag, 'tone_neutral'],
+        extraData: { streakKind: 'goal_incomplete' },
+      });
+    } else if (streakAlert) {
       const primary: CopyAttempt = {
-        context: [streakBand(streakAlert.streakCount), streakBreakdownContext(streakAlert)],
+        context: hasStreakBreakdown(streakAlert)
+          ? [streakBand(streakAlert.streakCount), streakBreakdownContext(streakAlert)]
+          : [],
         streakCount: String(streakAlert.streakCount),
         extraData: {
           meditationStreak: String(streakAlert.meditationStreak),
@@ -502,11 +537,14 @@ export const sendNotification = onRequest(async (req, res) => {
       // Fallback when the breakdown variant is missing/disabled/malformed: still says "overall" and
       // carries the count. `streak_generic` appears ONLY here, so it never matches the primary
       // context, and the primary context (band + breakdown) never matches these variants.
-      attempts.push(primary, { ...primary, context: [STREAK_GENERIC_CONTEXT] });
+      const generic: CopyAttempt = { ...primary, context: [STREAK_GENERIC_CONTEXT] };
+      // Yesterday held only by a heal (no activity): no breakdown copy applies, go straight to generic.
+      if (hasStreakBreakdown(streakAlert)) attempts.push(primary, generic);
+      else attempts.push(generic);
     } else {
       attempts.push({
         context: [],
-        streakCount: String(currentStreak(completions, localDay - 1)),
+        streakCount: String(currentStreak(completions, localDay - 1, healerUses)),
         extraData: {},
         extraPlaceholders: {},
       });
@@ -567,8 +605,15 @@ export const sendNotification = onRequest(async (req, res) => {
         channel,
         locale,
         contexts: attempts.map((attempt) => attempt.context),
+        ...(goalMissing ? { reason: 'goal-nudge-copy-missing' } : {}),
       }),
     );
+  }
+  // The nudge has no legacy title/body to fall back to (the client would show the static "streak
+  // about to end" text -- the wrong message) and must not consume the streak family cap.
+  if (goalMissing && !rendered) {
+    res.status(200).send('Skipped: goal-nudge-copy-missing');
+    return;
   }
   const streakCountValue = usedAttempt.streakCount;
 
@@ -578,6 +623,13 @@ export const sendNotification = onRequest(async (req, res) => {
 
   // The server no longer sends `activity`; drop it from any already-queued legacy task payload.
   const { activity: _stalePlannedActivity, ...legacyDataWithoutActivity } = legacyData ?? {};
+  if (goalMissing) {
+    // Planned as a (possible) at-risk alert, but at send time it is the goal nudge: drop the
+    // plan-time streak hints so the payload never carries stale at-risk numbers.
+    delete legacyDataWithoutActivity.streakCount;
+    delete legacyDataWithoutActivity.meditationStreak;
+    delete legacyDataWithoutActivity.affirmationsStreak;
+  }
   const v2Data: Record<string, string> = {
     ...legacyDataWithoutActivity,
     family,

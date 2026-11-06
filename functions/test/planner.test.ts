@@ -75,7 +75,9 @@ describe('planAndEnqueueUser', () => {
     const store = makeStore();
     const enqueuer = makeEnqueuer();
 
-    const result = await planUser(baseInput, store, enqueuer);
+    // Streak disabled: the always-enqueued 20:00 streak-family task is covered elsewhere.
+    const noStreak: UserPlanInput = { ...baseInput, settings: { ...baseInput.settings, streakEnabled: false } };
+    const result = await planUser(noStreak, store, enqueuer);
 
     expect(result.status).toBe('planned');
     expect(enqueuer.calls).toHaveLength(3);
@@ -93,6 +95,7 @@ describe('planAndEnqueueUser', () => {
         quietHoursEnabled: true,
         quietHoursStartMinute: 5 * 60,
         quietHoursEndMinute: 19 * 60,
+        streakEnabled: false,
       },
     };
 
@@ -107,8 +110,9 @@ describe('planAndEnqueueUser', () => {
     const store = makeStore();
     const enqueuer = makeEnqueuer();
 
-    await planUser(baseInput, store, enqueuer);
-    const second = await planUser(baseInput, store, enqueuer);
+    const noStreak: UserPlanInput = { ...baseInput, settings: { ...baseInput.settings, streakEnabled: false } };
+    await planUser(noStreak, store, enqueuer);
+    const second = await planUser(noStreak, store, enqueuer);
 
     expect(second.status).toBe('skipped');
     expect(enqueuer.calls).toHaveLength(3); // unchanged from the first run
@@ -216,13 +220,14 @@ describe('planAllUsers', () => {
       affirmationDone,
     });
 
-    it('enqueues no streak task when the streak ended two days ago', async () => {
+    it('enqueues a data-less 20:00 goal-nudge candidate when the streak ended two days ago', async () => {
       const enqueuer = makeEnqueuer();
       const day = baseInput.localDay;
 
       await planUser({ ...baseInput, completions: [row(day - 3, true, true), row(day - 2, true, true)] }, makeStore(), enqueuer);
 
-      expect(streakTaskOf(enqueuer)).toBeUndefined();
+      expect(streakTaskOf(enqueuer)).toBeDefined();
+      expect(streakTaskOf(enqueuer)?.data).toBeUndefined();
     });
 
     it('enqueues one general task with both per-activity streaks when both are live', async () => {
@@ -238,7 +243,7 @@ describe('planAllUsers', () => {
       expect(streakTaskOf(enqueuer)?.data).toEqual({ streakCount: '3', meditationStreak: '3', affirmationsStreak: '3' });
     });
 
-    it('enqueues no streak task when an activity is already done today', async () => {
+    it('enqueues a data-less goal-nudge candidate (no at-risk data) when an activity is already done today', async () => {
       const enqueuer = makeEnqueuer();
       const day = baseInput.localDay;
 
@@ -248,7 +253,8 @@ describe('planAllUsers', () => {
         enqueuer,
       );
 
-      expect(streakTaskOf(enqueuer)).toBeUndefined();
+      expect(streakTaskOf(enqueuer)).toBeDefined();
+      expect(streakTaskOf(enqueuer)?.data).toBeUndefined();
     });
 
     it('anchors the task at 20:00 of the user-local day in a non-UTC zone', async () => {
@@ -397,6 +403,7 @@ describe('planAllUsers', () => {
       settings: {
         ...baseInput.settings,
         remindersEnabled: false,
+        streakEnabled: false,
         moodEnabled: true,
         moodSegments: ['manana'],
         reflectionEnabled: true,
@@ -424,6 +431,7 @@ describe('planAllUsers', () => {
       settings: {
         ...baseInput.settings,
         remindersEnabled: false,
+        streakEnabled: false,
         moodEnabled: true,
         moodSegments: ['manana'],
         reflectionEnabled: true,
@@ -473,12 +481,21 @@ describe('applyPriority', () => {
 
   // design §3 table row 1: "Streak-Risk near 20:00 suppresses Meditation Return same day".
   it('drops a same-day meditation_return candidate when a streak candidate exists', () => {
-    const streakTask = task({ channel: 'streak' });
+    const streakTask = task({ channel: 'streak', data: { streakCount: '3' } });
     const meditationReturnTask = task({ channel: 'meditation_return' });
 
     const result = applyPriority([streakTask, meditationReturnTask], ZONE);
 
     expect(result).toEqual([streakTask]);
+  });
+
+  it('keeps meditation_return when the streak candidate is only the goal-nudge one (no at-risk data)', () => {
+    const streakTask = task({ channel: 'streak' });
+    const meditationReturnTask = task({ channel: 'meditation_return' });
+
+    const result = applyPriority([streakTask, meditationReturnTask], ZONE);
+
+    expect(result).toEqual([streakTask, meditationReturnTask]);
   });
 
   it('drops a same-day meditation_return candidate when a healer candidate exists', () => {

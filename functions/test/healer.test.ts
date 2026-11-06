@@ -10,7 +10,9 @@ import {
 import type { Completion } from '../src/streak';
 
 // Always well after the rollout floor, mirroring StreakHealerStatsTest.kt's `start` anchor.
-const start = HEALER_EPOCH_START_DAY + 10;
+const ZONE = 'UTC';
+const EPOCH_START = HEALER_EPOCH_START_DAY;
+const start = EPOCH_START + 10;
 
 function fullDay(epochDay: number): Completion {
   return { epochDay, meditationDone: true, affirmationDone: true };
@@ -51,10 +53,10 @@ describe('shouldFireHealerAlert', () => {
   });
 
   it('never grants from completions before the rollout floor', () => {
-    // Two full days entirely before HEALER_EPOCH_START_DAY, then a break right at the floor.
-    const rows = [fullDay(HEALER_EPOCH_START_DAY - 2), fullDay(HEALER_EPOCH_START_DAY - 1)];
+    // Two full days entirely before EPOCH_START, then a break right at the floor.
+    const rows = [fullDay(EPOCH_START - 2), fullDay(EPOCH_START - 1)];
 
-    expect(shouldFireHealerAlert(rows, [], HEALER_EPOCH_START_DAY + 1)).toBe(false);
+    expect(shouldFireHealerAlert(rows, [], EPOCH_START + 1)).toBe(false);
   });
 });
 
@@ -142,12 +144,12 @@ describe('inventory replay parity', () => {
   });
 
   it('uses inclusive lookback and rollout bounds', () => {
-    const today = HEALER_EPOCH_START_DAY + 400;
+    const today = EPOCH_START + 400;
     const floor = today - 370;
     const rows = [-2, -1, 0, 1, 2, 3].map((offset) => fullDay(floor + offset));
     expect(deriveHealerInventory(rows, [], today)).toEqual({ healerCount: 2, pairProgress: 0 });
     expect(deriveHealerInventory([fullDay(floor - 1), fullDay(floor)], [], today).healerCount).toBe(0);
-    expect(deriveHealerInventory([0, 1, 2, 3].map((offset) => fullDay(HEALER_EPOCH_START_DAY + offset)), [], HEALER_EPOCH_START_DAY + 3).healerCount).toBe(2);
+    expect(deriveHealerInventory([0, 1, 2, 3].map((offset) => fullDay(EPOCH_START + offset)), [], EPOCH_START + 3).healerCount).toBe(2);
   });
 
   it('declining retains both healers after expiry and an active yesterday is ineligible', () => {
@@ -156,5 +158,11 @@ describe('inventory replay parity', () => {
     expect(shouldFireHealerAlert(rows, [], start + 6)).toBe(false);
     expect(deriveHealerInventory(rows, [], start + 6).healerCount).toBe(2);
     expect(shouldFireHealerAlert([...rows, fullDay(start + 5)], [], start + 6)).toBe(false);
+  });
+});
+
+describe('HEALER_EPOCH_START_DAY', () => {
+  it('is the calendar epoch day of 2026-08-04', () => {
+    expect(HEALER_EPOCH_START_DAY).toBe(Date.UTC(2026, 7, 4) / 86_400_000);
   });
 });

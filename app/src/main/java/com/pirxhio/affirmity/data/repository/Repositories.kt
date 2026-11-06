@@ -188,6 +188,13 @@ interface NotificationSettingsRepository {
      * follow it. Defaults to a no-op: only the Firestore-backed implementation feeds the server.
      */
     suspend fun setLocale(locale: String) = Unit
+
+    /**
+     * Mirrors the user's preferred notification tone (`soft|direct|powerful|manifestation`) so the
+     * server can pick tone-matched copy; `null` (unanswered) clears it. Defaults to a no-op like
+     * [setLocale]: only the Firestore-backed implementation feeds the server.
+     */
+    suspend fun setPreferredTone(tone: String?) = Unit
 }
 
 /** Client-facing entitlement snapshot. [expiryTimeMillis] is `null` for a Free tier or a

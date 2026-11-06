@@ -5,16 +5,20 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocalFireDepartment
@@ -39,13 +43,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.pirxhio.affirmity.R
 import com.pirxhio.affirmity.data.ActivityMonthState
 import com.pirxhio.affirmity.data.CompletionHistorySlice
 import com.pirxhio.affirmity.data.HealerActivation
 import com.pirxhio.affirmity.data.StreakHealerState
+import com.pirxhio.affirmity.data.StreakMilestoneDetector
+import com.pirxhio.affirmity.data.StreakMilestones
 import com.pirxhio.affirmity.data.WeeklyStreak
 import com.pirxhio.affirmity.ui.components.FloatingStatusReservedEnd
 import kotlinx.coroutines.flow.Flow
@@ -70,6 +80,7 @@ fun ProgressScreen(
     meditationStreak: WeeklyStreak,
     streakHealer: StreakHealerState,
     onActivateHealer: () -> Unit,
+    bestMilestoneReached: Int = 0,
     observeActivityMonth: ((Long, Long) -> Flow<ActivityMonthState>)? = null,
     activitySaveError: Throwable? = null,
     onRetryActivity: () -> Unit = {},
@@ -113,6 +124,10 @@ fun ProgressScreen(
                     isTodayDone = streakHealer.isTodayDone,
                 )
                 StreakHealerCard(streakHealer = streakHealer, onActivateHealer = onActivateHealer)
+                MilestoneBadgesCard(
+                    bestMilestoneReached = bestMilestoneReached,
+                    generalStreakDays = streakHealer.generalStreakDays,
+                )
                 // Bug fix vs. the mockup: Meditación used to render a minutes-goal
                 // progress bar here. It now shares the exact same day-circle tracker
                 // component as Afirmaciones, just with its own icon/data.
@@ -252,6 +267,87 @@ private fun StreakHealerCard(streakHealer: StreakHealerState, onActivateHealer: 
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Lifetime streak-milestone badges: every entry of [StreakMilestones.ALL] (1 included) as a day-style
+ * circle, filled once reached (lifetime best, so a broken streak keeps its badges), plus how far the
+ * CURRENT streak is from the next one.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun MilestoneBadgesCard(bestMilestoneReached: Int, generalStreakDays: Int) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.EmojiEvents,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(
+                    text = stringResource(R.string.progress_milestones_title),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                StreakMilestones.ALL.forEach { days ->
+                    val reached = days <= bestMilestoneReached
+                    val description = stringResource(
+                        if (reached) R.string.progress_milestone_reached_content_description
+                        else R.string.progress_milestone_locked_content_description,
+                        days,
+                    )
+                    Box(
+                        modifier = Modifier
+                            .sizeIn(minWidth = 32.dp, minHeight = 32.dp)
+                            .background(
+                                color = if (reached) MaterialTheme.colorScheme.onSurface
+                                else MaterialTheme.colorScheme.surfaceContainerHighest,
+                                shape = CircleShape,
+                            )
+                            .then(
+                                if (!reached) Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                                else Modifier
+                            )
+                            .clearAndSetSemantics { contentDescription = description }
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = days.toString(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (reached) MaterialTheme.colorScheme.surface
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+            // Next CELEBRATED milestone: the 1-day badge is never a target.
+            val next = StreakMilestoneDetector.CELEBRATED.firstOrNull { it > generalStreakDays }
+            Text(
+                text = if (next != null) {
+                    val remaining = next - generalStreakDays
+                    pluralStringResource(R.plurals.progress_milestones_next, remaining, remaining, next)
+                } else {
+                    stringResource(R.string.progress_milestones_all_reached)
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

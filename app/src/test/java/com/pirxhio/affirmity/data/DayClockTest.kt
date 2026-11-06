@@ -143,4 +143,41 @@ class DayClockTest {
         assertEquals(1L, DayClock.attributedEpochDay(start, end, calendar))
         assertEquals(2L, DayClock.attributedEpochDay(end + 1_200_000, end + 1_800_000, calendar))
     }
+
+    @Test
+    fun `epochDay is the calendar epoch day and consecutive across London DST changes`() {
+        val london = TimeZone.getTimeZone("Europe/London")
+        fun key(m: Int, d: Int) = DayClock.epochDay(calendarAt(2026, m, d, zone = london))
+
+        assertEquals(key(Calendar.MARCH, 29) + 1, key(Calendar.MARCH, 30))
+        assertEquals(key(Calendar.OCTOBER, 25) + 1, key(Calendar.OCTOBER, 26))
+        assertEquals(java.time.LocalDate.of(2026, 8, 4).toEpochDay(), key(Calendar.AUGUST, 4))
+        assertEquals(20_669L, StreakHealerStats.EPOCH_START_DAY)
+    }
+
+    @Test
+    fun `epochDay by zone and millis uses the local date`() {
+        val kiritimati = java.time.ZoneId.of("Pacific/Kiritimati")
+        val millis = java.time.ZonedDateTime.of(2026, 8, 4, 0, 30, 0, 0, kiritimati).toInstant().toEpochMilli()
+
+        assertEquals(java.time.LocalDate.of(2026, 8, 4).toEpochDay(), DayClock.epochDay(kiritimati, millis))
+    }
+
+    @Test
+    fun `calendarForEpochDay round-trips across zones and DST days`() {
+        listOf("Europe/London", "Pacific/Kiritimati", "America/New_York", "America/Argentina/Buenos_Aires").forEach { id ->
+            val zone = TimeZone.getTimeZone(id)
+            listOf(
+                calendarAt(2026, Calendar.MARCH, 29, zone = zone),
+                calendarAt(2026, Calendar.OCTOBER, 25, zone = zone),
+                calendarAt(2026, Calendar.MARCH, 8, zone = zone),
+            ).forEach { original ->
+                val day = DayClock.epochDay(original)
+                val rebuilt = DayClock.calendarForEpochDay(day, Calendar.getInstance(zone))
+                assertEquals(id, day, DayClock.epochDay(rebuilt))
+                assertEquals(id, original.get(Calendar.DAY_OF_MONTH), rebuilt.get(Calendar.DAY_OF_MONTH))
+                assertEquals(id, 0, rebuilt.get(Calendar.HOUR_OF_DAY))
+            }
+        }
+    }
 }

@@ -1,5 +1,5 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "variants": [
     {
       "key": "affirmation_a",
@@ -1325,6 +1325,126 @@
       "locales": {
         "es": { "title": "Tu práctica sigue aquí", "body": "Cuando quieras volver, empezamos con algo simple." },
         "en": { "title": "Your practice is still here", "body": "Whenever you want to come back, we'll start with something simple." }
+      }
+    },
+    {
+      "key": "goal_incomplete_meditation_soft",
+      "family": "streak",
+      "context": ["goal_missing_meditation", "tone_soft"],
+      "placeholders": [],
+      "enabled": true,
+      "order": 7,
+      "locales": {
+        "es": { "title": "Aún hay tiempo para meditar", "body": "Tus afirmaciones ya están hechas. Un momento de calma completa tu día." },
+        "en": { "title": "There's still time to meditate", "body": "Your affirmations are done. A calm moment completes your day." }
+      }
+    },
+    {
+      "key": "goal_incomplete_meditation_direct",
+      "family": "streak",
+      "context": ["goal_missing_meditation", "tone_direct"],
+      "placeholders": [],
+      "enabled": true,
+      "order": 8,
+      "locales": {
+        "es": { "title": "Falta la meditación de hoy", "body": "Afirmaciones listas. Medita unos minutos y cierra el día completo." },
+        "en": { "title": "Today's meditation is missing", "body": "Affirmations done. Meditate a few minutes to finish the full day." }
+      }
+    },
+    {
+      "key": "goal_incomplete_meditation_powerful",
+      "family": "streak",
+      "context": ["goal_missing_meditation", "tone_powerful"],
+      "placeholders": [],
+      "enabled": true,
+      "order": 9,
+      "locales": {
+        "es": { "title": "Cierra el día meditando", "body": "Ya hiciste tus afirmaciones. Una meditación y el día es tuyo." },
+        "en": { "title": "Close the day with a meditation", "body": "You did your affirmations. One meditation and the day is yours." }
+      }
+    },
+    {
+      "key": "goal_incomplete_meditation_manifestation",
+      "family": "streak",
+      "context": ["goal_missing_meditation", "tone_manifestation"],
+      "placeholders": [],
+      "enabled": true,
+      "order": 10,
+      "locales": {
+        "es": { "title": "Ábrete a un momento de calma", "body": "Tus afirmaciones ya resuenan. Medita y deja que el día se complete." },
+        "en": { "title": "Open up to a moment of calm", "body": "Your affirmations already resonate. Meditate and let the day complete." }
+      }
+    },
+    {
+      "key": "goal_incomplete_meditation_neutral",
+      "family": "streak",
+      "context": ["goal_missing_meditation", "tone_neutral"],
+      "placeholders": [],
+      "enabled": true,
+      "order": 11,
+      "locales": {
+        "es": { "title": "Te falta la meditación de hoy", "body": "Tu racha ya está a salvo. Medita para completar el día." },
+        "en": { "title": "Today's meditation is still open", "body": "Your streak is already safe. Meditate to complete the day." }
+      }
+    },
+    {
+      "key": "goal_incomplete_affirmations_soft",
+      "family": "streak",
+      "context": ["goal_missing_affirmations", "tone_soft"],
+      "placeholders": [],
+      "enabled": true,
+      "order": 12,
+      "locales": {
+        "es": { "title": "Aún hay tiempo para tus afirmaciones", "body": "Ya meditaste hoy. Cinco afirmaciones completan tu día, sin prisa." },
+        "en": { "title": "There's still time for your affirmations", "body": "You already meditated. Five affirmations complete your day, no rush." }
+      }
+    },
+    {
+      "key": "goal_incomplete_affirmations_direct",
+      "family": "streak",
+      "context": ["goal_missing_affirmations", "tone_direct"],
+      "placeholders": [],
+      "enabled": true,
+      "order": 13,
+      "locales": {
+        "es": { "title": "Faltan tus afirmaciones de hoy", "body": "Meditación lista. Lee cinco afirmaciones y cierra el día completo." },
+        "en": { "title": "Today's affirmations are missing", "body": "Meditation done. Read five affirmations to finish the full day." }
+      }
+    },
+    {
+      "key": "goal_incomplete_affirmations_powerful",
+      "family": "streak",
+      "context": ["goal_missing_affirmations", "tone_powerful"],
+      "placeholders": [],
+      "enabled": true,
+      "order": 14,
+      "locales": {
+        "es": { "title": "Cierra el día con tus afirmaciones", "body": "Ya meditaste. Cinco afirmaciones más y el día es tuyo." },
+        "en": { "title": "Close the day with your affirmations", "body": "You meditated. Five more affirmations and the day is yours." }
+      }
+    },
+    {
+      "key": "goal_incomplete_affirmations_manifestation",
+      "family": "streak",
+      "context": ["goal_missing_affirmations", "tone_manifestation"],
+      "placeholders": [],
+      "enabled": true,
+      "order": 15,
+      "locales": {
+        "es": { "title": "Ábrete a tus afirmaciones de hoy", "body": "Ya meditaste. Deja que cinco afirmaciones completen tu día." },
+        "en": { "title": "Open up to today's affirmations", "body": "You already meditated. Let five affirmations complete your day." }
+      }
+    },
+    {
+      "key": "goal_incomplete_affirmations_neutral",
+      "family": "streak",
+      "context": ["goal_missing_affirmations", "tone_neutral"],
+      "placeholders": [],
+      "enabled": true,
+      "order": 16,
+      "locales": {
+        "es": { "title": "Te faltan las afirmaciones de hoy", "body": "Tu racha ya está a salvo. Cinco afirmaciones completan el día." },
+        "en": { "title": "Today's affirmations are still open", "body": "Your streak is already safe. Five affirmations complete the day." }
       }
     }
   ]

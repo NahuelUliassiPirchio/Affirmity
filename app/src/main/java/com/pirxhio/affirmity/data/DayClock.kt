@@ -1,5 +1,14 @@
 package com.pirxhio.affirmity.data
 
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.transformLatest
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Calendar
 
 /**
@@ -8,37 +17,72 @@ import java.util.Calendar
  */
 object DayClock {
 
-    /** A device-local day count (arbitrary epoch, only used for day-difference math). */
-    fun epochDay(calendar: Calendar = Calendar.getInstance()): Long {
-        val midnight = (calendar.clone() as Calendar).apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        return midnight.timeInMillis / (24 * 60 * 60 * 1000L)
+    /**
+     * The local calendar date's days since 1970-01-01 (`LocalDate.toEpochDay()`), read from
+     * [calendar]'s own time zone. Injective per calendar date in every zone, DST included; mirrors
+     * the server's `utcMillisToLocalEpochDay`.
+     */
+    fun epochDay(calendar: Calendar = Calendar.getInstance()): Long =
+        LocalDate.of(
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH) + 1,
+            calendar.get(Calendar.DAY_OF_MONTH),
+        ).toEpochDay()
+
+    /** [epochDay] of the local date that [millis] falls on in [zone]. */
+    fun epochDay(zone: ZoneId, millis: Long): Long =
+        Instant.ofEpochMilli(millis).atZone(zone).toLocalDate().toEpochDay()
+
+    /**
+     * Milliseconds from [nowMillis] until the next local midnight in [zone]. Computed from the
+     * zone's rules (not a fixed 24h), so 23h/25h DST days wake at the real boundary. Always >= 1.
+     */
+    fun millisUntilNextMidnight(nowMillis: Long, zone: ZoneId): Long {
+        val nextMidnight = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+            .plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        return (nextMidnight - nowMillis).coerceAtLeast(1L)
     }
+
+    /**
+     * Emits the local epoch day now and again at every local midnight, so collectors whose query
+     * ranges are anchored to "today" can re-subscribe instead of going stale while the app stays
+     * open. Each [recheck] emission (app resume, time-zone or date change) re-reads the clock and
+     * restarts the midnight timer, since coroutine delays do not advance during deep sleep.
+     * Consecutive duplicates are dropped.
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    fun epochDayFlow(
+        recheck: Flow<Unit> = emptyFlow(),
+        nowMillis: () -> Long = System::currentTimeMillis,
+        zone: () -> ZoneId = ZoneId::systemDefault,
+    ): Flow<Long> = recheck
+        .onStart { emit(Unit) }
+        .transformLatest {
+            while (true) {
+                val now = nowMillis()
+                val z = zone()
+                emit(epochDay(z, now))
+                delay(millisUntilNextMidnight(now, z))
+            }
+        }
+        .distinctUntilChanged()
 
     /** [epochDay] of the day 6 days before [calendar] — start of the rolling last-7-days window. */
     fun rollingWindowStartEpochDay(calendar: Calendar = Calendar.getInstance()): Long =
         epochDay(calendar) - 6
 
     /**
-     * Inverse of [epochDay]: a [Calendar] set to local midnight for the device-local day identified
-     * by [epochDay]. Walks day-by-day from the current local midnight with [Calendar.add] rather
-     * than multiplying [epochDay] by a fixed millis-per-day, so the result stays correct even
-     * across DST transitions and is never off by a UTC-offset day on negative-offset timezones.
+     * Inverse of [epochDay]: a [Calendar] (in [calendar]'s time zone) set to local midnight of the
+     * calendar date identified by [epochDay], via [LocalDate.ofEpochDay]. Calendar's lenient
+     * fields resolve a skipped midnight (DST gap) to the first valid instant of that date.
      */
     fun calendarForEpochDay(epochDay: Long, calendar: Calendar = Calendar.getInstance()): Calendar {
-        val midnight = (calendar.clone() as Calendar).apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
+        val date = LocalDate.ofEpochDay(epochDay)
+        return (calendar.clone() as Calendar).apply {
+            clear()
+            set(date.year, date.monthValue - 1, date.dayOfMonth, 0, 0, 0)
             set(Calendar.MILLISECOND, 0)
         }
-        val dayDelta = (epochDay - epochDay(midnight)).toInt()
-        midnight.add(Calendar.DAY_OF_YEAR, dayDelta)
-        return midnight
     }
 
     /**

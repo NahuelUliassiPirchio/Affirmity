@@ -149,22 +149,29 @@ export function planUserTasks(
     );
   }
 
-  const streakAlert =
-    settings.streakEnabled && shouldFireStreakAlert(completions, localDay)
-      ? selectStreakAlert(completions, localDay)
+  // The 20:00 streak-family task covers two send-time outcomes (see `sendPolicy.ts`): the at-risk
+  // alert and the goal-incomplete nudge. The planner runs in the morning and cannot know which
+  // applies, so it always enqueues it when the toggle is on; send time decides (or skips).
+  // Only the at-risk case carries streak data (and, in `applyPriority`, suppresses meditation_return).
+  if (settings.streakEnabled) {
+    const streakAlert = shouldFireStreakAlert(completions, localDay, healerUses)
+      ? selectStreakAlert(completions, localDay, healerUses)
       : null;
-  if (streakAlert) {
     const task: PlannedTask = {
       uid: '',
       localDay,
       channel: 'streak',
       slot: 0,
       atMillis: slotInstant(localDay, zone, STREAK_ALERT_MINUTE, STREAK_ALERT_MINUTE, rng).getTime(),
-      data: {
-        streakCount: String(streakAlert.streakCount),
-        meditationStreak: String(streakAlert.meditationStreak),
-        affirmationsStreak: String(streakAlert.affirmationsStreak),
-      },
+      ...(streakAlert
+        ? {
+            data: {
+              streakCount: String(streakAlert.streakCount),
+              meditationStreak: String(streakAlert.meditationStreak),
+              affirmationsStreak: String(streakAlert.affirmationsStreak),
+            },
+          }
+        : {}),
     };
     if (isSafelyFuture(task.atMillis, planGeneratedAtMillis)) tasks.push(task);
   }
@@ -243,7 +250,7 @@ function segmentEndMillisFor(minuteOfDay: number, localDay: number, zone: string
 /**
  * Applies design §3's plan-time suppression rules to one user's already-quiet-hours-filtered
  * candidate tasks for a local day:
- *  1. A `streak` or `healer` candidate suppresses a same-day `meditation_return` candidate
+ *  1. An at-risk `streak` (carries `data.streakCount`) or `healer` candidate suppresses a same-day `meditation_return` candidate
  *     outright.
  *  2. A `reflection` slot scheduled less than 2h after a `mood` slot is re-rolled to a random
  *     instant later THE SAME DAY-SEGMENT the original slot fell into (>= the 2h floor, < that
@@ -260,7 +267,11 @@ export function applyPriority(
   if (tasks.length === 0) return tasks;
   const localDay = tasks[0].localDay;
 
-  const hasHigherPriorityAlert = tasks.some((task) => task.channel === 'streak' || task.channel === 'healer');
+  // A streak task only suppresses meditation_return when it is the at-risk alert (planner attaches
+  // `data.streakCount` only then); the always-enqueued goal-nudge candidate must not.
+  const hasHigherPriorityAlert = tasks.some(
+    (task) => (task.channel === 'streak' && task.data?.streakCount !== undefined) || task.channel === 'healer',
+  );
   let result = hasHigherPriorityAlert
     ? tasks.filter((task) => task.channel !== 'meditation_return')
     : tasks;

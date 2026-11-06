@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { missingDayGoalActivity, parsePreferredTone } from '../src/dayGoal';
 
 import {
   streakOf,
@@ -7,6 +8,8 @@ import {
   streakBand,
   selectStreakAlert,
   streakBreakdownContext,
+  hasStreakBreakdown,
+  healerProtectedStreak,
   type Completion,
 } from '../src/streak';
 
@@ -242,5 +245,80 @@ describe('streakBand', () => {
 
   it('classifies a large streak into the 14+ band', () => {
     expect(streakBand(500)).toBe('streak_14plus');
+  });
+});
+
+describe('healed days count toward the GENERAL streak only', () => {
+  const med = (epochDay: number): Completion => ({ epochDay, meditationDone: true, affirmationDone: false });
+
+  it('currentStreak walks through a healed day with no activity', () => {
+    const rows = [med(MONDAY - 3), med(MONDAY - 2), med(MONDAY)];
+    expect(currentStreak(rows, MONDAY)).toBe(1);
+    expect(currentStreak(rows, MONDAY, [{ healedEpochDay: MONDAY - 1 }])).toBe(4);
+  });
+
+  it('a heal does not bridge a different gap', () => {
+    const rows = [med(MONDAY - 3), med(MONDAY)];
+    expect(currentStreak(rows, MONDAY, [{ healedEpochDay: MONDAY - 1 }])).toBe(2);
+  });
+
+  it('selectStreakAlert reports the healed general streak but keeps per-activity streaks activity-only', () => {
+    const rows = [med(MONDAY - 4), med(MONDAY - 3), med(MONDAY - 2)];
+    const uses = [{ healedEpochDay: MONDAY - 1 }];
+    expect(selectStreakAlert(rows, MONDAY, uses)).toEqual({
+      streakCount: 4,
+      meditationStreak: 0,
+      affirmationsStreak: 0,
+    });
+  });
+
+  it('healed yesterday with no activity: streak alert still fires and breakdown cannot be derived', () => {
+    const rows = [med(MONDAY - 2)];
+    const uses = [{ healedEpochDay: MONDAY - 1 }];
+    expect(shouldFireStreakAlert(rows, MONDAY, uses)).toBe(true);
+    expect(shouldFireStreakAlert(rows, MONDAY)).toBe(false);
+    const selection = selectStreakAlert(rows, MONDAY, uses)!;
+    expect(hasStreakBreakdown(selection)).toBe(false);
+  });
+
+  it('hasStreakBreakdown is true whenever an activity holds yesterday', () => {
+    expect(hasStreakBreakdown({ streakCount: 5, meditationStreak: 1, affirmationsStreak: 0 })).toBe(true);
+  });
+});
+
+describe('healerProtectedStreak', () => {
+  const med = (epochDay: number): Completion => ({ epochDay, meditationDone: true, affirmationDone: false });
+
+  it('is the general streak through the day before the break day (localDay - 1)', () => {
+    const rows = [med(MONDAY - 4), med(MONDAY - 3), med(MONDAY - 2)];
+    expect(healerProtectedStreak(rows, MONDAY)).toBe(3);
+  });
+
+  it('counts days healed by earlier healer uses', () => {
+    const rows = [med(MONDAY - 6), med(MONDAY - 5), med(MONDAY - 3), med(MONDAY - 2)];
+    expect(healerProtectedStreak(rows, MONDAY)).toBe(2);
+    expect(healerProtectedStreak(rows, MONDAY, [{ healedEpochDay: MONDAY - 4 }])).toBe(5);
+  });
+});
+
+describe('missingDayGoalActivity / parsePreferredTone', () => {
+  const day = 100;
+  const row = (meditationDone: boolean, affirmationDone: boolean) => [{ epochDay: day, meditationDone, affirmationDone }];
+
+  it('returns the missing activity only when exactly one is done today', () => {
+    expect(missingDayGoalActivity(row(true, false), day)).toBe('affirmations');
+    expect(missingDayGoalActivity(row(false, true), day)).toBe('meditation');
+    expect(missingDayGoalActivity(row(true, true), day)).toBeNull();
+    expect(missingDayGoalActivity(row(false, false), day)).toBeNull();
+    expect(missingDayGoalActivity([], day)).toBeNull();
+    expect(missingDayGoalActivity([{ epochDay: day - 1, meditationDone: true, affirmationDone: false }], day)).toBeNull();
+  });
+
+  it('whitelists the four tones', () => {
+    expect(parsePreferredTone('soft')).toBe('soft');
+    expect(parsePreferredTone('manifestation')).toBe('manifestation');
+    expect(parsePreferredTone('neutral')).toBeNull();
+    expect(parsePreferredTone(undefined)).toBeNull();
+    expect(parsePreferredTone(5)).toBeNull();
   });
 });
