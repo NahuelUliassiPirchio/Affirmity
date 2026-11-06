@@ -108,3 +108,21 @@ fun consumePlaybackScopedUnlock(
     SessionEndReason.Completed, SessionEndReason.Cancelled ->
         if (key.type == ContentType.MEDITATION) unlocks - key else unlocks
 }
+
+/** `"<uid>|<TIER>"` -- the last tier a Remote entitlement listener emitted, keyed by uid so one
+ * account's tier can never be shown to another. */
+fun encodeCachedEntitlement(uid: String, tier: AccessTier): String = "$uid|${tier.name}"
+
+/** The cached tier for [uid], or null when there is none, it belongs to another uid, the user is
+ * signed out, or the stored value is unreadable. */
+fun decodeCachedEntitlementTier(raw: String?, uid: String?): AccessTier? {
+    if (raw == null || uid == null) return null
+    val separator = raw.lastIndexOf('|')
+    if (separator < 0 || raw.substring(0, separator) != uid) return null
+    return AccessTier.entries.firstOrNull { it.name == raw.substring(separator + 1) }
+}
+
+/** A non-authoritative emission (the Local placeholder repository served while [Migrating]) must
+ * not erase a known last tier; the real listener is authoritative and always wins. */
+fun resolveEmittedEntitlementTier(emitted: AccessTier, authoritative: Boolean, cached: AccessTier?): AccessTier =
+    if (authoritative) emitted else cached ?: emitted

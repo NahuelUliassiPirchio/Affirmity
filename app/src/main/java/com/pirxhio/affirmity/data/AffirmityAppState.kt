@@ -197,7 +197,12 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.emitAll
@@ -1014,6 +1019,30 @@ class AffirmityAppState(
     var entitlementTier = mutableStateOf(AccessTier.FREE)
         private set
 
+    /** Raw `"<uid>|<TIER>"` last-known tier read from [TrackerPreferences]; decoded against the
+     * CURRENT uid on every use so another account's tier is never applied. User-facing gates read
+     * [entitlementTier] (what the user sees is what they can use); only irreversible actions (the
+     * deselect sweep and the lapse notice) wait for an authoritative emission. */
+    private var cachedEntitlementRaw: String? = null
+    private var authoritativeEntitlementEmitted = false
+
+    private fun currentUid(): String? = (authRepository.authState.value as? AuthState.SignedIn)?.uid
+
+    private fun persistCachedEntitlement(uid: String, tier: AccessTier) {
+        val encoded = encodeCachedEntitlement(uid, tier)
+        if (encoded == cachedEntitlementRaw) return
+        scope.launch {
+            try {
+                trackerPreferences.saveCachedEntitlement(encoded)
+                cachedEntitlementRaw = encoded
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Log.e(TAG, "cached entitlement save failed", error)
+            }
+        }
+    }
+
     /** True only once the repository has emitted a real entitlement for the current session.
      *  [entitlementTier] defaults to FREE, so anything that must never leak to a paying user
      *  (ads) has to wait for this instead of trusting that default. Reset on every session swap. */
@@ -1795,6 +1824,25 @@ class AffirmityAppState(
                 }
         }
         scope.launch {
+            // Last-known tier: applied as soon as DataStore answers, but only until an authoritative
+            // (non-Migrating) entitlement emission arrives -- the listener is the source of truth.
+            try {
+                combine(
+                    authRepository.authState.map { (it as? AuthState.SignedIn)?.uid }.distinctUntilChanged(),
+                    trackerPreferences.observeCachedEntitlement(),
+                ) { uid, raw -> raw to uid }
+                    .collect { (raw, uid) ->
+                        cachedEntitlementRaw = raw
+                        val cached = decodeCachedEntitlementTier(raw, uid)
+                        if (cached != null && !authoritativeEntitlementEmitted) entitlementTier.value = cached
+                    }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Log.e(TAG, "cached entitlement flow failed", error)
+            }
+        }
+        scope.launch {
             // Same class of problem as the healer-grant collector above (design.md D8): reset the
             // initialized flag INSIDE flatMapLatest so a fresh (re)started flow -- cold start or a
             // sign-in/sign-out session swap -- only ever seeds entitlementTier, never fires a
@@ -1802,15 +1850,40 @@ class AffirmityAppState(
             session.flatMapLatest { s ->
                 entitlementFlowInitialized = false
                 entitlementResolved.value = false
+                authoritativeEntitlementEmitted = false
+                var consecutiveFailures = 0L
                 s.entitlements.observe()
+                    // Inside flatMapLatest so a failed listener only affects THIS session's
+                    // stream: the cached tier stays displayed (unconfirmed) while we resubscribe
+                    // with capped backoff, woken early when connectivity returns.
+                    .onEach { consecutiveFailures = 0L }
+                    .retryWhen { error, _ ->
+                        if (error is CancellationException) return@retryWhen false
+                        val failures = consecutiveFailures++
+                        Log.e(TAG, "entitlement flow failed (consecutive failure $failures), retrying", error)
+                        val backoffMillis = minOf(ENTITLEMENT_RETRY_MAX_MILLIS, ENTITLEMENT_RETRY_BASE_MILLIS shl minOf(failures, 6L).toInt())
+                        // Only a LATER connectivity signal ends the wait early: the first emission is
+                        // the callback's immediate "already online" registration report and would
+                        // turn a persistent error into a tight resubscribe loop. A flow that is
+                        // empty or closes without a second signal waits out the full backoff.
+                        withTimeoutOrNull(backoffMillis) {
+                            if (activityConnectivity.drop(1).firstOrNull() == null) awaitCancellation()
+                        }
+                        true
+                    }
+                    .map { s to it }
             }.catch { error -> Log.e(TAG, "entitlement flow failed", error) }
-                .collect { entitlement ->
+                .collect { (emittingSession, entitlement) ->
                     // Compared against the repository-emitted value only, never a client-side
                     // optimistic purchase overlay (design.md D7/D8) -- an expiring optimistic
                     // window can never masquerade as a real lapse. proLapseNotice stays scoped to
                     // a LIVE Pro->Free transition only (design §10 Q4(iv)) -- it is a one-time
                     // snackbar, not a general "you are Free" indicator.
-                    if (entitlementFlowInitialized &&
+                    // The Local placeholder served while Migrating is not the user's entitlement, so
+                    // neither the notice nor the sweep may be driven by it.
+                    val authoritative = emittingSession !is DataSession.Migrating
+                    if (authoritative &&
+                        entitlementFlowInitialized &&
                         entitlementTier.value == AccessTier.PRO &&
                         entitlement.tier == AccessTier.FREE
                     ) {
@@ -1826,9 +1899,10 @@ class AffirmityAppState(
                     // grant) would silently survive forever. Re-persist only when the result
                     // actually differs, so a steady-state Free user causes no redundant DataStore
                     // write on every emission. Living inside this collector (not the
-                    // theme-preferences collector) guarantees it never fires before the tier has
-                    // resolved, so a cold start can never strip a Pro user's themes.
-                    if (entitlement.tier == AccessTier.FREE) {
+                    // theme-preferences collector) and running ONLY for authoritative emissions
+                    // guarantees it never fires from the Migrating placeholder (always Free), so
+                    // a cold start can never strip a Pro user's themes.
+                    if (authoritative && entitlement.tier == AccessTier.FREE) {
                         selectedThemeIds.value?.let { committed ->
                             val updated = deselectLockedThemes(committed, proOnlyThemeIds, defaultThematicThemeIds)
                             if (updated != committed) {
@@ -1839,9 +1913,19 @@ class AffirmityAppState(
                         }
                     }
                     entitlementFlowInitialized = true
-                    entitlementTier.value = entitlement.tier
+                    // The Local repository served while Migrating is a placeholder, not the user's
+                    // real entitlement: it must not erase a known last tier for this uid.
+                    if (authoritative) authoritativeEntitlementEmitted = true
+                    val cachedTier = decodeCachedEntitlementTier(cachedEntitlementRaw, currentUid())
+                    entitlementTier.value = resolveEmittedEntitlementTier(
+                        emitted = entitlement.tier,
+                        authoritative = authoritative,
+                        cached = cachedTier,
+                    )
+                    if (emittingSession is DataSession.Remote) persistCachedEntitlement(emittingSession.uid, entitlement.tier)
                     publishCarouselRefreshKey()
-                    entitlementResolved.value = true
+                    // A placeholder emission over a kept cached tier does not confirm anything.
+                    if (authoritative || cachedTier == null) entitlementResolved.value = true
                 }
         }
     }
@@ -2925,6 +3009,8 @@ class AffirmityAppState(
 
     private companion object {
         const val TAG = "AffirmityAppState"
+        const val ENTITLEMENT_RETRY_BASE_MILLIS = 1_000L
+        const val ENTITLEMENT_RETRY_MAX_MILLIS = 60_000L
         const val AFFIRMATIONS_GOAL_PER_DAY = 5
         const val FCM_TOKEN_CLEANUP_TIMEOUT_MILLIS = 2_000L
 

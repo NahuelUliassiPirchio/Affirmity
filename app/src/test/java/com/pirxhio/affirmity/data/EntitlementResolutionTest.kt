@@ -205,4 +205,29 @@ class EntitlementResolutionTest {
         )
         assertEquals(setOf("free.t"), result)
     }
+
+    // --- last-known tier cache ---------------------------------------------------------------
+
+    @Test
+    fun `cached tier round-trips for the same uid`() {
+        assertEquals(AccessTier.PRO, decodeCachedEntitlementTier(encodeCachedEntitlement("u1", AccessTier.PRO), "u1"))
+        assertEquals(AccessTier.FREE, decodeCachedEntitlementTier(encodeCachedEntitlement("u1", AccessTier.FREE), "u1"))
+    }
+
+    @Test
+    fun `cached tier is ignored for another uid, signed-out, or garbage`() {
+        val raw = encodeCachedEntitlement("u1", AccessTier.PRO)
+        assertEquals(null, decodeCachedEntitlementTier(raw, "u2"))
+        assertEquals(null, decodeCachedEntitlementTier(raw, null))
+        assertEquals(null, decodeCachedEntitlementTier(null, "u1"))
+        assertEquals(null, decodeCachedEntitlementTier("u1|GOLD", "u1"))
+        assertEquals(null, decodeCachedEntitlementTier("nonsense", "u1"))
+    }
+
+    @Test
+    fun `a non-authoritative emission keeps the cached tier, an authoritative one wins`() {
+        assertEquals(AccessTier.PRO, resolveEmittedEntitlementTier(AccessTier.FREE, authoritative = false, cached = AccessTier.PRO))
+        assertEquals(AccessTier.FREE, resolveEmittedEntitlementTier(AccessTier.FREE, authoritative = true, cached = AccessTier.PRO))
+        assertEquals(AccessTier.FREE, resolveEmittedEntitlementTier(AccessTier.FREE, authoritative = false, cached = null))
+    }
 }

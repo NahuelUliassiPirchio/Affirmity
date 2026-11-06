@@ -4,6 +4,7 @@ import com.pirxhio.affirmity.access.AccessTier
 import com.pirxhio.affirmity.access.AdUnlockRecord
 import com.pirxhio.affirmity.access.ContentKey
 import com.pirxhio.affirmity.access.ContentType
+import com.pirxhio.affirmity.access.isUnlocked
 import com.pirxhio.affirmity.auth.AuthProviderId
 import com.pirxhio.affirmity.auth.AuthRepository
 import com.pirxhio.affirmity.auth.AuthState
@@ -354,6 +355,9 @@ private fun buildState(
     knownThemeIds: Set<String> = setOf("u1.t1"),
     defaultThematicThemeIds: Set<String> = setOf("u1.t1"),
     proOnlyThemeIds: Set<String> = emptySet(),
+    cachedEntitlement: String? = null,
+    cachedEntitlementFlow: Flow<String?>? = null,
+    activityConnectivity: Flow<Unit> = kotlinx.coroutines.flow.emptyFlow(),
     recentMeditationIdsFlow: Flow<List<String>>? = null,
     onboardingPreferencesOverride: OnboardingPreferences? = null,
     onboardingGuidePreferencesOverride: OnboardingGuidePreferences? = null,
@@ -377,6 +381,7 @@ private fun buildState(
     // failing their assertions or hanging forever on a channel receive.
     whenever(trackerPreferences.observeHiddenAffirmationIds()).thenReturn(flowOf(emptySet()))
     whenever(trackerPreferences.observeFeedSources()).thenReturn(flowOf(FeedSources()))
+    whenever(trackerPreferences.observeCachedEntitlement()).thenReturn(cachedEntitlementFlow ?: flowOf(cachedEntitlement))
     whenever(trackerPreferences.observeRecentMeditationIds()).thenReturn(recentMeditationIdsFlow ?: flowOf(emptyList()))
     val notificationDebugLog = mock(NotificationDebugLog::class.java)
     whenever(notificationDebugLog.entries)
@@ -420,6 +425,7 @@ private fun buildState(
         legacyGroupIdsProvider = legacyGroupIdsProvider,
         goalIdsProvider = goalIdsProvider,
         claimActivity = claimActivity,
+        activityConnectivity = activityConnectivity,
         syncFailureReporter = syncFailureReporter,
     )
 }
@@ -1765,6 +1771,333 @@ class AffirmityAppStateSwapTest {
 
         job.cancel()
         scope.cancel()
+    }
+
+    // --- last-known entitlement tier ------------------------------------------------------------
+
+    private fun buildCachedTierState(
+        scope: CoroutineScope,
+        cached: String?,
+        remoteEntitlements: Flow<Entitlement>,
+    ): AffirmityAppState {
+        val events = mutableListOf<String>()
+        return buildState(
+            local = fakeLocal(events, id = "local-cache"),
+            remote = { fakeRemote("uid-c", events, entitlements = FakeEntitlementRepository(remoteEntitlements)) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = FakeAuthRepository(initial = AuthState.SignedIn(uid = "uid-c", displayName = null, email = null)),
+            scope = scope,
+            cachedEntitlement = cached,
+        )
+    }
+
+    @Test
+    fun `cached tier is used before the entitlement listener emits`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val state = buildCachedTierState(scope, "uid-c|PRO", kotlinx.coroutines.flow.flow { awaitCancellation() })
+        delay(200)
+
+        assertEquals(AccessTier.PRO, state.entitlementTier.value)
+        scope.cancel()
+    }
+
+    @Test
+    fun `an authoritative emission is not overwritten by a cached value that arrives later`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val lateCache = kotlinx.coroutines.flow.flow<String?> {
+            delay(300)
+            emit("uid-c|PRO")
+            awaitCancellation()
+        }
+        val events = mutableListOf<String>()
+        val state = buildState(
+            local = fakeLocal(events, id = "local-late-cache"),
+            remote = { fakeRemote("uid-c", events, entitlements = FakeEntitlementRepository(flowOf(Entitlement.Free))) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = FakeAuthRepository(initial = AuthState.SignedIn(uid = "uid-c", displayName = null, email = null)),
+            scope = scope,
+            cachedEntitlementFlow = lateCache,
+        )
+        delay(150)
+        assertEquals(AccessTier.FREE, state.entitlementTier.value)
+        delay(400)
+
+        assertEquals("the late cache must not override the authoritative FREE", AccessTier.FREE, state.entitlementTier.value)
+        scope.cancel()
+    }
+
+    private fun buildUidCacheState(scope: CoroutineScope, signedInUid: String, cached: String): AffirmityAppState {
+        val events = mutableListOf<String>()
+        return buildState(
+            local = fakeLocal(events, id = "local-uid-cache"),
+            remote = {
+                fakeRemote(signedInUid, events, entitlements = FakeEntitlementRepository(kotlinx.coroutines.flow.flow { awaitCancellation() }))
+            },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = FakeAuthRepository(initial = AuthState.SignedIn(uid = signedInUid, displayName = null, email = null)),
+            scope = scope,
+            cachedEntitlement = cached,
+        )
+    }
+
+    @Test
+    fun `a cached PRO is applied to its own uid and never to another uid`() = runBlocking {
+        val scopeA = CoroutineScope(Dispatchers.Unconfined)
+        val stateA = buildUidCacheState(scopeA, signedInUid = "uid-a", cached = "uid-a|PRO")
+        delay(200)
+        assertEquals(AccessTier.PRO, stateA.entitlementTier.value)
+        scopeA.cancel()
+
+        val scopeB = CoroutineScope(Dispatchers.Unconfined)
+        val stateB = buildUidCacheState(scopeB, signedInUid = "uid-b", cached = "uid-a|PRO")
+        delay(200)
+        assertEquals(AccessTier.FREE, stateB.entitlementTier.value)
+        scopeB.cancel()
+    }
+
+    @Test
+    fun `an unconfirmed cached PRO stays unresolved while the Local placeholder is served during Migrating`() = runBlocking {
+        val gate = CompletableDeferred<Unit>()
+        val events = mutableListOf<String>()
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val state = buildState(
+            local = fakeLocal(events, id = "local-migrating-cache"),
+            remote = { fakeRemote("uid-m", events, entitlements = FakeEntitlementRepository(flowOf(Entitlement(tier = AccessTier.PRO)))) },
+            migrator = FirestoreMigrator(GatedFirestoreMigrationSource(gate)),
+            authRepository = FakeAuthRepository(initial = AuthState.SignedIn(uid = "uid-m", displayName = null, email = null)),
+            scope = scope,
+            cachedEntitlement = "uid-m|PRO",
+        )
+        delay(200)
+
+        assertEquals(AccessTier.PRO, state.entitlementTier.value)
+        assertFalse("the placeholder must not confirm the tier", state.entitlementResolved.value)
+
+        gate.complete(Unit)
+        delay(200)
+        assertTrue(state.entitlementResolved.value)
+        scope.cancel()
+    }
+
+    // --- deselect sweep / lapse notice only on authoritative emissions ---------------------------
+
+    private fun buildProThemeState(
+        scope: CoroutineScope,
+        themePreferences: FakeThemeSelectionPreferences,
+        migrator: FirestoreMigrator,
+        remoteEntitlements: Flow<Entitlement>,
+    ): AffirmityAppState {
+        val events = mutableListOf<String>()
+        return buildState(
+            local = fakeLocal(events, id = "local-pro-themes"),
+            remote = { fakeRemote("uid-t", events, entitlements = FakeEntitlementRepository(remoteEntitlements)) },
+            migrator = migrator,
+            authRepository = FakeAuthRepository(initial = AuthState.SignedIn(uid = "uid-t", displayName = null, email = null)),
+            scope = scope,
+            themePreferences = themePreferences,
+            knownThemeIds = setOf("u1.t1", "u2.t2"),
+            defaultThematicThemeIds = setOf("u1.t1"),
+            proOnlyThemeIds = setOf("u2.t2"),
+            cachedEntitlement = "uid-t|PRO",
+        )
+    }
+
+    @Test
+    fun `a PRO user's Pro themes survive the Migrating placeholder and are not persisted away`() = runBlocking {
+        val gate = CompletableDeferred<Unit>()
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val themes = FakeThemeSelectionPreferences(initial = setOf("u1.t1", "u2.t2"))
+        val state = buildProThemeState(
+            scope, themes, FirestoreMigrator(GatedFirestoreMigrationSource(gate)),
+            flowOf(Entitlement(tier = AccessTier.PRO)),
+        )
+        delay(200)
+
+        assertEquals(setOf("u1.t1", "u2.t2"), state.selectedThemeIds.value)
+        assertTrue("nothing may be persisted from the placeholder", themes.saved.isEmpty())
+
+        gate.complete(Unit)
+        delay(200)
+        assertEquals(setOf("u1.t1", "u2.t2"), state.selectedThemeIds.value)
+        assertTrue(themes.saved.isEmpty())
+        scope.cancel()
+    }
+
+    @Test
+    fun `a real authoritative downgrade strips Pro themes and shows the lapse notice`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val themes = FakeThemeSelectionPreferences(initial = setOf("u1.t1", "u2.t2"))
+        val remote = kotlinx.coroutines.flow.MutableSharedFlow<Entitlement>(replay = 1)
+        val state = buildProThemeState(scope, themes, FirestoreMigrator(ImmediateFirestoreMigrationSource()), remote)
+        remote.emit(Entitlement(tier = AccessTier.PRO))
+        delay(200)
+        assertEquals(setOf("u1.t1", "u2.t2"), state.selectedThemeIds.value)
+        assertFalse(state.proLapseNotice.value)
+
+        remote.emit(Entitlement.Free)
+        delay(200)
+
+        assertEquals(setOf("u1.t1"), state.selectedThemeIds.value)
+        assertTrue(themes.saved.contains(setOf("u1.t1")))
+        assertTrue(state.proLapseNotice.value)
+        scope.cancel()
+    }
+
+    @Test
+    fun `when the entitlement listener errors the cached PRO is shown but stays unconfirmed`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val themes = FakeThemeSelectionPreferences(initial = setOf("u1.t1", "u2.t2"))
+        val state = buildProThemeState(
+            scope, themes, FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            kotlinx.coroutines.flow.flow { throw IllegalStateException("listener failed") },
+        )
+        delay(300)
+
+        assertEquals(AccessTier.PRO, state.entitlementTier.value)
+        assertFalse(state.entitlementResolved.value)
+        assertTrue("what the user sees unlocked they can use", state.customAffirmationCreateDecision.isUnlocked)
+        assertEquals(setOf("u1.t1", "u2.t2"), state.selectedThemeIds.value)
+        assertTrue(themes.saved.isEmpty())
+        assertFalse(state.proLapseNotice.value)
+        scope.cancel()
+    }
+
+    @Test
+    fun `a cached PRO user can create and launch Pro content while Migrating`() = runBlocking {
+        val gate = CompletableDeferred<Unit>()
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val state = buildProThemeState(
+            scope, FakeThemeSelectionPreferences(initial = setOf("u1.t1")),
+            FirestoreMigrator(GatedFirestoreMigrationSource(gate)),
+            flowOf(Entitlement(tier = AccessTier.PRO)),
+        )
+        delay(200)
+
+        assertEquals(AccessTier.PRO, state.entitlementTier.value)
+        assertTrue(state.customAffirmationCreateDecision.isUnlocked)
+        val proEntry = requireNotNull(com.pirxhio.affirmity.ui.meditation.catalog.findMeditationCatalogEntry("body_scan"))
+        assertTrue(
+            com.pirxhio.affirmity.ui.meditation.catalog
+                .meditationAccessDecision(proEntry, state.entitlementTier.value, state.adUnlockState, System.currentTimeMillis())
+                .isUnlocked,
+        )
+        scope.cancel()
+    }
+
+    @Test
+    fun `the entitlement listener is resubscribed with backoff after a failure`() = runTest {
+        val scope = backgroundScope
+        var subscriptions = 0
+        val flaky = kotlinx.coroutines.flow.flow {
+            subscriptions++
+            if (subscriptions == 1) throw IllegalStateException("listener failed")
+            emit(Entitlement(tier = AccessTier.PRO))
+            awaitCancellation()
+        }
+        val events = mutableListOf<String>()
+        val state = buildState(
+            local = fakeLocal(events, id = "local-retry"),
+            remote = { fakeRemote("uid-retry", events, entitlements = FakeEntitlementRepository(flaky)) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = FakeAuthRepository(initial = AuthState.SignedIn(uid = "uid-retry", displayName = null, email = null)),
+            scope = scope,
+        )
+        advanceTimeBy(500)
+        runCurrent()
+        assertFalse("still failed within the first backoff", state.entitlementResolved.value && state.entitlementTier.value == AccessTier.PRO)
+
+        advanceTimeBy(1_500)
+        runCurrent()
+
+        assertEquals(2, subscriptions)
+        assertTrue(state.entitlementResolved.value)
+        assertEquals(AccessTier.PRO, state.entitlementTier.value)
+    }
+
+    @Test
+    fun `the entitlement retry backoff resets after a successful emission`() = runTest {
+        var subscriptions = 0
+        val flaky = kotlinx.coroutines.flow.flow {
+            subscriptions++
+            if (subscriptions < 5) throw IllegalStateException("listener failed")
+            emit(Entitlement(tier = AccessTier.PRO))
+            if (subscriptions == 5) throw IllegalStateException("failed again after recovering")
+            awaitCancellation()
+        }
+        val events = mutableListOf<String>()
+        buildState(
+            local = fakeLocal(events, id = "local-reset"),
+            remote = { fakeRemote("uid-reset", events, entitlements = FakeEntitlementRepository(flaky)) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = FakeAuthRepository(initial = AuthState.SignedIn(uid = "uid-reset", displayName = null, email = null)),
+            scope = backgroundScope,
+        )
+        // Failures at t=0,1s,3s,7s back off 1s,2s,4s,8s; the 5th subscription (t=15s) emits, then fails.
+        advanceTimeBy(15_000)
+        runCurrent()
+        assertEquals(5, subscriptions)
+
+        advanceTimeBy(1_500)
+        runCurrent()
+
+        assertEquals("backoff must restart at ~1s after a successful emission", 6, subscriptions)
+    }
+
+    @Test
+    fun `an immediately-emitting connectivity flow does not turn the entitlement retry into a tight loop`() = runTest {
+        var subscriptions = 0
+        val alwaysFailing = kotlinx.coroutines.flow.flow<Entitlement> {
+            subscriptions++
+            // Safety valve so a regression ends with a countable failure instead of hanging.
+            if (subscriptions > 500) awaitCancellation()
+            throw IllegalStateException("permission denied")
+        }
+        // Like registerDefaultNetworkCallback: emits on every registration while online.
+        val onlineOnSubscribe = kotlinx.coroutines.flow.flow { emit(Unit); awaitCancellation() }
+        val events = mutableListOf<String>()
+        buildState(
+            local = fakeLocal(events, id = "local-spin"),
+            remote = { fakeRemote("uid-spin", events, entitlements = FakeEntitlementRepository(alwaysFailing)) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = FakeAuthRepository(initial = AuthState.SignedIn(uid = "uid-spin", displayName = null, email = null)),
+            scope = backgroundScope,
+            activityConnectivity = onlineOnSubscribe,
+        )
+        advanceTimeBy(3_500)
+        runCurrent()
+
+        // Backoff schedule: subscribe at t=0, 1s, 3s.
+        assertEquals("retries must follow the backoff, not spin", 3, subscriptions)
+    }
+
+    @Test
+    fun `a genuine later reconnection wakes the entitlement retry early`() = runTest {
+        var subscriptions = 0
+        val failsOnceThenWorks = kotlinx.coroutines.flow.flow {
+            subscriptions++
+            if (subscriptions == 1) throw IllegalStateException("offline")
+            emit(Entitlement(tier = AccessTier.PRO))
+            awaitCancellation()
+        }
+        val reconnect = kotlinx.coroutines.flow.flow {
+            emit(Unit) // registration emission
+            delay(300)
+            emit(Unit) // real reconnection
+            awaitCancellation()
+        }
+        val events = mutableListOf<String>()
+        buildState(
+            local = fakeLocal(events, id = "local-wake"),
+            remote = { fakeRemote("uid-wake", events, entitlements = FakeEntitlementRepository(failsOnceThenWorks)) },
+            migrator = FirestoreMigrator(ImmediateFirestoreMigrationSource()),
+            authRepository = FakeAuthRepository(initial = AuthState.SignedIn(uid = "uid-wake", displayName = null, email = null)),
+            scope = backgroundScope,
+            activityConnectivity = reconnect,
+        )
+        advanceTimeBy(600)
+        runCurrent()
+
+        assertEquals("the later reconnection must cut the 1s backoff short", 2, subscriptions)
     }
 
     // --- initial content gate / recents ------------------------------------------------------------

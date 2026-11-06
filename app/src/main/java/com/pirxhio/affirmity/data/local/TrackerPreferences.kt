@@ -160,7 +160,17 @@ class TrackerPreferences(private val context: Context) {
         }
     }
 
+    /** Last entitlement tier a Remote listener emitted, as `"<uid>|<TIER>"` (see
+     * `encodeCachedEntitlement`). Lets a cold start show the right tier before Firestore answers. */
+    fun observeCachedEntitlement(): Flow<String?> =
+        context.trackerDataStore.data.map { it[CACHED_ENTITLEMENT] }
+
+    suspend fun saveCachedEntitlement(value: String) {
+        context.trackerDataStore.edit { it[CACHED_ENTITLEMENT] = value }
+    }
+
     private companion object {
+        val CACHED_ENTITLEMENT = stringPreferencesKey("cached_entitlement")
         val AFFIRMATIONS_VIEWED_EPOCH_DAY = longPreferencesKey("affirmations_viewed_epoch_day")
         val AFFIRMATIONS_VIEWED_COUNT = intPreferencesKey("affirmations_viewed_count")
         val AFFIRMATIONS_VIEWED_OWNER = androidx.datastore.preferences.core.stringPreferencesKey("affirmations_viewed_owner")
