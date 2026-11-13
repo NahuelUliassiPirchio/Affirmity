@@ -9,6 +9,8 @@ import com.pirxhio.affirmity.data.local.AnonymousGenerationClaimedException
 import com.pirxhio.affirmity.data.remote.FirestoreActivityRepository
 import com.pirxhio.affirmity.data.remote.FirebaseActivityClient
 import com.pirxhio.affirmity.data.remote.ActivityHistoryImporter
+import com.pirxhio.affirmity.data.remote.ActivityImportRunner
+import com.pirxhio.affirmity.data.remote.RoomActivityImportStore
 import com.pirxhio.affirmity.data.remote.FirebaseActivityImportSource
 import kotlinx.coroutines.async
 import com.pirxhio.affirmity.data.local.advanceOwnedDailyViews
@@ -3189,11 +3191,19 @@ fun rememberAffirmityAppState(userGoalsStore: UserGoalsStore): AffirmityAppState
                 database.claimActivitySnapshot(identity.owner, uid)
             },
             importActivity = { uid ->
-                val importer = ActivityHistoryImporter(FirebaseActivityImportSource(firestore))
-                for (owner in database.activityDao().claimedOwners(uid)) {
-                    val snapshot = database.claimActivitySnapshot(owner.owner, uid)
-                    importer.import(snapshot, uid) { FirebaseAuth.getInstance().currentUser?.uid }
-                }
+                ActivityImportRunner(
+                    importer = ActivityHistoryImporter(FirebaseActivityImportSource(firestore)),
+                    store = RoomActivityImportStore(database),
+                    nowMillis = System::currentTimeMillis,
+                    report = { stats ->
+                        // Diagnostics only: debug and the release-like benchmark build, never a shipped release.
+                        if (BuildConfig.DEBUG || BuildConfig.BUILD_TYPE == "benchmark") {
+                            Log.i("AffStartup", "importActivity claimed=${stats.claimed} " +
+                                "skippedImported=${stats.skippedImported} skippedEmpty=${stats.skippedEmpty} " +
+                                "networkChecked=${stats.networkChecked}")
+                        }
+                    },
+                ).run(uid) { FirebaseAuth.getInstance().currentUser?.uid }
             },
             remoteSessionFactory = { uid ->
                 DataSession.Remote(
