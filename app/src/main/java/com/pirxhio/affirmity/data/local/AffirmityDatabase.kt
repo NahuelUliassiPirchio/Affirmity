@@ -1,6 +1,7 @@
 package com.pirxhio.affirmity.data.local
 
 import android.content.Context
+import com.pirxhio.affirmity.diagnostics.StartupTrace
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -362,7 +363,10 @@ abstract class AffirmityDatabase : RoomDatabase() {
         private var instance: AffirmityDatabase? = null
 
         fun getInstance(context: Context): AffirmityDatabase =
-            instance ?: synchronized(this) {
+            instance ?: StartupTrace.section("aff:AffirmityDatabase.getInstance") { create(context) }
+
+        private fun create(context: Context): AffirmityDatabase =
+            synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     AffirmityDatabase::class.java,

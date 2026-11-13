@@ -11,6 +11,7 @@ import android.provider.Settings
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import androidx.activity.compose.ReportDrawnWhen
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
@@ -746,6 +747,9 @@ fun AffirmityApp(
     val userGoalsStore = remember(context) { UserGoalsPreferences(context.applicationContext) }
     // Goals feed the one-time initial theme selection derived when the survey completes.
     val appState = rememberAffirmityAppState(userGoalsStore)
+    // TTFD marker: Activity.reportFullyDrawn() fires once, when the first surface (onboarding, or
+    // home with real feed + streak data) is ready. See isHomeFullyDrawn.
+    ReportDrawnWhen { appState.isFullyDrawn.value }
     // Launch-time UMP consent (outside the feed, fire-and-forget, once per process): without it
     // canRequestAds() stays false on a fresh install and the round interstitial never loads.
     // Re-preloads once consent is available; the entitlement-keyed preload effect below covers

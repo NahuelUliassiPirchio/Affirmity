@@ -65,7 +65,10 @@ import com.pirxhio.affirmity.analytics.NotificationLocaleValue
 import com.pirxhio.affirmity.analytics.RoundSource
 import com.pirxhio.affirmity.analytics.firebase.AndroidFirebaseAnalyticsSink
 import com.pirxhio.affirmity.analytics.toAdFailureReason
+import com.pirxhio.affirmity.diagnostics.FirstEmissionSpan
 import com.pirxhio.affirmity.diagnostics.ProcessDiagnostics
+import com.pirxhio.affirmity.diagnostics.StartupTrace
+import com.pirxhio.affirmity.diagnostics.endSpansOnCompletion
 import com.pirxhio.affirmity.diagnostics.NoOpSyncFailureReporter
 import com.pirxhio.affirmity.diagnostics.SyncFailureKind
 import com.pirxhio.affirmity.diagnostics.SyncFailureReporter
@@ -197,6 +200,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.first
@@ -1177,6 +1181,48 @@ class AffirmityAppState(
     var hasCompletedOnboarding = mutableStateOf<Boolean?>(null)
         private set
 
+    // Startup instrumentation: async spans closed by the first emission of each source (no-ops
+    // after that), plus the "first data arrived" flags the TTFD marker (isHomeFullyDrawn) reads.
+    private val onboardingFlagSpan = FirstEmissionSpan("aff:flow.onboardingFlag.first")
+    private val guideFlagSpan = FirstEmissionSpan("aff:flow.guideFlag.first")
+    private val themeIdsSpan = FirstEmissionSpan("aff:flow.selectedThemeIds.first")
+    private val catalogFeedSpan = FirstEmissionSpan("aff:flow.catalogFeed.first")
+    private val streakSpan = FirstEmissionSpan("aff:flow.streak.first")
+    private val sessionSpan = FirstEmissionSpan("aff:session.resolve")
+    init {
+        // A span waiting for a first emission must not outlive the scope that would produce it.
+        scope.endSpansOnCompletion(
+            onboardingFlagSpan, guideFlagSpan, themeIdsSpan, catalogFeedSpan, streakSpan, sessionSpan,
+        )
+    }
+    private var ownedEmitted by mutableStateOf(false)
+    private val catalogFeedGate = CatalogFeedGate(seedAlreadySettled = catalogSeeder == null)
+    private var streakEmitted by mutableStateOf(false)
+
+    /** TTFD signal: the feed has real rows, or is genuinely empty (see [isFeedContentReady]). */
+    val isFeedReady: State<Boolean> = derivedStateOf {
+        isFeedContentReady(
+            hasCatalogRows = catalogAffirmations.isNotEmpty(),
+            hasOwnedRows = affirmations.isNotEmpty(),
+            catalogEmitted = catalogFeedGate.observedAfterSeed,
+            ownedEmitted = ownedEmitted,
+            catalogSeedSettled = catalogFeedGate.seedSettled,
+        )
+    }
+
+    /** TTFD signal: the session's streak collector has emitted at least once (or failed). */
+    val isStreakResolved: State<Boolean> = derivedStateOf { streakEmitted }
+
+    /** The `reportFullyDrawn` predicate for [MainActivity]; see [isHomeFullyDrawn]. */
+    val isFullyDrawn: State<Boolean> = derivedStateOf {
+        isHomeFullyDrawn(
+            initialContentResolved = isInitialContentResolved.value,
+            hasCompletedOnboarding = hasCompletedOnboarding.value,
+            feedContentReady = isFeedReady.value,
+            streakResolved = isStreakResolved.value,
+        )
+    }
+
     /** Resolved guide checkpoint: `null` while either persisted gate input is unresolved, `false`
      * when the guide is required, and `true` once seen. This is the single source of truth for
      * both the pre-survey route and the legacy post-survey auto gate. */
@@ -1242,19 +1288,22 @@ class AffirmityAppState(
             previousSessionUid = uid
             if (uid == null || !useRemoteSession) {
                 emit(activeLocal)
+                sessionSpan.end()
                 return@transformLatest
             }
             emit(DataSession.Migrating(uid, activeLocal))
             try {
                 val source = activeLocal
                 try {
-                    claimActivity(source, uid)
+                    StartupTrace.asyncScope("aff:session.claimActivity") { claimActivity(source, uid) }
                 } catch (failure: Exception) {
                     reportSyncFailure(SyncFailureKind.CLAIM, failure)
                     throw failure
                 }
-                migrator.ensureMigrated(migrationSnapshotFor(uid, source))
-                importActivity(uid)
+                StartupTrace.asyncScope("aff:session.ensureMigrated") {
+                    migrator.ensureMigrated(migrationSnapshotFor(uid, source))
+                }
+                StartupTrace.asyncScope("aff:session.importActivity") { importActivity(uid) }
                 syncError.value = null
                 val remote = remoteSessionFactory(uid)
                 // EC-1/Q3 reconciliation: replay every local durable ad-unlock into the remote
@@ -1263,11 +1312,13 @@ class AffirmityAppState(
                 // Room copy is never deleted (design §10).
                 replayDurableAdUnlocks(local.adUnlocks.getDurableUnlocks(), remote.adUnlocks)
                 emit(remote)
+                sessionSpan.end()
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (failure: Exception) {
                 syncError.value = failure.message
                 emit(DataSession.Failed(uid, failure, remoteSessionFactory(uid)))
+                sessionSpan.end()
             }
         }
         .stateIn(scope, SharingStarted.Eagerly, local)
@@ -1398,11 +1449,23 @@ class AffirmityAppState(
             // CatalogPreferences.seededCatalogVersion, so safe to call on every launch. `null`
             // (the default) means no seeding -- every existing JVM unit test never touches assets.
             try {
-                catalogSeeder?.seedIfNeeded()
+                StartupTrace.asyncScope("aff:CatalogSeeder.seedIfNeeded") { catalogSeeder?.seedIfNeeded() }
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (error: Exception) {
                 Log.e(TAG, "catalog seed failed", error)
+            }
+            catalogFeedGate.onSeedSettled()
+            // The table may be unchanged after the seed (failed seed, empty asset), so no emission
+            // would follow; one explicit read confirms a genuinely empty catalog for the TTFD marker.
+            try {
+                catalogFeedGate.confirmIfStillUnobserved(CATALOG_EMPTY_CONFIRM_TIMEOUT_MS) {
+                    catalog.observeByGroupIds(knownGroupIds).first().isEmpty()
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Log.e(TAG, "catalog empty confirmation failed", error)
             }
         }
         scope.launch {
@@ -1446,9 +1509,11 @@ class AffirmityAppState(
         scope.launch {
             session.flatMapLatest { it.affirmations.observeAll() }
                 .catch { error -> Log.e(TAG, "affirmations flow failed", error) }
+                .onCompletion { ownedEmitted = true }
                 .collect { entities ->
                     affirmations.clear()
                     affirmations.addAll(entities.map { it.toAffirmation() })
+                    ownedEmitted = true
                 }
         }
         scope.launch {
@@ -1463,9 +1528,12 @@ class AffirmityAppState(
                 session.flatMapLatest { it.catalogOverrides.observeAll() },
             ) { rows, overrides -> rows to overrides }
                 .catch { error -> Log.e(TAG, "catalog flow failed", error) }
+                .onCompletion { catalogFeedGate.onConfirmedEmpty(); catalogFeedSpan.end() }
                 .collect { (rows, overrides) ->
                     catalogAffirmations.clear()
                     catalogAffirmations.addAll(rows.map { it.toAffirmation(overrides[it.id].orEmpty()) })
+                    catalogFeedGate.onEmission()
+                    catalogFeedSpan.end()
                 }
         }
         scope.launch {
@@ -1490,6 +1558,7 @@ class AffirmityAppState(
                     ) { completionRows, healerRows -> StreakEmission(today, completionRows, healerRows) }
                 }
             }.catch { error -> Log.e(TAG, "completions/healer flow failed", error) }
+                .onCompletion { streakEmitted = true; streakSpan.end() }
                 .collect { (today, rows, healerRows) ->
                 val windowStart = today - 6
                 val healerStart = healerStartEpochDay(today)
@@ -1526,6 +1595,8 @@ class AffirmityAppState(
                 }
                 previousStreakState = newHealerState
                 streakHealer.value = newHealerState
+                streakEmitted = true
+                streakSpan.end()
                 evaluateMilestone(newHealerState.generalStreakDays, canCelebrate)
             }
         }
@@ -1726,7 +1797,10 @@ class AffirmityAppState(
             }
         }
         scope.launch {
-            onboardingPreferences.observeHasCompletedOnboarding().collect { hasCompletedOnboarding.value = it }
+            onboardingPreferences.observeHasCompletedOnboarding().collect {
+                hasCompletedOnboarding.value = it
+                onboardingFlagSpan.end()
+            }
         }
         scope.launch {
             // D2 migration default: combines the raw tri-state guide-seen read with the survey's
@@ -1755,6 +1829,7 @@ class AffirmityAppState(
                 .collect { (rawGuideSeen, completedOnboarding) ->
                     val resolved = resolveGuideBackfill(rawGuideSeen, completedOnboarding)
                     hasSeenOnboardingGuide.value = resolved
+                    guideFlagSpan.end()
                 }
         }
         scope.launch {
@@ -1779,6 +1854,7 @@ class AffirmityAppState(
                     }
                     val resolved = resolveSelectedThemeIds(persisted, legacyGroupIds, knownThemeIds, defaultThematicThemeIds)
                     selectedThemeIds.value = resolved
+                    themeIdsSpan.end()
                     if (!themeDraftInitialized) {
                         draftThemeIds.value = resolved
                         themeDraftInitialized = true
@@ -1797,6 +1873,7 @@ class AffirmityAppState(
             if (!themeDraftInitialized) {
                 val resolved = resolveSelectedThemeIds(null, legacyGroupIds, knownThemeIds, defaultThematicThemeIds)
                 selectedThemeIds.value = resolved
+                themeIdsSpan.end()
                 draftThemeIds.value = resolved
                 themeDraftInitialized = true
                 markFeedDraftReadyIfSeeded()
@@ -3016,6 +3093,9 @@ class AffirmityAppState(
 
         /** How far back to look when deriving the running streak from `daily_completion`. */
         const val STREAK_LOOKBACK_DAYS = StreakHealerStats.LOOKBACK_DAYS
+
+        /** How long to wait for a post-seed catalog emission before reading once to confirm "empty". */
+        const val CATALOG_EMPTY_CONFIRM_TIMEOUT_MS = 1_500L
     }
 }
 
@@ -3054,6 +3134,7 @@ fun rememberAffirmityAppState(userGoalsStore: UserGoalsStore): AffirmityAppState
     // user with no grants. Consumed by the downgrade-auto-deselect collector.
     val proOnlyThemeIds = knownThemeIds - defaultThematicThemeIds
     return remember {
+        StartupTrace.section("aff:AffirmityAppState.build") {
         val database = AffirmityDatabase.getInstance(context)
         val notificationPreferences = NotificationPreferences(context)
         val notificationDebugLog = NotificationDebugLog(context.applicationContext)
@@ -3205,6 +3286,7 @@ fun rememberAffirmityAppState(userGoalsStore: UserGoalsStore): AffirmityAppState
                 enabled = BuildConfig.ROUND_INTERSTITIAL_ENABLED,
             ),
         )
+        }
     }
 }
 
