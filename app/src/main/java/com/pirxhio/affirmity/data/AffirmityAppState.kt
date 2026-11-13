@@ -111,6 +111,7 @@ import com.pirxhio.affirmity.data.local.OnboardingPreferences
 import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.FeedSources
+import com.pirxhio.affirmity.data.local.MigrationConfirmationPreferences
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.FcmTokenRepository
 import com.pirxhio.affirmity.data.remote.FirestoreAdUnlockRepository
@@ -121,6 +122,8 @@ import com.pirxhio.affirmity.data.remote.FirestoreDailyMoodRepository
 import com.pirxhio.affirmity.data.remote.FirestoreEntitlementRepository
 import com.pirxhio.affirmity.data.remote.FirestoreMeditationPreferencesRepository
 import com.pirxhio.affirmity.data.remote.FirestoreMigrator
+import com.pirxhio.affirmity.data.remote.MigrationOutcome
+import com.pirxhio.affirmity.data.remote.DataStoreMigrationConfirmations
 import com.pirxhio.affirmity.data.remote.FirestoreNotificationSettingsRepository
 import com.pirxhio.affirmity.data.remote.FirestoreOnboardingRepository
 import com.pirxhio.affirmity.data.remote.FirestoreStreakHealerRepository
@@ -1303,7 +1306,8 @@ class AffirmityAppState(
                     throw failure
                 }
                 StartupTrace.asyncScope("aff:session.ensureMigrated") {
-                    migrator.ensureMigrated(migrationSnapshotFor(uid, source))
+                    val outcome = migrator.ensureMigrated(uid) { migrationSnapshotFor(uid, source) }
+                    reportMigration(outcome)
                 }
                 StartupTrace.asyncScope("aff:session.importActivity") { importActivity(uid) }
                 syncError.value = null
@@ -1345,6 +1349,13 @@ class AffirmityAppState(
     /** One-time snapshot of the Room/DataStore state for [uid], taken right before migration
      * (design.md's "The swap moment" step 4). Always reads through [local] — never [session] —
      * since this runs while the session is still [DataSession.Migrating]. */
+    /** Diagnostics only: debug and the release-like benchmark build, never a shipped release. */
+    private fun reportMigration(outcome: MigrationOutcome) {
+        if (BuildConfig.DEBUG || BuildConfig.BUILD_TYPE == "benchmark") {
+            Log.i("AffStartup", "ensureMigrated skipped=${outcome == MigrationOutcome.SKIPPED_CONFIRMED_LOCALLY} outcome=$outcome")
+        }
+    }
+
     private suspend fun migrationSnapshotFor(uid: String, source: DataSession.Local): MigrationSnapshot {
         val today = DayClock.epochDay()
         return MigrationSnapshot(
@@ -3224,7 +3235,10 @@ fun rememberAffirmityAppState(userGoalsStore: UserGoalsStore): AffirmityAppState
                     catalogOverrides = FirestoreCatalogOverrideRepository(firestore, uid),
                 )
             },
-            migrator = FirestoreMigrator(firestore),
+            migrator = FirestoreMigrator(
+                firestore,
+                DataStoreMigrationConfirmations(MigrationConfirmationPreferences(context)),
+            ) { message, cause -> Log.w("AffStartup", message, cause) },
             trackerPreferences = trackerPreferences,
             onboardingPreferences = onboardingPreferences,
             onboardingGuidePreferences = onboardingGuidePreferences,
