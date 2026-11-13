@@ -9,6 +9,7 @@ import android.media.RingtoneManager
 import android.os.Build
 import androidx.core.app.NotificationManagerCompat
 import com.pirxhio.affirmity.diagnostics.ProcessDiagnostics
+import com.pirxhio.affirmity.diagnostics.StartupTrace
 import com.pirxhio.affirmity.notifications.ChannelImportance
 import com.pirxhio.affirmity.notifications.NotificationChannelSpec
 import com.pirxhio.affirmity.widget.DayRiskThresholdWorker
@@ -19,11 +20,13 @@ class AffirmityApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        // Before any UI: headless starts (widget, FCM) must also honor consent and drop stale unsent reports.
-        ProcessDiagnostics.shared.applyStartupConsent(isDebugBuild = BuildConfig.DEBUG)
-        createNotificationChannels()
-        deleteRetiredNotificationChannels()
-        ensureWidgetWorkScheduled()
+        StartupTrace.section("aff:Application.onCreate") {
+            // Before any UI: headless starts (widget, FCM) must also honor consent and drop stale unsent reports.
+            ProcessDiagnostics.shared.applyStartupConsent(isDebugBuild = BuildConfig.DEBUG)
+            createNotificationChannels()
+            deleteRetiredNotificationChannels()
+            ensureWidgetWorkScheduled()
+        }
     }
 
     /**

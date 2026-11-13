@@ -2,6 +2,7 @@ package com.pirxhio.affirmity.ads
 
 import android.content.Context
 import com.google.android.gms.ads.MobileAds
+import com.pirxhio.affirmity.diagnostics.StartupTrace
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -25,9 +26,11 @@ internal object MobileAdsInitializer {
         if (initialized) return
         mutex.withLock {
             if (initialized) return@withLock
-            suspendCancellableCoroutine<Unit> { continuation ->
-                MobileAds.initialize(context) {
-                    if (continuation.isActive) continuation.resume(Unit)
+            StartupTrace.asyncScope("aff:MobileAds.initialize") {
+                suspendCancellableCoroutine<Unit> { continuation ->
+                    MobileAds.initialize(context) {
+                        if (continuation.isActive) continuation.resume(Unit)
+                    }
                 }
             }
             initialized = true

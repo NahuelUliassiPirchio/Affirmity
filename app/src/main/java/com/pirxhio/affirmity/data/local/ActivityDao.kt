@@ -103,6 +103,17 @@ abstract class ActivityDao {
     @Query("SELECT * FROM activity_owner WHERE claimedUid = :uid ORDER BY owner")
     abstract suspend fun claimedOwners(uid: String): List<ActivityOwnerEntity>
 
+    /** Records, once, that the claimed generation is fully imported. Never touches an unclaimed or foreign row. */
+    @Query("UPDATE activity_owner SET importedAtMillis = :atMillis WHERE owner = :owner AND claimedUid = :uid AND importedAtMillis IS NULL")
+    abstract suspend fun markImported(owner: String, uid: String, atMillis: Long)
+
+    /** Sealed rows are kept forever (they are the write barrier), so launches read only the not-yet-imported ones. */
+    @Query("SELECT * FROM activity_owner WHERE claimedUid = :uid AND importedAtMillis IS NULL ORDER BY owner")
+    abstract suspend fun pendingImportOwners(uid: String): List<ActivityOwnerEntity>
+
+    @Query("SELECT COUNT(*) FROM activity_owner WHERE claimedUid = :uid")
+    abstract suspend fun countClaimed(uid: String): Int
+
     @Query("SELECT * FROM activity_owner WHERE active = 1 AND claimedUid IS NULL LIMIT 1")
     protected abstract suspend fun activeAnonymous(): ActivityOwnerEntity?
 

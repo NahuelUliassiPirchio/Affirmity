@@ -32,9 +32,15 @@ class CatalogSeeder(
      */
     suspend fun seedIfNeeded(locale: CatalogLocale? = null) = mutex.withLock {
         val target = locale ?: currentLocale()
-        val bundled = CatalogAssetParser.parse(assetReader.readCatalogJson(target), knownCollectionIds())
-        val marker = "${bundled.version}|${target.tag}"
+        val json = assetReader.readCatalogJson(target)
         val seededMarker = prefs.observeSeededCatalogVersion().first()
+        // Cheap path first: the version is the leading JSON field, so an already-seeded install
+        // decides without parsing the whole asset. Falls back to a full parse when it can't peek.
+        val peeked = CatalogAssetParser.peekVersion(json)
+        if (peeked != null && seededMarker == "$peeked|${target.tag}" && dao.count() > 0) return@withLock
+
+        val bundled = CatalogAssetParser.parse(json, knownCollectionIds())
+        val marker = "${bundled.version}|${target.tag}"
         // The marker lives in DataStore, which Auto Backup restores, while the Room DB is excluded
         // from backup. A matching marker over an empty table therefore means "restored/cleared
         // DB", not "already seeded" -- trusting the marker alone leaves the catalog empty forever.

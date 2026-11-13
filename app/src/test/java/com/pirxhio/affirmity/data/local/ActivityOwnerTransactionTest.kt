@@ -75,6 +75,9 @@ class ActivityOwnerTransactionTest {
         override suspend fun assignOwner(owner: String, uid: String) {
             owners[owner] = owners.getValue(owner).copy(claimedUid = uid, active = false)
         }
+        override suspend fun pendingImportOwners(uid: String) = owners.values.filter { it.claimedUid == uid && it.importedAtMillis == null }
+        override suspend fun countClaimed(uid: String) = owners.values.count { it.claimedUid == uid }
+        override suspend fun markImported(owner: String, uid: String, atMillis: Long) = Unit
         override suspend fun insertEvent(event: ActivityEventEntity): Long {
             val key = event.owner to event.eventId
             if (key in events) return -1L

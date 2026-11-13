@@ -21,3 +21,5 @@ local.properties
 
 # Local dev notes, not part of the shipped project
 /docs/
+# Local AI runtime state
+.atl/

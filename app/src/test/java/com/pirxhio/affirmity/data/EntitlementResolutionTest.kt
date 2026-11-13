@@ -205,4 +205,56 @@ class EntitlementResolutionTest {
         )
         assertEquals(setOf("free.t"), result)
     }
+
+    // --- last-known tier cache ---------------------------------------------------------------
+
+    @Test
+    fun `cached tier round-trips for the same uid with and without an expiry`() {
+        assertEquals(AccessTier.PRO, decodeCachedEntitlementTier(encodeCachedEntitlement("u1", AccessTier.PRO), "u1", NOW))
+        assertEquals(AccessTier.FREE, decodeCachedEntitlementTier(encodeCachedEntitlement("u1", AccessTier.FREE), "u1", NOW))
+        assertEquals(AccessTier.PRO, decodeCachedEntitlementTier(encodeCachedEntitlement("u1", AccessTier.PRO, NOW + 1), "u1", NOW))
+    }
+
+    @Test
+    fun `cached PRO is dropped once its expiry has passed, mirroring resolveTier`() {
+        assertEquals(null, decodeCachedEntitlementTier(encodeCachedEntitlement("u1", AccessTier.PRO, NOW - 1), "u1", NOW))
+        assertEquals(null, decodeCachedEntitlementTier(encodeCachedEntitlement("u1", AccessTier.PRO, NOW), "u1", NOW))
+        assertEquals(AccessTier.FREE, decodeCachedEntitlementTier(encodeCachedEntitlement("u1", AccessTier.FREE, NOW - 1), "u1", NOW))
+    }
+
+    @Test
+    fun `a uid containing a pipe round-trips and never matches a different uid`() {
+        val raw = encodeCachedEntitlement("a|b", AccessTier.PRO, NOW + 5)
+        assertEquals(AccessTier.PRO, decodeCachedEntitlementTier(raw, "a|b", NOW))
+        assertEquals(null, decodeCachedEntitlementTier(raw, "a", NOW))
+        assertEquals(null, decodeCachedEntitlementTier(raw, "b", NOW))
+    }
+
+    @Test
+    fun `the legacy two-part value is discarded`() {
+        assertEquals(null, decodeCachedEntitlementTier("u1|PRO", "u1", NOW))
+        assertEquals(null, decodeCachedEntitlementTier("u1|FREE", "u1", NOW))
+    }
+
+    @Test
+    fun `cached tier is ignored for another uid, signed-out, or garbage`() {
+        val raw = encodeCachedEntitlement("u1", AccessTier.PRO)
+        assertEquals(null, decodeCachedEntitlementTier(raw, "u2", NOW))
+        assertEquals(null, decodeCachedEntitlementTier(raw, null, NOW))
+        assertEquals(null, decodeCachedEntitlementTier(null, "u1", NOW))
+        assertEquals(null, decodeCachedEntitlementTier("u1|GOLD|", "u1", NOW))
+        assertEquals(null, decodeCachedEntitlementTier("u1|PRO|notanumber", "u1", NOW))
+        assertEquals(null, decodeCachedEntitlementTier("nonsense", "u1", NOW))
+    }
+
+    @Test
+    fun `a non-authoritative emission keeps the cached tier, an authoritative one wins`() {
+        assertEquals(AccessTier.PRO, resolveEmittedEntitlementTier(AccessTier.FREE, authoritative = false, cached = AccessTier.PRO))
+        assertEquals(AccessTier.FREE, resolveEmittedEntitlementTier(AccessTier.FREE, authoritative = true, cached = AccessTier.PRO))
+        assertEquals(AccessTier.FREE, resolveEmittedEntitlementTier(AccessTier.FREE, authoritative = false, cached = null))
+    }
+
+    private companion object {
+        const val NOW = 1_700_000_000_000L
+    }
 }

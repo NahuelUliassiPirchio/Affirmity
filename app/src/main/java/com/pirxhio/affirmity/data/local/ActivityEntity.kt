@@ -32,6 +32,8 @@ data class ActivityOwnerEntity(
     val active: Boolean,
     @ColumnInfo(defaultValue = "0") val legacyAdoptionComplete: Boolean = false,
     val legacyAdopterOwner: String? = null,
+    /** Set locally once this claimed generation is fully on the server; later launches skip it with no network. */
+    val importedAtMillis: Long? = null,
 )
 
 @Entity(tableName = "activity_coverage", primaryKeys = ["owner", "sourceId", "recordingSchema", "fromEpochDay", "toEpochDay", "uncertain"])

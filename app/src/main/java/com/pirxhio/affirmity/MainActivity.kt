@@ -11,6 +11,7 @@ import android.provider.Settings
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import androidx.activity.compose.ReportDrawnWhen
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
@@ -746,6 +747,9 @@ fun AffirmityApp(
     val userGoalsStore = remember(context) { UserGoalsPreferences(context.applicationContext) }
     // Goals feed the one-time initial theme selection derived when the survey completes.
     val appState = rememberAffirmityAppState(userGoalsStore)
+    // TTFD marker: Activity.reportFullyDrawn() fires once, when the first surface (onboarding, or
+    // home with real feed + streak data) is ready. See isHomeFullyDrawn.
+    ReportDrawnWhen { appState.isFullyDrawn.value }
     // Launch-time UMP consent (outside the feed, fire-and-forget, once per process): without it
     // canRequestAds() stays false on a fresh install and the round interstitial never loads.
     // Re-preloads once consent is available; the entitlement-keyed preload effect below covers
@@ -812,19 +816,9 @@ fun AffirmityApp(
             meditationCueSoundEnabled = enabled
         }
     }
-    // Pre-launch audit item #5's "recent meditations" shelf. Same device-local posture as
-    // meditationCueSoundEnabled above -- deliberately kept out of AffirmityAppState/DataSession.
-    // Ids that no longer resolve to a catalog entry (e.g. removed in a later version) are silently
-    // dropped here rather than surfacing a broken card.
-    var recentMeditationIds by remember { mutableStateOf<List<String>>(emptyList()) }
-    LaunchedEffect(meditationTrackerPreferences) {
-        meditationTrackerPreferences.observeRecentMeditationIds().collect { ids ->
-            recentMeditationIds = ids
-        }
-    }
-    val recentMeditationEntries = remember(recentMeditationIds) {
-        recentMeditationIds.mapNotNull { id -> findMeditationCatalogEntry(id) }
-    }
+    // Pre-launch audit item #5's "recent meditations" shelf now lives in AffirmityAppState so it
+    // starts collecting at construction time rather than after first composition.
+    val recentMeditationEntries = appState.recentMeditationEntries.value
 
     // Shared upgrade-CTA routing (design.md D7): signed-out taps route to sign-in, never straight
     // to the paywall -- used by both the group selector sheet's per-row CTA and any other entry

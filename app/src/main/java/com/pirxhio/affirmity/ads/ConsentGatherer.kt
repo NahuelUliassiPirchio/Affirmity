@@ -5,6 +5,7 @@ import android.util.Log
 import com.google.android.ump.ConsentDebugSettings
 import com.google.android.ump.ConsentRequestParameters
 import com.google.android.ump.UserMessagingPlatform
+import com.pirxhio.affirmity.diagnostics.StartupTrace
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -106,12 +107,14 @@ internal object ConsentGatherer {
         onConsentAvailable: () -> Unit,
     ) {
         try {
-            singleFlight.runOnceAfterSuccess { request(activity, testDeviceHash, isDebug) }
-                ?: return
-            val canRequestAds = UserMessagingPlatform.getConsentInformation(activity).canRequestAds()
-            if (canRequestAds) {
-                MobileAdsInitializer.ensureInitialized(activity.applicationContext)
-                onConsentAvailable()
+            StartupTrace.asyncScope("aff:ConsentGatherer.gatherAtLaunch") {
+                singleFlight.runOnceAfterSuccess { request(activity, testDeviceHash, isDebug) }
+                    ?: return
+                val canRequestAds = UserMessagingPlatform.getConsentInformation(activity).canRequestAds()
+                if (canRequestAds) {
+                    MobileAdsInitializer.ensureInitialized(activity.applicationContext)
+                    onConsentAvailable()
+                }
             }
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled

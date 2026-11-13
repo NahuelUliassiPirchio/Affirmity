@@ -9,6 +9,8 @@ import com.pirxhio.affirmity.data.local.AnonymousGenerationClaimedException
 import com.pirxhio.affirmity.data.remote.FirestoreActivityRepository
 import com.pirxhio.affirmity.data.remote.FirebaseActivityClient
 import com.pirxhio.affirmity.data.remote.ActivityHistoryImporter
+import com.pirxhio.affirmity.data.remote.ActivityImportRunner
+import com.pirxhio.affirmity.data.remote.RoomActivityImportStore
 import com.pirxhio.affirmity.data.remote.FirebaseActivityImportSource
 import kotlinx.coroutines.async
 import com.pirxhio.affirmity.data.local.advanceOwnedDailyViews
@@ -65,7 +67,10 @@ import com.pirxhio.affirmity.analytics.NotificationLocaleValue
 import com.pirxhio.affirmity.analytics.RoundSource
 import com.pirxhio.affirmity.analytics.firebase.AndroidFirebaseAnalyticsSink
 import com.pirxhio.affirmity.analytics.toAdFailureReason
+import com.pirxhio.affirmity.diagnostics.FirstEmissionSpan
 import com.pirxhio.affirmity.diagnostics.ProcessDiagnostics
+import com.pirxhio.affirmity.diagnostics.StartupTrace
+import com.pirxhio.affirmity.diagnostics.endSpansOnCompletion
 import com.pirxhio.affirmity.diagnostics.NoOpSyncFailureReporter
 import com.pirxhio.affirmity.diagnostics.SyncFailureKind
 import com.pirxhio.affirmity.diagnostics.SyncFailureReporter
@@ -106,6 +111,7 @@ import com.pirxhio.affirmity.data.local.OnboardingPreferences
 import com.pirxhio.affirmity.data.local.PERSONALIZADAS_GROUP_ID
 import com.pirxhio.affirmity.data.local.QuietHoursSettings
 import com.pirxhio.affirmity.data.local.FeedSources
+import com.pirxhio.affirmity.data.local.MigrationConfirmationPreferences
 import com.pirxhio.affirmity.data.local.TrackerPreferences
 import com.pirxhio.affirmity.data.remote.FcmTokenRepository
 import com.pirxhio.affirmity.data.remote.FirestoreAdUnlockRepository
@@ -116,6 +122,8 @@ import com.pirxhio.affirmity.data.remote.FirestoreDailyMoodRepository
 import com.pirxhio.affirmity.data.remote.FirestoreEntitlementRepository
 import com.pirxhio.affirmity.data.remote.FirestoreMeditationPreferencesRepository
 import com.pirxhio.affirmity.data.remote.FirestoreMigrator
+import com.pirxhio.affirmity.data.remote.MigrationOutcome
+import com.pirxhio.affirmity.data.remote.DataStoreMigrationConfirmations
 import com.pirxhio.affirmity.data.remote.FirestoreNotificationSettingsRepository
 import com.pirxhio.affirmity.data.remote.FirestoreOnboardingRepository
 import com.pirxhio.affirmity.data.remote.FirestoreStreakHealerRepository
@@ -169,6 +177,8 @@ import com.pirxhio.affirmity.ui.groups.catalogCollectionsById
 import com.pirxhio.affirmity.ui.groups.catalogUniverseGroups
 import com.pirxhio.affirmity.ui.groups.catalogThemes
 import com.pirxhio.affirmity.ui.groups.catalogThemesById
+import com.pirxhio.affirmity.ui.meditation.catalog.MeditationCatalogEntry
+import com.pirxhio.affirmity.ui.meditation.catalog.resolveRecentMeditationEntries
 import com.pirxhio.affirmity.ui.groups.selectableAffirmationGroups
 import com.pirxhio.affirmity.ui.groups.themeAccessDecision
 import com.pirxhio.affirmity.access.isUnlocked
@@ -195,7 +205,13 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.emitAll
@@ -428,7 +444,8 @@ fun shouldShowGuide(resolvedGuideSeen: Boolean?): Boolean = resolvedGuideSeen ==
 fun areInitialContentInputsResolved(
     hasCompletedOnboarding: Boolean?,
     guideSeen: Boolean?,
-): Boolean = hasCompletedOnboarding != null && guideSeen != null
+    themesResolved: Boolean,
+): Boolean = hasCompletedOnboarding != null && guideSeen != null && themesResolved
 
 /** Resolves the first-launch surface without hiding the existing-account shortcut behind the
  * guide. A fresh user stays on the onboarding intro until they explicitly enter the survey; only
@@ -751,6 +768,12 @@ class AffirmityAppState(
     var selectedThemeIds = mutableStateOf<Set<String>?>(null)
         private set
 
+    /** Most-recent-first meditation catalog entries the user started (pre-launch audit item #5).
+     * Collected from construction time so the shelf is populated by the time the screen shows,
+     * instead of waiting for a composition-scoped effect. Unknown ids are dropped. */
+    var recentMeditationEntries = mutableStateOf<List<MeditationCatalogEntry>>(emptyList())
+        private set
+
     /** Pending (uncommitted) selection "Your feed"/"See all themes" mutate while open. Seeded from
      * [selectedThemeIds] when it first resolves. */
     var draftThemeIds = mutableStateOf<Set<String>>(emptySet())
@@ -1005,6 +1028,30 @@ class AffirmityAppState(
     var entitlementTier = mutableStateOf(AccessTier.FREE)
         private set
 
+    /** Raw `"<uid>|<TIER>|<expiryMillisOrEmpty>"` last-known tier read from [TrackerPreferences]; decoded against the
+     * CURRENT uid on every use so another account's tier is never applied. User-facing gates read
+     * [entitlementTier] (what the user sees is what they can use); only irreversible actions (the
+     * deselect sweep and the lapse notice) wait for an authoritative emission. */
+    private var cachedEntitlementRaw: String? = null
+    private var authoritativeEntitlementEmitted = false
+
+    private fun currentUid(): String? = (authRepository.authState.value as? AuthState.SignedIn)?.uid
+
+    private fun persistCachedEntitlement(uid: String, tier: AccessTier, expiryTimeMillis: Long?) {
+        val encoded = encodeCachedEntitlement(uid, tier, expiryTimeMillis)
+        if (encoded == cachedEntitlementRaw) return
+        scope.launch {
+            try {
+                trackerPreferences.saveCachedEntitlement(encoded)
+                cachedEntitlementRaw = encoded
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Log.e(TAG, "cached entitlement save failed", error)
+            }
+        }
+    }
+
     /** True only once the repository has emitted a real entitlement for the current session.
      *  [entitlementTier] defaults to FREE, so anything that must never leak to a paying user
      *  (ads) has to wait for this instead of trusting that default. Reset on every session swap. */
@@ -1139,6 +1186,48 @@ class AffirmityAppState(
     var hasCompletedOnboarding = mutableStateOf<Boolean?>(null)
         private set
 
+    // Startup instrumentation: async spans closed by the first emission of each source (no-ops
+    // after that), plus the "first data arrived" flags the TTFD marker (isHomeFullyDrawn) reads.
+    private val onboardingFlagSpan = FirstEmissionSpan("aff:flow.onboardingFlag.first")
+    private val guideFlagSpan = FirstEmissionSpan("aff:flow.guideFlag.first")
+    private val themeIdsSpan = FirstEmissionSpan("aff:flow.selectedThemeIds.first")
+    private val catalogFeedSpan = FirstEmissionSpan("aff:flow.catalogFeed.first")
+    private val streakSpan = FirstEmissionSpan("aff:flow.streak.first")
+    private val sessionSpan = FirstEmissionSpan("aff:session.resolve")
+    init {
+        // A span waiting for a first emission must not outlive the scope that would produce it.
+        scope.endSpansOnCompletion(
+            onboardingFlagSpan, guideFlagSpan, themeIdsSpan, catalogFeedSpan, streakSpan, sessionSpan,
+        )
+    }
+    private var ownedEmitted by mutableStateOf(false)
+    private val catalogFeedGate = CatalogFeedGate(seedAlreadySettled = catalogSeeder == null)
+    private var streakEmitted by mutableStateOf(false)
+
+    /** TTFD signal: the feed has real rows, or is genuinely empty (see [isFeedContentReady]). */
+    val isFeedReady: State<Boolean> = derivedStateOf {
+        isFeedContentReady(
+            hasCatalogRows = catalogAffirmations.isNotEmpty(),
+            hasOwnedRows = affirmations.isNotEmpty(),
+            catalogEmitted = catalogFeedGate.observedAfterSeed,
+            ownedEmitted = ownedEmitted,
+            catalogSeedSettled = catalogFeedGate.seedSettled,
+        )
+    }
+
+    /** TTFD signal: the session's streak collector has emitted at least once (or failed). */
+    val isStreakResolved: State<Boolean> = derivedStateOf { streakEmitted }
+
+    /** The `reportFullyDrawn` predicate for [MainActivity]; see [isHomeFullyDrawn]. */
+    val isFullyDrawn: State<Boolean> = derivedStateOf {
+        isHomeFullyDrawn(
+            initialContentResolved = isInitialContentResolved.value,
+            hasCompletedOnboarding = hasCompletedOnboarding.value,
+            feedContentReady = isFeedReady.value,
+            streakResolved = isStreakResolved.value,
+        )
+    }
+
     /** Resolved guide checkpoint: `null` while either persisted gate input is unresolved, `false`
      * when the guide is required, and `true` once seen. This is the single source of truth for
      * both the pre-survey route and the legacy post-survey auto gate. */
@@ -1151,7 +1240,14 @@ class AffirmityAppState(
     /** The native splash can leave only after both inputs that choose the first content surface
      * have emitted. Keeping this derived in app state prevents composition-local readiness races. */
     val isInitialContentResolved: State<Boolean> = derivedStateOf {
-        areInitialContentInputsResolved(hasCompletedOnboarding.value, hasSeenOnboardingGuide.value)
+        areInitialContentInputsResolved(
+            hasCompletedOnboarding = hasCompletedOnboarding.value,
+            guideSeen = hasSeenOnboardingGuide.value,
+            // Without this the feed renders owned rows only and can flash the EMPTY state for
+            // catalog content that is merely still loading. The theme collector always resolves
+            // (default fallback on a failed read), so this can never hold the splash forever.
+            themesResolved = selectedThemeIds.value != null,
+        )
     }
 
     /** Commits the guide as seen (spec R2.3, R4.2/R4.3) -- called by both the auto and manual
@@ -1197,19 +1293,23 @@ class AffirmityAppState(
             previousSessionUid = uid
             if (uid == null || !useRemoteSession) {
                 emit(activeLocal)
+                sessionSpan.end()
                 return@transformLatest
             }
             emit(DataSession.Migrating(uid, activeLocal))
             try {
                 val source = activeLocal
                 try {
-                    claimActivity(source, uid)
+                    StartupTrace.asyncScope("aff:session.claimActivity") { claimActivity(source, uid) }
                 } catch (failure: Exception) {
                     reportSyncFailure(SyncFailureKind.CLAIM, failure)
                     throw failure
                 }
-                migrator.ensureMigrated(migrationSnapshotFor(uid, source))
-                importActivity(uid)
+                StartupTrace.asyncScope("aff:session.ensureMigrated") {
+                    val outcome = migrator.ensureMigrated(uid) { migrationSnapshotFor(uid, source) }
+                    reportMigration(outcome)
+                }
+                StartupTrace.asyncScope("aff:session.importActivity") { importActivity(uid) }
                 syncError.value = null
                 val remote = remoteSessionFactory(uid)
                 // EC-1/Q3 reconciliation: replay every local durable ad-unlock into the remote
@@ -1218,11 +1318,13 @@ class AffirmityAppState(
                 // Room copy is never deleted (design §10).
                 replayDurableAdUnlocks(local.adUnlocks.getDurableUnlocks(), remote.adUnlocks)
                 emit(remote)
+                sessionSpan.end()
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (failure: Exception) {
                 syncError.value = failure.message
                 emit(DataSession.Failed(uid, failure, remoteSessionFactory(uid)))
+                sessionSpan.end()
             }
         }
         .stateIn(scope, SharingStarted.Eagerly, local)
@@ -1247,6 +1349,13 @@ class AffirmityAppState(
     /** One-time snapshot of the Room/DataStore state for [uid], taken right before migration
      * (design.md's "The swap moment" step 4). Always reads through [local] — never [session] —
      * since this runs while the session is still [DataSession.Migrating]. */
+    /** Diagnostics only: debug and the release-like benchmark build, never a shipped release. */
+    private fun reportMigration(outcome: MigrationOutcome) {
+        if (BuildConfig.DEBUG || BuildConfig.BUILD_TYPE == "benchmark") {
+            Log.i("AffStartup", "ensureMigrated skipped=${outcome == MigrationOutcome.SKIPPED_CONFIRMED_LOCALLY} outcome=$outcome")
+        }
+    }
+
     private suspend fun migrationSnapshotFor(uid: String, source: DataSession.Local): MigrationSnapshot {
         val today = DayClock.epochDay()
         return MigrationSnapshot(
@@ -1353,11 +1462,23 @@ class AffirmityAppState(
             // CatalogPreferences.seededCatalogVersion, so safe to call on every launch. `null`
             // (the default) means no seeding -- every existing JVM unit test never touches assets.
             try {
-                catalogSeeder?.seedIfNeeded()
+                StartupTrace.asyncScope("aff:CatalogSeeder.seedIfNeeded") { catalogSeeder?.seedIfNeeded() }
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (error: Exception) {
                 Log.e(TAG, "catalog seed failed", error)
+            }
+            catalogFeedGate.onSeedSettled()
+            // The table may be unchanged after the seed (failed seed, empty asset), so no emission
+            // would follow; one explicit read confirms a genuinely empty catalog for the TTFD marker.
+            try {
+                catalogFeedGate.confirmIfStillUnobserved(CATALOG_EMPTY_CONFIRM_TIMEOUT_MS) {
+                    catalog.observeByGroupIds(knownGroupIds).first().isEmpty()
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Log.e(TAG, "catalog empty confirmation failed", error)
             }
         }
         scope.launch {
@@ -1401,9 +1522,11 @@ class AffirmityAppState(
         scope.launch {
             session.flatMapLatest { it.affirmations.observeAll() }
                 .catch { error -> Log.e(TAG, "affirmations flow failed", error) }
+                .onCompletion { ownedEmitted = true }
                 .collect { entities ->
                     affirmations.clear()
                     affirmations.addAll(entities.map { it.toAffirmation() })
+                    ownedEmitted = true
                 }
         }
         scope.launch {
@@ -1418,9 +1541,12 @@ class AffirmityAppState(
                 session.flatMapLatest { it.catalogOverrides.observeAll() },
             ) { rows, overrides -> rows to overrides }
                 .catch { error -> Log.e(TAG, "catalog flow failed", error) }
+                .onCompletion { catalogFeedGate.onConfirmedEmpty(); catalogFeedSpan.end() }
                 .collect { (rows, overrides) ->
                     catalogAffirmations.clear()
                     catalogAffirmations.addAll(rows.map { it.toAffirmation(overrides[it.id].orEmpty()) })
+                    catalogFeedGate.onEmission()
+                    catalogFeedSpan.end()
                 }
         }
         scope.launch {
@@ -1445,6 +1571,7 @@ class AffirmityAppState(
                     ) { completionRows, healerRows -> StreakEmission(today, completionRows, healerRows) }
                 }
             }.catch { error -> Log.e(TAG, "completions/healer flow failed", error) }
+                .onCompletion { streakEmitted = true; streakSpan.end() }
                 .collect { (today, rows, healerRows) ->
                 val windowStart = today - 6
                 val healerStart = healerStartEpochDay(today)
@@ -1481,6 +1608,8 @@ class AffirmityAppState(
                 }
                 previousStreakState = newHealerState
                 streakHealer.value = newHealerState
+                streakEmitted = true
+                streakSpan.end()
                 evaluateMilestone(newHealerState.generalStreakDays, canCelebrate)
             }
         }
@@ -1511,6 +1640,17 @@ class AffirmityAppState(
         scope.launch {
             trackerPreferences.observeAffirmationsViewedToday().collect { viewed ->
                 affirmationsViewedToday = viewed
+            }
+        }
+        scope.launch {
+            try {
+                trackerPreferences.observeRecentMeditationIds().collect { ids ->
+                    recentMeditationEntries.value = resolveRecentMeditationEntries(ids)
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Log.e(TAG, "recent meditations flow failed", error)
             }
         }
         scope.launch {
@@ -1670,7 +1810,10 @@ class AffirmityAppState(
             }
         }
         scope.launch {
-            onboardingPreferences.observeHasCompletedOnboarding().collect { hasCompletedOnboarding.value = it }
+            onboardingPreferences.observeHasCompletedOnboarding().collect {
+                hasCompletedOnboarding.value = it
+                onboardingFlagSpan.end()
+            }
         }
         scope.launch {
             // D2 migration default: combines the raw tri-state guide-seen read with the survey's
@@ -1699,6 +1842,7 @@ class AffirmityAppState(
                 .collect { (rawGuideSeen, completedOnboarding) ->
                     val resolved = resolveGuideBackfill(rawGuideSeen, completedOnboarding)
                     hasSeenOnboardingGuide.value = resolved
+                    guideFlagSpan.end()
                 }
         }
         scope.launch {
@@ -1723,6 +1867,7 @@ class AffirmityAppState(
                     }
                     val resolved = resolveSelectedThemeIds(persisted, legacyGroupIds, knownThemeIds, defaultThematicThemeIds)
                     selectedThemeIds.value = resolved
+                    themeIdsSpan.end()
                     if (!themeDraftInitialized) {
                         draftThemeIds.value = resolved
                         themeDraftInitialized = true
@@ -1741,6 +1886,7 @@ class AffirmityAppState(
             if (!themeDraftInitialized) {
                 val resolved = resolveSelectedThemeIds(null, legacyGroupIds, knownThemeIds, defaultThematicThemeIds)
                 selectedThemeIds.value = resolved
+                themeIdsSpan.end()
                 draftThemeIds.value = resolved
                 themeDraftInitialized = true
                 markFeedDraftReadyIfSeeded()
@@ -1768,6 +1914,25 @@ class AffirmityAppState(
                 }
         }
         scope.launch {
+            // Last-known tier: applied as soon as DataStore answers, but only until an authoritative
+            // (non-Migrating) entitlement emission arrives -- the listener is the source of truth.
+            try {
+                combine(
+                    authRepository.authState.map { (it as? AuthState.SignedIn)?.uid }.distinctUntilChanged(),
+                    trackerPreferences.observeCachedEntitlement(),
+                ) { uid, raw -> raw to uid }
+                    .collect { (raw, uid) ->
+                        cachedEntitlementRaw = raw
+                        val cached = decodeCachedEntitlementTier(raw, uid, System.currentTimeMillis())
+                        if (cached != null && !authoritativeEntitlementEmitted) entitlementTier.value = cached
+                    }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                Log.e(TAG, "cached entitlement flow failed", error)
+            }
+        }
+        scope.launch {
             // Same class of problem as the healer-grant collector above (design.md D8): reset the
             // initialized flag INSIDE flatMapLatest so a fresh (re)started flow -- cold start or a
             // sign-in/sign-out session swap -- only ever seeds entitlementTier, never fires a
@@ -1775,15 +1940,40 @@ class AffirmityAppState(
             session.flatMapLatest { s ->
                 entitlementFlowInitialized = false
                 entitlementResolved.value = false
+                authoritativeEntitlementEmitted = false
+                var consecutiveFailures = 0L
                 s.entitlements.observe()
+                    // Inside flatMapLatest so a failed listener only affects THIS session's
+                    // stream: the cached tier stays displayed (unconfirmed) while we resubscribe
+                    // with capped backoff, woken early when connectivity returns.
+                    .onEach { consecutiveFailures = 0L }
+                    .retryWhen { error, _ ->
+                        if (error is CancellationException) return@retryWhen false
+                        val failures = consecutiveFailures++
+                        Log.e(TAG, "entitlement flow failed (consecutive failure $failures), retrying", error)
+                        val backoffMillis = minOf(ENTITLEMENT_RETRY_MAX_MILLIS, ENTITLEMENT_RETRY_BASE_MILLIS shl minOf(failures, 6L).toInt())
+                        // Only a LATER connectivity signal ends the wait early: the first emission is
+                        // the callback's immediate "already online" registration report and would
+                        // turn a persistent error into a tight resubscribe loop. A flow that is
+                        // empty or closes without a second signal waits out the full backoff.
+                        withTimeoutOrNull(backoffMillis) {
+                            if (activityConnectivity.drop(1).firstOrNull() == null) awaitCancellation()
+                        }
+                        true
+                    }
+                    .map { s to it }
             }.catch { error -> Log.e(TAG, "entitlement flow failed", error) }
-                .collect { entitlement ->
+                .collect { (emittingSession, entitlement) ->
                     // Compared against the repository-emitted value only, never a client-side
                     // optimistic purchase overlay (design.md D7/D8) -- an expiring optimistic
                     // window can never masquerade as a real lapse. proLapseNotice stays scoped to
                     // a LIVE Pro->Free transition only (design §10 Q4(iv)) -- it is a one-time
                     // snackbar, not a general "you are Free" indicator.
-                    if (entitlementFlowInitialized &&
+                    // The Local placeholder served while Migrating is not the user's entitlement, so
+                    // neither the notice nor the sweep may be driven by it.
+                    val authoritative = emittingSession !is DataSession.Migrating
+                    if (authoritative &&
+                        entitlementFlowInitialized &&
                         entitlementTier.value == AccessTier.PRO &&
                         entitlement.tier == AccessTier.FREE
                     ) {
@@ -1799,9 +1989,10 @@ class AffirmityAppState(
                     // grant) would silently survive forever. Re-persist only when the result
                     // actually differs, so a steady-state Free user causes no redundant DataStore
                     // write on every emission. Living inside this collector (not the
-                    // theme-preferences collector) guarantees it never fires before the tier has
-                    // resolved, so a cold start can never strip a Pro user's themes.
-                    if (entitlement.tier == AccessTier.FREE) {
+                    // theme-preferences collector) and running ONLY for authoritative emissions
+                    // guarantees it never fires from the Migrating placeholder (always Free), so
+                    // a cold start can never strip a Pro user's themes.
+                    if (authoritative && entitlement.tier == AccessTier.FREE) {
                         selectedThemeIds.value?.let { committed ->
                             val updated = deselectLockedThemes(committed, proOnlyThemeIds, defaultThematicThemeIds)
                             if (updated != committed) {
@@ -1812,9 +2003,19 @@ class AffirmityAppState(
                         }
                     }
                     entitlementFlowInitialized = true
-                    entitlementTier.value = entitlement.tier
+                    // The Local repository served while Migrating is a placeholder, not the user's
+                    // real entitlement: it must not erase a known last tier for this uid.
+                    if (authoritative) authoritativeEntitlementEmitted = true
+                    val cachedTier = decodeCachedEntitlementTier(cachedEntitlementRaw, currentUid(), System.currentTimeMillis())
+                    entitlementTier.value = resolveEmittedEntitlementTier(
+                        emitted = entitlement.tier,
+                        authoritative = authoritative,
+                        cached = cachedTier,
+                    )
+                    if (emittingSession is DataSession.Remote) persistCachedEntitlement(emittingSession.uid, entitlement.tier, entitlement.expiryTimeMillis)
                     publishCarouselRefreshKey()
-                    entitlementResolved.value = true
+                    // A placeholder emission over a kept cached tier does not confirm anything.
+                    if (authoritative || cachedTier == null) entitlementResolved.value = true
                 }
         }
     }
@@ -2898,11 +3099,16 @@ class AffirmityAppState(
 
     private companion object {
         const val TAG = "AffirmityAppState"
+        const val ENTITLEMENT_RETRY_BASE_MILLIS = 1_000L
+        const val ENTITLEMENT_RETRY_MAX_MILLIS = 60_000L
         const val AFFIRMATIONS_GOAL_PER_DAY = 5
         const val FCM_TOKEN_CLEANUP_TIMEOUT_MILLIS = 2_000L
 
         /** How far back to look when deriving the running streak from `daily_completion`. */
         const val STREAK_LOOKBACK_DAYS = StreakHealerStats.LOOKBACK_DAYS
+
+        /** How long to wait for a post-seed catalog emission before reading once to confirm "empty". */
+        const val CATALOG_EMPTY_CONFIRM_TIMEOUT_MS = 1_500L
     }
 }
 
@@ -2941,6 +3147,7 @@ fun rememberAffirmityAppState(userGoalsStore: UserGoalsStore): AffirmityAppState
     // user with no grants. Consumed by the downgrade-auto-deselect collector.
     val proOnlyThemeIds = knownThemeIds - defaultThematicThemeIds
     return remember {
+        StartupTrace.section("aff:AffirmityAppState.build") {
         val database = AffirmityDatabase.getInstance(context)
         val notificationPreferences = NotificationPreferences(context)
         val notificationDebugLog = NotificationDebugLog(context.applicationContext)
@@ -2995,11 +3202,19 @@ fun rememberAffirmityAppState(userGoalsStore: UserGoalsStore): AffirmityAppState
                 database.claimActivitySnapshot(identity.owner, uid)
             },
             importActivity = { uid ->
-                val importer = ActivityHistoryImporter(FirebaseActivityImportSource(firestore))
-                for (owner in database.activityDao().claimedOwners(uid)) {
-                    val snapshot = database.claimActivitySnapshot(owner.owner, uid)
-                    importer.import(snapshot, uid) { FirebaseAuth.getInstance().currentUser?.uid }
-                }
+                ActivityImportRunner(
+                    importer = ActivityHistoryImporter(FirebaseActivityImportSource(firestore)),
+                    store = RoomActivityImportStore(database),
+                    nowMillis = System::currentTimeMillis,
+                    report = { stats ->
+                        // Diagnostics only: debug and the release-like benchmark build, never a shipped release.
+                        if (BuildConfig.DEBUG || BuildConfig.BUILD_TYPE == "benchmark") {
+                            Log.i("AffStartup", "importActivity claimed=${stats.claimed} " +
+                                "skippedImported=${stats.skippedImported} skippedEmpty=${stats.skippedEmpty} " +
+                                "networkChecked=${stats.networkChecked}")
+                        }
+                    },
+                ).run(uid) { FirebaseAuth.getInstance().currentUser?.uid }
             },
             remoteSessionFactory = { uid ->
                 DataSession.Remote(
@@ -3020,7 +3235,10 @@ fun rememberAffirmityAppState(userGoalsStore: UserGoalsStore): AffirmityAppState
                     catalogOverrides = FirestoreCatalogOverrideRepository(firestore, uid),
                 )
             },
-            migrator = FirestoreMigrator(firestore),
+            migrator = FirestoreMigrator(
+                firestore,
+                DataStoreMigrationConfirmations(MigrationConfirmationPreferences(context)),
+            ) { message, cause -> Log.w("AffStartup", message, cause) },
             trackerPreferences = trackerPreferences,
             onboardingPreferences = onboardingPreferences,
             onboardingGuidePreferences = onboardingGuidePreferences,
@@ -3092,6 +3310,7 @@ fun rememberAffirmityAppState(userGoalsStore: UserGoalsStore): AffirmityAppState
                 enabled = BuildConfig.ROUND_INTERSTITIAL_ENABLED,
             ),
         )
+        }
     }
 }
 

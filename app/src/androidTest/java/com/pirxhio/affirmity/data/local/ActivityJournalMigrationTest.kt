@@ -76,4 +76,19 @@ class ActivityJournalMigrationTest {
             }
         }
     }
+
+    @Test fun upgrade18To19KeepsClaimedOwnersAndLeavesThemUnimported() {
+        helper.createDatabase("activity-upgrade-19-test", 18).apply {
+            execSQL("INSERT INTO activity_owner (owner, sourceId, claimedUid, active, legacyAdoptionComplete, legacyAdopterOwner) " +
+                "VALUES ('local:first', 'device', 'A', 0, 1, 'local:first')")
+            close()
+        }
+        helper.runMigrationsAndValidate("activity-upgrade-19-test", 19, true, MIGRATION_18_19).use { db ->
+            db.query("SELECT claimedUid, importedAtMillis FROM activity_owner WHERE owner = 'local:first'").use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertEquals("A", cursor.getString(0))
+                assertTrue(cursor.isNull(1))
+            }
+        }
+    }
 }

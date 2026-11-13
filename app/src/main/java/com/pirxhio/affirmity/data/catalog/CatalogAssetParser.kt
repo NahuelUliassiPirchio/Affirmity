@@ -21,6 +21,17 @@ data class ParsedCatalog(val version: String, val affirmations: List<CatalogAffi
  */
 object CatalogAssetParser {
 
+    private val LEADING_VERSION = Regex("""^\s*\{\s*"version"\s*:\s*"([^"\\]*)"""")
+
+    /**
+     * Cheap read of the leading `"version"` field without parsing the whole document. Returns null
+     * when the field is not the first key (or is escaped); callers then fall back to [parse].
+     */
+    fun peekVersion(json: String): String? =
+        LEADING_VERSION.find(json.take(PEEK_WINDOW))?.groupValues?.get(1)
+
+    private const val PEEK_WINDOW = 256
+
     fun parse(json: String, knownCollectionIds: Set<String>): ParsedCatalog {
         val root = JSONObject(json)
         val version = root.getString("version")

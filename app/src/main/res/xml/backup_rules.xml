@@ -10,4 +10,6 @@
     <exclude domain="database" path="affirmity.db"/>
     <exclude domain="database" path="affirmity.db-shm"/>
     <exclude domain="database" path="affirmity.db-wal"/>
+    <!-- Migration confirmation is device-local: a restored install must re-check the server. -->
+    <exclude domain="file" path="datastore/migration_confirmations.preferences_pb"/>
 </full-backup-content>

@@ -20,6 +20,7 @@ import com.pirxhio.affirmity.meditation.StopAmbient
 import com.pirxhio.affirmity.meditation.StopAudio
 import kotlin.math.abs
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -326,6 +327,22 @@ class MeditationCatalogTest {
             assertTrue("${entry.id}: audioResources must be empty", entry.presentation.audioResources.isEmpty())
             assertTrue("${entry.id}: sfxResources must be empty", entry.presentation.sfxResources.isEmpty())
         }
+    }
+
+    @Test
+    fun `catalog is built once and ids are unique so the O(1) lookup matches a linear search`() {
+        assertSame(meditationCatalog(), meditationCatalog())
+        val catalog = meditationCatalog()
+        assertEquals(catalog.size, catalog.map { it.id }.toSet().size)
+        catalog.forEach { assertSame(catalog.first { e -> e.id == it.id }, findMeditationCatalogEntry(it.id)) }
+    }
+
+    @Test
+    fun `resolveRecentMeditationEntries keeps order and drops unknown ids`() {
+        val resolved = resolveRecentMeditationEntries(listOf("body_scan", "gone_in_later_version", "calma"))
+
+        assertEquals(listOf("body_scan", "calma"), resolved.map { it.id })
+        assertTrue(resolveRecentMeditationEntries(emptyList()).isEmpty())
     }
 
     // --- 12. findMeditationCatalogEntry correctness -------------------------------------------------

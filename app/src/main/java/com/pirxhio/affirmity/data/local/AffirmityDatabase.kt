@@ -1,6 +1,7 @@
 package com.pirxhio.affirmity.data.local
 
 import android.content.Context
+import com.pirxhio.affirmity.diagnostics.StartupTrace
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -302,6 +303,16 @@ val MIGRATION_17_18 = object : androidx.room.migration.Migration(17, 18) {
     }
 }
 
+/**
+ * Additive: remembers locally which claimed generations are already imported. Nullable with no backfill,
+ * so owners claimed before this version are checked once (empty ones without network) and then marked.
+ */
+val MIGRATION_18_19 = object : androidx.room.migration.Migration(18, 19) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `activity_owner` ADD COLUMN `importedAtMillis` INTEGER")
+    }
+}
+
 @Database(
     entities = [
         AffirmationEntity::class,
@@ -323,7 +334,7 @@ val MIGRATION_17_18 = object : androidx.room.migration.Migration(17, 18) {
         ActivityCoverageEntity::class,
         ActivityDailyFactEntity::class,
     ],
-    version = 18,
+    version = 19,
     exportSchema = true,
 )
 @androidx.room.TypeConverters(OverridesConverters::class)
@@ -344,25 +355,27 @@ abstract class AffirmityDatabase : RoomDatabase() {
     abstract fun activityDao(): ActivityDao
     abstract fun activityDailyFactDao(): ActivityDailyFactDao
 
-    suspend fun initializeAnonymousActivityOwner(candidate: ActivityOwnerEntity): ActivityOwnerEntity = withTransaction {
-        val owner = activityDao().anonymousOwner(candidate)
-        activityDailyFactDao().adoptLegacyOnce(owner.owner)
-        requireNotNull(activityDao().owner(owner.owner))
+    private val activityLifecycle by lazy {
+        ActivityOwnerLifecycle(activityDao(), activityDailyFactDao(), object : TransactionRunner {
+            override suspend fun <T> run(block: suspend () -> T): T = withTransaction(block)
+        })
     }
 
-    suspend fun claimActivitySnapshot(owner: String, uid: String): ActivityClaimSnapshot = withTransaction {
-        val claimed = activityDao().claimAnonymous(owner, uid)
-        ActivityClaimSnapshot(claimed, activityDailyFactDao().getAll(owner),
-            activityDao().getRange(owner, Long.MIN_VALUE, Long.MAX_VALUE),
-            activityDao().coverageRange(owner, Long.MIN_VALUE, Long.MAX_VALUE))
-    }
+    suspend fun initializeAnonymousActivityOwner(candidate: ActivityOwnerEntity): ActivityOwnerEntity =
+        activityLifecycle.initialize(candidate)
+
+    suspend fun claimActivitySnapshot(owner: String, uid: String): ActivityClaimSnapshot =
+        activityLifecycle.claim(owner, uid)
 
     companion object {
         @Volatile
         private var instance: AffirmityDatabase? = null
 
         fun getInstance(context: Context): AffirmityDatabase =
-            instance ?: synchronized(this) {
+            instance ?: StartupTrace.section("aff:AffirmityDatabase.getInstance") { create(context) }
+
+        private fun create(context: Context): AffirmityDatabase =
+            synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     AffirmityDatabase::class.java,
@@ -385,6 +398,7 @@ abstract class AffirmityDatabase : RoomDatabase() {
                     MIGRATION_15_16,
                     MIGRATION_16_17,
                     MIGRATION_17_18,
+                    MIGRATION_18_19,
                 ).build().also { instance = it }
             }
     }
