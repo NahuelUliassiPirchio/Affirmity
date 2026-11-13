@@ -109,17 +109,29 @@ fun consumePlaybackScopedUnlock(
         if (key.type == ContentType.MEDITATION) unlocks - key else unlocks
 }
 
-/** `"<uid>|<TIER>"` -- the last tier a Remote entitlement listener emitted, keyed by uid so one
- * account's tier can never be shown to another. */
-fun encodeCachedEntitlement(uid: String, tier: AccessTier): String = "$uid|${tier.name}"
+/** `"<uid>|<TIER>|<expiryMillisOrEmpty>"` -- the last tier a Remote entitlement listener emitted,
+ * keyed by uid so one account's tier can never be shown to another. The expiry travels with the
+ * tier so a known-expired PRO is never restored from the cache. */
+fun encodeCachedEntitlement(uid: String, tier: AccessTier, expiryTimeMillis: Long? = null): String =
+    "$uid|${tier.name}|${expiryTimeMillis ?: ""}"
 
 /** The cached tier for [uid], or null when there is none, it belongs to another uid, the user is
- * signed out, or the stored value is unreadable. */
-fun decodeCachedEntitlementTier(raw: String?, uid: String?): AccessTier? {
+ * signed out, the stored value is unreadable or in the discarded pre-release two-part format, or
+ * it is a PRO whose expiry has passed at [nowMillis]. Expiry mirrors [resolveTier]: a null expiry
+ * never expires and `nowMillis >= expiry` is expired. Parsed from the right so a `|` inside the
+ * uid is safe (tier names and the numeric expiry never contain one). */
+fun decodeCachedEntitlementTier(raw: String?, uid: String?, nowMillis: Long): AccessTier? {
     if (raw == null || uid == null) return null
-    val separator = raw.lastIndexOf('|')
-    if (separator < 0 || raw.substring(0, separator) != uid) return null
-    return AccessTier.entries.firstOrNull { it.name == raw.substring(separator + 1) }
+    val expirySeparator = raw.lastIndexOf('|')
+    if (expirySeparator < 0) return null
+    val tierSeparator = raw.lastIndexOf('|', expirySeparator - 1)
+    if (tierSeparator < 0 || raw.substring(0, tierSeparator) != uid) return null
+    val tier = AccessTier.entries.firstOrNull { it.name == raw.substring(tierSeparator + 1, expirySeparator) }
+        ?: return null
+    val expiryText = raw.substring(expirySeparator + 1)
+    val expiry = if (expiryText.isEmpty()) null else expiryText.toLongOrNull() ?: return null
+    if (tier == AccessTier.PRO && expiry != null && nowMillis >= expiry) return null
+    return tier
 }
 
 /** A non-authoritative emission (the Local placeholder repository served while [Migrating]) must

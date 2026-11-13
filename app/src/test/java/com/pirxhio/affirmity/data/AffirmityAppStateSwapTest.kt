@@ -1794,7 +1794,7 @@ class AffirmityAppStateSwapTest {
     @Test
     fun `cached tier is used before the entitlement listener emits`() = runBlocking {
         val scope = CoroutineScope(Dispatchers.Unconfined)
-        val state = buildCachedTierState(scope, "uid-c|PRO", kotlinx.coroutines.flow.flow { awaitCancellation() })
+        val state = buildCachedTierState(scope, "uid-c|PRO|", kotlinx.coroutines.flow.flow { awaitCancellation() })
         delay(200)
 
         assertEquals(AccessTier.PRO, state.entitlementTier.value)
@@ -1806,7 +1806,7 @@ class AffirmityAppStateSwapTest {
         val scope = CoroutineScope(Dispatchers.Unconfined)
         val lateCache = kotlinx.coroutines.flow.flow<String?> {
             delay(300)
-            emit("uid-c|PRO")
+            emit("uid-c|PRO|")
             awaitCancellation()
         }
         val events = mutableListOf<String>()
@@ -1823,6 +1823,37 @@ class AffirmityAppStateSwapTest {
         delay(400)
 
         assertEquals("the late cache must not override the authoritative FREE", AccessTier.FREE, state.entitlementTier.value)
+        scope.cancel()
+    }
+
+    @Test
+    fun `an expired cached PRO is not applied while the listener is down`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val state = buildUidCacheState(scope, signedInUid = "uid-e", cached = "uid-e|PRO|1")
+        delay(200)
+
+        assertEquals(AccessTier.FREE, state.entitlementTier.value)
+        scope.cancel()
+    }
+
+    @Test
+    fun `a non-expired cached PRO is applied while the listener is down`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val future = System.currentTimeMillis() + 3_600_000L
+        val state = buildUidCacheState(scope, signedInUid = "uid-f", cached = "uid-f|PRO|$future")
+        delay(200)
+
+        assertEquals(AccessTier.PRO, state.entitlementTier.value)
+        scope.cancel()
+    }
+
+    @Test
+    fun `a legacy two-part cached PRO is ignored`() = runBlocking {
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val state = buildUidCacheState(scope, signedInUid = "uid-l", cached = "uid-l|PRO")
+        delay(200)
+
+        assertEquals(AccessTier.FREE, state.entitlementTier.value)
         scope.cancel()
     }
 
@@ -1843,13 +1874,13 @@ class AffirmityAppStateSwapTest {
     @Test
     fun `a cached PRO is applied to its own uid and never to another uid`() = runBlocking {
         val scopeA = CoroutineScope(Dispatchers.Unconfined)
-        val stateA = buildUidCacheState(scopeA, signedInUid = "uid-a", cached = "uid-a|PRO")
+        val stateA = buildUidCacheState(scopeA, signedInUid = "uid-a", cached = "uid-a|PRO|")
         delay(200)
         assertEquals(AccessTier.PRO, stateA.entitlementTier.value)
         scopeA.cancel()
 
         val scopeB = CoroutineScope(Dispatchers.Unconfined)
-        val stateB = buildUidCacheState(scopeB, signedInUid = "uid-b", cached = "uid-a|PRO")
+        val stateB = buildUidCacheState(scopeB, signedInUid = "uid-b", cached = "uid-a|PRO|")
         delay(200)
         assertEquals(AccessTier.FREE, stateB.entitlementTier.value)
         scopeB.cancel()
@@ -1866,7 +1897,7 @@ class AffirmityAppStateSwapTest {
             migrator = FirestoreMigrator(GatedFirestoreMigrationSource(gate)),
             authRepository = FakeAuthRepository(initial = AuthState.SignedIn(uid = "uid-m", displayName = null, email = null)),
             scope = scope,
-            cachedEntitlement = "uid-m|PRO",
+            cachedEntitlement = "uid-m|PRO|",
         )
         delay(200)
 
@@ -1898,7 +1929,7 @@ class AffirmityAppStateSwapTest {
             knownThemeIds = setOf("u1.t1", "u2.t2"),
             defaultThematicThemeIds = setOf("u1.t1"),
             proOnlyThemeIds = setOf("u2.t2"),
-            cachedEntitlement = "uid-t|PRO",
+            cachedEntitlement = "uid-t|PRO|",
         )
     }
 

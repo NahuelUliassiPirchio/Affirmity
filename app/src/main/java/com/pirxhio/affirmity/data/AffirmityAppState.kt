@@ -1028,7 +1028,7 @@ class AffirmityAppState(
     var entitlementTier = mutableStateOf(AccessTier.FREE)
         private set
 
-    /** Raw `"<uid>|<TIER>"` last-known tier read from [TrackerPreferences]; decoded against the
+    /** Raw `"<uid>|<TIER>|<expiryMillisOrEmpty>"` last-known tier read from [TrackerPreferences]; decoded against the
      * CURRENT uid on every use so another account's tier is never applied. User-facing gates read
      * [entitlementTier] (what the user sees is what they can use); only irreversible actions (the
      * deselect sweep and the lapse notice) wait for an authoritative emission. */
@@ -1037,8 +1037,8 @@ class AffirmityAppState(
 
     private fun currentUid(): String? = (authRepository.authState.value as? AuthState.SignedIn)?.uid
 
-    private fun persistCachedEntitlement(uid: String, tier: AccessTier) {
-        val encoded = encodeCachedEntitlement(uid, tier)
+    private fun persistCachedEntitlement(uid: String, tier: AccessTier, expiryTimeMillis: Long?) {
+        val encoded = encodeCachedEntitlement(uid, tier, expiryTimeMillis)
         if (encoded == cachedEntitlementRaw) return
         scope.launch {
             try {
@@ -1923,7 +1923,7 @@ class AffirmityAppState(
                 ) { uid, raw -> raw to uid }
                     .collect { (raw, uid) ->
                         cachedEntitlementRaw = raw
-                        val cached = decodeCachedEntitlementTier(raw, uid)
+                        val cached = decodeCachedEntitlementTier(raw, uid, System.currentTimeMillis())
                         if (cached != null && !authoritativeEntitlementEmitted) entitlementTier.value = cached
                     }
             } catch (cancellation: CancellationException) {
@@ -2006,13 +2006,13 @@ class AffirmityAppState(
                     // The Local repository served while Migrating is a placeholder, not the user's
                     // real entitlement: it must not erase a known last tier for this uid.
                     if (authoritative) authoritativeEntitlementEmitted = true
-                    val cachedTier = decodeCachedEntitlementTier(cachedEntitlementRaw, currentUid())
+                    val cachedTier = decodeCachedEntitlementTier(cachedEntitlementRaw, currentUid(), System.currentTimeMillis())
                     entitlementTier.value = resolveEmittedEntitlementTier(
                         emitted = entitlement.tier,
                         authoritative = authoritative,
                         cached = cachedTier,
                     )
-                    if (emittingSession is DataSession.Remote) persistCachedEntitlement(emittingSession.uid, entitlement.tier)
+                    if (emittingSession is DataSession.Remote) persistCachedEntitlement(emittingSession.uid, entitlement.tier, entitlement.expiryTimeMillis)
                     publishCarouselRefreshKey()
                     // A placeholder emission over a kept cached tier does not confirm anything.
                     if (authoritative || cachedTier == null) entitlementResolved.value = true
